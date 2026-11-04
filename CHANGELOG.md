@@ -7,6 +7,11 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+### Fixed
+
+- Widescreen: no more thin cracks of light across the curtain in Create-a-Sim.
+  The edges of polygons seen edge-on picked up colours from far along them.
+
 ## [0.1.1] - 2026-11-04
 
 First release: The Sims 2 (DS) in one window on Windows, Mac and Linux.
