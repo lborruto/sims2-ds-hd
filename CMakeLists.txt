@@ -25,7 +25,11 @@ FetchContent_Declare(sdl2
     URL_HASH SHA256=24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4)
 FetchContent_MakeAvailable(sdl2)
 
-add_executable(sims2wide src/main.cpp src/platform.cpp src/thirdparty/tinyfiledialogs.c)
+add_executable(sims2wide
+    src/main.cpp src/platform.cpp
+    src/audio.cpp src/input.cpp src/layout.cpp src/picker.cpp src/scene.cpp src/script.cpp
+    src/shots.cpp src/state.cpp src/video.cpp
+    src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
 target_link_libraries(sims2wide PRIVATE core SDL2::SDL2-static)
 target_compile_definitions(sims2wide PRIVATE SIMS2WIDE_VERSION="${PROJECT_VERSION}")

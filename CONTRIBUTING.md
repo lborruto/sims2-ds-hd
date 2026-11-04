@@ -104,9 +104,13 @@ Keep your ROM in `roms/` and your shots and states in `shots/`: both are ignored
 
 ## How it works
 
-Everything is in `src/main.cpp`, in sections:
+`src/main.cpp` reads the command line, starts the DS and runs the frame loop: input, one
+`RunFrame()`, AUTO's decision, shots, sound, picture. Each part has its own file pair:
+`app.h` (the shared state: the DS, the layout chosen and shown, fast forward), `input.*`
+(keyboard, mouse, the frontend's own keys), `video.*` (the window), `audio.*`, `layout.*`,
+`scene.*` (AUTO's detection), `script.*`, `shots.*`, `state.*`, `picker.*`.
 
-- **Input script**: parses `--input` files.
+- **Input script** (`script.*`): parses `--input` files.
 - **Layouts**: `Place()` puts the top and bottom screens on a canvas (FOCUS: 1280 × 720, the big
   screen 960 × 720, the other 320 × 240 at the right, centred). The window scales the canvas;
   mouse clicks go back through the same `Place()` to a touch-screen position.

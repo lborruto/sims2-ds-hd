@@ -2,7 +2,7 @@
 
 The Sims 2 (Nintendo DS, 2005) in one window, in the spirit of
 [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex). The melonDS 1.1 core (submodule,
-unmodified) runs the game; a small SDL2 frontend (`src/main.cpp`) lays out the two screens and
+unmodified) runs the game; a small SDL2 frontend (`src/`) lays out the two screens and
 picks the layout from what the screens show. No decompilation or recompiler: none exists for
 this game and plain melonDS is fast enough. `origin` = `lborruto/sims2-ds-wide` (private until
 the owner makes it public; write everything as if it were public already).
@@ -25,7 +25,14 @@ the owner makes it public; write everything as if it were public already).
 
 | Path | Role |
 | --- | --- |
-| `src/main.cpp` | Everything: CLI, input scripts, `Place()` layouts, `HudVisible()`/`AutoLayout`, shots, save states, SDL window, audio, main loop |
+| `src/main.cpp` | Command line, starting the DS, the frame loop (input → `RunFrame` → AUTO → shots → sound → picture) |
+| `src/app.h` | Shared state: the `NDS`, layout chosen/shown, `mainIsTop`, fast forward, quit, F5/F12 paths |
+| `src/input.*` | Keyboard (DS keys and the frontend's keys) and mouse as the stylus |
+| `src/video.*` | The SDL window: draws the shown layout, maps window points to touch positions |
+| `src/audio.*` | SDL sound queue |
+| `src/layout.*` | `Place()` (canvas per layout), `CanvasFit` (letterboxed scaling), `TouchFromOutput` |
+| `src/scene.*` | AUTO's detection from the screens' pixels: `HudVisible()`, `AutoLayout::Update(top, bottom, mainIsTop)` |
+| `src/script.*`, `src/shots.*`, `src/state.*`, `src/picker.*` | Headless input scripts; PNG shots and `--compose`; save states; ROM file picker and `Tell()` |
 | `src/platform.cpp` | melonDS Platform interface (files, threads, save), adapted from pokemon-fulldex |
 | `src/host.h` | Writes the game's save when melonDS reports it changed |
 | `src/thirdparty/stb_image_write.h` | PNG writer |
