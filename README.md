@@ -153,14 +153,15 @@ edges. Each one costs speed; all three together still run well over full speed o
 
 ## Good to know
 
-- **An early version.** Town, conversations, Create-a-Sim, the shop and the social games are
-  checked; not everything the game has is yet.
+- **An early version.** Town, conversations, Create-a-Sim, the shop, the social games, the
+  hotel's lobby and basement and the vacuum are checked; not everything the game has is yet.
 - **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
   world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it.
 - **Widescreen is opt-in.** See [Looks](#looks).
-- **Most minigames not checked yet.** The social reactions, the shop and Build Rooms are; the
-  hotel's activities (the vacuum, cards, painting, the music mixer…) are not. If one shows up
-  wrong, Tab swaps the big screen and 2 shows both.
+- **Most minigames not checked yet.** The social reactions, the shop, Build Rooms and the vacuum
+  (its bowl comes big; drag the finds into the bag with the mouse) are; cards, painting, the
+  music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows
+  both.
 - **Tested with the European game** (code `ASJP`). The American one should work; its automatic
   layout is untested.
 - **Not signed by Apple or Microsoft.** Hence the extra click the first time. Once the project
