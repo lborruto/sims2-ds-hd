@@ -25,12 +25,17 @@ the owner makes it public; write everything as if it were public already).
 
 | Path | Role |
 | --- | --- |
-| `src/main.cpp` | Command line, starting the DS, the frame loop (input → `RunFrame` → AUTO → shots → sound → picture) |
-| `src/app.h` | Shared state: the `NDS`, layout chosen/shown, `mainIsTop`, fast forward, quit, F5/F12 paths |
-| `src/input.*` | Keyboard (DS keys and the frontend's keys) and mouse as the stylus |
-| `src/video.*` | The SDL window: draws the shown layout, maps window points to touch positions |
-| `src/audio.*` | SDL sound queue |
-| `src/layout.*` | `Place()` (canvas per layout), `CanvasFit` (letterboxed scaling), `TouchFromOutput` |
+| `src/main.cpp` | Command line, starting the DS, the frame loop (input → `RunFrame` → AUTO → shots → sound → picture; paused: menu only) |
+| `src/app.h` | Shared state: the `NDS`, layout chosen/shown, `mainIsTop`, fast forward, quit, `micBlow`, `topAspect`, F5/F12 paths |
+| `src/settings.*` | `Settings`: every option with its default; `settings.ini` load/save (SDL pref path), not headless |
+| `src/controls.*` | Actions, key and controller bindings, defaults, names (from FullDex) |
+| `src/input.*` | Keyboard, mouse (stylus; wheel and right drag as the camera), SDL_GameController, stick cursor, script window events |
+| `src/video.*` | The SDL window: draws the shown layout and the overlay, fullscreen, scaling, maps window points to touch positions |
+| `src/ui.*`, `src/menu.*` | `Canvas` (ARGB overlay, 5 × 7 font) and `Menu` (from FullDex); `PauseMenu` (pages, bindings capture, toasts, cursor) |
+| `src/audio.*`, `src/audiostretch.h` | SDL sound queue, WSOLA stretching when slow (from FullDex), volume, fast forward |
+| `src/backup.*` | Copies of the `.sav` in `backups/`, at start and every half hour, eight kept |
+| `src/layout.*` | `Place()` (canvas per layout, `topAspect`, FOCUS's overlaid panel), `CanvasFit`, `TouchFromOutput`, `OverTop` |
+| `tests/layout_test.cpp` | Touch mapping of every pixel in every layout and size (`ninja -C build layout_test`) |
 | `src/scene.*` | AUTO's detection from the screens' pixels: `HudVisible()`, `AutoLayout::Update(top, bottom, mainIsTop)` |
 | `src/script.*`, `src/shots.*`, `src/state.*`, `src/picker.*` | Headless input scripts; PNG shots and `--compose`; save states; ROM file picker and `Tell()` |
 | `src/platform.cpp` | melonDS Platform interface (files, threads, save), adapted from pokemon-fulldex |
@@ -61,7 +66,17 @@ Save states `shots/s2.st` (main menu), `s3` (Create-a-Sim), `s4` (Keep this Sim?
 - HUD detection uses row 190 only (`#415969` from x 8 to 248). Row 186 crosses the clock's
   white text; rows 189 and 191 are not flat.
 - Touch mapping goes through the same `Place()` as drawing: change one, the other follows.
-  Window points and renderer pixels differ on HiDPI; `touchAt` converts.
+  Window points and renderer pixels differ on HiDPI; `Video::ToOutput` converts. FOCUS's panel
+  lies over the world: it is drawn second (`Placement::topFirst`, `alpha`) and wins the mouse.
+- The game zooms in with X and out with Y; L and R turn the camera continuously while held
+  (checked with `scripts`-style runs from `s7`). The wheel and the right-button drag press them.
+- Settings are never loaded or saved headless (runs must be the same everywhere); the menu
+  never opens there. Window events in a script (`press`, `click`, `winshot`) count loop turns
+  (`iter`), not game frames: the game stands still while the menu is open.
+- The menu's font has capitals, digits and `:-+./<>!(),` only: write its text in capitals.
+- A real pointer resting on the menu sends motion events; hover selects a row only when the
+  pointer moves onto another one, otherwise it overrides keyboard navigation.
+- Fullscreen keeps the pointer visible: the mouse is the stylus.
 - In town the bottom screen often has a popup to close (the X near 126,110 or 126,126) before
   the D-pad moves the Sim.
 - JIT is off (`ENABLE_JIT OFF`): macOS arm64 needs MAP_JIT entitlements.
@@ -85,7 +100,8 @@ Save states `shots/s2.st` (main menu), `s3` (Create-a-Sim), `s4` (Keep this Sim?
 | --- | --- | --- |
 | 1 | POC: melonDS + SDL frontend, headless study of the screens, AUTO layout | ✅ |
 | 2 | Repository template (docs, CI, release, issue templates), portfolio page in `lborruto/docs` | 🔄 |
-| 3 | Bigger side panel, or a panel over the edge of the world view | ⏳ |
+| 3 | Bigger side panel, or a panel over the edge of the world view | ✅ |
+| 7 | Comfort: pause menu, settings file, controllers, mouse camera, fullscreen, sound stretching, save backups | ✅ |
 | 4 | Widescreen 3D, borrowed from FullDex's `GPU3D_Wide.cpp` | ⏳ |
 | 5 | Survey the minigames and the other situations (shops, jobs, night) | ⏳ |
 | 6 | Desktop apps: file picker, universal Mac app, Windows .exe (CI and release) | 🔄 (PR #1) |

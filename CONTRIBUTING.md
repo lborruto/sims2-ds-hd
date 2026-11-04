@@ -46,9 +46,12 @@ Before opening a pull request:
     ninja -C build sims2wide                 # no warnings from src/
     ./build/sims2wide --help                 # prints the usage (with no ROM it opens the file picker)
     ./build/sims2wide <rom> --headless --frames 1800 --shot-every 120 --shot-dir shots/boot
+    ninja -C build layout_test && ./build/layout_test   # every touch pixel maps back to itself, in every layout
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
-states of the situations it touches (below).
+states of the situations it touches (below). A change to the menu, the mouse or the keys is
+checked in the window with a script of window events (`press`, `click`, `winshot`: see the
+table below) and `--frames`, which closes the window by itself.
 
 CI runs on every pull request and push to `main`: actionlint and shellcheck on the workflows,
 gitleaks over the whole history, CodeQL on `src/` (once the repository is public: code
@@ -89,6 +92,7 @@ The headless mode runs the game without a window, about four times faster than r
 |---|---|
 | `--headless --frames N` | run N frames, no window |
 | `--input FILE` | an input script, one event per line: `frame frames-held key[+key]` or `frame frames-held touch x y` (`scripts/` has examples) |
+| (in a script, window only) | `press KEY` (SDL's key names: `Escape`, `Return`, `F11`, `X`), `move x y` and `click x y` (window points), `wheel n`, `winshot` (the window's picture, `w<frame>.png`): real SDL events for the frontend; their frame counts the loop's turns, paused ones too |
 | `--shot-every N`, `--shot-at a,b,c`, `--shot-dir DIR` | both screens as PNG (256 × 384) |
 | `--compose` | the window's picture instead (the layout AUTO would show) |
 | `--state-load FILE`, `--state-save FILE` | start from a save state, save one at the end |
@@ -105,15 +109,49 @@ Keep your ROM in `roms/` and your shots and states in `shots/`: both are ignored
 ## How it works
 
 `src/main.cpp` reads the command line, starts the DS and runs the frame loop: input, one
-`RunFrame()`, AUTO's decision, shots, sound, picture. Each part has its own file pair:
-`app.h` (the shared state: the DS, the layout chosen and shown, fast forward), `input.*`
-(keyboard, mouse, the frontend's own keys), `video.*` (the window), `audio.*`, `layout.*`,
-`scene.*` (AUTO's detection), `script.*`, `shots.*`, `state.*`, `picker.*`.
+`RunFrame()`, AUTO's decision, shots, sound, picture (or, with the menu open, just the menu
+over the last picture). Each part has its own file pair: `app.h` (the shared state: the DS,
+the layout chosen and shown, fast forward), `settings.*` (every option, the file),
+`controls.*` (the key and button bindings), `input.*` (keyboard, mouse, controller),
+`video.*` (the window), `audio.*` (with `audiostretch.h`), `layout.*`, `scene.*` (AUTO's
+detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `script.*`,
+`shots.*`, `state.*`, `picker.*`.
 
-- **Input script** (`script.*`): parses `--input` files.
-- **Layouts**: `Place()` puts the top and bottom screens on a canvas (FOCUS: 1280 × 720, the big
-  screen 960 × 720, the other 320 × 240 at the right, centred). The window scales the canvas;
-  mouse clicks go back through the same `Place()` to a touch-screen position.
+- **Input script** (`script.*`): parses `--input` files; the window events in it are pushed as
+  SDL events by `Input::PushScript`, so the frontend is checked through its real path.
+- **Layouts**: `Place()` puts the top and bottom screens on a canvas, sizing the top one from
+  `App::topAspect` (4:3 on the DS, wider with the widescreen world). FOCUS is 1280 × 720 with
+  the world 720 high at the left and the touch screen at twice its size (512 × 384) over the
+  world's right edge, centred and a little see-through (`Placement::alpha`): the DS's 4:3 world
+  leaves only a 320-wide column beside it, too narrow for a readable panel, and a wider world
+  leaves none; centred, the panel leaves the status bar at the world's bottom clear. With the
+  touch screen big (Tab), the world goes small into the column and nothing covers the touch
+  screen. The window scales the canvas; mouse clicks go back through the same `Place()` to a
+  touch-screen position (`tests/layout_test.cpp` checks every pixel in every layout).
+- **Settings** (`settings.*`): one `Settings` struct for every option, whoever uses it; loaded
+  from `settings.ini` (plain `key=value`) in SDL's per-user folder when the window opens, never
+  headless, saved on every change from the menu and when the program closes (with the window's
+  size). Add a field with its default, its two lines in `Load` and `Save`, its row in `menu.cpp`.
+- **Controls** (`controls.*`, `input.*`): each action (the 12 DS buttons, MENU, FAST FORWARD,
+  SWAP SCREENS, SAVE STATE, LOAD STATE, BLOW, CURSOR PRESS) has a key (an SDL keycode, so the
+  key's label on any layout) and a controller input; giving an action a key another one had
+  swaps them. Controllers are read through SDL_GameController, labels by SDL's convention (A is
+  the button printed A). The right stick moves a cursor on the touch screen, pressed with
+  CURSOR PRESS (LT). Over the world, the mouse wheel holds X or Y a few frames per notch (the
+  game zooms in with X, out with Y) and a right-button drag holds L or R for a frame every
+  three points moved (the game turns the camera continuously while they are held).
+- **The pause menu** (`menu.*`, `ui.*`): a `Canvas` the size of the output (ARGB, a 5 × 7
+  bitmap font: capitals, digits and a few signs only) uploaded as one texture over the game;
+  `Menu` draws a page of rows with values and a hint, and takes keyboard, controller and mouse
+  input (hover chooses a row only when the pointer moves onto another one, so a resting pointer
+  does not fight the keyboard). While it is open nothing is emulated. The same canvas shows the
+  stick cursor, short messages and the fast forward mark.
+- **Sound** (`audio.*`): the frames' samples go through `AudioStretch` (WSOLA, from FullDex),
+  which stretches them at their own pitch when frames take longer than a DS frame, steered to
+  keep about 100 ms queued; volume is applied after it; in fast forward the sound is muted or
+  played at normal pitch with the rest skipped.
+- **Save backups** (`backup.*`): `backups/<name>-<date>.sav` beside the save when the program
+  starts and every half hour, unless identical to the newest copy; the last eight are kept.
 - **AUTO**: `HudVisible()` checks row 190 of the top screen, the status bar's bottom border, one
   flat colour (`#415969`) from edge to edge in town and nowhere else. `AutoLayout` waits for ten
   frames of agreement before switching, so fades do not flicker.
@@ -128,11 +166,13 @@ Keep your ROM in `roms/` and your shots and states in `shots/`: both are ignored
   to it (`SafeForPicker()`), and errors show in SDL's message box (`Tell()`), never tinyfd's.
 - **Packaging**: `packaging/` holds the icon (drawn by `tools/make_icon.py`), the Mac app's
   `Info.plist`, `make_icns.sh` and the Windows resource file.
-- **Main loop**: one `RunFrame()` per frame, keys and touch from the script, the keyboard and
-  the mouse, audio queued to SDL at 48 kHz.
+- **Main loop**: one `RunFrame()` per frame, keys and touch from the script, the keyboard, the
+  mouse and the controller, audio queued to SDL at 48 kHz. `frame` counts the game's frames
+  (scripts, shots); `iter` every turn of the loop, paused ones too (`--frames`, window events).
 
 `src/platform.cpp` is melonDS's Platform interface (files, threads, the game's save), adapted
-from Pokémon FullDex; network, microphone and camera are stubs. `src/host.h` writes the save.
+from Pokémon FullDex, as are `controls.h`, `ui.*` and `audiostretch.h` (each says so in its
+header); network and camera are stubs. `src/host.h` writes the save.
 
 ## Commits and pull requests
 
