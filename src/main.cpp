@@ -26,6 +26,7 @@
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+#include "tinyfiledialogs.h"
 
 using namespace melonDS;
 
@@ -186,7 +187,7 @@ static void Usage()
 {
     fprintf(stderr,
         "sims2wide " SIMS2WIDE_VERSION "\n"
-        "usage: sims2wide <rom.nds> [options]\n"
+        "usage: sims2wide [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
         "  --layout auto|focus|side|stacked  window layout (default auto)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
         "  --headless                    no window; with --frames and the shot options\n"
@@ -196,27 +197,76 @@ static void Usage()
         "  --shot-every N | --shot-at a,b,c\n"
         "  --state-load FILE / --state-save FILE (saved at the end)\n"
         "  --save FILE                   the game's save (default beside the ROM, .sav)\n"
+        "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select\n"
-        "      Tab swaps the big screen (focus), 0 auto, 1/2/3 layouts, F5 save state, F7 load, Space fast\n");
+        "      Tab swaps the big screen (focus), 0 auto, 1/2/3 layouts, Space fast forward\n"
+        "      F5/F7 save/load state (<rom>.quick.st), F12 screenshot (<rom>-shot.png), Esc quit\n");
 }
+
+// A message for whoever started the program: on the terminal always, and in a dialog box too
+// when there may be no terminal (started by a double click).
+static void Tell(bool dialog, const char* type, const std::string& msg)
+{
+    fprintf(stderr, "%s\n", msg.c_str());
+    if (dialog) tinyfd_messageBox("The Sims 2 DS, one screen", msg.c_str(), "ok", type, 1);
+}
+
+// The ROM chosen last time, kept in the per-user settings folder (SDL's pref path).
+static std::string LastRomFile()
+{
+    char* dir = SDL_GetPrefPath("", "sims2-ds-wide");
+    if (!dir) return "";
+    std::string f = std::string(dir) + "last-rom.txt";
+    SDL_free(dir);
+    return f;
+}
+
+static std::string PickRom()
+{
+    std::string last, file = LastRomFile();
+    if (std::ifstream in(file); in) std::getline(in, last);
+    const char* patterns[] = {"*.nds"};
+    const char* chosen = tinyfd_openFileDialog("Choose your copy of The Sims 2 (DS)", last.empty() ? nullptr : last.c_str(),
+                                               1, patterns, "Nintendo DS ROM (.nds)", 0);
+    if (!chosen) return "";
+    std::string rom = chosen;
+    if (!file.empty()) { std::ofstream out(file); out << rom << "\n"; }
+    return rom;
+}
+
+#ifdef _WIN32
+// From kernel32, declared here rather than through <windows.h> (its macros clash with the rest).
+extern "C" __declspec(dllimport) int __stdcall AttachConsole(unsigned long processId);
+extern "C" __declspec(dllimport) void* __stdcall GetStdHandle(unsigned long which);
+#endif
 
 int main(int argc, char** argv)
 {
-    if (argc < 2) { Usage(); return 1; }
-    if (!strcmp(argv[1], "--version")) { printf("sims2wide %s\n", SIMS2WIDE_VERSION); return 0; }
-    std::string romPath = argv[1], inputPath, shotDir = "shots", stateLoad, stateSave;
+#ifdef _WIN32
+    // A Windows GUI program has no console: when started from a terminal, write to that one, so
+    // that the messages (and --help) still show there. Output already redirected (to a file, a
+    // pipe, CI's log) stays where it is.
+    void* out = GetStdHandle((unsigned long)-11); // STD_OUTPUT_HANDLE
+    if ((!out || out == (void*)-1) && AttachConsole((unsigned long)-1)) // ATTACH_PARENT_PROCESS
+    {
+        (void)freopen("CONOUT$", "w", stdout);
+        (void)freopen("CONOUT$", "w", stderr);
+    }
+#endif
+    std::string romPath, inputPath, shotDir = "shots", stateLoad, stateSave, savePath;
     bool headless = false;
     long frames = -1;
     int shotEvery = 0;
     std::set<long> shotAt;
     Layout layout = Layout::Auto;
     bool compose = false;
-    Host::SavePath = romPath.substr(0, romPath.rfind('.')) + ".sav";
-    for (int i = 2; i < argc; i++)
+    for (int i = 1; i < argc; i++)
     {
         std::string a = argv[i];
         auto next = [&]() -> std::string { if (i + 1 >= argc) { Usage(); exit(1); } return argv[++i]; };
-        if (a == "--headless") headless = true;
+        if (a == "--help" || a == "-h") { Usage(); return 0; }
+        else if (a == "--version") { printf("sims2wide %s\n", SIMS2WIDE_VERSION); return 0; }
+        else if (a == "--headless") headless = true;
         else if (a == "--compose") compose = true;
         else if (a == "--frames") frames = atol(next().c_str());
         else if (a == "--input") inputPath = next();
@@ -225,19 +275,36 @@ int main(int argc, char** argv)
         else if (a == "--shot-at") { std::stringstream ss(next()); std::string t; while (std::getline(ss, t, ',')) shotAt.insert(atol(t.c_str())); }
         else if (a == "--state-load") stateLoad = next();
         else if (a == "--state-save") stateSave = next();
-        else if (a == "--save") Host::SavePath = next();
+        else if (a == "--save") savePath = next();
         else if (a == "--layout")
         {
             std::string l = next();
             layout = l == "side" ? Layout::Side : l == "stacked" ? Layout::Stacked : l == "focus" ? Layout::Focus : Layout::Auto;
         }
+        else if (a.rfind("-psn_", 0) == 0) {} // older macOS adds this to an app started from the Finder
+        else if (a[0] != '-' && romPath.empty()) romPath = a;
         else { Usage(); return 1; }
     }
     if (headless && frames < 0) { fprintf(stderr, "--headless needs --frames\n"); return 1; }
 
+    // No ROM on the command line (a double click on the app): ask for one.
+    const bool picked = romPath.empty();
+    if (picked)
+    {
+        if (headless) { Usage(); return 1; }
+        romPath = PickRom();
+        if (romPath.empty()) return 0; // cancelled
+    }
+    const bool dialogs = picked; // started without a terminal, most likely
+    // The game's save, the quick save state and the screenshot go beside the ROM: a program
+    // started from the Finder or Explorer has no useful current folder.
+    const std::string romBase = romPath.substr(0, romPath.rfind('.'));
+    Host::SavePath = savePath.empty() ? romBase + ".sav" : savePath;
+    const std::string quickState = romBase + ".quick.st", shotFile = romBase + "-shot.png";
+
     // The ROM and its save.
     std::ifstream rf(romPath, std::ios::binary);
-    if (!rf) { fprintf(stderr, "cannot read %s\n", romPath.c_str()); return 1; }
+    if (!rf) { Tell(dialogs, "error", "Cannot read " + romPath); return 1; }
     std::vector<u8> rom((std::istreambuf_iterator<char>(rf)), {});
     NDSCart::NDSCartArgs cartArgs {};
     {
@@ -252,7 +319,7 @@ int main(int argc, char** argv)
         }
     }
     auto cart = NDSCart::ParseROM(rom.data(), (u32)rom.size(), nullptr, std::move(cartArgs));
-    if (!cart) { fprintf(stderr, "not a DS ROM: %s\n", romPath.c_str()); return 1; }
+    if (!cart) { Tell(dialogs, "error", "Not a Nintendo DS ROM: " + romPath); return 1; }
 
     NDSArgs args;
     args.JIT = std::nullopt;
@@ -348,9 +415,9 @@ int main(int argc, char** argv)
                         else if (k == SDLK_1) layout = Layout::Focus;
                         else if (k == SDLK_2) layout = Layout::Side;
                         else if (k == SDLK_3) layout = Layout::Stacked;
-                        else if (k == SDLK_F5) fprintf(stderr, "state save: %s\n", SaveState(*nds, "quick.st") ? "ok" : "failed");
-                        else if (k == SDLK_F7) fprintf(stderr, "state load: %s\n", LoadState(*nds, "quick.st") ? "ok" : "failed");
-                        else if (k == SDLK_F12) { WriteShot("shot.png", nds->GPU.Framebuffer[nds->GPU.FrontBuffer][0].get(), nds->GPU.Framebuffer[nds->GPU.FrontBuffer][1].get()); }
+                        else if (k == SDLK_F5) fprintf(stderr, "state save: %s\n", SaveState(*nds, quickState) ? "ok" : "failed");
+                        else if (k == SDLK_F7) fprintf(stderr, "state load: %s\n", LoadState(*nds, quickState) ? "ok" : "failed");
+                        else if (k == SDLK_F12) { WriteShot(shotFile, nds->GPU.Framebuffer[nds->GPU.FrontBuffer][0].get(), nds->GPU.Framebuffer[nds->GPU.FrontBuffer][1].get()); }
                         else if (k == SDLK_ESCAPE) frames = frame;
                     }
                     if (k == SDLK_SPACE) fast = down;
