@@ -26,12 +26,17 @@ the owner makes it public; write everything as if it were public already).
 
 | Path | Role |
 | --- | --- |
-| `src/main.cpp` | Command line, starting the DS, the frame loop (input → `RunFrame` → AUTO → shots → sound → picture) |
-| `src/app.h` | Shared state: the `NDS`, layout chosen/shown, `mainIsTop`, fast forward, quit, F5/F12 paths |
-| `src/input.*` | Keyboard (DS keys and the frontend's keys) and mouse as the stylus |
-| `src/video.*` | The SDL window: draws the shown layout, maps window points to touch positions |
-| `src/audio.*` | SDL sound queue |
-| `src/layout.*` | `Place()` (canvas per layout), `CanvasFit` (letterboxed scaling), `TouchFromOutput` |
+| `src/main.cpp` | Command line, starting the DS, the frame loop (input → `RunFrame` → AUTO → shots → sound → picture; paused: menu only) |
+| `src/app.h` | Shared state: the `NDS`, layout chosen/shown, `mainIsTop`, fast forward, quit, `micBlow`, `topAspect`, F5/F12 paths |
+| `src/settings.*` | `Settings`: every option with its default; `settings.ini` load/save (SDL pref path), not headless |
+| `src/controls.*` | Actions, key and controller bindings, defaults, names (from FullDex) |
+| `src/input.*` | Keyboard, mouse (stylus; wheel and right drag as the camera), SDL_GameController, stick cursor, script window events |
+| `src/video.*` | The SDL window: draws the shown layout and the overlay, fullscreen, scaling, maps window points to touch positions |
+| `src/ui.*`, `src/menu.*` | `Canvas` (ARGB overlay, 5 × 7 font) and `Menu` (from FullDex); `PauseMenu` (pages, bindings capture, toasts, cursor) |
+| `src/audio.*`, `src/audiostretch.h` | SDL sound queue, WSOLA stretching when slow (from FullDex), volume, fast forward |
+| `src/backup.*` | Copies of the `.sav` in `backups/`, at start and every half hour, eight kept |
+| `src/layout.*` | `Place()` (canvas per layout, `topAspect`, FOCUS's overlaid panel), `CanvasFit`, `TouchFromOutput`, `OverTop` |
+| `tests/layout_test.cpp` | Touch mapping of every pixel in every layout and size (`ninja -C build layout_test`) |
 | `src/looks.*` | Sharper / widescreen 3D and 60 fps: applies the Looks settings, builds `App::TopImage` |
 | `src/melonds_ext/GPU3D_Wide.*` | FullDex's wide 3D rasteriser (CPU), built into melonDS's `core` |
 | `patches/melonDS/*.patch` | Hooks in melonDS 1.1 for the looks, applied at configure time |
@@ -94,7 +99,17 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 - `SIMS2WIDE_PROBE=N` prints AUTO's signals every N frames (HUD, social, warm menu, motion and
   brightness of each screen).
 - Touch mapping goes through the same `Place()` as drawing: change one, the other follows.
-  Window points and renderer pixels differ on HiDPI; `touchAt` converts.
+  Window points and renderer pixels differ on HiDPI; `Video::ToOutput` converts. FOCUS's panel
+  lies over the world: it is drawn second (`Placement::topFirst`, `alpha`) and wins the mouse.
+- The game zooms in with X and out with Y; L and R turn the camera continuously while held
+  (checked with `scripts`-style runs from `s7`). The wheel and the right-button drag press them.
+- Settings are never loaded or saved headless (runs must be the same everywhere); the menu
+  never opens there. Window events in a script (`press`, `click`, `winshot`) count loop turns
+  (`iter`), not game frames: the game stands still while the menu is open.
+- The menu's font has capitals, digits and `:-+./<>!(),` only: write its text in capitals.
+- A real pointer resting on the menu sends motion events; hover selects a row only when the
+  pointer moves onto another one, otherwise it overrides keyboard navigation.
+- Fullscreen keeps the pointer visible: the mouse is the stylus.
 - In town the bottom screen often has a popup to close (the X near 126,110 or 126,126) before
   the D-pad moves the Sim.
 - Looks: with all looks off the headless output must stay byte for byte the same (24-shot
@@ -128,8 +143,10 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 | # | Task | Status |
 | --- | --- | --- |
 | 1 | POC: melonDS + SDL frontend, headless study of the screens, AUTO layout | ✅ |
-| 2 | Repository template (docs, CI, release, issue templates), portfolio page in `lborruto/docs` | 🔄 |
-| 3 | Bigger side panel, or a panel over the edge of the world view | ⏳ |
-| 4 | Widescreen 3D, borrowed from FullDex's `GPU3D_Wide.cpp`; sharper 3D, 60 fps (opt-in looks) | 🔄 (feat/looks) |
-| 5 | Survey the minigames and the other situations (shops, jobs, night): social reactions, the shop, Build Rooms, City Hall, pause done; the hotel and its rooms (vacuum, cards, painting, mixer…) not reached | 🔄 |
-| 6 | Desktop apps: file picker, universal Mac app, Windows .exe (CI and release) | 🔄 (PR #1) |
+| 2 | Repository template (docs, CI, release, issue templates); portfolio page in `lborruto/docs` waits on a local branch until the repo is public | ✅ / 🔄 |
+| 3 | Bigger side panel: the touch screen at 2x over the world's right edge | ✅ |
+| 4 | Looks: widescreen 3D from FullDex's `GPU3D_Wide.cpp`, sharper 3D, 60 fps (opt-in) | ✅ |
+| 5 | Survey the minigames and the other situations: social reactions, the shop, Build Rooms, City Hall, pause done; the hotel and its rooms (vacuum, cards, painting, mixer…) not reached | 🔄 |
+| 6 | Desktop apps: file picker, universal Mac app, Windows .exe (CI and release) | ✅ |
+| 7 | Comfort: pause menu, settings file, controllers, mouse camera, fullscreen, sound stretching, save backups | ✅ (controller untested on hardware) |
+| 8 | Playable: DS microphone (blow key, real mic), DS clock = the computer's, touch screen big for its activities | ✅ (in-game blow untested) |
