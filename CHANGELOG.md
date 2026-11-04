@@ -7,6 +7,10 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-04
+
+First release: The Sims 2 (DS) in one window on Windows, Mac and Linux.
+
 ### Added
 
 - The Sims 2 (DS) in one window, on the melonDS 1.1 core.
