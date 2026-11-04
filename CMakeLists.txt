@@ -67,3 +67,7 @@ if(WIN32)
         target_link_options(sims2wide PRIVATE -static)
     endif()
 endif()
+
+# Checks of the layouts' touch mapping (not built by default): ninja -C build layout_test && ./build/layout_test
+add_executable(layout_test EXCLUDE_FROM_ALL tests/layout_test.cpp src/layout.cpp)
+target_include_directories(layout_test PRIVATE melonDS/src src)
