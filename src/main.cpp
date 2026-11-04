@@ -219,9 +219,12 @@ int main(int argc, char** argv)
             bool autoMainIsTop = app.mainIsTop;
             Layout autoShown = app.autoLayout.Update(top, bottom, autoMainIsTop);
             Layout before = app.shown;
+            bool bigBefore = app.mainIsTop;
             if (app.layout == Layout::Auto) { app.shown = autoShown; app.mainIsTop = autoMainIsTop; }
             else app.shown = app.layout;
-            if (app.shown != before) fprintf(stderr, "frame %ld: layout %s\n", frame, LayoutName(app.shown));
+            if (app.shown != before || (app.shown == Layout::Focus && app.mainIsTop != bigBefore))
+                fprintf(stderr, "frame %ld: layout %s%s\n", frame, LayoutName(app.shown),
+                        app.shown != Layout::Focus ? "" : app.mainIsTop ? " (top big)" : " (bottom big)");
         }
         if (shotAt.count(frame) || (shotEvery && frame % shotEvery == 0))
         {
