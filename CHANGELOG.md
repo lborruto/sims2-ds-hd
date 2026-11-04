@@ -7,7 +7,7 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-11-04
+## [0.1.1] - 2026-11-04
 
 First release: The Sims 2 (DS) in one window on Windows, Mac and Linux.
 
@@ -51,3 +51,8 @@ First release: The Sims 2 (DS) in one window on Windows, Mac and Linux.
   eight kept.
 - Input scripts can drive the window itself (`press`, `move`, `click`, `wheel`, `winshot`),
   for checking the menu and the mouse.
+
+## [0.1.0] - 2026-11-04
+
+Tagged, never released: the release workflow could not check the tag against `main` in a
+private repository (fixed in 0.1.1).
