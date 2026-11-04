@@ -63,7 +63,8 @@ same: from save states of Create-a-Sim, a conversation and free roam, `--frames 
 CI runs on every pull request and push to `main`: actionlint and shellcheck on the workflows,
 gitleaks over the whole history, CodeQL on `src/` (once the repository is public: code
 scanning needs it on the free plan), and Release builds the way the release makes them: Linux
-(Ubuntu 24.04), the Mac app for both kinds of Mac (macOS 15, each half run) and Windows (MSYS2,
+(Ubuntu 24.04), the Mac app for both kinds of Mac (built on an Intel macOS 15 runner, as GitHub's Apple silicon
+ones are often out of capacity; the Intel half is run, the other checked present) and Windows (MSYS2,
 checked to need no DLL beyond Windows' own), each checked with `--version`. It has no ROM, so it
 cannot run the game. The one check to require
 is "CI result"; a docs-only pull request skips the build and still passes it.

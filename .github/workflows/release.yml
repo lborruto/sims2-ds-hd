@@ -105,7 +105,8 @@ jobs:
         include:
           - os: ubuntu-24.04
             platform: linux-x86_64
-          - os: macos-15
+          # Intel: see ci.yml (Apple silicon runner capacity).
+          - os: macos-15-intel
             platform: macos-universal
     env:
       TAG: ${{ github.ref_name }}

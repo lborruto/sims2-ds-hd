@@ -128,7 +128,9 @@ jobs:
         include:
           - os: ubuntu-24.04
             platform: linux-x86_64
-          - os: macos-15
+          # Intel: GitHub's Apple silicon runners are often out of capacity (jobs cancelled
+          # unstarted, November 2026). The app is universal either way.
+          - os: macos-15-intel
             platform: macos-universal
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (2026-07-20)
@@ -156,19 +158,17 @@ jobs:
             cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           fi
       - run: ninja -C build sims2wide
-      # The version the program reports is the one in CMakeLists.txt; on a Mac, both halves of
-      # the app's program are checked.
+      # The version the program reports is the one in CMakeLists.txt. On a Mac the app holds both
+      # halves; the Intel runner can only run its own (the Apple silicon one is checked present).
       - name: Version check
         run: |
           want="sims2wide $(sed -n 's/^project(sims2wide VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
           if [ "$RUNNER_OS" = macOS ]; then
             bin="build/Sims 2 DS Wide.app/Contents/MacOS/Sims 2 DS Wide"
             lipo "$bin" -verify_arch arm64 x86_64
-            for arch in arm64 x86_64; do
-              got="$(arch "-$arch" "$bin" --version)"
-              echo "$arch: $got"
-              test "$got" = "$want"
-            done
+            got="$(arch -x86_64 "$bin" --version)"
+            echo "x86_64: $got"
+            test "$got" = "$want"
           else
             got="$(build/sims2wide --version)"
             echo "$got"
