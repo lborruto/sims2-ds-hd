@@ -51,7 +51,8 @@ and look at the shots (`tools/sheet.py`). A layout change is checked with `--com
 states of the situations it touches (below).
 
 CI runs on every pull request and push to `main`: actionlint and shellcheck on the workflows,
-gitleaks over the whole history, and Release builds the way the release makes them: Linux
+gitleaks over the whole history, CodeQL on `src/` (once the repository is public: code
+scanning needs it on the free plan), and Release builds the way the release makes them: Linux
 (Ubuntu 24.04), the Mac app for both kinds of Mac (macOS 15, each half run) and Windows (MSYS2,
 checked to need no DLL beyond Windows' own), each checked with `--version`. It has no ROM, so it
 cannot run the game. The one check to require

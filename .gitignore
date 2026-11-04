@@ -1,7 +1,12 @@
+.claude/
+.impeccable/
+.superpowers/
+.worktrees/
 *.nds
 *.sav
 *.st
 build*/
+docs/superpowers/
 quick.st
 roms/
 shot.png
