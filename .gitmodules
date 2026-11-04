@@ -1,3 +1,5 @@
 [submodule "melonDS"]
 	path = melonDS
 	url = https://github.com/melonDS-emu/melonDS.git
+	# patches/melonDS are applied to its files at configure time (CMakeLists.txt)
+	ignore = dirty

@@ -1,0 +1,96 @@
+diff --git a/src/GPU2D_Soft.cpp b/src/GPU2D_Soft.cpp
+index 2f8afcb..fbb21db 100644
+--- a/src/GPU2D_Soft.cpp
++++ b/src/GPU2D_Soft.cpp
+@@ -22,6 +22,8 @@
+ 
+ namespace melonDS
+ {
++GPU2DLooks Looks2D; // sims2wide
++
+ namespace GPU2D
+ {
+ SoftRenderer::SoftRenderer(melonDS::GPU& gpu)
+@@ -144,6 +146,15 @@ void SoftRenderer::DrawScanline(u32 line, Unit* unit)
+     if (line == 0 && CurUnit->CaptureCnt & (1 << 31) && !forceblank)
+         CurUnit->CaptureLatch = true;
+ 
++    // sims2wide: no 3D on this line unless DrawScanline_BGOBJ finds some (GPU2DLooks).
++    if (CurUnit->Num == 0 && line < 192 && Looks2D.Record3D)
++    {
++        memset(&Looks2D.Pixel3D[line * 256], 0, 256);
++        Looks2D.LineEVY[line] = CurUnit->EVY;
++        Looks2D.LineBlendCnt[line] = CurUnit->BlendCnt;
++        Looks2D.LineMaster[line] = CurUnit->MasterBrightness;
++    }
++
+     if (CurUnit->Num == 0)
+     {
+         if (!GPU.GPU3D.IsRendererAccelerated())
+@@ -173,6 +184,9 @@ void SoftRenderer::DrawScanline(u32 line, Unit* unit)
+     // always render regular graphics
+     DrawScanline_BGOBJ(line);
+     CurUnit->UpdateMosaicCounters(line);
++    // sims2wide: the 3D layer is only shown in the regular display mode.
++    if (CurUnit->Num == 0 && line < 192 && Looks2D.Record3D && dispmode != 1)
++        memset(&Looks2D.Pixel3D[line * 256], 0, 256);
+ 
+     switch (dispmode)
+     {
+@@ -741,11 +755,29 @@ void SoftRenderer::DrawScanline_BGOBJ(u32 line)
+ 
+     if (!GPU.GPU3D.IsRendererAccelerated())
+     {
++        // sims2wide: where the 3D layer is on top, record how it is shown (GPU2DLooks).
++        u8* pixel3D = (CurUnit->Num == 0 && line < 192 && Looks2D.Record3D) ? &Looks2D.Pixel3D[line * 256] : nullptr;
++        const u32 blendCnt = CurUnit->BlendCnt;
+         for (int i = 0; i < 256; i++)
+         {
+             u32 val1 = BGOBJLine[i];
+             u32 val2 = BGOBJLine[256+i];
+ 
++            if (pixel3D && ((val1 >> 24) & 0xC0) == 0x40)
++            {
++                const u32 flag2 = val2 >> 24;
++                const u32 target2 = (flag2 & 0x80) ? 0x1000 : (flag2 & 0x40) ? 0x0100 : flag2 << 8;
++                u8 code = 1;
++                if (blendCnt & target2)
++                    code = ((val1 >> 24) & 0x1F) == 0x1F ? 1 : 0; // see-through 3D over 2D
++                else if ((blendCnt & 0x01) && (WindowMask[i] & 0x20))
++                {
++                    const u32 effect = (blendCnt >> 6) & 0x3;
++                    if (effect >= 2) code = (u8)effect;
++                }
++                pixel3D[i] = code;
++            }
++
+             BGOBJLine[i] = ColorComposite(i, val1, val2);
+         }
+     }
+diff --git a/src/GPU2D_Soft.h b/src/GPU2D_Soft.h
+index 4beaf8f..4690303 100644
+--- a/src/GPU2D_Soft.h
++++ b/src/GPU2D_Soft.h
+@@ -24,6 +24,22 @@ namespace melonDS
+ {
+ class GPU;
+ 
++// sims2wide: how the top screen's picture used the 3D layer, so that the frontend can put a
++// sharper or wider 3D picture in its place. Per pixel of engine A's last frame: 0 not the 3D
++// layer (or blended with what is under it), 1 the 3D layer as it is, 2 brightened, 3 darkened
++// (by LineEVY). Per line: the brightness factor, the blend control and the master brightness
++// register. Recorded while Record3D is set; display only, nothing the game sees. Kept outside
++// the renderer so that melonDS's own objects keep their memory layout. One console.
++struct GPU2DLooks
++{
++    bool Record3D = false;
++    u8 Pixel3D[256*192] {};
++    u8 LineEVY[192] {};
++    u16 LineBlendCnt[192] {};
++    u16 LineMaster[192] {};
++};
++extern GPU2DLooks Looks2D;
++
+ namespace GPU2D
+ {
+ 
