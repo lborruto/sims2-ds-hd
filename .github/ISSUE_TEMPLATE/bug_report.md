@@ -19,7 +19,7 @@ layout** (AUTO, FOCUS, SIDE, STACKED)
 
 **What the program printed** in the terminal (copy the text)
 
-**A screenshot** (F12 makes `shot.png`) if it helps
+**A screenshot** (F12 makes `<rom>-shot.png` beside the ROM) if it helps
 
 **Version** (the release tag, `v0.1.0`…, or the commit: `git rev-parse --short HEAD`)
 

@@ -29,6 +29,8 @@ the owner makes it public; write everything as if it were public already).
 | `src/platform.cpp` | melonDS Platform interface (files, threads, save), adapted from pokemon-fulldex |
 | `src/host.h` | Writes the game's save when melonDS reports it changed |
 | `src/thirdparty/stb_image_write.h` | PNG writer |
+| `src/thirdparty/tinyfiledialogs.*` | File picker and message boxes (3.22.1, zlib), for starting without a ROM |
+| `packaging/` | Icon (`tools/make_icon.py` draws it, original art: never EA's plumbob), Mac `Info.plist.in`, `make_icns.sh`, Windows `.rc` |
 | `scripts/*.txt` | Input scripts used to walk from the title to the town |
 | `tools/sheet.py` | Contact sheet of shots (Pillow) |
 | `melonDS/` | melonDS 1.1, submodule |
@@ -56,6 +58,17 @@ Save states `shots/s2.st` (main menu), `s3` (Create-a-Sim), `s4` (Keep this Sim?
 - In town the bottom screen often has a popup to close (the X near 126,110 or 126,126) before
   the D-pad moves the Sim.
 - JIT is off (`ENABLE_JIT OFF`): macOS arm64 needs MAP_JIT entitlements.
+- Running `sims2wide` with no ROM opens a file picker and waits: in automated runs always pass a
+  ROM (or `--help`/`--version`).
+- The Mac app is opt-in (`-DSIMS2WIDE_MAC_APP=ON`) so `build/sims2wide` stays the CLI program;
+  the bundle's binary is `Contents/MacOS/Sims 2 DS Wide`. Apple silicon refuses unsigned code:
+  the release ad-hoc signs (`codesign -s -`) after copying.
+- tinyfiledialogs builds shell commands (osascript, zenity) on Mac and Linux: never pass it
+  outside data (paths, ROM text) unchecked. `SafeForPicker()` gates the default folder; message
+  boxes go through `SDL_ShowSimpleMessageBox`.
+- Windows: GUI subsystem; `AttachConsole` only when stdout is not already redirected (CI reads
+  `--version` through a pipe). `windows.h` is not included (its macros clash); the two kernel32
+  functions are declared by hand.
 
 ## Tasks
 
@@ -68,4 +81,4 @@ Save states `shots/s2.st` (main menu), `s3` (Create-a-Sim), `s4` (Keep this Sim?
 | 3 | Bigger side panel, or a panel over the edge of the world view | ⏳ |
 | 4 | Widescreen 3D, borrowed from FullDex's `GPU3D_Wide.cpp` | ⏳ |
 | 5 | Survey the minigames and the other situations (shops, jobs, night) | ⏳ |
-| 6 | Windows build | ⏳ |
+| 6 | Desktop apps: file picker, universal Mac app, Windows .exe (CI and release) | 🔄 (PR #1) |

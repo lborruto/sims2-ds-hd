@@ -38,8 +38,18 @@ It is a proof of concept: see [Good to know](#good-to-know).
 You need your own copy of the game, dumped from your cartridge (`.nds`). Nothing of the game
 is included here.
 
-Ready-made downloads for Linux and Mac will be on the [releases page](../../releases) once the
-first version is out. Until then, build it (a few minutes):
+**Download** from the [releases page](../../releases) once the first version is out:
+
+| Where you play | Download | Start it |
+|---|---|---|
+| **Windows** (64-bit) | `sims2-ds-wide-…-windows-x86_64.zip` | unzip, double-click `sims2wide.exe`; the first time, More info > Run anyway |
+| **Mac** (Apple silicon or Intel, macOS 11+) | `sims2-ds-wide-…-macos-universal.zip` | unzip, move *Sims 2 DS Wide* to Applications; the first time, right click > Open |
+| **Linux** (x86_64) | `sims2-ds-wide-…-linux-x86_64.tar.gz` | unpack, run `./sims2wide` (the file picker needs zenity or kdialog) |
+
+It asks for your `.nds` when it starts, in the folder of the last one you chose. A ROM on the command
+line (`sims2wide path/to/your-sims2.nds`) skips the question.
+
+**Or build it** (a few minutes):
 
 ```bash
 git clone --recursive https://github.com/lborruto/sims2-ds-wide.git && cd sims2-ds-wide
@@ -64,8 +74,8 @@ them.
 | Tab | swap which screen is big |
 | 0 / 1 / 2 / 3 | layout: AUTO / FOCUS / SIDE / STACKED |
 | Space (hold) | fast forward |
-| F5 / F7 | save state / load state |
-| F12 | screenshot of both screens |
+| F5 / F7 | save state / load state (beside the ROM, `.quick.st`) |
+| F12 | screenshot of both screens (beside the ROM, `-shot.png`) |
 | Esc | quit |
 
 The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another
@@ -80,7 +90,7 @@ emulator or a flash cart works if you put it there.
 | **SIDE** | both screens side by side |
 | **STACKED** | as on the DS, one above the other |
 
-Start with another one: `--layout focus`. Run `./build/sims2wide` alone to see every option,
+Start with another one: `--layout focus`. Run `sims2wide --help` to see every option,
 including the headless mode used to study the game's screens
 ([CONTRIBUTING.md](CONTRIBUTING.md#studying-the-screens)).
 
@@ -93,7 +103,8 @@ including the headless mode used to study the game's screens
 - **Minigames not checked yet.** They may want both screens big: switch to SIDE (2) if so.
 - **Tested with the European game** (code `ASJP`). The American one should work; its automatic
   layout is untested.
-- **Linux and Mac.** Windows is not built yet.
+- **Not signed by Apple or Microsoft.** Hence the extra click the first time; each download
+  comes with a build attestation from GitHub instead ([SECURITY.md](SECURITY.md)).
 
 ## Help and docs
 
@@ -110,7 +121,8 @@ state.
 ## Licence and credits
 
 GPLv3, see [LICENSE](LICENSE), as melonDS. Built on [melonDS](https://github.com/melonDS-emu/melonDS)
-1.1, [SDL2](https://www.libsdl.org/) and [stb_image_write](https://github.com/nothings/stb).
+1.1, [SDL2](https://www.libsdl.org/), [stb_image_write](https://github.com/nothings/stb) and
+[tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/).
 The idea comes from [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex), which does
 this for the DS Pokémon games; `src/platform.cpp` is adapted from it.
 
