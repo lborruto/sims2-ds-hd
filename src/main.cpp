@@ -10,6 +10,7 @@
 //   picker.*   ROM file picker and error dialogs
 #include <SDL.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -28,6 +29,7 @@
 #include "audio.h"
 #include "host.h"
 #include "input.h"
+#include "looks.h"
 #include "picker.h"
 #include "script.h"
 #include "shots.h"
@@ -44,6 +46,9 @@ static void Usage()
         "usage: sims2wide [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
         "  --layout auto|focus|side|stacked  window layout (default auto)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
+        "  --res3d N                     3D drawn N times sharper (1 = the DS's own, default)\n"
+        "  --wide                        widescreen 16:9 world\n"
+        "  --interp                      60 fps in-between frames for the 3D\n"
         "  --headless                    no window; with --frames and the shot options\n"
         "  --frames N                    stop after N frames\n"
         "  --input FILE                  input script (frame len key[+key] | frame len touch x y)\n"
@@ -83,6 +88,8 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Auto;
     bool compose = false;
+    int res3d = 0;
+    bool wide = false, interp = false;
     for (int i = 1; i < argc; i++)
     {
         std::string a = argv[i];
@@ -91,6 +98,9 @@ int main(int argc, char** argv)
         else if (a == "--version") { printf("sims2wide %s\n", SIMS2WIDE_VERSION); return 0; }
         else if (a == "--headless") headless = true;
         else if (a == "--compose") compose = true;
+        else if (a == "--res3d") res3d = std::clamp(atoi(next().c_str()), 1, 8);
+        else if (a == "--wide") wide = true;
+        else if (a == "--interp") interp = true;
         else if (a == "--frames") frames = atol(next().c_str());
         else if (a == "--input") inputPath = next();
         else if (a == "--shot-dir") shotDir = next();
@@ -149,6 +159,10 @@ int main(int argc, char** argv)
     app.shown = layout == Layout::Auto ? Layout::Side : layout;
     app.quickState = quickState;
     app.shotFile = shotFile;
+    if (res3d) app.settings.resolution3D = res3d;
+    if (wide) app.settings.widescreen = true;
+    if (interp) app.settings.interpolate60 = true;
+    Looks looks;
     melonDS::NDSArgs args;
     args.JIT = std::nullopt;
     app.nds = std::make_unique<NDS>(std::move(args), nullptr);
@@ -190,7 +204,9 @@ int main(int argc, char** argv)
 
         nds.SetKeyMask(~keys & 0xFFF);
         if (touching) nds.TouchScreen((melonDS::u16)tx, (melonDS::u16)ty); else nds.ReleaseScreen();
+        looks.Apply(app);
         nds.RunFrame();
+        looks.Frame(app);
 
         const u32* top = app.Top();
         const u32* bottom = app.Bottom();
@@ -206,8 +222,16 @@ int main(int argc, char** argv)
         {
             char name[64];
             snprintf(name, sizeof name, "/f%06ld.png", frame);
-            if (compose) WriteCompose(shotDir + name, app.shown, app.mainIsTop, top, bottom);
+            int tw, th;
+            const u32* big = app.TopImage(tw, th);
+            if (compose) WriteCompose(shotDir + name, app.shown, app.mainIsTop, big, tw, th, bottom);
             else WriteShot(shotDir + name, top, bottom);
+            // The looks' top picture at its size, beside the DS's screens.
+            if (!compose && !app.topBig.empty())
+            {
+                snprintf(name, sizeof name, "/f%06ld-top.png", frame);
+                WriteImage(shotDir + name, big, tw, th);
+            }
         }
 
         if (headless) continue;
@@ -216,6 +240,8 @@ int main(int argc, char** argv)
         video.Present(app);
     }
 
+    Looks::Shutdown();
+    if (app.settings.interpolate60) fprintf(stderr, "looks: %u in-between frames\n", melonDS::Looks3D.InterpolatedFrames);
     if (!stateSave.empty()) fprintf(stderr, "state save %s: %s\n", stateSave.c_str(), SaveState(nds, stateSave) ? "ok" : "failed");
     if (!headless) SDL_Quit();
     return 0;

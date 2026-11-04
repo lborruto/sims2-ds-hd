@@ -3,6 +3,7 @@
 #pragma once
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "GPU.h"
 #include "NDS.h"
@@ -35,7 +36,19 @@ struct App
     std::string quickState;        // F5 / F7
     std::string shotFile;          // F12
 
+    // The top screen's picture at its real size when the looks are on (looks.cpp builds it after
+    // each frame): taller than 192 lines with the sharper 3D, wider than 4:3 with widescreen.
+    std::vector<u32> topBig;
+    int topBigW = 0, topBigH = 0;
+
     const u32* Top() const { return nds->GPU.Framebuffer[nds->GPU.FrontBuffer][0].get(); }
+    // The top screen as it should be shown: 256 x 192 (Top()) unless the looks made it bigger.
+    const u32* TopImage(int& w, int& h) const
+    {
+        if (!topBig.empty()) { w = topBigW; h = topBigH; return topBig.data(); }
+        w = SW; h = SH;
+        return Top();
+    }
     const u32* Bottom() const { return nds->GPU.Framebuffer[nds->GPU.FrontBuffer][1].get(); }
 };
 }
