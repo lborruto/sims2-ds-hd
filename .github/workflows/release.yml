@@ -36,8 +36,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          status="$(gh api "repos/$GH_REPO/compare/main...$GITHUB_SHA" -q .status)"
-          echo "compared with main: $status"
+          # main's commit by its full branch name, so a tag called "main" cannot stand in for it.
+          main_sha="$(gh api "repos/$GH_REPO/git/ref/heads/main" -q .object.sha)"
+          status="$(gh api "repos/$GH_REPO/compare/$main_sha...$GITHUB_SHA" -q .status)"
+          echo "compared with main ($main_sha): $status"
           case "$status" in identical | behind) ;; *)
             echo "::error::$GITHUB_REF_NAME points to a commit that is not on main ($status)"
             exit 1 ;;
