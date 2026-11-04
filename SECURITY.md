@@ -23,13 +23,17 @@ with, endorsed by or supported by Electronic Arts, Maxis, Nintendo or the melonD
 
 - **No network at all.** It opens no port and makes no connection: no update check, no
   telemetry. The DS's Wi-Fi and wireless play are stubs that send and receive nothing.
-- **It reads what you give it.** The ROM on the command line, its save (`.sav` beside it, or
+- **It reads what you give it.** The ROM on the command line or chosen in the file picker, its save (`.sav` beside it, or
   `--save`), a save state (`--state-load`, F7) and an input script (`--input`). melonDS parses
   the ROM, the save and the save state: treat ones from other people as untrusted files, as you
   would any file an emulator opens.
-- **It writes in a few known places.** The game's save (beside the ROM, or `--save`), and in the
-  folder you run it from: `quick.st` (F5), `shot.png` (F12), the `--state-save` file and the
-  `--shot-dir` folder (default `shots`). Nothing else.
+- **It writes in a few known places.** Beside the ROM: the game's save (or `--save`),
+  `<rom>.quick.st` (F5) and `<rom>-shot.png` (F12). In its per-user settings folder:
+  `last-rom.txt`, the path of the ROM chosen last time. Where you say: the `--state-save` file and
+  the `--shot-dir` folder (default `shots`, in the folder you run it from). Nothing else.
+- **Not signed by Apple or Microsoft.** The Mac app is ad-hoc signed and not notarised, the
+  Windows program not signed: the systems warn the first time. Check a download with
+  `gh attestation verify <archive> --repo lborruto/sims2-ds-wide` instead.
 - **No microphone or camera.** They are stubs; nothing is recorded.
 
 ### What it does not protect against

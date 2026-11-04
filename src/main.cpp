@@ -204,11 +204,13 @@ static void Usage()
 }
 
 // A message for whoever started the program: on the terminal always, and in a dialog box too
-// when there may be no terminal (started by a double click).
-static void Tell(bool dialog, const char* type, const std::string& msg)
+// when there may be no terminal (started by a double click). SDL's message box, not
+// tinyfiledialogs': on a Mac and on Linux tinyfd builds a shell command from its strings, and the
+// message carries a file path.
+static void Tell(bool dialog, const std::string& msg)
 {
     fprintf(stderr, "%s\n", msg.c_str());
-    if (dialog) tinyfd_messageBox("The Sims 2 DS, one screen", msg.c_str(), "ok", type, 1);
+    if (dialog) SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "The Sims 2 DS, one screen", msg.c_str(), nullptr);
 }
 
 // The ROM chosen last time, kept in the per-user settings folder (SDL's pref path).
@@ -221,16 +223,43 @@ static std::string LastRomFile()
     return f;
 }
 
+// Whether a path may go to the file picker. tinyfiledialogs runs osascript, zenity or kdialog
+// through a shell on a Mac and on Linux, with the default path inside the command, and copies it
+// into fixed-size buffers: only short paths without control characters or anything a shell gives
+// a meaning to inside quotes are passed (on Windows it calls the common dialog directly, and the
+// backslash is the path separator).
+static bool SafeForPicker(const std::string& path)
+{
+    if (path.empty() || path.size() > 400) return false;
+    for (unsigned char c : path)
+    {
+        if (c < 0x20 || c == 0x7F) return false;
+        if (c == '$' || c == '`' || c == '"' || c == '\'' || c == '!') return false;
+#ifndef _WIN32
+        if (c == '\\') return false;
+#endif
+    }
+    return true;
+}
+
 static std::string PickRom()
 {
     std::string last, file = LastRomFile();
     if (std::ifstream in(file); in) std::getline(in, last);
+    // Only the remembered ROM's folder, and only if it still exists and passes the check.
+    std::string startDir;
+    if (size_t slash = last.find_last_of("/\\"); slash != std::string::npos)
+    {
+        std::string dir = last.substr(0, slash + 1);
+        if (SafeForPicker(dir) && std::ifstream(last).good()) startDir = dir;
+    }
     const char* patterns[] = {"*.nds"};
-    const char* chosen = tinyfd_openFileDialog("Choose your copy of The Sims 2 (DS)", last.empty() ? nullptr : last.c_str(),
+    const char* chosen = tinyfd_openFileDialog("Choose your copy of The Sims 2 (DS)", startDir.empty() ? nullptr : startDir.c_str(),
                                                1, patterns, "Nintendo DS ROM (.nds)", 0);
     if (!chosen) return "";
     std::string rom = chosen;
-    if (!file.empty()) { std::ofstream out(file); out << rom << "\n"; }
+    // Remembered only if it could be offered again safely next time.
+    if (!file.empty() && SafeForPicker(rom)) { std::ofstream out(file); out << rom << "\n"; }
     return rom;
 }
 
@@ -304,7 +333,7 @@ int main(int argc, char** argv)
 
     // The ROM and its save.
     std::ifstream rf(romPath, std::ios::binary);
-    if (!rf) { Tell(dialogs, "error", "Cannot read " + romPath); return 1; }
+    if (!rf) { Tell(dialogs, "Cannot read " + romPath); return 1; }
     std::vector<u8> rom((std::istreambuf_iterator<char>(rf)), {});
     NDSCart::NDSCartArgs cartArgs {};
     {
@@ -319,7 +348,7 @@ int main(int argc, char** argv)
         }
     }
     auto cart = NDSCart::ParseROM(rom.data(), (u32)rom.size(), nullptr, std::move(cartArgs));
-    if (!cart) { Tell(dialogs, "error", "Not a Nintendo DS ROM: " + romPath); return 1; }
+    if (!cart) { Tell(dialogs, "Not a Nintendo DS ROM: " + romPath); return 1; }
 
     NDSArgs args;
     args.JIT = std::nullopt;

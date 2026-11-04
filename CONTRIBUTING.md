@@ -13,7 +13,7 @@ Contents: [Set up](#set-up) · [Checks](#checks) · [Principles](#principles) ·
 
 ## Set up
 
-You need CMake 3.21 or later (3.x), Ninja, a C++20 compiler and git. SDL2 2.30.9 is downloaded
+You need CMake 3.21 or later (4.x works), Ninja, a C++20 compiler and git. SDL2 2.30.9 is downloaded
 and built by CMake (its archive's hash is checked); melonDS 1.1 is a git submodule.
 
 On Linux, SDL needs its development packages. What CI installs on Ubuntu 24.04:
@@ -29,22 +29,32 @@ On a Mac, Xcode's command line tools are enough (plus CMake and Ninja, from Home
     ninja -C build sims2wide
 
 The first build compiles melonDS and SDL (a few minutes); after that, changing `src/` rebuilds
-in seconds. Windows is not built yet: the melonDS core has not been tried with MSVC here.
+in seconds. `build/sims2wide` is a plain program for the command line on every system.
+
+- **The Mac app**: add `-DSIMS2WIDE_MAC_APP=ON` (and `"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+  -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0` for both kinds of Mac, as the release does) to get
+  `build/Sims 2 DS Wide.app`, with the icon made from `packaging/icon.png`.
+- **Windows**: MinGW (UCRT64) from [MSYS2](https://www.msys2.org/), the toolchain melonDS itself
+  uses there: `pacman -S mingw-w64-ucrt-x86_64-{gcc,cmake,ninja}`, then the same commands in the
+  UCRT64 shell. The `.exe` is linked statically (no DLL beside it) and opens no console window;
+  started from a terminal, it writes to that one. MSVC is not supported.
 
 ## Checks
 
 Before opening a pull request:
 
     ninja -C build sims2wide                 # no warnings from src/
-    ./build/sims2wide                        # prints the usage
+    ./build/sims2wide --help                 # prints the usage (with no ROM it opens the file picker)
     ./build/sims2wide <rom> --headless --frames 1800 --shot-every 120 --shot-dir shots/boot
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below).
 
 CI runs on every pull request and push to `main`: actionlint and shellcheck on the workflows,
-gitleaks over the whole history, and a Release build on Linux (Ubuntu 24.04) and macOS 15 that
-runs the program's usage. It has no ROM, so it cannot run the game. The one check to require
+gitleaks over the whole history, and Release builds the way the release makes them: Linux
+(Ubuntu 24.04), the Mac app for both kinds of Mac (macOS 15, each half run) and Windows (MSYS2,
+checked to need no DLL beyond Windows' own), each checked with `--version`. It has no ROM, so it
+cannot run the game. The one check to require
 is "CI result"; a docs-only pull request skips the build and still passes it.
 
 ## Principles
@@ -64,7 +74,8 @@ issue.
   every situation surveyed so far.
 - **melonDS as it is.** The core is the upstream 1.1 release, unmodified. A change to it needs
   an issue first; most belong upstream.
-- **No new dependency without discussion.** Today: melonDS, SDL2, stb_image_write (and Pillow
+- **No new dependency without discussion.** Today: melonDS, SDL2, stb_image_write,
+  tinyfiledialogs (and Pillow
   for `tools/sheet.py` only).
 - **Measure performance claims**, more than once, on the same save state, with `--headless`.
 - **Playable from the keyboard and mouse alone.**
@@ -101,7 +112,17 @@ Everything is in `src/main.cpp`, in sections:
 - **AUTO**: `HudVisible()` checks row 190 of the top screen, the status bar's bottom border, one
   flat colour (`#415969`) from edge to edge in town and nowhere else. `AutoLayout` waits for ten
   frames of agreement before switching, so fades do not flicker.
-- **Shots and save states**: PNG with stb_image_write; melonDS's `Savestate`.
+- **Shots and save states**: PNG with stb_image_write; melonDS's `Savestate`. F5, F7 and F12
+  write beside the ROM (`<rom>.quick.st`, `<rom>-shot.png`): an app started from the Finder or
+  Explorer has no useful current folder.
+- **Starting without a ROM**: `PickRom()` opens the system's file picker (tinyfiledialogs:
+  AppleScript on a Mac, the common dialog on Windows, zenity or kdialog on Linux) in the folder
+  of the ROM chosen last time, kept in `last-rom.txt` in SDL's per-user folder
+  (`SDL_GetPrefPath`). On a Mac and on Linux tinyfd runs those tools through a shell with the
+  strings in the command line: only short paths without shell-special or control characters go
+  to it (`SafeForPicker()`), and errors show in SDL's message box (`Tell()`), never tinyfd's.
+- **Packaging**: `packaging/` holds the icon (drawn by `tools/make_icon.py`), the Mac app's
+  `Info.plist`, `make_icns.sh` and the Windows resource file.
 - **Main loop**: one `RunFrame()` per frame, keys and touch from the script, the keyboard and
   the mouse, audio queued to SDL at 48 kHz.
 
@@ -123,7 +144,8 @@ from Pokémon FullDex; network, microphone and camera are stubs. `src/host.h` wr
    `## [Unreleased]` above it.
 3. Merge to `main`, then tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 4. `release.yml` checks the tagged commit is on `main`, runs CI on it, checks that
-   `CMakeLists.txt` says `X.Y.Z`, builds `sims2-ds-wide-X.Y.Z-linux-x86_64.tar.gz` and
-   `sims2-ds-wide-X.Y.Z-macos-arm64.zip`, attests their build provenance and creates the GitHub
+   `CMakeLists.txt` says `X.Y.Z`, builds `sims2-ds-wide-X.Y.Z-linux-x86_64.tar.gz`,
+   `sims2-ds-wide-X.Y.Z-macos-universal.zip` (the app, ad-hoc signed, not notarised) and
+   `sims2-ds-wide-X.Y.Z-windows-x86_64.zip`, attests their build provenance and creates the GitHub
    release from the changelog section. A tag without its section, or with another version in
    `CMakeLists.txt`, fails on purpose.
