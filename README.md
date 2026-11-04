@@ -18,10 +18,16 @@
 
 - **One window, the right screen big.** In town, the 3D world takes the window and the touch
   screen's panel (Interact, Pockets, Goals, Relationships, Options, the phone, conversations)
-  sits beside it. Title, menus and Create-a-Sim show both screens side by side, since both
-  matter there.
-- **It switches on its own.** It sees when you are in town from the game's own status bar, so
-  the layout follows the game with nothing to set.
+  sits beside it. When the game moves to the touch screen (a social reaction to pick in time,
+  the shop's catalogue, Build Rooms) that one takes the window. Title, menus and Create-a-Sim
+  show both screens side by side, since both matter there.
+- **It switches on its own.** It sees what the game shows (its status bar, a social game, a
+  shop) from the screens themselves, so the layout follows the game with nothing to set.
+- **The DS clock is your clock.** The game lives by the time of day (rooms take real hours,
+  skill points come at set hours), so it reads your computer's time, also after a save state,
+  and fast forward never runs it ahead: the game never sees its clock go back.
+- **A microphone when the game asks for one.** Blow into it with a key (clearing the vacuum's
+  filter, the music mixer); your real microphone is a setting.
 - **The mouse is the stylus.** Click the touch screen wherever it is shown.
 - **Your keyboard is the DS.** Every button has a key; hold Space to fast forward.
 - **Save states and screenshots.** One key each, beside the game's own save.
@@ -85,7 +91,7 @@ emulator or a flash cart works if you put it there.
 
 | Layout | What you see |
 |---|---|
-| **AUTO** (default) | FOCUS in town, SIDE everywhere else |
+| **AUTO** (default) | FOCUS in town (the touch screen big during a social game, in the shop's catalogue or Build Rooms), SIDE everywhere else |
 | **FOCUS** | one screen big, the other at the side (Tab swaps them) |
 | **SIDE** | both screens side by side |
 | **STACKED** | as on the DS, one above the other |
@@ -100,7 +106,9 @@ including the headless mode used to study the game's screens
 - **The side panel is small.** On a 1280 × 720 window it is 320 × 240, a little larger than
   the DS screen. Readable, but a bigger panel is planned.
 - **4:3 world.** No widescreen 3D yet.
-- **Minigames not checked yet.** They may want both screens big: switch to SIDE (2) if so.
+- **Most minigames not checked yet.** The social reactions, the shop and Build Rooms are; the
+  hotel's activities (the vacuum, cards, painting, the music mixer…) are not. If one shows up
+  wrong, Tab swaps the big screen and 2 shows both.
 - **Tested with the European game** (code `ASJP`). The American one should work; its automatic
   layout is untested.
 - **Not signed by Apple or Microsoft.** Hence the extra click the first time; each download

@@ -20,3 +20,11 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   opens in the same folder next time.
 - A headless mode to study the screens: input scripts, shots, save states, and pictures of the
   window's layout (`--compose`).
+- The touch screen takes the window when the game plays on it: the timed social reactions
+  (Impress and the like), the shop's catalogue and Build Rooms. The world comes back when they
+  end.
+- The DS microphone: by default a key blows into it (the vacuum's filter, the music mixer); the
+  computer's own microphone, or none, as a setting (`--mic`).
+- The DS clock is the computer's, also after loading a save state, and fast forward does not
+  run it ahead of real time: the game's days, skill points and night missions keep to the
+  clock, and it never goes back (the game punishes that). `--clock` fixes it for tests.

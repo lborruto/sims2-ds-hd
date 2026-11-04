@@ -88,11 +88,18 @@ The headless mode runs the game without a window, about four times faster than r
 | Option | What it does |
 |---|---|
 | `--headless --frames N` | run N frames, no window |
-| `--input FILE` | an input script, one event per line: `frame frames-held key[+key]` or `frame frames-held touch x y` (`scripts/` has examples) |
+| `--input FILE` | an input script, one event per line: `frame frames-held key[+key]` or `frame frames-held touch x y` (`scripts/` has examples); the key `blow` blows into the microphone |
 | `--shot-every N`, `--shot-at a,b,c`, `--shot-dir DIR` | both screens as PNG (256 × 384) |
 | `--compose` | the window's picture instead (the layout AUTO would show) |
 | `--state-load FILE`, `--state-save FILE` | start from a save state, save one at the end |
 | `--save FILE` | the game's save (use a scratch one for tests) |
+| `--clock "YYYY-MM-DD HH:MM"` | fix the DS clock's start, so that two runs show the same time |
+| `--mic off\|blow\|real` | what the DS hears (the setting otherwise) |
+| `--fast` | start with fast forward held; headless, it exercises the clock's hold |
+| `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
+
+A headless run ends with a line that says what the DS clock reads, how often the hold wrote
+it, and how many microphone samples the game read (0 unless it listened).
 
 The way to explore: save a state at each situation, then work from it. `scripts/title.txt`
 touches the title screen, `play.txt` presses Play, `cas.txt` opens Create-a-Sim, `ok.txt` and
@@ -115,8 +122,28 @@ Keep your ROM in `roms/` and your shots and states in `shots/`: both are ignored
   screen 960 × 720, the other 320 × 240 at the right, centred). The window scales the canvas;
   mouse clicks go back through the same `Place()` to a touch-screen position.
 - **AUTO**: `HudVisible()` checks row 190 of the top screen, the status bar's bottom border, one
-  flat colour (`#415969`) from edge to edge in town and nowhere else. `AutoLayout` waits for ten
-  frames of agreement before switching, so fades do not flicker.
+  flat colour (`#415969`) from edge to edge in town and nowhere else: the world is big. The
+  touch screen is big instead when the game plays there: a social reaction (`SocialVisible()`:
+  the HUD plus row 0 flat `#597192`, the name and relationship box), the shop's catalogue or
+  Build Rooms (`WarmMenuVisible()`: all four corners of the bottom screen warm and bright), or,
+  without the HUD, a dark top screen with a lit bottom one (unverified: meant for the hotel's
+  activities, which no state reaches yet). `AutoLayout` waits for ten frames of agreement
+  before switching, so fades do not flicker; it sets `mainIsTop` only when its answer changes,
+  so Tab still swaps by hand in between.
+- **Microphone** (`mic.*`): melonDS asks `Platform::Mic_ReadInput` for mono 16-bit samples at
+  47.6 kHz while the game listens (`Mic_Start`/`Mic_Stop`, which the game triggers by sampling
+  the touch controller's AUX channel). Per the `mic` setting: the blow key feeds a full-scale
+  wave of random 200-1000 Hz half-periods, the kind of signal melonDS's own frontend plays for
+  its blow hotkey; "real" opens SDL's default capture device only while the game listens and
+  resamples it; "off" is silence. main.cpp copies the setting and the key into `Host::` each
+  frame; a script's `blow` counts as the key.
+- **Clock** (`clock.*`): melonDS's RTC ticks on emulated time and is part of the save state,
+  and a direct boot leaves it at 2000-01-01. The frontend sets it to the computer's local time
+  after `Reset()` and again after every state load, and holds it during fast forward: before
+  each frame it may go to one second before the host's (the host's second when a minute
+  starts), so that the game never sees a minute the host has not reached and never one going
+  back. Outside fast forward only forward corrections (a pause, sleep). The game calls a
+  clock set back cheating. `--clock` fixes the start and turns the holding off.
 - **Shots and save states**: PNG with stb_image_write; melonDS's `Savestate`. F5, F7 and F12
   write beside the ROM (`<rom>.quick.st`, `<rom>-shot.png`): an app started from the Finder or
   Explorer has no useful current folder.
@@ -132,7 +159,8 @@ Keep your ROM in `roms/` and your shots and states in `shots/`: both are ignored
   the mouse, audio queued to SDL at 48 kHz.
 
 `src/platform.cpp` is melonDS's Platform interface (files, threads, the game's save), adapted
-from Pokémon FullDex; network, microphone and camera are stubs. `src/host.h` writes the save.
+from Pokémon FullDex; the microphone goes to `mic.*`, network and camera are stubs.
+`src/host.h` writes the save and carries the mic mode and the blow key to platform.cpp.
 
 ## Commits and pull requests
 
