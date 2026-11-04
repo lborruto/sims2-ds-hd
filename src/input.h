@@ -36,6 +36,10 @@ struct Input
     // The left button went down on the touch screen: until it is released the stylus stays on
     // it, held to its edges (a drag that overshoots does not lift the stylus).
     bool stylusDrag = false;
+    // A press on the touch screen keeps the stylus down for at least this many game frames,
+    // where it was pressed: a quick click or a trackpad tap sends the button down and up within
+    // milliseconds, before the next frame, and the DS would never see the touch.
+    int tapFrames = 0, tapX = 0, tapY = 0;
     int mouseX = 0, mouseY = 0, dragX = 0;
     int zoom = 0;   // frames of X (> 0, zoom in) or Y (< 0, zoom out) still to hold, from the wheel
     float zoomAcc = 0;

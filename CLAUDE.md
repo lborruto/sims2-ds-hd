@@ -93,10 +93,10 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   panel are cool. The social game's bottom barely moves (motion ≤ 0.002 on the sampling grid):
   do not detect activities by motion. The vacuum keeps the HUD: told by row 1 of the bottom
   screen (`#30A2D3` x 4-44, `#304951` x 60-100; clogged, the sepia tint's fixed samples of
-  the same row). Without the HUD, a dark top (luma < 40) with a
-  lit bottom (> 50) for 120 frames in a row makes the bottom big: a guess for the activities not
-  reached; the hotel's doors show it for ~30 frames (the world fades out before the panel), so
-  never shorten the hold.
+  the same row). The casino's card game has no HUD: told by its score bar on the top screen
+  (row 17 flat `#594120`, row 19 `#CB9A38` from x 40; `CardsVisible`). Only rules checked on a
+  save state of the activity: a guessed "dark top, lit bottom" rule made the touch screen big in
+  dim places (the casino, as the owner played) and was removed.
 - The hotel route (from s7, goal "Check out the HOTEL"): close the phone (X at 237,15), L 94
   frames then up: the hotel is the building with the blue bed sign; enter by walking up into
   its red door. The concierge's talk gives "nuclear rods in the BASEMENT": rods lie on the
@@ -159,6 +159,12 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   (polygons seen edge-on, often made by clipping at the wide view's edge) to a far corner's
   depth and texels: the two cracks of light on Create-a-Sim's curtain (`--wide`, any `--res3d`).
   To find what draws a stray pixel, log the triangle and weights at that pixel in the write loop.
+- A press on the touch screen keeps the stylus down at least 3 game frames (`tapFrames`): a
+  click or a trackpad tap sends down and up within milliseconds, before the next frame, and the
+  DS never saw it (the owner's "the mouse doesn't work on the cards").
+- `act-cards.st` (shots/) is Keelhaulin' Cards, "Draw a card!", from the owner's play on the
+  downloaded complete save (not in git: `saves/complete-play.sav`, pass it as `--save`); the
+  deck is at touch 127,30. Layout check: `focus (bottom big)`.
 - The window paces itself (`keepPace` in main.cpp, 59.83 fps from the performance counter, not
   during fast forward): vsync alone follows the screen, and a 120 Hz screen ran the game at 2x.
 - The DS buttons' default keys are asked by position (`SDL_GetKeyFromScancode`), so AZERTY and
