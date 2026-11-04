@@ -18,16 +18,27 @@
 
 - **One window, the right screen big.** In town, the 3D world takes the window and the touch
   screen's panel (Interact, Pockets, Goals, Relationships, Options, the phone, conversations)
-  sits beside it. Title, menus and Create-a-Sim show both screens side by side, since both
-  matter there.
-- **It switches on its own.** It sees when you are in town from the game's own status bar, so
-  the layout follows the game with nothing to set.
-- **The mouse is the stylus.** Click the touch screen wherever it is shown.
-- **Your keyboard is the DS.** Every button has a key; hold Space to fast forward.
-- **Save states and screenshots.** One key each, beside the game's own save.
+  sits beside it. When the game moves to the touch screen (a social reaction to pick in time,
+  the shop's catalogue, Build Rooms) that one takes the window. Title, menus and Create-a-Sim
+  show both screens side by side, since both matter there.
+- **It switches on its own.** It sees what the game shows (its status bar, a social game, a
+  shop) from the screens themselves, so the layout follows the game with nothing to set.
+- **The DS clock is your clock.** The game lives by the time of day (rooms take real hours,
+  skill points come at set hours), so it reads your computer's time, also after a save state,
+  and fast forward never runs it ahead: the game never sees its clock go back.
+- **A microphone when the game asks for one.** Blow into it with a key (M: clearing the
+  vacuum's filter, the music mixer); your real microphone is a setting.
+- **The mouse is the stylus, and the camera.** Click the touch screen wherever it is shown;
+  over the world, the wheel zooms and a right-button drag turns the camera.
+- **Your keyboard or controller is the DS.** Every button has a key and a pad button, all
+  remappable; a controller's right stick moves a cursor on the touch screen.
+- **A pause menu.** Esc: save and load state, the settings (display, graphics, sound,
+  controls), quit. Settings are kept between runs.
+- **Sound that keeps up.** When the computer falls behind, the music stretches instead of
+  crackling. Copies of your save are kept beside it, every half hour.
 
 It runs the game on the [melonDS](https://melonds.kuribo64.net/) emulator core, built in.
-It is a proof of concept: see [Good to know](#good-to-know).
+It is an early version: see [Good to know](#good-to-know).
 
 <p align="center">
   <img src="docs/screenshots/create-a-sim.webp" alt="Create-a-Sim side by side: the Sim on the left, the name keyboard on the right" width="700">
@@ -38,7 +49,7 @@ It is a proof of concept: see [Good to know](#good-to-know).
 You need your own copy of the game, dumped from your cartridge (`.nds`). Nothing of the game
 is included here.
 
-**Download** from the [releases page](../../releases) once the first version is out:
+**Download** from the [releases page](../../releases):
 
 | Where you play | Download | Start it |
 |---|---|---|
@@ -64,29 +75,57 @@ them.
 
 ## Controls
 
-| Key | Does |
-|---|---|
-| Arrows | +Control Pad |
-| X / Z / S / A | A / B / X / Y |
-| Q / W | L / R |
-| Enter / Right Shift | Start / Select |
-| Mouse | the touch screen, wherever it is shown |
-| Tab | swap which screen is big |
-| 0 / 1 / 2 / 3 | layout: AUTO / FOCUS / SIDE / STACKED |
-| Space (hold) | fast forward |
-| F5 / F7 | save state / load state (beside the ROM, `.quick.st`) |
-| F12 | screenshot of both screens (beside the ROM, `-shot.png`) |
-| Esc | quit |
+| Key | Controller | Does |
+|---|---|---|
+| Arrows | D-pad or left stick | +Control Pad |
+| X / Z / S / A | A / B / X / Y (as labelled) | A / B / X / Y |
+| Q / W | LB / RB | L / R |
+| Enter / Right Shift | Start / Back | Start / Select |
+| Mouse | right stick + LT (the cursor) | the touch screen, wherever it is shown |
+| Mouse wheel, over the world | | zoom in / out (the game's X / Y) |
+| Right button drag, over the world | | turn the camera (the game's L / R) |
+| M (hold) | | blow into the microphone |
+| Esc | Guide, or Start + Back | the pause menu: save states, settings, quit |
+| Tab | right stick click | swap which screen is big |
+| Space (hold) | RT | fast forward |
+| F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
+| 0 / 1 / 2 / 3 | | layout: AUTO / FOCUS / SIDE / STACKED |
+| F11 | | fullscreen |
+| F12 | | screenshot of both screens (beside the ROM, `-shot.png`) |
+
+Every row but the last four can be changed in the menu (SETTINGS > CONTROLS > KEYS AND
+BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation and Switch
+controllers are known by their own button names.
 
 The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another
-emulator or a flash cart works if you put it there.
+emulator or a flash cart works if you put it there. A copy is made in `backups/` beside it when
+the program starts and every half hour (the last eight are kept).
+
+## Settings
+
+Esc opens the pause menu; SETTINGS has four pages:
+
+| Page | Settings |
+|---|---|
+| DISPLAY | fullscreen (F11), smooth scaling, layout |
+| GRAPHICS | 3D resolution, widescreen world, 60 fps |
+| SOUND | volume, sound during fast forward (muted, or at normal pitch skipping ahead) |
+| CONTROLS | stick touch cursor, microphone (off, the blow key, the real one), keys and buttons |
+
+<p align="center">
+  <img src="docs/screenshots/menu.webp" alt="The pause menu's settings page over the town: DISPLAY, GRAPHICS, SOUND, CONTROLS, with a hint for the chosen page" width="700">
+</p>
+
+They are kept in `settings.ini` in your user folder (the window's size too): on Windows
+`%APPDATA%\sims2-ds-wide`, on a Mac `~/Library/Application Support/sims2-ds-wide`, on Linux
+`~/.local/share/sims2-ds-wide`. Delete it to start over.
 
 ## Layouts
 
 | Layout | What you see |
 |---|---|
-| **AUTO** (default) | FOCUS in town, SIDE everywhere else |
-| **FOCUS** | one screen big, the other at the side (Tab swaps them) |
+| **AUTO** (default) | FOCUS in town (the touch screen big during a social game, in the shop's catalogue or Build Rooms), SIDE everywhere else |
+| **FOCUS** | the world big, the touch screen at twice its size over the world's right edge, a little see-through (Tab makes the touch screen the big one instead) |
 | **SIDE** | both screens side by side |
 | **STACKED** | as on the DS, one above the other |
 
@@ -94,17 +133,39 @@ Start with another one: `--layout focus`. Run `sims2wide --help` to see every op
 including the headless mode used to study the game's screens
 ([CONTRIBUTING.md](CONTRIBUTING.md#studying-the-screens)).
 
+## Looks
+
+Three options make the game look better without changing it. All are off by default.
+
+| Option | What it does | On the command line |
+|---|---|---|
+| **Sharper 3D** | draws the 3D world 2, 3 or 4 times sharper | `--res3d 3` |
+| **Widescreen** | shows more of the town left and right, 16:9 instead of 4:3; the status bar stays in the middle | `--wide` |
+| **60 fps** | adds in-between frames: the game draws its 3D at 30 frames a second | `--interp` |
+
+<p align="center">
+  <img src="docs/screenshots/widescreen.webp" alt="Widescreen and three times sharper: the town at night in 16:9, the status bar in the middle at the bottom" width="800">
+</p>
+
+Widescreen is a stretch for a game made for 4:3: the game is told to draw a wider view, and it
+does in town, in conversations and in Create-a-Sim, but a seam can show here and there at the
+edges. Each one costs speed; all three together still run well over full speed on a recent Mac.
+
 ## Good to know
 
-- **A proof of concept.** It shows the idea works; it is not finished.
-- **The side panel is small.** On a 1280 × 720 window it is 320 × 240, a little larger than
-  the DS screen. Readable, but a bigger panel is planned.
-- **4:3 world.** No widescreen 3D yet.
-- **Minigames not checked yet.** They may want both screens big: switch to SIDE (2) if so.
+- **An early version.** Town, conversations, Create-a-Sim, the shop and the social games are
+  checked; not everything the game has is yet.
+- **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
+  world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it.
+- **Widescreen is opt-in.** See [Looks](#looks).
+- **Most minigames not checked yet.** The social reactions, the shop and Build Rooms are; the
+  hotel's activities (the vacuum, cards, painting, the music mixer…) are not. If one shows up
+  wrong, Tab swaps the big screen and 2 shows both.
 - **Tested with the European game** (code `ASJP`). The American one should work; its automatic
   layout is untested.
-- **Not signed by Apple or Microsoft.** Hence the extra click the first time; each download
-  comes with a build attestation from GitHub instead ([SECURITY.md](SECURITY.md)).
+- **Not signed by Apple or Microsoft.** Hence the extra click the first time. Once the project
+  is public, each download comes with a build attestation from GitHub instead
+  ([SECURITY.md](SECURITY.md)).
 
 ## Help and docs
 
@@ -124,7 +185,10 @@ GPLv3, see [LICENSE](LICENSE), as melonDS. Built on [melonDS](https://github.com
 1.1, [SDL2](https://www.libsdl.org/), [stb_image_write](https://github.com/nothings/stb) and
 [tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/).
 The idea comes from [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex), which does
-this for the DS Pokémon games; `src/platform.cpp` is adapted from it.
+this for the DS Pokémon games; `src/platform.cpp`, the remappable controls (`src/controls.*`),
+the menu's drawing and font (`src/ui.*`) and the sound stretching (`src/audiostretch.h`) are
+adapted from it, and the sharper and widescreen 3D and the in-between frames are ported from its
+renderer (`src/melonds_ext/`, `patches/melonDS/`), GPLv3 too.
 
 ## Not affiliated, no warranty
 

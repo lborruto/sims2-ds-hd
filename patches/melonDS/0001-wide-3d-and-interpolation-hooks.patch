@@ -1,0 +1,292 @@
+diff --git a/src/GPU3D.cpp b/src/GPU3D.cpp
+index 1204741..9374df5 100644
+--- a/src/GPU3D.cpp
++++ b/src/GPU3D.cpp
+@@ -25,9 +25,11 @@
+ #include "GPU3D_Soft.h"
+ #include "Platform.h"
+ #include "GPU3D.h"
++#include "GPU3D_Wide.h"
+ 
+ namespace melonDS
+ {
++GPU3DLooks Looks3D; // sims2wide
+ using Platform::Log;
+ using Platform::LogLevel;
+ 
+@@ -971,6 +973,20 @@ void GPU3D::SubmitPolygon() noexcept
+     // TODO: work out how it works on the real thing
+     // the normalization part is a wild guess
+ 
++    // sims2wide: recorded so that the frame can be submitted again (GPU3D_Wide.cpp).
++    if ((Looks3D.InterpolationEnabled || Wide.Owner == this) && !Looks3D.InReplay)
++    {
++        GPU3DLooks::RawPolygon& raw = Looks3D.RawCurrent.emplace_back();
++        memcpy(raw.Vertices, TempVertexBuffer, sizeof(raw.Vertices));
++        raw.PolygonMode = PolygonMode;
++        raw.PolygonAttr = CurPolygonAttr;
++        raw.TexParam = TexParam;
++        raw.TexPalette = TexPalette;
++        memcpy(raw.Viewport, Viewport, sizeof(raw.Viewport));
++        raw.NumConsecutivePolygons = NumConsecutivePolygons;
++        raw.StripStart = LastStripPolygon == nullptr;
++    }
++
+     Vertex *v0, *v1, *v2, *v3;
+     s64 normalX, normalY, normalZ;
+     s64 dot;
+@@ -1092,7 +1108,7 @@ void GPU3D::SubmitPolygon() noexcept
+ 
+     // reject the polygon if it's not going to fit in polygon/vertex RAM
+ 
+-    if (NumPolygons >= 2048 || NumVertices+nverts > 6144)
++    if (NumPolygons >= Looks3D.PolygonLimit || NumVertices+nverts > Looks3D.VertexLimit)
+     {
+         LastStripPolygon = NULL;
+         DispCnt |= (1<<13);
+@@ -1589,6 +1605,15 @@ void GPU3D::BoxTest(const u32* params) noexcept
+         cube[i].Position[3] = ((s64)x*ClipMatrix[3] + (s64)y*ClipMatrix[7] + (s64)z*ClipMatrix[11] + (s64)0x1000*ClipMatrix[15]) >> 12;
+     }
+ 
++    // sims2wide (from Pokemon FullDex): with the widescreen picture on, the test is made against
++    // the wide view, so that the game also draws what is only visible beside the DS's own
++    // picture. The one place where widescreen changes what the game itself sees.
++    if (Wide.Owner == this && Wide.ViewWidth > 256)
++    {
++        for (int i = 0; i < 8; i++)
++            cube[i].Position[0] = (s32)((s64)cube[i].Position[0] * 256 / (s64)Wide.ViewWidth);
++    }
++
+     // front face (-Z)
+     face[0] = cube[0]; face[1] = cube[1]; face[2] = cube[2]; face[3] = cube[3];
+     res = ClipPolygon<false>(*this, face, 4, 0);
+@@ -2456,8 +2481,30 @@ bool YSort(Polygon* a, Polygon* b)
+     return a->SortKey < b->SortKey;
+ }
+ 
++// sims2wide: replays the frame just submitted with every vertex moved halfway back towards
++// where the same polygon was in the previous frame.
++void GPU3D::BuildInterpolatedFrame() noexcept
++{
++    Looks3D.InterpPending = false;
++    if (Looks3D.RawCurrent.empty() || Looks3D.RawPrevious.empty()) return;
++
++    if (Looks3D.InterpVertexRAM.empty())
++    {
++        Looks3D.InterpVertexRAM.resize(6144);
++        Looks3D.InterpPolygonRAM.resize(2048);
++    }
++
++    u32 matched = 0;
++    const size_t frameSize = Looks3D.RawCurrent.size();
++    WideReplay(*this, true, Looks3D.InterpVertexRAM.data(), Looks3D.InterpPolygonRAM.data(), Looks3D.InterpRenderPolygonRAM.data(),
++        Looks3D.InterpNumPolygons, matched);
++    // (Mostly new polygons: a cut to another scene, nothing to smooth.)
++    Looks3D.InterpPending = Looks3D.InterpNumPolygons && matched * 2 >= frameSize;
++}
++
+ void GPU3D::VBlank() noexcept
+ {
++    Looks3D.VBlankCount++;
+     if (GeometryEnabled)
+     {
+         if (RenderingEnabled)
+@@ -2487,6 +2534,21 @@ void GPU3D::VBlank() noexcept
+ 
+                 RenderNumPolygons = NumPolygons;
+                 RenderFrameIdentical = false;
++
++                // sims2wide: interpolate only on a steady every-other-frame cadence, and never
++                // while the 3D picture is being captured into video memory.
++                Looks3D.InterpPending = false;
++                Looks3D.InterpShowReal = false;
++                if (Looks3D.InterpolationEnabled || Wide.Owner == this)
++                {
++                    const bool capturing = (NDS.GPU.GPU2D_A.CaptureCnt & (1u << 31)) != 0;
++                    const bool interpolate = Looks3D.InterpolationEnabled && Looks3D.VBlankCount - Looks3D.LastFlushVBlank == 2 && !capturing;
++                    if (interpolate) BuildInterpolatedFrame();
++                    if (Wide.Owner == this) WideOnFlush(*this, Looks3D.InterpPending);
++                    Looks3D.RawPrevious.swap(Looks3D.RawCurrent);
++                    Looks3D.RawCurrent.clear();
++                }
++                Looks3D.LastFlushVBlank = Looks3D.VBlankCount;
+             }
+             else
+             {
+@@ -2499,6 +2561,13 @@ void GPU3D::VBlank() noexcept
+                     && memcmp(RenderEdgeTable, EdgeTable, 8*2) == 0
+                     && memcmp(RenderFogDensityTable + 1, FogDensityTable, 32) == 0
+                     && memcmp(RenderToonTable, ToonTable, 32*2) == 0;
++
++                // sims2wide: the previous display frame showed the in-between picture.
++                if (Looks3D.InterpShowReal)
++                {
++                    RenderFrameIdentical = false;
++                    Looks3D.InterpShowReal = false;
++                }
+             }
+ 
+             RenderDispCnt = DispCnt;
+@@ -2535,7 +2604,27 @@ void GPU3D::VBlank() noexcept
+ 
+ void GPU3D::VCount215(GPU& gpu) noexcept
+ {
++    // sims2wide: the wide picture drawn in the background reads texture memory, which rendering
++    // a frame is about to bring up to date.
++    WideWaitForTextures();
++    if (Looks3D.InterpPending)
++    {
++        // sims2wide: draw the in-between frame now; the real one follows on the next display frame.
++        std::array<Polygon*,2048> realList = RenderPolygonRAM;
++        const u32 realCount = RenderNumPolygons;
++        RenderPolygonRAM = Looks3D.InterpRenderPolygonRAM;
++        RenderNumPolygons = Looks3D.InterpNumPolygons;
++        CurrentRenderer->RenderFrame(gpu);
++        RenderPolygonRAM = realList;
++        RenderNumPolygons = realCount;
++        Looks3D.InterpPending = false;
++        Looks3D.InterpShowReal = true;
++        Looks3D.InterpolatedFrames++;
++        if (Wide.Owner == this) WideOnRender(gpu, true);
++        return;
++    }
+     CurrentRenderer->RenderFrame(gpu);
++    if (Wide.Owner == this) WideOnRender(gpu, false);
+ }
+ 
+ void GPU3D::SetRenderXPos(u16 xpos) noexcept
+diff --git a/src/GPU3D.h b/src/GPU3D.h
+index 08c2208..49e1028 100644
+--- a/src/GPU3D.h
++++ b/src/GPU3D.h
+@@ -21,6 +21,7 @@
+ 
+ #include <array>
+ #include <memory>
++#include <vector>
+ 
+ #include "Savestate.h"
+ #include "FIFO.h"
+@@ -85,8 +86,11 @@ struct Polygon
+ class Renderer3D;
+ class NDS;
+ 
++struct WideAccess; // sims2wide: the sharper and widescreen 3D picture (src/melonds_ext/GPU3D_Wide.cpp)
++
+ class GPU3D
+ {
++    friend struct WideAccess;
+ public:
+     GPU3D(melonDS::NDS& nds, std::unique_ptr<Renderer3D>&& renderer = nullptr) noexcept;
+     ~GPU3D() noexcept = default;
+@@ -128,6 +132,8 @@ public:
+     void Write16(u32 addr, u16 val) noexcept;
+     void Write32(u32 addr, u32 val) noexcept;
+     void Blit(const GPU& gpu) noexcept;
++    // sims2wide: in-between frames (GPU3D.cpp, GPU3DLooks below).
++    void BuildInterpolatedFrame() noexcept;
+ private:
+     melonDS::NDS& NDS;
+     typedef union
+@@ -329,6 +335,43 @@ public:
+     u32 ScrolledLine[256]; // not part of the hardware state, don't serialize
+ };
+ 
++// sims2wide (from Pokemon FullDex): what the sharper and widescreen 3D picture and the
++// in-between frames need, kept outside GPU3D so that melonDS's own objects keep their memory
++// layout (with everything off, the output stays byte for byte melonDS's). One console.
++struct GPU3DLooks
++{
++    // 3D frame interpolation: a game that updates its 3D scene every second display frame
++    // (30 fps) gets an in-between picture, built from the previous and the new geometry, on the
++    // first of those two frames. Only what is shown changes, never what the game sees.
++    bool InterpolationEnabled = false;
++    u32 InterpolatedFrames = 0; // statistics
++
++    // Everything SubmitPolygon reads, recorded per call (only while interpolation or the wide
++    // picture is on) so that a frame can be submitted again: with vertices halfway between two
++    // frames, or with a wider view.
++    struct RawPolygon
++    {
++        Vertex Vertices[4];
++        u32 PolygonMode, PolygonAttr, TexParam, TexPalette;
++        u32 Viewport[6];
++        u32 NumConsecutivePolygons;
++        bool StripStart; // no previous strip polygon to attach to
++    };
++    std::vector<RawPolygon> RawCurrent;   // frame being submitted
++    std::vector<RawPolygon> RawPrevious;  // last frame that was flushed
++    bool InReplay = false;
++    // How many polygons and vertices SubmitPolygon takes: the DS's memory, more for the wide lists.
++    u32 PolygonLimit = 2048, VertexLimit = 6144;
++    u64 VBlankCount = 0, LastFlushVBlank = 0;
++    bool InterpPending = false;   // an in-between frame is ready to be shown
++    bool InterpShowReal = false;  // the real frame must be drawn on the next display frame
++    std::vector<Vertex> InterpVertexRAM;
++    std::vector<Polygon> InterpPolygonRAM;
++    std::array<Polygon*,2048> InterpRenderPolygonRAM {};
++    u32 InterpNumPolygons = 0;
++};
++extern GPU3DLooks Looks3D;
++
+ class Renderer3D
+ {
+ public:
+diff --git a/src/GPU3D_Soft.cpp b/src/GPU3D_Soft.cpp
+index 9f6e2d7..c074c75 100644
+--- a/src/GPU3D_Soft.cpp
++++ b/src/GPU3D_Soft.cpp
+@@ -1740,6 +1740,12 @@ void SoftRenderer::VCount144(GPU& gpu)
+         Platform::Semaphore_Wait(Sema_RenderDone);
+ }
+ 
++// sims2wide: the list the render thread draws, a copy: interpolation swaps the GPU's list for
++// one call of RenderFrame and puts it back before the thread is done. (Not a member, so that
++// the renderer's memory layout stays melonDS's own.)
++static Polygon* ThreadPolygons[2048];
++static int ThreadNumPolygons = 0;
++
+ void SoftRenderer::RenderFrame(GPU& gpu)
+ {
+     auto textureDirty = gpu.VRAMDirty_Texture.DeriveState(gpu.VRAMMap_Texture, gpu);
+@@ -1752,6 +1758,9 @@ void SoftRenderer::RenderFrame(GPU& gpu)
+ 
+     if (RenderThreadRunning.load(std::memory_order_relaxed))
+     {
++        // sims2wide: the thread draws a copy of the list (ThreadPolygons).
++        ThreadNumPolygons = (int)gpu.GPU3D.RenderNumPolygons;
++        memcpy(ThreadPolygons, &gpu.GPU3D.RenderPolygonRAM[0], ThreadNumPolygons * sizeof(Polygon*));
+         // "Render thread, you're up! Get moving."
+         Platform::Semaphore_Post(Sema_RenderStart);
+     }
+@@ -1765,6 +1774,9 @@ void SoftRenderer::RenderFrame(GPU& gpu)
+ void SoftRenderer::RestartFrame(GPU& gpu)
+ {
+     SetupRenderThread(gpu);
++    // sims2wide: the list the thread draws (see RenderFrame).
++    ThreadNumPolygons = (int)gpu.GPU3D.RenderNumPolygons;
++    memcpy(ThreadPolygons, &gpu.GPU3D.RenderPolygonRAM[0], ThreadNumPolygons * sizeof(Polygon*));
+     EnableRenderThread();
+ }
+ 
+@@ -1790,7 +1802,7 @@ void SoftRenderer::RenderThreadFunc(GPU& gpu)
+         else
+         {
+             ClearBuffers(gpu);
+-            RenderPolygons(gpu, true, &gpu.GPU3D.RenderPolygonRAM[0], gpu.GPU3D.RenderNumPolygons);
++            RenderPolygons(gpu, true, ThreadPolygons, ThreadNumPolygons);
+         }
+ 
+         // Tell the main thread that we're done rendering
+diff --git a/src/GPU3D_Soft.h b/src/GPU3D_Soft.h
+index a201c6a..34a65dc 100644
+--- a/src/GPU3D_Soft.h
++++ b/src/GPU3D_Soft.h
+@@ -46,6 +46,7 @@ public:
+     void StopRenderThread();
+ private:
+     friend void GPU3D::DoSavestate(Savestate* file) noexcept;
++    friend struct WideAccess; // sims2wide: the wide picture shares texture decoding
+     // Notes on the interpolator:
+     //
+     // This is a theory on how the DS hardware interpolates values. It matches hardware output

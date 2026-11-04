@@ -14,7 +14,7 @@ basis, with no guaranteed response time.
 The latest release only: the most recent `vX.Y.Z` tag and its downloads on the
 [releases page](https://github.com/lborruto/sims2-ds-wide/releases). Fixes land on `main` and in
 the next release; older tags are not patched. Each download comes with a build provenance
-attestation: `gh attestation verify <file> --repo lborruto/sims2-ds-wide`.
+attestation once the repository is public: `gh attestation verify <file> --repo lborruto/sims2-ds-wide`.
 
 ## Security model
 

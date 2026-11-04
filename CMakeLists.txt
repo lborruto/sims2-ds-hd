@@ -10,7 +10,38 @@ set(BUILD_QT_SDL OFF CACHE BOOL "" FORCE)
 set(ENABLE_JIT OFF CACHE BOOL "" FORCE)
 set(ENABLE_GDBSTUB OFF CACHE BOOL "" FORCE)
 set(ENABLE_OGLRENDERER OFF CACHE BOOL "" FORCE)
+
+# melonDS stays the upstream 1.1 release; the few hooks the looks need (sharper and widescreen
+# 3D, 60 fps in-between frames) are patches in patches/melonDS, applied to the submodule's
+# files here, in order. Idempotent: a patch that already reverses cleanly is applied already.
+# To get the pristine files back: git -C melonDS checkout -- . (then configure again).
+find_package(Git REQUIRED)
+file(GLOB SIMS2WIDE_MELONDS_PATCHES "${CMAKE_CURRENT_SOURCE_DIR}/patches/melonDS/*.patch")
+list(SORT SIMS2WIDE_MELONDS_PATCHES)
+foreach(patch IN LISTS SIMS2WIDE_MELONDS_PATCHES)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${patch}")
+    execute_process(COMMAND "${GIT_EXECUTABLE}" apply --reverse --check "${patch}"
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/melonDS" RESULT_VARIABLE already OUTPUT_QUIET ERROR_QUIET)
+    if(NOT already EQUAL 0)
+        execute_process(COMMAND "${GIT_EXECUTABLE}" apply --whitespace=nowarn "${patch}"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/melonDS" RESULT_VARIABLE failed ERROR_VARIABLE why)
+        if(failed)
+            message(FATAL_ERROR "Cannot apply ${patch} to melonDS: ${why}Is the submodule at the 1.1 tag? (git submodule update --init)")
+        endif()
+        get_filename_component(name "${patch}" NAME)
+        message(STATUS "melonDS: applied ${name}")
+    endif()
+endforeach()
+
 add_subdirectory(melonDS EXCLUDE_FROM_ALL)
+
+# The sharper and widescreen 3D picture (src/melonds_ext, from Pokemon FullDex), built into
+# melonDS's core library, which calls it. Its rasteriser is a hot per-pixel loop.
+target_sources(core PRIVATE src/melonds_ext/GPU3D_Wide.cpp)
+target_include_directories(core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/melonds_ext" PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/melonDS/src")
+if(NOT MSVC)
+    set_source_files_properties(src/melonds_ext/GPU3D_Wide.cpp TARGET_DIRECTORY core PROPERTIES COMPILE_OPTIONS "-O3;-ffast-math")
+endif()
 
 # CMake 4 dropped compatibility with projects asking for policies older than 3.5; SDL2's own
 # CMakeLists still does. This keeps CMake 3.21 to 4.x working.
@@ -25,7 +56,12 @@ FetchContent_Declare(sdl2
     URL_HASH SHA256=24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4)
 FetchContent_MakeAvailable(sdl2)
 
-add_executable(sims2wide src/main.cpp src/platform.cpp src/thirdparty/tinyfiledialogs.c)
+add_executable(sims2wide
+    src/main.cpp src/platform.cpp
+    src/audio.cpp src/backup.cpp src/clock.cpp src/controls.cpp src/input.cpp src/layout.cpp
+    src/looks.cpp src/menu.cpp src/mic.cpp src/picker.cpp src/scene.cpp src/script.cpp
+    src/settings.cpp src/shots.cpp src/state.cpp src/ui.cpp src/video.cpp
+    src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
 target_link_libraries(sims2wide PRIVATE core SDL2::SDL2-static)
 target_compile_definitions(sims2wide PRIVATE SIMS2WIDE_VERSION="${PROJECT_VERSION}")
@@ -63,3 +99,7 @@ if(WIN32)
         target_link_options(sims2wide PRIVATE -static)
     endif()
 endif()
+
+# Checks of the layouts' touch mapping (not built by default): ninja -C build layout_test && ./build/layout_test
+add_executable(layout_test EXCLUDE_FROM_ALL tests/layout_test.cpp src/layout.cpp)
+target_include_directories(layout_test PRIVATE melonDS/src src)
