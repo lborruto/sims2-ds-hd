@@ -1,10 +1,10 @@
 name: Release
 
-# A tag vX.Y.Z on main runs CI on the tagged commit, builds the program for Linux x86_64 and macOS
-# on Apple silicon, attests the archives' build provenance, then creates the GitHub release with
-# that version's section of CHANGELOG.md as notes and the two archives attached. The version in
-# CMakeLists.txt must be the tag's. The archives hold the program, README.md and LICENSE: never a
-# ROM, a save or anything from the game.
+# A tag vX.Y.Z on main runs CI on the tagged commit, builds the program for Linux x86_64, macOS
+# (Sims 2 DS Wide.app, Apple silicon and Intel in one) and Windows x86_64, attests the archives'
+# build provenance, then creates the GitHub release with that version's section of CHANGELOG.md as
+# notes and the three archives attached. The version in CMakeLists.txt must be the tag's. The
+# archives hold the program, README.md and LICENSE: never a ROM, a save or anything from the game.
 on:
   push:
     tags: ["v*.*.*"]
@@ -96,7 +96,7 @@ jobs:
     name: Build (${{ matrix.platform }})
     needs: notes
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 40
     permissions:
       contents: read
     strategy:
@@ -106,7 +106,7 @@ jobs:
           - os: ubuntu-24.04
             platform: linux-x86_64
           - os: macos-15
-            platform: macos-arm64
+            platform: macos-universal
     env:
       TAG: ${{ github.ref_name }}
       PLATFORM: ${{ matrix.platform }}
@@ -125,7 +125,14 @@ jobs:
           else
             brew install ninja
           fi
-      - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - name: Configure
+        run: |
+          if [ "$RUNNER_OS" = macOS ]; then
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSIMS2WIDE_MAC_APP=ON \
+              "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          else
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          fi
       - run: ninja -C build sims2wide
       - name: Pack
         run: |
@@ -133,13 +140,20 @@ jobs:
           name="sims2-ds-wide-${version}-${PLATFORM}"
           out="$RUNNER_TEMP/dist"
           mkdir -p "$out/$name"
-          cp build/sims2wide README.md LICENSE "$out/$name/"
-          cd "$out"
+          cp README.md LICENSE "$out/$name/"
           if [ "$RUNNER_OS" = Linux ]; then
+            cp build/sims2wide "$out/$name/"
+            cd "$out"
             tar -czf "$name.tar.gz" "$name"
             sha256sum "$name.tar.gz" | tee "$name.sha256"
           else
-            zip -qr "$name.zip" "$name"
+            # Not notarised (that needs a paid Apple developer account): an ad-hoc signature,
+            # which Apple silicon needs to run it at all. First start: right click > Open.
+            cp -R "build/Sims 2 DS Wide.app" "$out/$name/"
+            codesign --force --deep -s - "$out/$name/Sims 2 DS Wide.app"
+            codesign -v "$out/$name/Sims 2 DS Wide.app"
+            cd "$out"
+            ditto -c -k --keepParent "$name" "$name.zip"
             shasum -a 256 "$name.zip" | tee "$name.sha256"
           fi
           rm -r "${out:?}/$name"
@@ -150,12 +164,58 @@ jobs:
           if-no-files-found: error
           retention-days: 5
 
+  build-windows:
+    name: Build (windows-x86_64)
+    needs: notes
+    runs-on: windows-2025
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: msys2 {0}
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (2026-07-20)
+        with:
+          persist-credentials: false
+          submodules: true
+      - uses: msys2/setup-msys2@ec48f7c5447b3140e2b088413ae3a55687bccb6e # v2.33.0 (2026-09-27)
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            zip
+      - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - run: ninja -C build sims2wide
+      - name: Pack
+        run: |
+          version="${TAG#v}"
+          name="sims2-ds-wide-${version}-windows-x86_64"
+          out="$(cygpath -u "$RUNNER_TEMP")/dist"
+          mkdir -p "$out/$name"
+          cp build/sims2wide.exe README.md LICENSE "$out/$name/"
+          cd "$out"
+          zip -qr "$name.zip" "$name"
+          sha256sum "$name.zip" | tee "$name.sha256"
+          rm -r "${out:?}/$name"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2 (2026-10-07)
+        with:
+          name: dist-windows-x86_64
+          path: ${{ runner.temp }}/dist/
+          if-no-files-found: error
+          retention-days: 5
+
   # A signed build-provenance attestation of the archives (Sigstore, stored by GitHub): who built
   # them, from which commit and workflow. The OIDC token exists only in this job, which runs no
   # code from the repository.
   attest:
     name: Build provenance
-    needs: build
+    needs: [build, build-windows]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -176,7 +236,7 @@ jobs:
 
   release:
     name: GitHub release
-    needs: [notes, build, attest]
+    needs: [notes, build, build-windows, attest]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -207,7 +267,8 @@ jobs:
             echo
             echo "Check an archive's build provenance with"
             echo "\`gh attestation verify <archive> --repo $GITHUB_REPOSITORY\`."
-            echo "The programs are not signed: on a Mac, right click > Open the first time."
+            echo "The programs are not signed by Apple or Microsoft: the first time, right click >"
+            echo "Open on a Mac, and More info > Run anyway on Windows."
           } >>notes/notes.md
           set --
           case "$TAG" in *-*) set -- --prerelease ;; esac

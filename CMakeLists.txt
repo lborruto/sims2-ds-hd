@@ -25,7 +25,41 @@ FetchContent_Declare(sdl2
     URL_HASH SHA256=24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4)
 FetchContent_MakeAvailable(sdl2)
 
-add_executable(sims2wide src/main.cpp src/platform.cpp)
+add_executable(sims2wide src/main.cpp src/platform.cpp src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
 target_link_libraries(sims2wide PRIVATE core SDL2::SDL2-static)
 target_compile_definitions(sims2wide PRIVATE SIMS2WIDE_VERSION="${PROJECT_VERSION}")
+
+# macOS: an app to double-click (the release builds it, for Apple silicon and Intel at once with
+# -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"). Off by default, so that build/sims2wide stays a
+# plain program for the command line.
+option(SIMS2WIDE_MAC_APP "Build Sims 2 DS Wide.app instead of a plain program (macOS)" OFF)
+if(APPLE AND SIMS2WIDE_MAC_APP)
+    set(ICNS "${CMAKE_CURRENT_BINARY_DIR}/AppIcon.icns")
+    add_custom_command(OUTPUT "${ICNS}"
+        COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/packaging/make_icns.sh" "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icon.png" "${ICNS}"
+        DEPENDS packaging/icon.png packaging/make_icns.sh)
+    target_sources(sims2wide PRIVATE "${ICNS}")
+    set_source_files_properties("${ICNS}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+    set_target_properties(sims2wide PROPERTIES
+        MACOSX_BUNDLE TRUE
+        OUTPUT_NAME "Sims 2 DS Wide"
+        MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/Info.plist.in"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
+        MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
+endif()
+
+# Windows: a program that opens no console window when double-clicked (main.cpp attaches to the
+# terminal it was started from, if any), with its icon, linked statically so that the .exe needs
+# no DLL beside it. The file picker uses comdlg32 and ole32.
+if(WIN32)
+    target_sources(sims2wide PRIVATE packaging/sims2wide.rc)
+    set_target_properties(sims2wide PROPERTIES WIN32_EXECUTABLE TRUE)
+    if(TARGET SDL2::SDL2main)
+        target_link_libraries(sims2wide PRIVATE SDL2::SDL2main)
+    endif()
+    target_link_libraries(sims2wide PRIVATE comdlg32 ole32)
+    if(MINGW)
+        target_link_options(sims2wide PRIVATE -static)
+    endif()
+endif()
