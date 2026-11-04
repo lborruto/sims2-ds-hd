@@ -30,16 +30,18 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (2026-07-20)
-        with:
-          persist-credentials: false
-          fetch-depth: 0
-      - run: |
-          git fetch --no-tags origin main
-          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
-            echo "::error::$GITHUB_REF_NAME points to a commit that is not on main"
-            exit 1
-          fi
+      # Asked of GitHub's API rather than with git fetch: the checkout keeps no credentials, and
+      # a private repository cannot be fetched without them.
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          status="$(gh api "repos/$GH_REPO/compare/main...$GITHUB_SHA" -q .status)"
+          echo "compared with main: $status"
+          case "$status" in identical | behind) ;; *)
+            echo "::error::$GITHUB_REF_NAME points to a commit that is not on main ($status)"
+            exit 1 ;;
+          esac
 
   checks:
     name: CI on the tagged commit
