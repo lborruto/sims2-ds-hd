@@ -1,0 +1,5 @@
+roms/
+build*/
+*.sav
+*.st
+shots/
