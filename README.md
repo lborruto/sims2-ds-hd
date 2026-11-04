@@ -38,7 +38,7 @@
   crackling. Copies of your save are kept beside it, every half hour.
 
 It runs the game on the [melonDS](https://melonds.kuribo64.net/) emulator core, built in.
-It is a proof of concept: see [Good to know](#good-to-know).
+It is an early version: see [Good to know](#good-to-know).
 
 <p align="center">
   <img src="docs/screenshots/create-a-sim.webp" alt="Create-a-Sim side by side: the Sim on the left, the name keyboard on the right" width="700">
@@ -49,7 +49,7 @@ It is a proof of concept: see [Good to know](#good-to-know).
 You need your own copy of the game, dumped from your cartridge (`.nds`). Nothing of the game
 is included here.
 
-**Download** from the [releases page](../../releases) once the first version is out:
+**Download** from the [releases page](../../releases):
 
 | Where you play | Download | Start it |
 |---|---|---|
@@ -153,7 +153,8 @@ edges. Each one costs speed; all three together still run well over full speed o
 
 ## Good to know
 
-- **A proof of concept.** It shows the idea works; it is not finished.
+- **An early version.** Town, conversations, Create-a-Sim, the shop and the social games are
+  checked; not everything the game has is yet.
 - **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
   world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it.
 - **Widescreen is opt-in.** See [Looks](#looks).
@@ -162,8 +163,9 @@ edges. Each one costs speed; all three together still run well over full speed o
   wrong, Tab swaps the big screen and 2 shows both.
 - **Tested with the European game** (code `ASJP`). The American one should work; its automatic
   layout is untested.
-- **Not signed by Apple or Microsoft.** Hence the extra click the first time; each download
-  comes with a build attestation from GitHub instead ([SECURITY.md](SECURITY.md)).
+- **Not signed by Apple or Microsoft.** Hence the extra click the first time. Once the project
+  is public, each download comes with a build attestation from GitHub instead
+  ([SECURITY.md](SECURITY.md)).
 
 ## Help and docs
 

@@ -214,9 +214,12 @@ jobs:
   # A signed build-provenance attestation of the archives (Sigstore, stored by GitHub): who built
   # them, from which commit and workflow. The OIDC token exists only in this job, which runs no
   # code from the repository.
+  # Attestations need a public repository on GitHub's free plan: while the repository is
+  # private the job is skipped, and the release says so.
   attest:
     name: Build provenance
     needs: [build, build-windows]
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -238,6 +241,8 @@ jobs:
   release:
     name: GitHub release
     needs: [notes, build, build-windows, attest]
+    # Runs when every build passed and the attestation passed, or was skipped (private).
+    if: ${{ always() && needs.notes.result == 'success' && needs.build.result == 'success' && needs.build-windows.result == 'success' && (needs.attest.result == 'success' || needs.attest.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -257,6 +262,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
+          ATTESTED: ${{ needs.attest.result }}
         run: |
           {
             echo
@@ -266,8 +272,10 @@ jobs:
             echo
             for f in dist/*.sha256; do echo "- \`$(cut -d' ' -f3 "$f")\` \`$(cut -d' ' -f1 "$f")\`"; done
             echo
-            echo "Check an archive's build provenance with"
-            echo "\`gh attestation verify <archive> --repo $GITHUB_REPOSITORY\`."
+            if [ "$ATTESTED" = success ]; then
+              echo "Check an archive's build provenance with"
+              echo "\`gh attestation verify <archive> --repo $GITHUB_REPOSITORY\`."
+            fi
             echo "The programs are not signed by Apple or Microsoft: the first time, right click >"
             echo "Open on a Mac, and More info > Run anyway on Windows."
           } >>notes/notes.md
