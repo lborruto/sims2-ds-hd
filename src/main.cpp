@@ -8,7 +8,7 @@
 //   audio.*    sound                 layout.*  where the screens go          scene.*   AUTO's detection
 //   script.*   headless input        shots.*   PNG pictures                  state.*   save states
 //   picker.*   ROM file picker       menu.*    pause menu and overlay        ui.*      overlay drawing
-//   settings.* the settings file     controls.* key and button bindings
+//   settings.* the settings file     controls.* key and button bindings      backup.*  save copies
 #include <SDL.h>
 
 #include <cstdio>
@@ -27,6 +27,7 @@
 #include "NDSCart.h"
 #include "app.h"
 #include "audio.h"
+#include "backup.h"
 #include "host.h"
 #include "input.h"
 #include "menu.h"
@@ -171,17 +172,19 @@ int main(int argc, char** argv)
     for (const InputEvent& e : script) winShots |= e.winShot;
     if (!shotAt.empty() || shotEvery || winShots) { std::string cmd = "mkdir -p '" + shotDir + "'"; (void)system(cmd.c_str()); }
 
-    // Window, sound, controllers.
+    // Window, sound, controllers, the save's backups.
     Video video;
     Audio audio;
     Input input;
     PauseMenu menu;
+    Backups backups;
     if (!headless)
     {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
         if (!video.Open(app.settings)) return 1;
         audio.Open();
         input.OpenPads();
+        backups.Start(Host::SavePath);
     }
 
     // frame counts the game's frames (shots, scripts); iter every turn of the loop, paused too.
@@ -227,6 +230,7 @@ int main(int argc, char** argv)
             }
             input.Frame(app, video, frame, keys, touching, tx, ty);
             input.EndFrame();
+            backups.Tick(SDL_GetTicks());
         }
 
         nds.SetKeyMask(~keys & 0xFFF);
