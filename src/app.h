@@ -9,6 +9,7 @@
 #include "common.h"
 #include "layout.h"
 #include "scene.h"
+#include "settings.h"
 
 namespace sims2wide
 {
@@ -21,8 +22,15 @@ struct App
     bool mainIsTop = true;         // FOCUS: which screen is big
     AutoLayout autoLayout;
 
+    Settings settings;
+
     bool fast = false;             // fast forward held
     bool quit = false;
+    bool micBlow = false;          // the "blow into the microphone" key is held
+
+    // The shape of the top screen's picture, width / height: 4/3 on the DS; wider when the
+    // widescreen world is on. Layouts size the top screen from it.
+    float topAspect = 4.0f / 3.0f;
 
     std::string quickState;        // F5 / F7
     std::string shotFile;          // F12
