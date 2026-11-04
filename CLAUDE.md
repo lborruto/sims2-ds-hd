@@ -121,8 +121,12 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 - Looks: the wide picture is published one frame after it is drawn; `Looks::Frame` waits three
   frames after the looks are switched on. `--wide` changes the box test, so it changes what
   the game draws (and its output); `--res3d` and `--interp` change only what is shown.
-- Looks: widescreen seams. In Create-a-Sim, two thin horizontal cracks on the curtain right of
-  the DS's view (geometry that only meets at DS resolution); none seen in town.
+- Looks: seams in the big 3D. `GPU3D_Wide.cpp` grows each triangle by 0.34 output pixel to
+  close gaps between polygons; a sample in that margin must go back to the triangle's *nearest*
+  point (`edge[]`, square to the edge). Clamping its weights instead moved it along slivers
+  (polygons seen edge-on, often made by clipping at the wide view's edge) to a far corner's
+  depth and texels: the two cracks of light on Create-a-Sim's curtain (`--wide`, any `--res3d`).
+  To find what draws a stray pixel, log the triangle and weights at that pixel in the write loop.
 - JIT is off (`ENABLE_JIT OFF`): macOS arm64 needs MAP_JIT entitlements.
 - Running `sims2wide` with no ROM opens a file picker and waits: in automated runs always pass a
   ROM (or `--help`/`--version`).
