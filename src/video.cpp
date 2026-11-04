@@ -18,7 +18,20 @@ bool Video::Open()
 
 void Video::Present(const App& app)
 {
-    SDL_UpdateTexture(tex[0], nullptr, app.Top(), SW * 4);
+    // --- looks: the top screen at its real size (App::TopImage: sharper / widescreen 3D). The
+    // texture follows the picture's size. Layouts size the top screen from app.topAspect.
+    {
+        int tw, th, cw, ch;
+        const u32* top = app.TopImage(tw, th);
+        SDL_QueryTexture(tex[0], nullptr, nullptr, &cw, &ch);
+        if (cw != tw || ch != th)
+        {
+            SDL_DestroyTexture(tex[0]);
+            tex[0] = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, tw, th);
+        }
+        SDL_UpdateTexture(tex[0], nullptr, top, tw * 4);
+    }
+    // --- end looks
     SDL_UpdateTexture(tex[1], nullptr, app.Bottom(), SW * 4);
     Placement p = Place(app.shown, app.mainIsTop);
     int ow, oh;
