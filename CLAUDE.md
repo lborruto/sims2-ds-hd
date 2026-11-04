@@ -159,6 +159,10 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   (polygons seen edge-on, often made by clipping at the wide view's edge) to a far corner's
   depth and texels: the two cracks of light on Create-a-Sim's curtain (`--wide`, any `--res3d`).
   To find what draws a stray pixel, log the triangle and weights at that pixel in the write loop.
+- The window paces itself (`keepPace` in main.cpp, 59.83 fps from the performance counter, not
+  during fast forward): vsync alone follows the screen, and a 120 Hz screen ran the game at 2x.
+- The DS buttons' default keys are asked by position (`SDL_GetKeyFromScancode`), so AZERTY and
+  QWERTZ get the QWERTY places; the other defaults (M, Enter, arrows, F keys) are by name.
 - JIT is off (`ENABLE_JIT OFF`): macOS arm64 needs MAP_JIT entitlements.
 - Running `sims2wide` with no ROM opens a file picker and waits: in automated runs always pass a
   ROM (or `--help`/`--version`).

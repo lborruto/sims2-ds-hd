@@ -78,8 +78,8 @@ them.
 | Key | Controller | Does |
 |---|---|---|
 | Arrows | D-pad or left stick | +Control Pad |
-| X / Z / S / A | A / B / X / Y (as labelled) | A / B / X / Y |
-| Q / W | LB / RB | L / R |
+| X / Z / S / A (AZERTY: X / W / S / Q) | A / B / X / Y (as labelled) | A / B / X / Y |
+| Q / W (AZERTY: A / Z) | LB / RB | L / R |
 | Enter / Right Shift | Start / Back | Start / Select |
 | Mouse | right stick + LT (the cursor) | the touch screen, wherever it is shown |
 | Mouse wheel, over the world | | zoom in / out (the game's X / Y) |
@@ -93,7 +93,8 @@ them.
 | F11 | | fullscreen |
 | F12 | | screenshot of both screens (beside the ROM, `-shot.png`) |
 
-Every row but the last four can be changed in the menu (SETTINGS > CONTROLS > KEYS AND
+The DS's buttons are placed by position, not by letter: on an AZERTY or QWERTZ keyboard they
+sit in the same places as on QWERTY. Every row but the last four can be changed in the menu (SETTINGS > CONTROLS > KEYS AND
 BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation and Switch
 controllers are known by their own button names.
 

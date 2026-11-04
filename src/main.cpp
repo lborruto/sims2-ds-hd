@@ -218,6 +218,20 @@ int main(int argc, char** argv)
 
     // frame counts the game's frames (shots, scripts); iter every turn of the loop, paused too.
     long frame = 0;
+    // The window keeps the DS's own pace, 59.83 frames a second: vsync alone would follow the
+    // screen, and on a 120 Hz screen (ProMotion, gaming monitors) the game ran twice too fast.
+    const double dsFrame = 1.0 / (33513982.0 / (6.0 * 355.0 * 263.0)); // seconds
+    const double perfFreq = (double)SDL_GetPerformanceFrequency();
+    double nextFrameAt = 0; // in seconds of the performance counter; 0: not started
+    auto keepPace = [&]() {
+        if (headless || app.fast) { nextFrameAt = 0; return; }
+        double now = SDL_GetPerformanceCounter() / perfFreq;
+        if (nextFrameAt == 0 || now - nextFrameAt > 4 * dsFrame) nextFrameAt = now; // start, or fell behind
+        nextFrameAt += dsFrame;
+        double wait = nextFrameAt - now;
+        if (wait > 0.002) SDL_Delay((Uint32)((wait - 0.001) * 1000)); // sleep most of it
+        while (SDL_GetPerformanceCounter() / perfFreq < nextFrameAt) {} // then the last moment
+    };
     for (long iter = 0; (frames < 0 || iter < frames) && !app.quit; iter++)
     {
         u32 keys = 0;
@@ -245,6 +259,7 @@ int main(int argc, char** argv)
                 input.EndFrame();
                 menu.Draw(app, video, input, frame);
                 video.Present(app, &menu.canvas);
+                keepPace();
                 continue;
             }
             if (input.wantSave) menu.Say(SaveState(nds, quickState) ? "STATE SAVED" : "STATE NOT SAVED", frame);
@@ -308,6 +323,7 @@ int main(int argc, char** argv)
         audio.Frame(nds, app.fast, app.settings);
         if (app.fast && frame % 4) continue; // fast forward: one picture in four
         video.Present(app, menu.Draw(app, video, input, frame) ? &menu.canvas : nullptr);
+        keepPace();
     }
 
     Looks::Shutdown();

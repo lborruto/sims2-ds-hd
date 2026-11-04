@@ -56,12 +56,15 @@ int DefaultKey(int a)
 {
     switch (a)
     {
-    case A: return SDLK_x;
-    case B: return SDLK_z;
-    case X: return SDLK_s;
-    case Y: return SDLK_a;
-    case L: return SDLK_q;
-    case R: return SDLK_w;
+    // The DS's buttons sit where they are on a QWERTY keyboard's left hand, whatever the layout:
+    // asked by position (scancode), so AZERTY gets W for B, Q for Y, A for L and Z for R. SDL
+    // knows the layout once its video part is up, which is before any key is read.
+    case A: return SDL_GetKeyFromScancode(SDL_SCANCODE_X);
+    case B: return SDL_GetKeyFromScancode(SDL_SCANCODE_Z);
+    case X: return SDL_GetKeyFromScancode(SDL_SCANCODE_S);
+    case Y: return SDL_GetKeyFromScancode(SDL_SCANCODE_A);
+    case L: return SDL_GetKeyFromScancode(SDL_SCANCODE_Q);
+    case R: return SDL_GetKeyFromScancode(SDL_SCANCODE_W);
     case START: return SDLK_RETURN;
     case SELECT: return SDLK_RSHIFT;
     case UP: return SDLK_UP;
