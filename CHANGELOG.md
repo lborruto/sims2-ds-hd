@@ -9,6 +9,7 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
+- The casino's card game (Keelhaulin' Cards) shows the cards big, the table beside them.
 - The DS buttons' keys follow their position on any keyboard layout: on AZERTY, B is on W,
   Y on Q, L on A and R on Z, the same places as on QWERTY.
 
@@ -17,6 +18,10 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Fixed
 
+- A quick click or a trackpad tap on the touch screen was often lost (the button went down and
+  up between two frames): every press now holds the stylus down for three frames.
+- In the casino the screens swapped size now and then: a guessed rule made the touch screen big
+  in dim places. It is gone; only situations checked in the game switch the layout.
 - The game ran twice too fast on 120 Hz screens (MacBook Pro, gaming monitors): the window now
   keeps the DS's own pace, 59.83 frames a second, whatever the screen.
 - A mouse drag that started on the touch screen no longer lifts the stylus when it overshoots

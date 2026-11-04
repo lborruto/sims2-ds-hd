@@ -29,6 +29,14 @@ bool SocialVisible(const u32* top)
     return HudVisible(top) && FlatRow(top, 0, 0x597192);
 }
 
+bool CardsVisible(const u32* top)
+{
+    // Keelhaulin' Cards (the casino): the score bar across the top screen, a flat dark brown
+    // row 17 (#594120) and the gold line of row 19 (#CB9A38, from x 40: its left end is
+    // shaded). The same in every frame of a 4000-frame game; no other state matches.
+    return FlatRow(top, 17, 0x594120) && FlatRow(top, 19, 0xCB9A38, 40, 248);
+}
+
 bool VacuumVisible(const u32* bottom)
 {
     // The vacuum's bowl keeps the town's HUD on top; its frame on the touch screen is told by
@@ -109,15 +117,12 @@ Layout AutoLayout::Update(const u32* topPx, const u32* bottomPx, bool& mainIsTop
     topLuma += (tl - topLuma) * k;
     bottomLuma += (bl - bottomLuma) * k;
 
-    // The touch screen's turn. With the HUD: a social reaction, a full-screen menu or the
-    // vacuum. Without it, the fallback for the activities not reached yet (cards, painting…): the
-    // game dims the world on top and plays on the touch screen. Unverified; the hotel's dark
-    // rooms fade out the top before the panel (about 30 frames of dark top and lit bottom), so it
-    // must hold for two seconds.
-    const bool darkNow = !hudNow && topLuma < 40 && bottomLuma > 50;
-    darkStreak = darkNow ? darkStreak + 1 : 0;
+    // The touch screen's turn: with the HUD, a social reaction, a full-screen menu or the vacuum;
+    // without it, the casino's card game. Only rules checked on a save state of the activity: a
+    // guessed "dark top, lit bottom" rule made the touch screen big in dim places (the casino)
+    // and was removed.
     bool bigNow = hudNow ? (SocialVisible(topPx) || WarmMenuVisible(bottomPx) || VacuumVisible(bottomPx))
-                         : darkStreak >= 120;
+                         : CardsVisible(topPx);
     bigStreak = bigNow == bottomBig ? 0 : bigStreak + 1;
     if (bigStreak >= 10)
     {
@@ -130,7 +135,7 @@ Layout AutoLayout::Update(const u32* topPx, const u32* bottomPx, bool& mainIsTop
     static const int probeEvery = probe ? atoi(probe) : 0;
     if (probeEvery > 0 && frame % probeEvery == 0)
         fprintf(stderr, "probe frame %ld: hud %d social %d warm %d vacuum %d | top motion %.4f luma %.0f | bottom motion %.4f luma %.0f\n",
-                frame, hudNow, SocialVisible(topPx), WarmMenuVisible(bottomPx), VacuumVisible(bottomPx), topMotion, topLuma, bottomMotion, bottomLuma);
+                frame, hudNow, SocialVisible(topPx), WarmMenuVisible(bottomPx), VacuumVisible(bottomPx) || CardsVisible(topPx), topMotion, topLuma, bottomMotion, bottomLuma);
 
     if (hud || bottomBig) return Layout::Focus;
     // Anything else (title, Create-a-Sim, loading) needs both screens alike: SIDE.
