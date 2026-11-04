@@ -42,6 +42,9 @@ struct CanvasFit
 
 // An output pixel position on the bottom screen, as a DS touch position; false when outside it.
 bool TouchFromOutput(const Placement& p, const CanvasFit& fit, float px, float py, int& tx, int& ty);
+// The same, held to the bottom screen's edges wherever the point is: a stylus drag that started
+// on the touch screen (dragging an item, tracing) stays on it when the mouse overshoots.
+void TouchClamped(const Placement& p, const CanvasFit& fit, float px, float py, int& tx, int& ty);
 // Whether an output pixel position is on the top screen's picture (and not under the panel).
 bool OverTop(const Placement& p, const CanvasFit& fit, float px, float py);
 

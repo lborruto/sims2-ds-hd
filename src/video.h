@@ -33,6 +33,8 @@ struct Video
     void ToOutput(int wx, int wy, float& px, float& py) const;
     // A window position on the touch screen, as a DS touch position.
     bool TouchAt(const App& app, int wx, int wy, int& tx, int& ty) const;
+    // A window position as a DS touch position held to the touch screen's edges (a drag).
+    void TouchClampedAt(const App& app, int wx, int wy, int& tx, int& ty) const;
     // Whether a window position is over the top (world) screen's picture.
     bool OverTop(const App& app, int wx, int wy) const;
     // The bottom screen's rectangle in output pixels (where the touch cursor is drawn).

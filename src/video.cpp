@@ -133,6 +133,16 @@ bool Video::TouchAt(const App& app, int wx, int wy, int& tx, int& ty) const
     return TouchFromOutput(p, CanvasFit::For(p, ow, oh), px, py, tx, ty);
 }
 
+void Video::TouchClampedAt(const App& app, int wx, int wy, int& tx, int& ty) const
+{
+    const Placement p = Placed(app);
+    int ow, oh;
+    SDL_GetRendererOutputSize(ren, &ow, &oh);
+    float px, py;
+    ToOutput(wx, wy, px, py);
+    TouchClamped(p, CanvasFit::For(p, ow, oh), px, py, tx, ty);
+}
+
 bool Video::OverTop(const App& app, int wx, int wy) const
 {
     const Placement p = Placed(app);

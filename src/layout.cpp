@@ -69,6 +69,16 @@ bool TouchFromOutput(const Placement& p, const CanvasFit& fit, float px, float p
     return true;
 }
 
+void TouchClamped(const Placement& p, const CanvasFit& fit, float px, float py, int& tx, int& ty)
+{
+    float cx, cy;
+    fit.ToCanvas(px, py, cx, cy);
+    const Rect& b = p.bottom;
+    const float x = (cx - b.x) * SW / b.w, y = (cy - b.y) * SH / b.h;
+    tx = x < 0 ? 0 : x > SW - 1 ? SW - 1 : (int)x;
+    ty = y < 0 ? 0 : y > SH - 1 ? SH - 1 : (int)y;
+}
+
 bool OverTop(const Placement& p, const CanvasFit& fit, float px, float py)
 {
     float cx, cy;
