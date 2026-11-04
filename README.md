@@ -94,12 +94,30 @@ Start with another one: `--layout focus`. Run `sims2wide --help` to see every op
 including the headless mode used to study the game's screens
 ([CONTRIBUTING.md](CONTRIBUTING.md#studying-the-screens)).
 
+## Looks
+
+Three options make the game look better without changing it. All are off by default.
+
+| Option | What it does | On the command line |
+|---|---|---|
+| **Sharper 3D** | draws the 3D world 2, 3 or 4 times sharper | `--res3d 3` |
+| **Widescreen** | shows more of the town left and right, 16:9 instead of 4:3; the status bar stays in the middle | `--wide` |
+| **60 fps** | adds in-between frames: the game draws its 3D at 30 frames a second | `--interp` |
+
+<p align="center">
+  <img src="docs/screenshots/widescreen.webp" alt="Widescreen and three times sharper: the town at night in 16:9, the status bar in the middle at the bottom" width="800">
+</p>
+
+Widescreen is a stretch for a game made for 4:3: the game is told to draw a wider view, and it
+does in town, in conversations and in Create-a-Sim, but a seam can show here and there at the
+edges. Each one costs speed; all three together still run well over full speed on a recent Mac.
+
 ## Good to know
 
 - **A proof of concept.** It shows the idea works; it is not finished.
 - **The side panel is small.** On a 1280 × 720 window it is 320 × 240, a little larger than
   the DS screen. Readable, but a bigger panel is planned.
-- **4:3 world.** No widescreen 3D yet.
+- **Widescreen is opt-in.** See [Looks](#looks).
 - **Minigames not checked yet.** They may want both screens big: switch to SIDE (2) if so.
 - **Tested with the European game** (code `ASJP`). The American one should work; its automatic
   layout is untested.
@@ -124,7 +142,9 @@ GPLv3, see [LICENSE](LICENSE), as melonDS. Built on [melonDS](https://github.com
 1.1, [SDL2](https://www.libsdl.org/), [stb_image_write](https://github.com/nothings/stb) and
 [tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/).
 The idea comes from [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex), which does
-this for the DS Pokémon games; `src/platform.cpp` is adapted from it.
+this for the DS Pokémon games; `src/platform.cpp` is adapted from it, and the sharper and
+widescreen 3D and the in-between frames are ported from its renderer (`src/melonds_ext/`,
+`patches/melonDS/`, GPLv3 too).
 
 ## Not affiliated, no warranty
 

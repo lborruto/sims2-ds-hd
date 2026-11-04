@@ -29,7 +29,10 @@ On a Mac, Xcode's command line tools are enough (plus CMake and Ninja, from Home
     ninja -C build sims2wide
 
 The first build compiles melonDS and SDL (a few minutes); after that, changing `src/` rebuilds
-in seconds. `build/sims2wide` is a plain program for the command line on every system.
+in seconds. Configuring also applies `patches/melonDS/*.patch` to the submodule's files (see
+[How it works](#how-it-works)): `git status` does not show that (`ignore = dirty` in
+`.gitmodules`), and `git -C melonDS checkout -- .` gives the pristine files back until the next
+configure. `build/sims2wide` is a plain program for the command line on every system.
 
 - **The Mac app**: add `-DSIMS2WIDE_MAC_APP=ON` (and `"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0` for both kinds of Mac, as the release does) to get
@@ -49,6 +52,10 @@ Before opening a pull request:
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below).
+
+A change to the core's patches or to the looks keeps the looks-off output byte for byte the
+same: from save states of Create-a-Sim, a conversation and free roam, `--frames 200
+--shot-every 50` with and without `--compose`, shasums compared before and after the change.
 
 CI runs on every pull request and push to `main`: actionlint and shellcheck on the workflows,
 gitleaks over the whole history, CodeQL on `src/` (once the repository is public: code
@@ -73,8 +80,10 @@ issue.
 - **Learn from the picture, not from the game's code.** Situations are recognised from the
   screens' pixels (like the status bar). A rule comes with the shots that show it holds, in
   every situation surveyed so far.
-- **melonDS as it is.** The core is the upstream 1.1 release, unmodified. A change to it needs
-  an issue first; most belong upstream.
+- **melonDS as it is.** The core is the upstream 1.1 release. The only changes are the small
+  hooks in `patches/melonDS/` for the looks, applied at configure time; with the looks off they
+  change nothing (the check below). Another change to it needs an issue first; most belong
+  upstream.
 - **No new dependency without discussion.** Today: melonDS, SDL2, stb_image_write,
   tinyfiledialogs (and Pillow
   for `tools/sheet.py` only).
@@ -91,6 +100,7 @@ The headless mode runs the game without a window, about four times faster than r
 | `--input FILE` | an input script, one event per line: `frame frames-held key[+key]` or `frame frames-held touch x y` (`scripts/` has examples) |
 | `--shot-every N`, `--shot-at a,b,c`, `--shot-dir DIR` | both screens as PNG (256 × 384) |
 | `--compose` | the window's picture instead (the layout AUTO would show) |
+| `--res3d N`, `--wide`, `--interp` | the looks; shots then also write the top picture at its size (`fNNNNNN-top.png`) |
 | `--state-load FILE`, `--state-save FILE` | start from a save state, save one at the end |
 | `--save FILE` | the game's save (use a scratch one for tests) |
 
@@ -128,6 +138,24 @@ Keep your ROM in `roms/` and your shots and states in `shots/`: both are ignored
   to it (`SafeForPicker()`), and errors show in SDL's message box (`Tell()`), never tinyfd's.
 - **Packaging**: `packaging/` holds the icon (drawn by `tools/make_icon.py`), the Mac app's
   `Info.plist`, `make_icns.sh` and the Windows resource file.
+- **Looks** (`looks.*`, `melonds_ext/`, `patches/melonDS/`): sharper 3D, widescreen and 60 fps
+  in-between frames, ported from Pokémon FullDex's renderer (GPLv3). melonDS stays the 1.1
+  tag; CMake applies the patches in `patches/melonDS/` to the submodule at configure time, in
+  order, skipping one that `git apply --reverse --check` says is applied already. `0001` records
+  every polygon the game submits (`GPU3DLooks::RawCurrent`) while a look is on, calls the hooks
+  in `melonds_ext/GPU3D_Wide.cpp` when a frame is flushed and rendered, draws the in-between
+  frame, and widens the box test with the view. `0002` records per pixel where the top screen
+  showed its 3D layer and how (`GPU2DLooks::Pixel3D`, brightness per line). Their state lives
+  in globals, not in melonDS's objects, so that the emulator's memory layout (and its output
+  with the looks off) does not change. `GPU3D_Wide.cpp` replays the frame's polygons (x
+  squeezed by 256/view width for widescreen), rasterises them on worker threads at the asked
+  size (SIMD through the compiler's vector types: SSE2 on x86-64, NEON on arm64), and publishes
+  the picture a frame later, in step with the DS's own 3D. `Looks::Frame` then builds the top
+  picture: the big 3D where `Pixel3D` says the DS showed 3D (with the same brightness effects),
+  the DS's 2D scaled up elsewhere, the wide 3D beside the DS's 256 columns.
+  `App::TopImage(w, h)` returns it and `app.topAspect` its shape. In-between frames:
+  only when the game draws its 3D every second frame (Sims 2 does, at 30 fps); each polygon
+  is paired with the same one in the previous frame and moved halfway (a frame of latency).
 - **Main loop**: one `RunFrame()` per frame, keys and touch from the script, the keyboard and
   the mouse, audio queued to SDL at 48 kHz.
 

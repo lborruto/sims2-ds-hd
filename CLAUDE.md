@@ -2,7 +2,7 @@
 
 The Sims 2 (Nintendo DS, 2005) in one window, in the spirit of
 [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex). The melonDS 1.1 core (submodule,
-unmodified) runs the game; a small SDL2 frontend (`src/`) lays out the two screens and
+plus the small looks hooks in `patches/melonDS/`) runs the game; a small SDL2 frontend (`src/`) lays out the two screens and
 picks the layout from what the screens show. No decompilation or recompiler: none exists for
 this game and plain melonDS is fast enough. `origin` = `lborruto/sims2-ds-wide` (private until
 the owner makes it public; write everything as if it were public already).
@@ -18,7 +18,8 @@ the owner makes it public; write everything as if it were public already).
 - Never push `main` without the owner's go-ahead.
 - Keep the README short and for players; technical detail goes here and in CONTRIBUTING.md. A PR
   that changes what README.md or this file says updates them.
-- AUTO stays the default layout. melonDS stays unmodified unless the owner agrees.
+- AUTO stays the default layout. melonDS stays the upstream 1.1 tag: changes go in
+  `patches/melonDS/` (applied by CMake) and only with the owner's agreement; never a fork.
 - One task = one clear commit; `ninja -C build sims2wide` and a headless run before each commit.
 
 ## Layout
@@ -31,6 +32,9 @@ the owner makes it public; write everything as if it were public already).
 | `src/video.*` | The SDL window: draws the shown layout, maps window points to touch positions |
 | `src/audio.*` | SDL sound queue |
 | `src/layout.*` | `Place()` (canvas per layout), `CanvasFit` (letterboxed scaling), `TouchFromOutput` |
+| `src/looks.*` | Sharper / widescreen 3D and 60 fps: applies the Looks settings, builds `App::TopImage` |
+| `src/melonds_ext/GPU3D_Wide.*` | FullDex's wide 3D rasteriser (CPU), built into melonDS's `core` |
+| `patches/melonDS/*.patch` | Hooks in melonDS 1.1 for the looks, applied at configure time |
 | `src/scene.*` | AUTO's detection from the screens' pixels: `HudVisible()`, `AutoLayout::Update(top, bottom, mainIsTop)` |
 | `src/script.*`, `src/shots.*`, `src/state.*`, `src/picker.*` | Headless input scripts; PNG shots and `--compose`; save states; ROM file picker and `Tell()` |
 | `src/platform.cpp` | melonDS Platform interface (files, threads, save), adapted from pokemon-fulldex |
@@ -64,6 +68,17 @@ Save states `shots/s2.st` (main menu), `s3` (Create-a-Sim), `s4` (Keep this Sim?
   Window points and renderer pixels differ on HiDPI; `touchAt` converts.
 - In town the bottom screen often has a popup to close (the X near 126,110 or 126,126) before
   the D-pad moves the Sim.
+- Looks: with all looks off the headless output must stay byte for byte the same (24-shot
+  shasum check in CONTRIBUTING). Frame 0 after `--state-load` shows melonDS's uninitialised 3D
+  buffer, so even the memory layout of melonDS's objects matters: patch state goes in globals
+  (`Looks3D`, `Looks2D`), never in new members.
+- Looks: a patch that no longer applies fails the configure with a message. To edit one, change
+  the submodule's files, then `git -C melonDS diff -- <files> > patches/melonDS/000N-….patch`.
+- Looks: the wide picture is published one frame after it is drawn; `Looks::Frame` waits three
+  frames after the looks are switched on. `--wide` changes the box test, so it changes what
+  the game draws (and its output); `--res3d` and `--interp` change only what is shown.
+- Looks: widescreen seams. In Create-a-Sim, two thin horizontal cracks on the curtain right of
+  the DS's view (geometry that only meets at DS resolution); none seen in town.
 - JIT is off (`ENABLE_JIT OFF`): macOS arm64 needs MAP_JIT entitlements.
 - Running `sims2wide` with no ROM opens a file picker and waits: in automated runs always pass a
   ROM (or `--help`/`--version`).
@@ -86,6 +101,6 @@ Save states `shots/s2.st` (main menu), `s3` (Create-a-Sim), `s4` (Keep this Sim?
 | 1 | POC: melonDS + SDL frontend, headless study of the screens, AUTO layout | ✅ |
 | 2 | Repository template (docs, CI, release, issue templates), portfolio page in `lborruto/docs` | 🔄 |
 | 3 | Bigger side panel, or a panel over the edge of the world view | ⏳ |
-| 4 | Widescreen 3D, borrowed from FullDex's `GPU3D_Wide.cpp` | ⏳ |
+| 4 | Widescreen 3D, borrowed from FullDex's `GPU3D_Wide.cpp`; sharper 3D, 60 fps (opt-in looks) | 🔄 (feat/looks) |
 | 5 | Survey the minigames and the other situations (shops, jobs, night) | ⏳ |
 | 6 | Desktop apps: file picker, universal Mac app, Windows .exe (CI and release) | 🔄 (PR #1) |

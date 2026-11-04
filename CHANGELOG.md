@@ -18,5 +18,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - Downloads for Windows (one `.exe`), Mac (an app for Apple silicon and Intel) and Linux.
 - Started without a ROM (a double click), it asks for one with the system's file picker and
   opens in the same folder next time.
+- Looks, all off by default: sharper 3D (`--res3d N`, 2 to 4 times the DS's resolution), a
+  widescreen 16:9 world (`--wide`) and 60 fps in-between frames for the 3D (`--interp`), ported
+  from Pokémon FullDex's renderer.
 - A headless mode to study the screens: input scripts, shots, save states, and pictures of the
   window's layout (`--compose`).
