@@ -185,6 +185,7 @@ static bool LoadState(NDS& nds, const std::string& path)
 static void Usage()
 {
     fprintf(stderr,
+        "sims2wide " SIMS2WIDE_VERSION "\n"
         "usage: sims2wide <rom.nds> [options]\n"
         "  --layout auto|focus|side|stacked  window layout (default auto)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
@@ -202,6 +203,7 @@ static void Usage()
 int main(int argc, char** argv)
 {
     if (argc < 2) { Usage(); return 1; }
+    if (!strcmp(argv[1], "--version")) { printf("sims2wide %s\n", SIMS2WIDE_VERSION); return 0; }
     std::string romPath = argv[1], inputPath, shotDir = "shots", stateLoad, stateSave;
     bool headless = false;
     long frames = -1;

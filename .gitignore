@@ -1,5 +1,8 @@
-roms/
-build*/
+*.nds
 *.sav
 *.st
+build*/
+quick.st
+roms/
+shot.png
 shots/

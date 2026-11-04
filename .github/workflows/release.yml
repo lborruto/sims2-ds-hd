@@ -1,0 +1,215 @@
+name: Release
+
+# A tag vX.Y.Z on main runs CI on the tagged commit, builds the program for Linux x86_64 and macOS
+# on Apple silicon, attests the archives' build provenance, then creates the GitHub release with
+# that version's section of CHANGELOG.md as notes and the two archives attached. The version in
+# CMakeLists.txt must be the tag's. The archives hold the program, README.md and LICENSE: never a
+# ROM, a save or anything from the game.
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+# Tags queue rather than cancel one another: a cancelled run could leave an attestation without
+# its release.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# Every action is pinned to the commit of a release at least two weeks old (resolved from its
+# tag on 2026-11-01); the comment names the release and the date it was published. No Actions
+# cache feeds the build: the released programs are built from a clean checkout.
+jobs:
+  # A release is only ever made from reviewed code: the tagged commit must be on main.
+  on-main:
+    name: Tagged commit is on main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (2026-07-20)
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - run: |
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME points to a commit that is not on main"
+            exit 1
+          fi
+
+  checks:
+    name: CI on the tagged commit
+    needs: on-main
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+
+  # The version and the notes, checked before anything is built.
+  notes:
+    name: Version and notes
+    needs: checks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (2026-07-20)
+        with:
+          persist-credentials: false
+      - name: CMakeLists.txt version is the tag's
+        run: |
+          version="$(sed -n 's/^project(sims2wide VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::CMakeLists.txt says $version but the tag is $TAG; bump the version before tagging"
+            exit 1
+          fi
+      # The notes are the `## [X.Y.Z]` section of CHANGELOG.md (Keep a Changelog); a tag without
+      # its section fails here.
+      - name: Notes from CHANGELOG.md
+        run: |
+          version="${TAG#v}"
+          mkdir -p "$RUNNER_TEMP/notes"
+          awk -v heading="## [$version]" '
+            index($0, heading) == 1 { found = 1; next }
+            /^## / { found = 0 }
+            found
+          ' CHANGELOG.md >"$RUNNER_TEMP/notes/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes/notes.md"; then
+            echo "::error::CHANGELOG.md has no '## [$version]' section; add it before tagging v$version"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/notes/notes.md"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2 (2026-10-07)
+        with:
+          name: notes
+          path: ${{ runner.temp }}/notes/
+          if-no-files-found: error
+          retention-days: 5
+
+  build:
+    name: Build (${{ matrix.platform }})
+    needs: notes
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-x86_64
+          - os: macos-15
+            platform: macos-arm64
+    env:
+      TAG: ${{ github.ref_name }}
+      PLATFORM: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (2026-07-20)
+        with:
+          persist-credentials: false
+          submodules: true
+      - name: Build tools and SDL's system headers
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            sudo apt-get update -q
+            sudo apt-get install -y -q ninja-build libx11-dev libxext-dev libxrandr-dev \
+              libxcursor-dev libxi-dev libxss-dev libxkbcommon-dev libwayland-dev \
+              wayland-protocols libasound2-dev libpulse-dev
+          else
+            brew install ninja
+          fi
+      - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+      - run: ninja -C build sims2wide
+      - name: Pack
+        run: |
+          version="${TAG#v}"
+          name="sims2-ds-wide-${version}-${PLATFORM}"
+          out="$RUNNER_TEMP/dist"
+          mkdir -p "$out/$name"
+          cp build/sims2wide README.md LICENSE "$out/$name/"
+          cd "$out"
+          if [ "$RUNNER_OS" = Linux ]; then
+            tar -czf "$name.tar.gz" "$name"
+            sha256sum "$name.tar.gz" | tee "$name.sha256"
+          else
+            zip -qr "$name.zip" "$name"
+            shasum -a 256 "$name.zip" | tee "$name.sha256"
+          fi
+          rm -r "${out:?}/$name"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2 (2026-10-07)
+        with:
+          name: dist-${{ matrix.platform }}
+          path: ${{ runner.temp }}/dist/
+          if-no-files-found: error
+          retention-days: 5
+
+  # A signed build-provenance attestation of the archives (Sigstore, stored by GitHub): who built
+  # them, from which commit and workflow. The OIDC token exists only in this job, which runs no
+  # code from the repository.
+  attest:
+    name: Build provenance
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2 (2026-10-07)
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2 (2026-08-06)
+        with:
+          subject-path: |
+            dist/sims2-ds-wide-*.tar.gz
+            dist/sims2-ds-wide-*.zip
+
+  release:
+    name: GitHub release
+    needs: [notes, build, attest]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2 (2026-10-07)
+        with:
+          pattern: dist-*
+          merge-multiple: true
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2 (2026-10-07)
+        with:
+          name: notes
+          path: notes
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          {
+            echo
+            echo "---"
+            echo
+            echo "Attached (SHA-256):"
+            echo
+            for f in dist/*.sha256; do echo "- \`$(cut -d' ' -f3 "$f")\` \`$(cut -d' ' -f1 "$f")\`"; done
+            echo
+            echo "Check an archive's build provenance with"
+            echo "\`gh attestation verify <archive> --repo $GITHUB_REPOSITORY\`."
+            echo "The programs are not signed: on a Mac, right click > Open the first time."
+          } >>notes/notes.md
+          set --
+          case "$TAG" in *-*) set -- --prerelease ;; esac
+          gh release create "$TAG" dist/sims2-ds-wide-*.tar.gz dist/sims2-ds-wide-*.zip \
+            --verify-tag --title "$TAG" --notes-file notes/notes.md "$@"

@@ -1,0 +1,14 @@
+version: 2
+# Weekly, grouped, and only for releases at least 14 days old (cooldown), matching the rule for
+# pinned actions. melonDS is a submodule pinned to its 1.1 tag and SDL2 a hash-pinned download in
+# CMakeLists.txt: both are updated by hand, tested with a ROM, not by Dependabot.
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 14
+    groups:
+      actions:
+        patterns: ["*"]

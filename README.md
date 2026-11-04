@@ -1,49 +1,122 @@
-# The Sims 2 DS, one screen (proof of concept)
+<h1 align="center">The Sims 2 DS, one screen</h1>
 
-The Sims 2 (Nintendo DS, 2005) in a single window, in the spirit of
-[Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex): the melonDS core runs the game,
-and a small frontend lays out the two DS screens.
+<p align="center">
+  <strong>The Sims 2 for the Nintendo DS in a single window.</strong><br>
+  The town fills the screen, the touch screen's menus sit beside it and work with the mouse. No more two tiny stacked screens.
+</p>
 
-- **AUTO** (default): in town the 3D world fills the window and the touch screen's menu panel
-  (Interact, Pockets, Goals, Relationships, Options, phone) sits beside it, clickable with the
-  mouse. Title, menus and Create-a-Sim show the two screens side by side. Gameplay is
-  recognised from the HUD strip under the world view, so there is nothing game-specific to
-  dump or ship.
-- **FOCUS**, **SIDE**, **STACKED**: the same layouts by hand.
+<p align="center">
+  <a href="https://github.com/lborruto/sims2-ds-wide/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/lborruto/sims2-ds-wide/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="LICENSE"><img alt="Licence: GPL v3" src="https://img.shields.io/badge/licence-GPLv3-blue.svg"></a>
+</p>
 
-Bring your own ROM (tested with the European one, `ASJP`).
+<p align="center">
+  <img src="docs/screenshots/gameplay.webp" alt="The Sims 2 DS in one window: the town at night fills most of it, the phone from the touch screen sits on the right" width="900">
+</p>
 
-## Build and run (macOS, Linux)
+## What it does
 
-Needs CMake 3.21 to 3.x, Ninja and a C++20 compiler; SDL2 is downloaded and built in.
+- **One window, the right screen big.** In town, the 3D world takes the window and the touch
+  screen's panel (Interact, Pockets, Goals, Relationships, Options, the phone, conversations)
+  sits beside it. Title, menus and Create-a-Sim show both screens side by side, since both
+  matter there.
+- **It switches on its own.** It sees when you are in town from the game's own status bar, so
+  the layout follows the game with nothing to set.
+- **The mouse is the stylus.** Click the touch screen wherever it is shown.
+- **Your keyboard is the DS.** Every button has a key; hold Space to fast forward.
+- **Save states and screenshots.** One key each, beside the game's own save.
 
-    git clone --recursive <this repo> && cd sims2-ds-wide
-    cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-    ninja -C build sims2wide
-    ./build/sims2wide path/to/sims2.nds
+It runs the game on the [melonDS](https://melonds.kuribo64.net/) emulator core, built in.
+It is a proof of concept: see [Good to know](#good-to-know).
 
-| Key | DS |
+<p align="center">
+  <img src="docs/screenshots/create-a-sim.webp" alt="Create-a-Sim side by side: the Sim on the left, the name keyboard on the right" width="700">
+</p>
+
+## Get started
+
+You need your own copy of the game, dumped from your cartridge (`.nds`). Nothing of the game
+is included here.
+
+Ready-made downloads for Linux and Mac will be on the [releases page](../../releases) once the
+first version is out. Until then, build it (a few minutes):
+
+```bash
+git clone --recursive https://github.com/lborruto/sims2-ds-wide.git && cd sims2-ds-wide
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+ninja -C build sims2wide
+./build/sims2wide path/to/your-sims2.nds
+```
+
+You need CMake (3.21 or later), Ninja and a C++20 compiler (Xcode's command line tools on a
+Mac). On Linux, SDL's development packages too: [CONTRIBUTING.md](CONTRIBUTING.md#set-up) lists
+them.
+
+## Controls
+
+| Key | Does |
 |---|---|
 | Arrows | +Control Pad |
 | X / Z / S / A | A / B / X / Y |
 | Q / W | L / R |
 | Enter / Right Shift | Start / Select |
-| Mouse | touch screen (wherever it is shown) |
-| Tab | swap the big screen (FOCUS) |
-| 0 / 1 / 2 / 3 | AUTO / FOCUS / SIDE / STACKED |
+| Mouse | the touch screen, wherever it is shown |
+| Tab | swap which screen is big |
+| 0 / 1 / 2 / 3 | layout: AUTO / FOCUS / SIDE / STACKED |
 | Space (hold) | fast forward |
-| F5 / F7 | save / load state (`quick.st`) |
-| F12 | screenshot of both screens (`shot.png`) |
+| F5 / F7 | save state / load state |
+| F12 | screenshot of both screens |
+| Esc | quit |
 
-The game's own save is written beside the ROM (`.sav`).
+The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another
+emulator or a flash cart works if you put it there.
 
-## Studying the screens
+## Layouts
 
-`--headless --frames N` runs without a window as fast as it can (about 4× real time), with
-`--input` scripts (`scripts/`), `--shot-every` / `--shot-at`, `--state-load` / `--state-save`
-and `--compose` (the window's picture instead of the two raw screens).
-`tools/sheet.py` makes a contact sheet of shots. Run `build/sims2wide` alone for every option.
+| Layout | What you see |
+|---|---|
+| **AUTO** (default) | FOCUS in town, SIDE everywhere else |
+| **FOCUS** | one screen big, the other at the side (Tab swaps them) |
+| **SIDE** | both screens side by side |
+| **STACKED** | as on the DS, one above the other |
 
-## Licence
+Start with another one: `--layout focus`. Run `./build/sims2wide` alone to see every option,
+including the headless mode used to study the game's screens
+([CONTRIBUTING.md](CONTRIBUTING.md#studying-the-screens)).
 
-GPLv3, as melonDS. `src/platform.cpp` is adapted from pokemon-fulldex.
+## Good to know
+
+- **A proof of concept.** It shows the idea works; it is not finished.
+- **The side panel is small.** On a 1280 × 720 window it is 320 × 240, a little larger than
+  the DS screen. Readable, but a bigger panel is planned.
+- **4:3 world.** No widescreen 3D yet.
+- **Minigames not checked yet.** They may want both screens big: switch to SIDE (2) if so.
+- **Tested with the European game** (code `ASJP`). The American one should work; its automatic
+  layout is untested.
+- **Linux and Mac.** Windows is not built yet.
+
+## Help and docs
+
+| I want to… | Read |
+|---|---|
+| Build it, hack on it, see how it works | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Know what it reads and writes, report a vulnerability | [SECURITY.md](SECURITY.md) |
+| See what changed | [CHANGELOG.md](CHANGELOG.md) |
+
+Found a bug? [Open an issue](https://github.com/lborruto/sims2-ds-wide/issues) with your system,
+the version and what the program printed in the terminal. Never attach a ROM, a save or a save
+state.
+
+## Licence and credits
+
+GPLv3, see [LICENSE](LICENSE), as melonDS. Built on [melonDS](https://github.com/melonDS-emu/melonDS)
+1.1, [SDL2](https://www.libsdl.org/) and [stb_image_write](https://github.com/nothings/stb).
+The idea comes from [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex), which does
+this for the DS Pokémon games; `src/platform.cpp` is adapted from it.
+
+## Not affiliated, no warranty
+
+An independent, unofficial project. It is not made, endorsed or supported by Electronic Arts,
+Maxis, Nintendo or the melonDS team; the names are theirs, used only to say what it works with.
+Bring your own copy, dumped from a cartridge you own. No warranty of any kind: keep a copy of
+your save.
