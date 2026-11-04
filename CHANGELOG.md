@@ -9,11 +9,16 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
+- The DS buttons' keys follow their position on any keyboard layout: on AZERTY, B is on W,
+  Y on Q, L on A and R on Z, the same places as on QWERTY.
+
 - The hotel's vacuum: AUTO shows its bowl big, with the world beside it, clogged or not; the
   blow key (M) clears its clogged filter.
 
 ### Fixed
 
+- The game ran twice too fast on 120 Hz screens (MacBook Pro, gaming monitors): the window now
+  keeps the DS's own pace, 59.83 frames a second, whatever the screen.
 - A mouse drag that started on the touch screen no longer lifts the stylus when it overshoots
   the screen's edge (dragging a find into the vacuum's bag, in its corner, dropped it).
 - AUTO no longer flashes the touch screen big for half a second at the hotel's doors (dark

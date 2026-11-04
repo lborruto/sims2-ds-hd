@@ -45,7 +45,7 @@ const char* ActionName(int a); // in the menu (capitals: the menu's font)
 const char* InputKey(int i);
 int InputFromKey(const std::string& s);
 const char* InputName(int i, int style);
-int DefaultKey(int a); // an SDL keycode (SDLK_*): what the key is labelled, on any keyboard layout
+int DefaultKey(int a); // an SDL keycode (SDLK_*); the DS buttons A/B/X/Y/L/R by position (any layout)
 int DefaultPad(int a); // a PadInput, or kNone
 // A key's name in the menu's font (capitals, digits and : - + . / < > ! ( ) only).
 std::string KeyName(int keycode);
