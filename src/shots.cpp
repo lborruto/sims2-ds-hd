@@ -23,6 +23,11 @@ void WriteShot(const std::string& path, const u32* top, const u32* bottom)
     stbi_write_png(path.c_str(), SW, SH * 2, 3, rgb.data(), SW * 3);
 }
 
+void WriteRgb(const std::string& path, int w, int h, const u8* rgb)
+{
+    stbi_write_png(path.c_str(), w, h, 3, rgb, w * 3);
+}
+
 void WriteCompose(const std::string& path, Layout l, bool mainIsTop, const u32* top, const u32* bottom)
 {
     Placement p = Place(l, mainIsTop);

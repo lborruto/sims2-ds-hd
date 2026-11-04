@@ -26,6 +26,11 @@ std::vector<InputEvent> LoadScript(const std::string& path)
         std::string what;
         if (!(ss >> e.frame >> e.len >> what)) continue;
         if (what == "touch") { e.touch = true; ss >> e.tx >> e.ty; }
+        else if (what == "press") { ss >> std::ws; std::getline(ss, e.press); }
+        else if (what == "move") { e.move = true; ss >> e.tx >> e.ty; }
+        else if (what == "click") { e.click = true; ss >> e.tx >> e.ty; }
+        else if (what == "wheel") ss >> e.wheel;
+        else if (what == "winshot") e.winShot = true;
         else
         {
             std::stringstream ks(what);
@@ -45,10 +50,17 @@ std::vector<InputEvent> LoadScript(const std::string& path)
 void ApplyScript(const std::vector<InputEvent>& script, long frame, u32& keys, bool& touching, int& tx, int& ty)
 {
     for (const auto& e : script)
-        if (frame >= e.frame && frame < e.frame + e.len)
+        if (frame >= e.frame && frame < e.frame + e.len && e.press.empty() && !e.move && !e.click && !e.wheel && !e.winShot)
         {
             keys |= e.keys;
             if (e.touch) { touching = true; tx = e.tx; ty = e.ty; }
         }
+}
+
+bool ScriptWindowShot(const std::vector<InputEvent>& script, long iter)
+{
+    for (const auto& e : script)
+        if (e.winShot && e.frame == iter) return true;
+    return false;
 }
 }

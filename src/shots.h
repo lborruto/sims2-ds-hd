@@ -8,6 +8,8 @@
 namespace sims2wide
 {
 void WriteShot(const std::string& path, const u32* top, const u32* bottom);
+// Any RGB picture (the window's, from video.cpp).
+void WriteRgb(const std::string& path, int w, int h, const u8* rgb);
 // The window's picture on the CPU (nearest scaling).
 void WriteCompose(const std::string& path, Layout l, bool mainIsTop, const u32* top, const u32* bottom);
 }

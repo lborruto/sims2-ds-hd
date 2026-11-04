@@ -4,10 +4,11 @@
 // choice of layouts, and has a headless mode (input scripts, shots, save states) to study which
 // screen carries what in each situation of the game. main.cpp reads the command line, starts the
 // DS and runs the frame loop; the parts live beside it:
-//   app.h      shared state          input.*   keyboard and mouse     video.*   the window
-//   audio.*    sound                 layout.*  where the screens go   scene.*   AUTO's detection
-//   script.*   headless input        shots.*   PNG pictures           state.*   save states
-//   picker.*   ROM file picker and error dialogs
+//   app.h      shared state          input.*   keyboard, mouse, controller   video.*   the window
+//   audio.*    sound                 layout.*  where the screens go          scene.*   AUTO's detection
+//   script.*   headless input        shots.*   PNG pictures                  state.*   save states
+//   picker.*   ROM file picker       menu.*    pause menu and overlay        ui.*      overlay drawing
+//   settings.* the settings file     controls.* key and button bindings
 #include <SDL.h>
 
 #include <cstdio>
@@ -28,6 +29,7 @@
 #include "audio.h"
 #include "host.h"
 #include "input.h"
+#include "menu.h"
 #include "picker.h"
 #include "script.h"
 #include "shots.h"
@@ -52,9 +54,10 @@ static void Usage()
         "  --state-load FILE / --state-save FILE (saved at the end)\n"
         "  --save FILE                   the game's save (default beside the ROM, .sav)\n"
         "  --version, --help\n"
-        "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select\n"
-        "      Tab swaps the big screen (focus), 0 auto, 1/2/3 layouts, Space fast forward\n"
-        "      F5/F7 save/load state (<rom>.quick.st), F12 screenshot (<rom>-shot.png), Esc quit\n");
+        "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
+        "      Esc menu (settings, save states, quit), Space fast forward, Tab swaps the big screen\n"
+        "      0 auto, 1/2/3 layouts, F5/F7 save/load state, F11 fullscreen, F12 screenshot\n"
+        "      mouse: the touch screen; over the world, wheel zooms and a right-button drag turns\n");
 }
 
 #ifdef _WIN32
@@ -149,6 +152,9 @@ int main(int argc, char** argv)
     app.shown = layout == Layout::Auto ? Layout::Side : layout;
     app.quickState = quickState;
     app.shotFile = shotFile;
+    // The settings file (not headless: those runs stay the same on every machine).
+    const std::string settingsPath = headless ? "" : Settings::DefaultPath();
+    if (!settingsPath.empty() && app.settings.Load(settingsPath)) fprintf(stderr, "settings: %s\n", settingsPath.c_str());
     melonDS::NDSArgs args;
     args.JIT = std::nullopt;
     app.nds = std::make_unique<NDS>(std::move(args), nullptr);
@@ -161,20 +167,26 @@ int main(int argc, char** argv)
 
     std::vector<InputEvent> script;
     if (!inputPath.empty()) script = LoadScript(inputPath);
-    if (!shotAt.empty() || shotEvery) { std::string cmd = "mkdir -p '" + shotDir + "'"; (void)system(cmd.c_str()); }
+    bool winShots = false;
+    for (const InputEvent& e : script) winShots |= e.winShot;
+    if (!shotAt.empty() || shotEvery || winShots) { std::string cmd = "mkdir -p '" + shotDir + "'"; (void)system(cmd.c_str()); }
 
-    // Window and sound.
+    // Window, sound, controllers.
     Video video;
     Audio audio;
     Input input;
+    PauseMenu menu;
     if (!headless)
     {
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
-        if (!video.Open()) return 1;
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
+        if (!video.Open(app.settings)) return 1;
         audio.Open();
+        input.OpenPads();
     }
 
-    for (long frame = 0; (frames < 0 || frame < frames) && !app.quit; frame++)
+    // frame counts the game's frames (shots, scripts); iter every turn of the loop, paused too.
+    long frame = 0;
+    for (long iter = 0; (frames < 0 || iter < frames) && !app.quit; iter++)
     {
         u32 keys = 0;
         bool touching = false;
@@ -183,9 +195,38 @@ int main(int argc, char** argv)
         if (!headless)
         {
             SDL_Event ev;
-            while (SDL_PollEvent(&ev)) input.HandleEvent(ev, app);
+            input.PushScript(script, iter, video);
+            while (SDL_PollEvent(&ev)) input.HandleEvent(ev, app, video, menu.open);
+            if (ScriptWindowShot(script, iter))
+            {
+                char name[64];
+                snprintf(name, sizeof name, "/w%06ld.png", iter);
+                video.shotPath = shotDir + name;
+            }
             if (app.quit) break;
-            input.Frame(app, video, keys, touching, tx, ty);
+            input.Poll(app, menu.open);
+            if (menu.open) menu.Frame(app, video, input, settingsPath);
+            else if (input.wantMenu) menu.Toggle(app, input);
+            if (menu.open)
+            {
+                // Paused: the last picture with the menu over it; nothing is emulated.
+                input.EndFrame();
+                menu.Draw(app, video, input, frame);
+                video.Present(app, &menu.canvas);
+                continue;
+            }
+            if (input.wantSave) menu.Say(SaveState(nds, quickState) ? "STATE SAVED" : "STATE NOT SAVED", frame);
+            if (input.wantLoad) menu.Say(LoadState(nds, quickState) ? "STATE LOADED" : "NO STATE TO LOAD", frame);
+            if (input.wantShot) { WriteShot(shotFile, app.Top(), app.Bottom()); menu.Say("SCREENSHOT SAVED", frame); }
+            if (input.wantLayout >= 0) app.layout = (Layout)input.wantLayout;
+            if (input.wantFullscreen)
+            {
+                app.settings.fullscreen = !app.settings.fullscreen;
+                video.SetFullscreen(app.settings.fullscreen);
+                app.settings.Save(settingsPath);
+            }
+            input.Frame(app, video, frame, keys, touching, tx, ty);
+            input.EndFrame();
         }
 
         nds.SetKeyMask(~keys & 0xFFF);
@@ -209,14 +250,21 @@ int main(int argc, char** argv)
             if (compose) WriteCompose(shotDir + name, app.shown, app.mainIsTop, top, bottom);
             else WriteShot(shotDir + name, top, bottom);
         }
+        frame++;
 
         if (headless) continue;
-        audio.Frame(nds, app.fast);
+        audio.Frame(nds, app.fast, app.settings);
         if (app.fast && frame % 4) continue; // fast forward: one picture in four
-        video.Present(app);
+        video.Present(app, menu.Draw(app, video, input, frame) ? &menu.canvas : nullptr);
     }
 
     if (!stateSave.empty()) fprintf(stderr, "state save %s: %s\n", stateSave.c_str(), SaveState(nds, stateSave) ? "ok" : "failed");
-    if (!headless) SDL_Quit();
+    if (!headless)
+    {
+        video.RememberSize(app.settings);
+        if (!app.settings.Save(settingsPath)) fprintf(stderr, "cannot write %s\n", settingsPath.c_str());
+        input.ClosePads();
+        SDL_Quit();
+    }
     return 0;
 }
