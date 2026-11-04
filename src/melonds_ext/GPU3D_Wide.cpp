@@ -1079,6 +1079,19 @@ struct WideAccess
                         0.34 * std::sqrt(E[2][0] * E[2][0] + E[2][1] * E[2][1]),
                     };
 
+                    // Edge i, opposite corner i, from the corner after it (for the samples pulled back).
+                    struct Edge { float X, Y, DX, DY, InvLen2; } edge[3];
+                    {
+                        const WideVertex* v[3] = { &a, &b, &c };
+                        for (int i = 0; i < 3; i++)
+                        {
+                            const WideVertex& p = *v[(i + 1) % 3];
+                            const WideVertex& q = *v[(i + 2) % 3];
+                            const float dx = q.X - p.X, dy = q.Y - p.Y, len2 = dx * dx + dy * dy;
+                            edge[i] = { p.X, p.Y, dx, dy, len2 > 0 ? 1.0f / len2 : 0.0f };
+                        }
+                    }
+
                     const double xmin = std::min({ (double)a.X, (double)b.X, (double)c.X });
                     const double xmax = std::max({ (double)a.X, (double)b.X, (double)c.X });
                     const int y0 = std::max(t.Y0, rowA), y1 = std::min(t.Y1, rowB - 1);
@@ -1126,14 +1139,33 @@ struct WideAccess
                             // Samples a hair outside the triangle (the widened spans) are pulled
                             // back onto it, and all of them slightly towards its middle, so that
                             // texture coordinates never reach past the polygon's own texels.
-                            VF w0 = Select(f0 < 0, VF{}, f0), w1 = Select(f1 < 0, VF{}, f1), w2 = 1.0f - w0 - w1;
-                            const VI outside = w2 < 0;
+                            // The nearest point of the triangle: square to the edge the sample is
+                            // furthest beyond, then along it to stay between its ends. (Weights only
+                            // clamped to zero moved it parallel to another edge: in a sliver, a
+                            // polygon seen edge-on a few hundredths of a pixel thick, that lands far
+                            // along it, on a far corner's depth and texels, which drew cracks of light
+                            // across Create-a-Sim's curtain in the wide view.)
+                            VF w0 = f0, w1 = f1, w2 = 1.0f - f0 - f1;
+                            const VI outside = (w0 < 0) | (w1 < 0) | (w2 < 0);
                             if (Any(outside))
                             {
-                                const VF kk = 1.0f / (w0 + w1);
-                                w0 = Select(outside, w0 * kk, w0);
-                                w1 = Select(outside, w1 * kk, w1);
-                                w2 = Select(outside, VF{}, w2);
+                                const VI m0 = (w0 <= w1) & (w0 <= w2), m1 = ~m0 & (w1 <= w2);
+                                const VF ox = Select(m0, VF{} + edge[0].X, Select(m1, VF{} + edge[1].X, VF{} + edge[2].X));
+                                const VF oy = Select(m0, VF{} + edge[0].Y, Select(m1, VF{} + edge[1].Y, VF{} + edge[2].Y));
+                                const VF ex = Select(m0, VF{} + edge[0].DX, Select(m1, VF{} + edge[1].DX, VF{} + edge[2].DX));
+                                const VF ey = Select(m0, VF{} + edge[0].DY, Select(m1, VF{} + edge[1].DY, VF{} + edge[2].DY));
+                                const VF il = Select(m0, VF{} + edge[0].InvLen2, Select(m1, VF{} + edge[1].InvLen2, VF{} + edge[2].InvLen2));
+                                const VF px = (float)xb + 0.5f + LaneIndexF();
+                                VF t = ((px - ox) * ex + ((float)py - oy) * ey) * il;
+                                t = Select(t < 0, VF{}, Select(t > 1.0f, VF{} + 1.0f, t));
+                                const VF u = 1.0f - t;
+                                // Edge i runs from the corner after i to the one after that.
+                                const VF n0 = Select(m0, VF{}, Select(m1, t, u));
+                                const VF n1 = Select(m0, u, Select(m1, VF{}, t));
+                                const VF n2 = Select(m0, t, Select(m1, u, VF{}));
+                                w0 = Select(outside, n0, w0);
+                                w1 = Select(outside, n1, w1);
+                                w2 = Select(outside, n2, w2);
                             }
                             w0 = w0 * 0.9994f + 0.0002f;
                             w1 = w1 * 0.9994f + 0.0002f;

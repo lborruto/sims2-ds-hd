@@ -18,6 +18,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   the screen's edge (dragging a find into the vacuum's bag, in its corner, dropped it).
 - AUTO no longer flashes the touch screen big for half a second at the hotel's doors (dark
   rooms fade the world out before the panel).
+- Widescreen: no more thin cracks of light across the curtain in Create-a-Sim.
+  The edges of polygons seen edge-on picked up colours from far along them.
 
 ## [0.1.1] - 2026-11-04
 

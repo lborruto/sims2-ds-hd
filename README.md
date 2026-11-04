@@ -148,8 +148,8 @@ Three options make the game look better without changing it. All are off by defa
 </p>
 
 Widescreen is a stretch for a game made for 4:3: the game is told to draw a wider view, and it
-does in town, in conversations and in Create-a-Sim, but a seam can show here and there at the
-edges. Each one costs speed; all three together still run well over full speed on a recent Mac.
+does in town, in conversations and in Create-a-Sim, but in places not checked yet something
+the game never meant to be seen can show at the edges. Each one costs speed; all three together still run well over full speed on a recent Mac.
 
 ## Good to know
 
