@@ -32,6 +32,7 @@ std::vector<InputEvent> LoadScript(const std::string& path)
             std::string k;
             while (std::getline(ks, k, '+'))
             {
+                if (k == "blow") { e.blow = true; continue; }
                 auto it = kKeyNames.find(k);
                 if (it == kKeyNames.end()) { fprintf(stderr, "unknown key %s\n", k.c_str()); exit(1); }
                 e.keys |= 1u << it->second;
@@ -42,12 +43,13 @@ std::vector<InputEvent> LoadScript(const std::string& path)
     return evs;
 }
 
-void ApplyScript(const std::vector<InputEvent>& script, long frame, u32& keys, bool& touching, int& tx, int& ty)
+void ApplyScript(const std::vector<InputEvent>& script, long frame, u32& keys, bool& blow, bool& touching, int& tx, int& ty)
 {
     for (const auto& e : script)
         if (frame >= e.frame && frame < e.frame + e.len)
         {
             keys |= e.keys;
+            if (e.blow) blow = true;
             if (e.touch) { touching = true; tx = e.tx; ty = e.ty; }
         }
 }

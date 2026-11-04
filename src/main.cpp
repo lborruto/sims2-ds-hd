@@ -28,6 +28,7 @@
 #include "audio.h"
 #include "host.h"
 #include "input.h"
+#include "mic.h"
 #include "picker.h"
 #include "script.h"
 #include "shots.h"
@@ -51,6 +52,7 @@ static void Usage()
         "  --shot-every N | --shot-at a,b,c\n"
         "  --state-load FILE / --state-save FILE (saved at the end)\n"
         "  --save FILE                   the game's save (default beside the ROM, .sav)\n"
+        "  --mic off|blow|real           what the DS hears: silence, the blow key, the computer's microphone\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select\n"
         "      Tab swaps the big screen (focus), 0 auto, 1/2/3 layouts, Space fast forward\n"
@@ -76,7 +78,7 @@ int main(int argc, char** argv)
         (void)freopen("CONOUT$", "w", stderr);
     }
 #endif
-    std::string romPath, inputPath, shotDir = "shots", stateLoad, stateSave, savePath;
+    std::string romPath, inputPath, shotDir = "shots", stateLoad, stateSave, savePath, micArg;
     bool headless = false;
     long frames = -1;
     int shotEvery = 0;
@@ -99,6 +101,7 @@ int main(int argc, char** argv)
         else if (a == "--state-load") stateLoad = next();
         else if (a == "--state-save") stateSave = next();
         else if (a == "--save") savePath = next();
+        else if (a == "--mic") micArg = next();
         else if (a == "--layout")
         {
             std::string l = next();
@@ -149,6 +152,11 @@ int main(int argc, char** argv)
     app.shown = layout == Layout::Auto ? Layout::Side : layout;
     app.quickState = quickState;
     app.shotFile = shotFile;
+    // --mic overrides the setting (keep this after the settings are loaded).
+    if (micArg == "off") app.settings.mic = MicMode::Off;
+    else if (micArg == "blow") app.settings.mic = MicMode::BlowKey;
+    else if (micArg == "real") app.settings.mic = MicMode::Real;
+    else if (!micArg.empty()) { Usage(); return 1; }
     melonDS::NDSArgs args;
     args.JIT = std::nullopt;
     app.nds = std::make_unique<NDS>(std::move(args), nullptr);
@@ -177,9 +185,9 @@ int main(int argc, char** argv)
     for (long frame = 0; (frames < 0 || frame < frames) && !app.quit; frame++)
     {
         u32 keys = 0;
-        bool touching = false;
+        bool blow = false, touching = false;
         int tx = 0, ty = 0;
-        ApplyScript(script, frame, keys, touching, tx, ty);
+        ApplyScript(script, frame, keys, blow, touching, tx, ty);
         if (!headless)
         {
             SDL_Event ev;
@@ -187,6 +195,10 @@ int main(int argc, char** argv)
             if (app.quit) break;
             input.Frame(app, video, keys, touching, tx, ty);
         }
+
+        // Playable: what the DS hears this frame (the setting, the blow key or the script's "blow").
+        Host::MicMode = app.settings.mic;
+        Host::MicBlow = app.micBlow || blow;
 
         nds.SetKeyMask(~keys & 0xFFF);
         if (touching) nds.TouchScreen((melonDS::u16)tx, (melonDS::u16)ty); else nds.ReleaseScreen();
@@ -217,6 +229,11 @@ int main(int argc, char** argv)
     }
 
     if (!stateSave.empty()) fprintf(stderr, "state save %s: %s\n", stateSave.c_str(), SaveState(nds, stateSave) ? "ok" : "failed");
+    if (headless)
+    {
+        // For the tests: whether the game listened.
+        fprintf(stderr, "mic: %ld samples read by the game\n", mic::SamplesRead());
+    }
     if (!headless) SDL_Quit();
     return 0;
 }

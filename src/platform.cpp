@@ -12,6 +12,7 @@
 #include "SPI_Firmware.h"
 
 #include "host.h"
+#include "mic.h"
 #ifdef __ANDROID__
 #include <dlfcn.h>
 #endif
@@ -197,9 +198,10 @@ void Camera_Start(int, void*) {}
 void Camera_Stop(int, void*) {}
 void Camera_CaptureFrame(int, u32*, int, int, bool, void*) {}
 
-void Mic_Start(void*) {}
-void Mic_Stop(void*) {}
-int Mic_ReadInput(s16*, int, void*) { return 0; }
+// The microphone lives in mic.cpp (blow key, the computer's microphone, or silence).
+void Mic_Start(void*) { sims2wide::mic::Start(); }
+void Mic_Stop(void*) { sims2wide::mic::Stop(); }
+int Mic_ReadInput(s16* data, int maxlength, void*) { return sims2wide::mic::Read(data, maxlength); }
 
 AACDecoder* AAC_Init() { return nullptr; }
 void AAC_DeInit(AACDecoder*) {}
