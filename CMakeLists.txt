@@ -27,7 +27,7 @@ FetchContent_MakeAvailable(sdl2)
 
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
-    src/audio.cpp src/input.cpp src/layout.cpp src/mic.cpp src/picker.cpp
+    src/audio.cpp src/clock.cpp src/input.cpp src/layout.cpp src/mic.cpp src/picker.cpp
     src/scene.cpp src/script.cpp src/shots.cpp src/state.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)

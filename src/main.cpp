@@ -26,6 +26,7 @@
 #include "NDSCart.h"
 #include "app.h"
 #include "audio.h"
+#include "clock.h"
 #include "host.h"
 #include "input.h"
 #include "mic.h"
@@ -53,6 +54,8 @@ static void Usage()
         "  --state-load FILE / --state-save FILE (saved at the end)\n"
         "  --save FILE                   the game's save (default beside the ROM, .sav)\n"
         "  --mic off|blow|real           what the DS hears: silence, the blow key, the computer's microphone\n"
+        "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
+        "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select\n"
         "      Tab swaps the big screen (focus), 0 auto, 1/2/3 layouts, Space fast forward\n"
@@ -79,7 +82,7 @@ int main(int argc, char** argv)
     }
 #endif
     std::string romPath, inputPath, shotDir = "shots", stateLoad, stateSave, savePath, micArg;
-    bool headless = false;
+    bool headless = false, fast = false;
     long frames = -1;
     int shotEvery = 0;
     std::set<long> shotAt;
@@ -102,6 +105,8 @@ int main(int argc, char** argv)
         else if (a == "--state-save") stateSave = next();
         else if (a == "--save") savePath = next();
         else if (a == "--mic") micArg = next();
+        else if (a == "--fast") fast = true;
+        else if (a == "--clock") { if (!clock::SetFixed(next())) { fprintf(stderr, "--clock wants \"YYYY-MM-DD HH:MM\"\n"); return 1; } }
         else if (a == "--layout")
         {
             std::string l = next();
@@ -152,6 +157,7 @@ int main(int argc, char** argv)
     app.shown = layout == Layout::Auto ? Layout::Side : layout;
     app.quickState = quickState;
     app.shotFile = shotFile;
+    app.fast = fast;
     // --mic overrides the setting (keep this after the settings are loaded).
     if (micArg == "off") app.settings.mic = MicMode::Off;
     else if (micArg == "blow") app.settings.mic = MicMode::BlowKey;
@@ -163,6 +169,7 @@ int main(int argc, char** argv)
     NDS& nds = *app.nds;
     nds.SetNDSCart(std::move(cart));
     nds.Reset();
+    clock::Seed(nds); // the DS clock: the computer's local time (or --clock); LoadState re-seeds it
     nds.SetupDirectBoot("game.nds");
     nds.Start();
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
@@ -196,9 +203,11 @@ int main(int argc, char** argv)
             input.Frame(app, video, keys, touching, tx, ty);
         }
 
-        // Playable: what the DS hears this frame (the setting, the blow key or the script's "blow").
+        // Playable: what the DS hears this frame (the setting, the blow key or the script's
+        // "blow") and, in a window, the DS clock held to real time (fast forward, pauses).
         Host::MicMode = app.settings.mic;
         Host::MicBlow = app.micBlow || blow;
+        if (!headless || app.fast) clock::Frame(nds, app.fast);
 
         nds.SetKeyMask(~keys & 0xFFF);
         if (touching) nds.TouchScreen((melonDS::u16)tx, (melonDS::u16)ty); else nds.ReleaseScreen();
@@ -231,8 +240,12 @@ int main(int argc, char** argv)
     if (!stateSave.empty()) fprintf(stderr, "state save %s: %s\n", stateSave.c_str(), SaveState(nds, stateSave) ? "ok" : "failed");
     if (headless)
     {
-        // For the tests: whether the game listened.
-        fprintf(stderr, "mic: %ld samples read by the game\n", mic::SamplesRead());
+        // For the tests: what the DS clock says at the end, and whether the game listened.
+        clock::Time t = clock::Read(nds);
+        const clock::Stats& cs = clock::GetStats();
+        fprintf(stderr, "clock: %04d-%02d-%02d %02d:%02d:%02d (held %ld times, at most %ld s ahead of the computer, "
+                "a minute ahead on %ld frames)  mic: %ld samples read by the game\n",
+                t.year, t.month, t.day, t.hour, t.minute, t.second, cs.writes, cs.maxAhead, cs.minuteAhead, mic::SamplesRead());
     }
     if (!headless) SDL_Quit();
     return 0;
