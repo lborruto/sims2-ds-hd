@@ -35,7 +35,15 @@ bool VacuumVisible(const u32* bottom)
     // row 1: the light blue top edge of the gauge (top left, x 4 to 44) and the dark teal frame
     // right of it (x 60 to 100). On every frame of the vacuum (act-vacuum and runs from it), on
     // no other screen seen.
-    return FlatRow(bottom, 1, 0x30A2D3, 4, 44) && FlatRow(bottom, 1, 0x304951, 60, 100);
+    if (FlatRow(bottom, 1, 0x30A2D3, 4, 44) && FlatRow(bottom, 1, 0x304951, 60, 100)) return true;
+    // Clogged (dust touched with the stylus, until the player blows): the game tints the whole
+    // screen sepia, dithered, so the same row reads differently but just as steadily (act-vacuum-clog).
+    static const struct { int x; u32 rgb; } kClogged[] = {
+        {4, 0x51A2BA}, {12, 0x51A2BA}, {20, 0x51A2BA}, {28, 0x459AB6}, {36, 0x459AB6}, {44, 0x459AB6},
+        {60, 0x515D59}, {68, 0x515D59}, {76, 0x455555}, {84, 0x455555}, {92, 0x515D59}};
+    for (const auto& p : kClogged)
+        if ((bottom[SW + p.x] & 0xFFFFFF) != p.rgb) return false;
+    return true;
 }
 
 static u32 CornerMean(const u32* screen, int x0, int y0)

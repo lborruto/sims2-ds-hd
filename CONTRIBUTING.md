@@ -178,7 +178,8 @@ detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `s
   the HUD plus row 0 flat `#597192`, the name and relationship box), the shop's catalogue or
   Build Rooms (`WarmMenuVisible()`: all four corners of the bottom screen warm and bright), the
   hotel's vacuum (`VacuumVisible()`: the HUD stays, and row 1 of the bottom screen is
-  `#30A2D3` from x 4 to 44, the gauge's top edge, then `#304951` from x 60 to 100), or,
+  `#30A2D3` from x 4 to 44, the gauge's top edge, then `#304951` from x 60 to 100; clogged, the
+  game tints the screen sepia and the same row has other fixed values), or,
   without the HUD, a dark top screen with a lit bottom one for two seconds in a row (unverified:
   meant for activities not reached yet; the hotel's dark rooms show it for about 30 frames at
   each door, while the world fades out before the panel). `AutoLayout` waits for ten frames of agreement

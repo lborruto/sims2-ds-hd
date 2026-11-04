@@ -9,7 +9,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
-- The hotel's vacuum: AUTO shows its bowl big, with the world beside it.
+- The hotel's vacuum: AUTO shows its bowl big, with the world beside it, clogged or not; the
+  blow key (M) clears its clogged filter.
 
 ### Fixed
 

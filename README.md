@@ -159,7 +159,8 @@ edges. Each one costs speed; all three together still run well over full speed o
   world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it.
 - **Widescreen is opt-in.** See [Looks](#looks).
 - **Most minigames not checked yet.** The social reactions, the shop, Build Rooms and the vacuum
-  (its bowl comes big; drag the finds into the bag with the mouse) are; cards, painting, the
+  (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
+  filter clear) are; cards, painting, the
   music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows
   both.
 - **Tested with the European game** (code `ASJP`). The American one should work; its automatic

@@ -70,13 +70,14 @@ Save states `shots/s2.st` (main menu), `s3` (Create-a-Sim), `s4` (Keep this Sim?
 `sit-pause`; the hotel (made on the DS clock 2026-01-01 12:03 to 12:46: run them with
 `--clock "2026-01-01 14:00"` or later, never earlier): `sit-hotel` (the lobby, free roam, after
 the concierge's first talk), `sit-concierge` (that talk), `sit-basement` (the dark reactor
-room), `act-vacuum` (the vacuum just switched on in the lobby). Pass `--clock "2026-01-01
+room), `act-vacuum` (the vacuum just switched on in the lobby), `act-vacuum-clog` (the same,
+filter clogged). Pass `--clock "2026-01-01
 12:00"` to runs from the town states whose output is compared.
 
 The layout check: from each state, `--headless --frames 200` must log `focus (top big)` for
 s5, s6, s7, sit-dialogue, sit-gift, sit-cityhall, sit-store, sit-pause, and (clock 2026-01-01
 14:00) sit-hotel, sit-concierge, sit-basement; `focus (bottom big)` for act-social, sit-build,
-sit-storebuy, and (14:00) act-vacuum; nothing (SIDE) for s2, s3, s4. From act-social, 2400
+sit-storebuy, and (14:00) act-vacuum, act-vacuum-clog; nothing (SIDE) for s2, s3, s4. From act-social, 2400
 frames go back to `top big` around frame 1570, when the game returns to town.
 
 ## Known traps
@@ -91,7 +92,8 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   the bottom screen (r > b + 40, luma > 100); the panel, the phone, popups and the paused
   panel are cool. The social game's bottom barely moves (motion ≤ 0.002 on the sampling grid):
   do not detect activities by motion. The vacuum keeps the HUD: told by row 1 of the bottom
-  screen (`#30A2D3` x 4-44, `#304951` x 60-100). Without the HUD, a dark top (luma < 40) with a
+  screen (`#30A2D3` x 4-44, `#304951` x 60-100; clogged, the sepia tint's fixed samples of
+  the same row). Without the HUD, a dark top (luma < 40) with a
   lit bottom (> 50) for 120 frames in a row makes the bottom big: a guess for the activities not
   reached; the hotel's doors show it for ~30 frames (the world fades out before the panel), so
   never shorten the hold.
@@ -104,11 +106,14 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   Back in the lobby a cutscene: Jebediah wants the hotel vacuumed. The vacuum is the red upright
   at the desk's end (Pick Up); Pockets tab (16,59), the vacuum (232,88), the hand (194,107)
   switches it on. Its goal ("clean up 5 DUST piles") did not complete in ~5000 frames.
-- In the vacuum the D-pad walks the Sim; dust and finds swirl in the bowl and go down the
-  hole; a find dragged (successive `touch` events) into the box at the bottom right is kept.
-  The game reads the mic the whole time (samples counted), but holding `blow` changed no pixel
-  in any situation reached (frames byte for byte the same with and without): the clog that
-  blowing clears was never seen, so the blow key is still untested in game.
+- In the vacuum up walks forward, left/right turn, down backs up; dust and finds swirl in the
+  bowl and go down the hole; a find dragged (successive `touch` events) into the box at the
+  bottom right is kept. Touching dust with the stylus clogs the filter: the whole touch screen
+  turns sepia (dithered), a mouth and an arrow blink bottom left, dust stops draining
+  (`act-vacuum-clog`). Holding `blow` 7 frames or more clears it (gone 17 frames after the blow
+  starts); 6 frames do not; without it the clog stays. melonDS's recorded blow
+  (`melonDS/src/frontend/mic_blow.h`) gives exactly the same thresholds, so the synthesised
+  wave stays. The blow key is verified in game.
 - Navigation headless is slow: the camera follows, L/R turn it (about 156 frames a full turn),
   walls stop the Sim silently. Branch from saved states and try several scripts in parallel
   (background runs), comparing their last shots.
@@ -176,4 +181,4 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 | 5 | Survey the minigames and the other situations: social reactions, the shop, Build Rooms, City Hall, pause, the hotel's lobby, basement and vacuum done; the vacuum's goal, hotel rooms, cards, painting, mixer… not reached | 🔄 |
 | 6 | Desktop apps: file picker, universal Mac app, Windows .exe (CI and release) | ✅ |
 | 7 | Comfort: pause menu, settings file, controllers, mouse camera, fullscreen, sound stretching, save backups | ✅ (controller untested on hardware) |
-| 8 | Playable: DS microphone (blow key, real mic), DS clock = the computer's, touch screen big for its activities, mouse drags held to the touch screen | ✅ (in-game blow untested: no clog seen in the vacuum) |
+| 8 | Playable: DS microphone (blow key, real mic), DS clock = the computer's, touch screen big for its activities, mouse drags held to the touch screen | ✅ (blow verified in the vacuum's clog) |
