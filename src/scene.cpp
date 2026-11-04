@@ -5,10 +5,11 @@
 
 namespace sims2wide
 {
-// A row of the screen is one flat colour from x 8 to 248 (sampled every 8 pixels).
-static bool FlatRow(const u32* screen, int y, u32 rgb)
+// A row of the screen is one flat colour from x0 to x1 (sampled every 8 pixels; by default from
+// edge to edge, x 8 to 248).
+static bool FlatRow(const u32* screen, int y, u32 rgb, int x0 = 8, int x1 = 248)
 {
-    for (int x = 8; x < 250; x += 8)
+    for (int x = x0; x <= x1; x += 8)
         if ((screen[y * SW + x] & 0xFFFFFF) != rgb) return false;
     return true;
 }
@@ -26,6 +27,23 @@ bool SocialVisible(const u32* top)
     // The top edge of the name and relationship box, from x 5 to 252, on every frame of the
     // Impress game (act-social); on no other screen seen (the HUD's row 190 is another colour).
     return HudVisible(top) && FlatRow(top, 0, 0x597192);
+}
+
+bool VacuumVisible(const u32* bottom)
+{
+    // The vacuum's bowl keeps the town's HUD on top; its frame on the touch screen is told by
+    // row 1: the light blue top edge of the gauge (top left, x 4 to 44) and the dark teal frame
+    // right of it (x 60 to 100). On every frame of the vacuum (act-vacuum and runs from it), on
+    // no other screen seen.
+    if (FlatRow(bottom, 1, 0x30A2D3, 4, 44) && FlatRow(bottom, 1, 0x304951, 60, 100)) return true;
+    // Clogged (dust touched with the stylus, until the player blows): the game tints the whole
+    // screen sepia, dithered, so the same row reads differently but just as steadily (act-vacuum-clog).
+    static const struct { int x; u32 rgb; } kClogged[] = {
+        {4, 0x51A2BA}, {12, 0x51A2BA}, {20, 0x51A2BA}, {28, 0x459AB6}, {36, 0x459AB6}, {44, 0x459AB6},
+        {60, 0x515D59}, {68, 0x515D59}, {76, 0x455555}, {84, 0x455555}, {92, 0x515D59}};
+    for (const auto& p : kClogged)
+        if ((bottom[SW + p.x] & 0xFFFFFF) != p.rgb) return false;
+    return true;
 }
 
 static u32 CornerMean(const u32* screen, int x0, int y0)
@@ -91,12 +109,15 @@ Layout AutoLayout::Update(const u32* topPx, const u32* bottomPx, bool& mainIsTop
     topLuma += (tl - topLuma) * k;
     bottomLuma += (bl - bottomLuma) * k;
 
-    // The touch screen's turn. In town (HUD): a social reaction, or a full-screen menu. Without
-    // the HUD, the fallback for the activities not reached yet (the vacuum, cards, painting…):
-    // the game dims the world on top and plays on the touch screen. Unverified: no state
-    // surveyed so far shows it, and none without the HUD has a dark top with a lit bottom.
-    bool bigNow = hudNow ? (SocialVisible(topPx) || WarmMenuVisible(bottomPx))
-                         : (topLuma < 40 && bottomLuma > 50);
+    // The touch screen's turn. With the HUD: a social reaction, a full-screen menu or the
+    // vacuum. Without it, the fallback for the activities not reached yet (cards, painting…): the
+    // game dims the world on top and plays on the touch screen. Unverified; the hotel's dark
+    // rooms fade out the top before the panel (about 30 frames of dark top and lit bottom), so it
+    // must hold for two seconds.
+    const bool darkNow = !hudNow && topLuma < 40 && bottomLuma > 50;
+    darkStreak = darkNow ? darkStreak + 1 : 0;
+    bool bigNow = hudNow ? (SocialVisible(topPx) || WarmMenuVisible(bottomPx) || VacuumVisible(bottomPx))
+                         : darkStreak >= 120;
     bigStreak = bigNow == bottomBig ? 0 : bigStreak + 1;
     if (bigStreak >= 10)
     {
@@ -108,8 +129,8 @@ Layout AutoLayout::Update(const u32* topPx, const u32* bottomPx, bool& mainIsTop
     static const char* probe = getenv("SIMS2WIDE_PROBE");
     static const int probeEvery = probe ? atoi(probe) : 0;
     if (probeEvery > 0 && frame % probeEvery == 0)
-        fprintf(stderr, "probe frame %ld: hud %d social %d warm %d | top motion %.4f luma %.0f | bottom motion %.4f luma %.0f\n",
-                frame, hudNow, SocialVisible(topPx), WarmMenuVisible(bottomPx), topMotion, topLuma, bottomMotion, bottomLuma);
+        fprintf(stderr, "probe frame %ld: hud %d social %d warm %d vacuum %d | top motion %.4f luma %.0f | bottom motion %.4f luma %.0f\n",
+                frame, hudNow, SocialVisible(topPx), WarmMenuVisible(bottomPx), VacuumVisible(bottomPx), topMotion, topLuma, bottomMotion, bottomLuma);
 
     if (hud || bottomBig) return Layout::Focus;
     // Anything else (title, Create-a-Sim, loading) needs both screens alike: SIDE.

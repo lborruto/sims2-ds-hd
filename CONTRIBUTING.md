@@ -145,7 +145,9 @@ detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `s
   leaves none; centred, the panel leaves the status bar at the world's bottom clear. With the
   touch screen big (Tab), the world goes small into the column and nothing covers the touch
   screen. The window scales the canvas; mouse clicks go back through the same `Place()` to a
-  touch-screen position (`tests/layout_test.cpp` checks every pixel in every layout).
+  touch-screen position (`tests/layout_test.cpp` checks every pixel in every layout). A press on
+  the touch screen keeps the stylus down until the button is released, held to the screen's
+  edges (`TouchClamped()`), so a drag that overshoots does not drop what it carries.
 - **Settings** (`settings.*`): one `Settings` struct for every option, whoever uses it; loaded
   from `settings.ini` (plain `key=value`) in SDL's per-user folder when the window opens, never
   headless, saved on every change from the menu and when the program closes (with the window's
@@ -174,9 +176,13 @@ detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `s
   flat colour (`#415969`) from edge to edge in town and nowhere else: the world is big. The
   touch screen is big instead when the game plays there: a social reaction (`SocialVisible()`:
   the HUD plus row 0 flat `#597192`, the name and relationship box), the shop's catalogue or
-  Build Rooms (`WarmMenuVisible()`: all four corners of the bottom screen warm and bright), or,
-  without the HUD, a dark top screen with a lit bottom one (unverified: meant for the hotel's
-  activities, which no state reaches yet). `AutoLayout` waits for ten frames of agreement
+  Build Rooms (`WarmMenuVisible()`: all four corners of the bottom screen warm and bright), the
+  hotel's vacuum (`VacuumVisible()`: the HUD stays, and row 1 of the bottom screen is
+  `#30A2D3` from x 4 to 44, the gauge's top edge, then `#304951` from x 60 to 100; clogged, the
+  game tints the screen sepia and the same row has other fixed values), or,
+  without the HUD, a dark top screen with a lit bottom one for two seconds in a row (unverified:
+  meant for activities not reached yet; the hotel's dark rooms show it for about 30 frames at
+  each door, while the world fades out before the panel). `AutoLayout` waits for ten frames of agreement
   before switching, so fades do not flicker; it sets `mainIsTop` only when its answer changes,
   so Tab still swaps by hand in between.
 - **Microphone** (`mic.*`): melonDS asks `Platform::Mic_ReadInput` for mono 16-bit samples at

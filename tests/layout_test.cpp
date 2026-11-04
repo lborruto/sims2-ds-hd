@@ -1,6 +1,7 @@
 // Checks the layouts' touch mapping: every DS touch pixel, drawn in each layout at several window
 // sizes (HiDPI too), maps back to itself from the centre of where it was drawn; the top screen
-// is never touchable, and FOCUS's panel wins over the world under it.
+// is never touchable, FOCUS's panel wins over the world under it, and a drag past the touch
+// screen is held to its edges.
 //   ninja -C build layout_test && ./build/layout_test
 #include <cstdio>
 #include <cstdlib>
@@ -31,7 +32,21 @@ static void TestLayout(Layout l, bool mainIsTop, float aspect, int ow, int oh)
                 return;
             }
             CHECK(!OverTop(p, fit, px, py));
+            int cxT = -1, cyT = -1;
+            TouchClamped(p, fit, px, py, cxT, cyT);
+            CHECK(cxT == x && cyT == y);
         }
+    // A drag past the touch screen's edges is held to them: corners and the middle of each side.
+    {
+        int tx, ty;
+        const float l = fit.ox + (p.bottom.x - 50) * fit.scale, r = fit.ox + (p.bottom.x + p.bottom.w + 50) * fit.scale;
+        const float t = fit.oy + (p.bottom.y - 50) * fit.scale, b = fit.oy + (p.bottom.y + p.bottom.h + 50) * fit.scale;
+        const float mx = fit.ox + (p.bottom.x + p.bottom.w / 2.0f) * fit.scale, my = fit.oy + (p.bottom.y + p.bottom.h / 2.0f) * fit.scale;
+        TouchClamped(p, fit, l, t, tx, ty); CHECK(tx == 0 && ty == 0);
+        TouchClamped(p, fit, r, b, tx, ty); CHECK(tx == SW - 1 && ty == SH - 1);
+        TouchClamped(p, fit, r, my, tx, ty); CHECK(tx == SW - 1 && abs(ty - SH / 2) <= 1);
+        TouchClamped(p, fit, mx, t, tx, ty); CHECK(abs(tx - SW / 2) <= 1 && ty == 0);
+    }
     // The first output pixel of the bottom screen, and the first one past its right edge.
     int tx, ty;
     CHECK(TouchFromOutput(p, fit, fit.ox + p.bottom.x * fit.scale + 0.5f, fit.oy + p.bottom.y * fit.scale + 0.5f, tx, ty) && tx == 0 && ty == 0);

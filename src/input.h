@@ -33,6 +33,9 @@ struct Input
     int padStyle = Controls::XBOX; // the last controller's labels, for the menu
 
     bool mouseDown = false, rightDown = false;
+    // The left button went down on the touch screen: until it is released the stylus stays on
+    // it, held to its edges (a drag that overshoots does not lift the stylus).
+    bool stylusDrag = false;
     int mouseX = 0, mouseY = 0, dragX = 0;
     int zoom = 0;   // frames of X (> 0, zoom in) or Y (< 0, zoom out) still to hold, from the wheel
     float zoomAcc = 0;

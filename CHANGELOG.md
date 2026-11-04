@@ -7,8 +7,17 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+### Added
+
+- The hotel's vacuum: AUTO shows its bowl big, with the world beside it, clogged or not; the
+  blow key (M) clears its clogged filter.
+
 ### Fixed
 
+- A mouse drag that started on the touch screen no longer lifts the stylus when it overshoots
+  the screen's edge (dragging a find into the vacuum's bag, in its corner, dropped it).
+- AUTO no longer flashes the touch screen big for half a second at the hotel's doors (dark
+  rooms fade the world out before the panel).
 - Widescreen: no more thin cracks of light across the curtain in Create-a-Sim.
   The edges of polygons seen edge-on picked up colours from far along them.
 

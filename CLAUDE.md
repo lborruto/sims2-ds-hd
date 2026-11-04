@@ -40,7 +40,7 @@ the owner makes it public; write everything as if it were public already).
 | `src/looks.*` | Sharper / widescreen 3D and 60 fps: applies the Looks settings, builds `App::TopImage` |
 | `src/melonds_ext/GPU3D_Wide.*` | FullDex's wide 3D rasteriser (CPU), built into melonDS's `core` |
 | `patches/melonDS/*.patch` | Hooks in melonDS 1.1 for the looks, applied at configure time |
-| `src/scene.*` | AUTO's detection from the screens' pixels: `HudVisible()`, `SocialVisible()`, `WarmMenuVisible()`, `AutoLayout::Update(top, bottom, mainIsTop)` |
+| `src/scene.*` | AUTO's detection from the screens' pixels: `HudVisible()`, `SocialVisible()`, `WarmMenuVisible()`, `VacuumVisible()`, `AutoLayout::Update(top, bottom, mainIsTop)` |
 | `src/script.*`, `src/shots.*`, `src/state.*`, `src/picker.*` | Headless input scripts (keys, `touch`, `blow`); PNG shots and `--compose`; save states (a load re-seeds the clock); ROM file picker and `Tell()` |
 | `src/mic.*` | What the DS hears: the blow key's signal, the computer's microphone (SDL capture, resampled), or silence |
 | `src/clock.*` | The DS clock: the host's time at boot and after a state load, held to real time during fast forward; `--clock` |
@@ -67,11 +67,17 @@ Save states `shots/s2.st` (main menu), `s3` (Create-a-Sim), `s4` (Keep this Sim?
 126,126) are in git-ignored `shots/`; from s7: `act-social` (the Impress reaction game),
 `sit-dialogue`, `sit-gift` (the inventory popup), `sit-cityhall` (inside, with the HUD),
 `sit-build` (Build Rooms), `sit-store` and `sit-storebuy` (the shop floor, its catalogue),
-`sit-pause`. Pass `--clock "2026-01-01 12:00"` to runs whose output is compared.
+`sit-pause`; the hotel (made on the DS clock 2026-01-01 12:03 to 12:46: run them with
+`--clock "2026-01-01 14:00"` or later, never earlier): `sit-hotel` (the lobby, free roam, after
+the concierge's first talk), `sit-concierge` (that talk), `sit-basement` (the dark reactor
+room), `act-vacuum` (the vacuum just switched on in the lobby), `act-vacuum-clog` (the same,
+filter clogged). Pass `--clock "2026-01-01
+12:00"` to runs from the town states whose output is compared.
 
 The layout check: from each state, `--headless --frames 200` must log `focus (top big)` for
-s5, s6, s7, sit-dialogue, sit-gift, sit-cityhall, sit-store, sit-pause; `focus (bottom big)`
-for act-social, sit-build, sit-storebuy; nothing (SIDE) for s2, s3, s4. From act-social, 2400
+s5, s6, s7, sit-dialogue, sit-gift, sit-cityhall, sit-store, sit-pause, and (clock 2026-01-01
+14:00) sit-hotel, sit-concierge, sit-basement; `focus (bottom big)` for act-social, sit-build,
+sit-storebuy, and (14:00) act-vacuum, act-vacuum-clog; nothing (SIDE) for s2, s3, s4. From act-social, 2400
 frames go back to `top big` around frame 1570, when the game returns to town.
 
 ## Known traps
@@ -85,8 +91,32 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   fill may change. The shop's catalogue and Build Rooms are told by warm, bright corners of
   the bottom screen (r > b + 40, luma > 100); the panel, the phone, popups and the paused
   panel are cool. The social game's bottom barely moves (motion ≤ 0.002 on the sampling grid):
-  do not detect activities by motion. Without the HUD, a dark top (luma < 40) with a lit bottom
-  (> 50) makes the bottom big: a guess for the activities not reached, true of no state so far.
+  do not detect activities by motion. The vacuum keeps the HUD: told by row 1 of the bottom
+  screen (`#30A2D3` x 4-44, `#304951` x 60-100; clogged, the sepia tint's fixed samples of
+  the same row). Without the HUD, a dark top (luma < 40) with a
+  lit bottom (> 50) for 120 frames in a row makes the bottom big: a guess for the activities not
+  reached; the hotel's doors show it for ~30 frames (the world fades out before the panel), so
+  never shorten the hold.
+- The hotel route (from s7, goal "Check out the HOTEL"): close the phone (X at 237,15), L 94
+  frames then up: the hotel is the building with the blue bed sign; enter by walking up into
+  its red door. The concierge's talk gives "nuclear rods in the BASEMENT": rods lie on the
+  floor (lobby corridor, the lounge right of the desk, the basement corridor; Pick Up at
+  234,61); the basement door is the dark door at the back of the lounge, then stairs down, a
+  corridor and the reactor room's door; the furnace takes six ("Add 1 Fuel Rod" at 234,61).
+  Back in the lobby a cutscene: Jebediah wants the hotel vacuumed. The vacuum is the red upright
+  at the desk's end (Pick Up); Pockets tab (16,59), the vacuum (232,88), the hand (194,107)
+  switches it on. Its goal ("clean up 5 DUST piles") did not complete in ~5000 frames.
+- In the vacuum up walks forward, left/right turn, down backs up; dust and finds swirl in the
+  bowl and go down the hole; a find dragged (successive `touch` events) into the box at the
+  bottom right is kept. Touching dust with the stylus clogs the filter: the whole touch screen
+  turns sepia (dithered), a mouth and an arrow blink bottom left, dust stops draining
+  (`act-vacuum-clog`). Holding `blow` 7 frames or more clears it (gone 17 frames after the blow
+  starts); 6 frames do not; without it the clog stays. melonDS's recorded blow
+  (`melonDS/src/frontend/mic_blow.h`) gives exactly the same thresholds, so the synthesised
+  wave stays. The blow key is verified in game.
+- Navigation headless is slow: the camera follows, L/R turn it (about 156 frames a full turn),
+  walls stop the Sim silently. Branch from saved states and try several scripts in parallel
+  (background runs), comparing their last shots.
 - melonDS ticks the RTC on emulated time and keeps it in the save state; a direct boot leaves
   it at 2000-01-01. Never set it back (the game punishes that): `clock::Seed` after `Reset()`
   and in `LoadState`, `clock::Frame` holds it during fast forward (headless: only with
@@ -99,6 +129,8 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 - `SIMS2WIDE_PROBE=N` prints AUTO's signals every N frames (HUD, social, warm menu, motion and
   brightness of each screen).
 - Touch mapping goes through the same `Place()` as drawing: change one, the other follows.
+  The stylus goes down only when the left button is pressed on the touch screen; until release
+  it follows the pointer clamped to that screen (`TouchClamped`), wherever the pointer goes.
   Window points and renderer pixels differ on HiDPI; `Video::ToOutput` converts. FOCUS's panel
   lies over the world: it is drawn second (`Placement::topFirst`, `alpha`) and wins the mouse.
 - The game zooms in with X and out with Y; L and R turn the camera continuously while held
@@ -150,7 +182,7 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 | 2 | Repository template (docs, CI, release, issue templates); portfolio page in `lborruto/docs` waits on a local branch until the repo is public | ✅ / 🔄 |
 | 3 | Bigger side panel: the touch screen at 2x over the world's right edge | ✅ |
 | 4 | Looks: widescreen 3D from FullDex's `GPU3D_Wide.cpp`, sharper 3D, 60 fps (opt-in) | ✅ |
-| 5 | Survey the minigames and the other situations: social reactions, the shop, Build Rooms, City Hall, pause done; the hotel and its rooms (vacuum, cards, painting, mixer…) not reached | 🔄 |
+| 5 | Survey the minigames and the other situations: social reactions, the shop, Build Rooms, City Hall, pause, the hotel's lobby, basement and vacuum done; the vacuum's goal, hotel rooms, cards, painting, mixer… not reached | 🔄 |
 | 6 | Desktop apps: file picker, universal Mac app, Windows .exe (CI and release) | ✅ |
 | 7 | Comfort: pause menu, settings file, controllers, mouse camera, fullscreen, sound stretching, save backups | ✅ (controller untested on hardware) |
-| 8 | Playable: DS microphone (blow key, real mic), DS clock = the computer's, touch screen big for its activities | ✅ (in-game blow untested) |
+| 8 | Playable: DS microphone (blow key, real mic), DS clock = the computer's, touch screen big for its activities, mouse drags held to the touch screen | ✅ (blow verified in the vacuum's clog) |
