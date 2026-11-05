@@ -1,5 +1,5 @@
 // The game's own screen manager, read from main RAM (EU table): which screen each DS screen
-// shows and the selections on it, without looking at pixels. The RAM map is in CLAUDE.md.
+// shows and the selections on it, without looking at pixels. The RAM map is in docs/research/ram-map.md.
 #pragma once
 #include <string>
 

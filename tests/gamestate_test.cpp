@@ -154,18 +154,16 @@ static void invalid_chains()
 static void random_ram()
 {
     std::mt19937 rng(12345);
-    std::vector<u8> b(kMask + 1);
+    Ram r;
     for (int i = 0; i < 1000; i++)
     {
-        for (auto& x : b) x = (u8)rng();
-        // Make half of them reach deep into the chain.
-        if (i & 1)
-        {
-            u32 p = kBase + (rng() & kMask);
-            memcpy(&b[0x02139FA4 - kBase], &p, 4);
-        }
-        GameState g = ReadGameState(RamView{b.data(), kMask});
+        for (size_t k = 0; k + 4 <= r.b.size(); k += 4) { u32 v = rng(); memcpy(&r.b[k], &v, 4); }
+        // Half of them reach deep into the chain.
+        if (i & 1) r.W32(0x02139FA4, kBase + (rng() & kMask));
+        GameState g = ReadGameState(r.View());
         (void)GameStateName(g);
+        CHECK(g.screen == GScreen::Unknown || g.valid);
+        CHECK(g.tab >= -1 && g.tab <= 4);
     }
 }
 
