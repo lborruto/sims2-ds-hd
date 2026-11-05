@@ -162,18 +162,21 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   edges (`TouchClamped()`), so a drag that overshoots does not drop what it carries.
 - **Compositions and CONSOLE** (`compose.*`, `console.*`): what the window shows is a
   `Composition`, a list of pieces (a rectangle of one DS screen drawn at a rectangle of the
-  canvas, whole-number scaled for the touch screen) and overlays (rounded frames and boxes in the
+  canvas: the touch screen 2x, 2.5x or 3x) and overlays (rounded frames and boxes in the
   game's colours, the dimmed backdrop, the focus ring), drawn in order by the window and by
   `--compose` alike; the mouse goes back through the same pieces (`TouchFromComposition`: the
   topmost piece under the pointer decides; `touch=false` swallows clicks and the camera). SIDE,
   STACKED and FOCUS are two-piece compositions made from `Place()`. CONSOLE (`--layout console`)
-  builds one per recognised screen (`screens.*`) on 1280 × 720: in town (the panel) the world with
-  a rail of the touch screen's tab icons and phone (2x) at the right; the menu, the phone, a popup
-  and Give Item the
-  whole touch screen 3x over the dimmed world; a conversation the world without its status bar
-  and the dialogue's name, text, portrait and arrow (2x) in a wide frame; activities (and
-  unknown screens) the touch screen 3x at the left and the world small at the top right; no HUD
-  (title, Create-a-Sim): SIDE. The focus ring frames a hotspot's area (`hotspots.*`) where the
+  builds one per screen (`App::ConsoleScreen()`: the game's from RAM, else `screens.*`) on
+  1280 × 720, and never shows the two screens bare side by side as SIDE does: in town (the panel)
+  the world with a rail of the touch screen's tab icons and phone (2x) at the right; the menu,
+  the phone, a popup and Give Item the whole touch screen 3x over the dimmed world (framed for
+  the save slots, the item in hand and unknown screens, where the stick cursor works); a
+  conversation the world without its status bar and the dialogue's name, text, portrait and
+  arrow (2x) in a wide frame; activities the touch screen 3x at the left, the world small at the
+  top right and the hints' box; no HUD (title, main menu, Create-a-Sim) the top screen framed at
+  the left at its own shape and the touch screen 2.5x framed at the right, with the buttons' hint
+  below; a black load between screens (Loading) only the dark backdrop. The focus ring frames a hotspot's area (`hotspots.*`) where the
   piece showing it draws it. The navigator (below) opens the menu and moves the ring;
   `--console-menu` and `--console-focus N` pin them for the checks' pictures (`tests/console_check.sh`); `tests/layout_test.cpp` maps every pixel of every piece
   of every CONSOLE composition back to itself.

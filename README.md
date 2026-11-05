@@ -47,7 +47,7 @@ It is an early version: see [Good to know](#good-to-know).
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/create-a-sim.webp" alt="Create-a-Sim side by side: the Sim on the left, the name keyboard on the right" width="700">
+  <img src="docs/screenshots/create-a-sim.webp" alt="CONSOLE in Create-a-Sim: the Sim in a frame on the left, the name keyboard big in a frame on the right, the buttons' hint below" width="700">
 </p>
 
 ## Get started

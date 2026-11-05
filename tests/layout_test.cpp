@@ -111,7 +111,7 @@ static std::vector<ScreenState> AllStates()
     std::vector<ScreenState> v;
     for (Screen sc : {Screen::None, Screen::Panel, Screen::Phone, Screen::Dialogue, Screen::Popup, Screen::Gift, Screen::Social,
                       Screen::Vacuum, Screen::Cards, Screen::Catalogue, Screen::Build, Screen::FrontEnd,
-                      Screen::CreateASim, Screen::SaveSlots, Screen::ItemHand, Screen::Unknown})
+                      Screen::CreateASim, Screen::SaveSlots, Screen::ItemHand, Screen::Unknown, Screen::Loading})
         if (sc == Screen::Panel)
             for (Tab t : {Tab::None, Tab::Interact, Tab::Pockets, Tab::Goals, Tab::Relationships, Tab::Options}) v.push_back({sc, t});
         else v.push_back({sc, Tab::None});
@@ -153,7 +153,8 @@ static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int top
         TouchClampedComposition(c, i, fit, 1e6f, 1e6f, tx, ty);
         CHECK(tx == q.from.x + q.from.w - 1 && ty == q.from.y + q.from.h - 1);
     }
-    CHECK(bottoms > 0);
+    // A black load (Loading) shows nothing at all: no piece to touch.
+    CHECK(s.screen == Screen::Loading ? bottoms == 0 : bottoms > 0);
 }
 
 int main()
@@ -217,7 +218,29 @@ int main()
             CHECK(hint);
             float cx, cy, sc2;
             CHECK(CanvasFromTouch(c, 10, 20, cx, cy, sc2) && sc2 == 2.5f && cx == c.pieces[1].to.x + 25 && cy == c.pieces[1].to.y + 50);
+            // Both pieces framed (6 pixels outside each, drawn before the top piece); the top
+            // screen is the camera (wheel, right drag), as SIDE's was.
+            CHECK(c.pieces[0].touch);
+            int frames = 0;
+            for (const Overlay& o : c.overlays)
+                for (const Piece& q : c.pieces)
+                    if (!o.text && o.argb == kFrameArgb && o.border == 6 && o.before == 0 && o.to.x == q.to.x - 6 && o.to.y == q.to.y - 6 &&
+                        o.to.w == q.to.w + 12 && o.to.h == q.to.h + 12)
+                        frames++;
+            CHECK(frames == 2);
         }
+    // A black load: the bare backdrop, nothing drawn, nothing touchable, no cursor, no camera.
+    for (bool menuOpen : {false, true})
+    {
+        const Composition c = BuildConsole({Screen::Loading, Tab::None}, menuOpen, 0, SW, SH);
+        CHECK(c.cw == kConsoleW && c.ch == kConsoleH && c.pieces.empty() && c.overlays.empty());
+        const CanvasFit fit = CanvasFit::For(c.cw, c.ch, 1280, 720);
+        int tx, ty;
+        float cx, cy, sc2;
+        CHECK(!TouchFromComposition(c, fit, 640, 360, tx, ty));
+        CHECK(!OverTopComposition(c, fit, 640, 360));
+        CHECK(!CanvasFromTouch(c, 128, 96, cx, cy, sc2));
+    }
     // SaveSlots, ItemHand, Unknown (HUD up): the menu composition, framed, with the stick cursor.
     for (Screen sc : {Screen::SaveSlots, Screen::ItemHand, Screen::Unknown})
     {

@@ -32,7 +32,7 @@ struct App
     // pinned them for a check's picture.
     bool consolePinned = false;
     // CONSOLE's screen: the game's own (RAM) when it reads, else the pixel tracker's (gamestate.h).
-    ScreenState ConsoleScreen() const { return ConsoleScreenOf(game, screens.Current(), HudVisible(Top())); }
+    ScreenState ConsoleScreen() const { return ConsoleScreenOf(game, screens.Current(), HudVisible(Top()), (game.valid || game.between) && ScreensBlack(Top(), Bottom())); }
     // The game's bottom slot is not switching (true without a RAM reading): the navigator's gate.
     bool Settled() const { return !game.valid || game.settled; }
 

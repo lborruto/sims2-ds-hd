@@ -61,10 +61,26 @@ static void no_hud_without_the_strip()
     CHECK(!HudVisible(s.data()));
 }
 
+// Both screens black (the game's loads: every pixel exactly 0 after a fade of 60, 28, 0): any
+// pixel brighter than the threshold on either screen is not a load.
+static void black_screens()
+{
+    std::vector<u32> top(SW * 192, 0xFF000000), bottom(SW * 192, 0xFF000000);
+    CHECK(ScreensBlack(top.data(), bottom.data()));
+    top[100 * SW + 37] = 0xFF080808;
+    CHECK(ScreensBlack(top.data(), bottom.data()));
+    bottom[191 * SW + 255] = 0xFF001C00; // the fade's last step, one pixel
+    CHECK(!ScreensBlack(top.data(), bottom.data()));
+    bottom[191 * SW + 255] = 0xFF000000;
+    top[3 * SW + 1] = 0xFF1C0000;
+    CHECK(!ScreensBlack(top.data(), bottom.data()));
+}
+
 int main()
 {
     hud_whatever_the_bar();
     no_hud_without_the_strip();
+    black_screens();
     if (failures) { fprintf(stderr, "screens_test: %d failures\n", failures); return 1; }
     printf("screens_test: ok\n");
     return 0;

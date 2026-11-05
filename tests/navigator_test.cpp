@@ -632,9 +632,9 @@ static void save_slots_and_quit_keep_the_cursor()
 
 static void front_end_screens_pass_the_buttons()
 {
-    // Title / main menu, Create-a-Sim: no table of targets yet, the DS's own buttons (A, B, the
-    // D-pad), even with a stick cursor.
-    for (ScreenState s : {kFrontEnd, kCreateASim})
+    // Title / main menu, Create-a-Sim, a black load: no table of targets, the DS's own buttons
+    // (A, B, the D-pad), even with a stick cursor.
+    for (ScreenState s : {kFrontEnd, kCreateASim, ScreenState {Screen::Loading, Tab::None}})
     {
         Rig r;
         r.Frame(s);
@@ -648,6 +648,7 @@ static void front_end_screens_pass_the_buttons()
         CHECK(HotspotsFor(s).empty());
     }
     CHECK(std::string(ScreenName(Screen::SaveSlots)) == "SaveSlots");
+    CHECK(std::string(ScreenName(Screen::Loading)) == "Loading");
 }
 
 int main()

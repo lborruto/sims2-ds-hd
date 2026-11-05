@@ -68,6 +68,19 @@ static void panel_and_popup()
     CHECK(g.tab == 3 && g.selection == 0x204 && GameStateName(g) == "Panel/Relationships");
 }
 
+// The black loads: the manager reads, its bottom object pointer is null.
+static void between_screens()
+{
+    Ram r = Make(0x0213203C, -1);
+    r.W32(kP + 0xDAC, 0);
+    const GameState g = ReadGameState(r.View());
+    CHECK(!g.valid && g.between && g.screen == GScreen::Unknown);
+    CHECK(GameStateName(g) == "Unknown(ov=-1,vt=0x00000000)");
+    CHECK(!ReadGameState(Make(0x0213203C, -1).View()).between);
+    Ram none;
+    CHECK(!ReadGameState(none.View()).between);
+}
+
 static void settled_only_for_3()
 {
     for (u32 s : {0u, 3u, 4u, 5u})
@@ -220,23 +233,37 @@ static void to_screen_state()
 
 static void console_screen()
 {
-    // RAM when it reads; a black load (Unknown, no HUD) is None; without RAM the pixels.
+    // RAM when it reads; an Unknown without the HUD is Loading when both screens are black (the
+    // black loads), None otherwise (an unmapped front-end screen); without RAM the pixels.
     GameState g;
-    CHECK(ConsoleScreenOf(g, {Screen::Phone}, true) == (ScreenState{Screen::Phone}));
+    CHECK(ConsoleScreenOf(g, {Screen::Phone}, true, false) == (ScreenState{Screen::Phone}));
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false, true) == (ScreenState{Screen::None}));
+    // Between screens (the manager reads, no bottom object): Loading when black without the HUD.
+    g.between = true;
+    CHECK(ConsoleScreenOf(g, {Screen::Cards}, false, true) == (ScreenState{Screen::Loading}));
+    CHECK(ConsoleScreenOf(g, {Screen::Cards}, false, false) == (ScreenState{Screen::Cards}));
+    CHECK(ConsoleScreenOf(g, {Screen::Panel, Tab::Goals}, true, true) == (ScreenState{Screen::Panel, Tab::Goals}));
+    g.between = false;
     g.valid = true;
-    CHECK(ConsoleScreenOf(g, {Screen::Cards}, false) == (ScreenState{Screen::None}));
-    CHECK(ConsoleScreenOf(g, {Screen::None}, true) == (ScreenState{Screen::Unknown}));
+    CHECK(ConsoleScreenOf(g, {Screen::Cards}, false, false) == (ScreenState{Screen::None}));
+    CHECK(ConsoleScreenOf(g, {Screen::Cards}, false, true) == (ScreenState{Screen::Loading}));
+    CHECK(ConsoleScreenOf(g, {Screen::None}, true, false) == (ScreenState{Screen::Unknown}));
     g.screen = GScreen::Panel;
     g.tab = -1;
-    CHECK(ConsoleScreenOf(g, {Screen::None}, false) == (ScreenState{Screen::None}));
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false, false) == (ScreenState{Screen::None}));
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false, true) == (ScreenState{Screen::Loading}));
     g.tab = 1;
-    CHECK(ConsoleScreenOf(g, {Screen::None}, false) == (ScreenState{Screen::Panel, Tab::Pockets}));
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false, false) == (ScreenState{Screen::Panel, Tab::Pockets}));
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false, true) == (ScreenState{Screen::Panel, Tab::Pockets}));
     g.screen = GScreen::Cards;
-    CHECK(ConsoleScreenOf(g, {Screen::None}, false) == (ScreenState{Screen::Cards}));
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false, false) == (ScreenState{Screen::Cards}));
+    g.screen = GScreen::FrontEnd;
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false, true) == (ScreenState{Screen::FrontEnd}));
 }
 
 int main()
 {
+    between_screens();
     panel_and_popup();
     settled_only_for_3();
     plain_screens();

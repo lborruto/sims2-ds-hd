@@ -34,7 +34,7 @@ The screen manager's "set screen" routine is at 0x02046C24 and its per-frame loo
 
 | Field | Address / offset | Type | Meaning |
 | --- | --- | --- | --- |
-| bottom screen object `S` | `*(P+0xDAC)` | ptr | its first word is a vtable pointer that names the screen |
+| bottom screen object `S` | `*(P+0xDAC)` | ptr | its first word is a vtable pointer that names the screen; 0 during the black loads between screens (title → Create-a-Sim, Create-a-Sim → town, quitting the cards), both screens then exactly black |
 | top screen object | `*(P+0xDA8)` | ptr | world, title/menu or Create-a-Sim object |
 | loaded overlay | `P+0xE34` | s32 | -1 none; needed because overlay vtables collide |
 | popup | `P+0x8` | u8 | 0xFF front end, 0 none, 1 opening, 2 shown, 3 closing (still drawn) |

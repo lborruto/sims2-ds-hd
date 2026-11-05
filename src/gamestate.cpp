@@ -70,9 +70,13 @@ GameState ReadGameState(RamView ram)
     if (!ram.ram) return g;
     Reader m{ram};
     u32 P, S, vt, ovRaw, pop, slot = 0;
-    if (!m.R32(kEU.manager, P) || !m.R32(P + kEU.bottomObj, S) || !m.R32(S, vt)
-        || !m.R32(P + kEU.overlay, ovRaw) || !m.R8(P + kEU.popup, pop))
+    if (!m.R32(kEU.manager, P) || !m.R32(P + kEU.bottomObj, S)) return g;
+    if (S == 0)
+    {
+        g.between = true;
         return g;
+    }
+    if (!m.R32(S, vt) || !m.R32(P + kEU.overlay, ovRaw) || !m.R8(P + kEU.popup, pop)) return g;
     g.valid = true;
     g.vtable = vt;
     g.overlay = (int)ovRaw;   // 0xFFFFFFFF is -1
@@ -177,11 +181,11 @@ bool PixelsAgree(const GameState& g, ScreenState pixels)
     }
 }
 
-ScreenState ConsoleScreenOf(const GameState& g, ScreenState pixels, bool hud)
+ScreenState ConsoleScreenOf(const GameState& g, ScreenState pixels, bool hud, bool black)
 {
-    if (!g.valid) return pixels;
+    if (!g.valid) return g.between && !hud && black ? ScreenState {Screen::Loading} : pixels;
     ScreenState s = ToScreenState(g);
-    if (s.screen == Screen::Unknown && !hud) s = {Screen::None};
+    if (s.screen == Screen::Unknown && !hud) s = {black ? Screen::Loading : Screen::None};
     return s;
 }
 }

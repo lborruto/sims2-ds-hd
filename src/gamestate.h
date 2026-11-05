@@ -13,6 +13,10 @@ enum class GScreen { Unknown, FrontEnd /*title or main menu*/, CreateASim, Panel
 struct GameState
 {
     bool valid = false;            // the manager pointer chain read cleanly
+    // The manager reads but its bottom-screen object pointer (P+0xDAC) is null: the game is
+    // between screens, in a black load (valid stays false). Measured on every load seen: the
+    // title -> Create-a-Sim, Create-a-Sim -> town, quitting the cards.
+    bool between = false;
     GScreen screen = GScreen::Unknown;
     u32 vtable = 0; int overlay = -1;   // raw, for Unknown logging
     u8 popup = 0;                  // P+0x8 (0xFF front end, 0 none, 1 opening, 2 shown, 3 closing)
@@ -35,9 +39,12 @@ std::string GameStateName(const GameState&);   // "Panel/Goals", "Popup", "Unkno
 // Options > Quit is a popup over the Options tab (tab 4): Unknown too, since its yes / no
 // buttons are not kPopupClose (the stick cursor answers it, or the DS's A).
 ScreenState ToScreenState(const GameState&);
-// What CONSOLE shows and steers: ToScreenState when RAM reads (an Unknown without the HUD, the
-// black loads between screens, is None: SIDE, not the activity layout), else the pixels' answer.
-ScreenState ConsoleScreenOf(const GameState&, ScreenState pixels, bool hud);
+// What CONSOLE shows and steers: ToScreenState when RAM reads, else the pixels' answer. Without
+// the HUD and with both screens black (`black`: ScreensBlack), the game between screens
+// (GameState::between) or an Unknown is Loading (the black loads: the bare backdrop); an Unknown
+// without the HUD that is not black is None (an unmapped front-end screen: the front end's view).
+// The pixels' None (RAM not read at all) stays None.
+ScreenState ConsoleScreenOf(const GameState&, ScreenState pixels, bool hud, bool black);
 // Whether the pixel tracker's answer (screens.h) is what the game's screen looks like:
 // the same, or None for FrontEnd / CreateASim (no HUD), Unknown for SaveSlots / ItemHand.
 bool PixelsAgree(const GameState&, ScreenState pixels);

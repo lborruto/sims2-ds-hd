@@ -40,7 +40,7 @@ Mode ModeOf(Screen s, bool menuOpen)
     case Screen::Popup: return Mode::Popup;
     case Screen::Unknown: return Mode::Cursor;
     case Screen::ItemHand: case Screen::SaveSlots: return Mode::Cursor; // no table yet: as Unknown
-    case Screen::None: case Screen::Dialogue: case Screen::FrontEnd: case Screen::CreateASim: return Mode::Pass;
+    case Screen::None: case Screen::Dialogue: case Screen::FrontEnd: case Screen::CreateASim: case Screen::Loading: return Mode::Pass;
     }
     return Mode::Pass;
 }

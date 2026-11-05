@@ -11,7 +11,8 @@
 #   top right, the hints' box; s2, s3, s4 (the main menu, Create-a-Sim, Keep this Sim?: no HUD):
 #   the front end's view, the top screen framed at the left at its shape and the touch screen
 #   2.5x framed at the right, the buttons' hint below, never SIDE; slots (sit-store, Options >
-#   Save: the save slots, from RAM): the touch screen 3x, framed, over the dimmed world. (The pictures pin the menu and the focus with
+#   Save: the save slots, from RAM): the touch screen 3x, framed, over the dimmed world; load
+#   (act-cards quitting, frame 119: RAM between screens, both screens black): the bare backdrop. (The pictures pin the menu and the focus with
 #   --console-focus / --console-menu: the navigator does not move them.)
 # Then the navigator, driven by the scripts' "pad" events (scripts/console/), from what
 # --print-game (the game's screen, which CONSOLE acts on) and --print-screen (the pixels') print:
@@ -23,7 +24,7 @@
 # answers with the right icon (it lights green; the game itself plays on for about 1600
 # frames whatever the answers); from act-cards, X draws (Jun's count on the score bar changes),
 # X then Y draws and discards (the count back to its start), B then A quits (Cards, None,
-# Panel/Interact; the game: Cards, Unknown in the black load, which CONSOLE shows as None, then
+# Panel/Interact; the game: Cards, Unknown in the black load, which CONSOLE shows as Loading, then
 # Panel/Interact), B then B answers no and X still draws; from act-vacuum-clog, Y held 10
 # frames clears the clog (the bowl's row 1 back to #30A2D3) within 30 frames.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
@@ -51,15 +52,14 @@ run() {
     file=$shots/$state.st
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
-    local save=$tmp/$name.sav input=()
+    local save=$tmp/$name.sav
     if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
-    if [ "$name" = slots ]; then input=(--input "$repo/scripts/hotspots/options-save.txt"); fi
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
-        --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 ${input[@]+"${input[@]}"} "$@" > "$tmp/$name.log" 2>&1 &&
+        --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
     [ "$state" = act-cards ] && cp "$complete_save" "$save"
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
-        --shot-at 119 --shot-dir "$tmp/$name/r" ${input[@]+"${input[@]}"} "$@" > "$tmp/$name-r.log" 2>&1 &&
+        --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
 }
 
@@ -80,11 +80,12 @@ run s3 s3 "${town[@]}" &
 wait
 run s2 s2 "${town[@]}" &
 run s4 s4 "${town[@]}" &
-run slots sit-store "${town[@]}" &
+run slots sit-store "${town[@]}" --input "$repo/scripts/hotspots/options-save.txt" &
+run load act-cards "${late[@]}" --input "$repo/scripts/console/cards-quit.txt" &
 wait
 
 fails=0
-for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots; do
+for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots load; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -149,7 +150,7 @@ def front():
     expect("backdrop", C(5, 5), (16, 18, 24))
     expect("backdrop between", C(604, 300), (16, 18, 24))
     expect("hint box", C(640, 604), FRAME)
-    row = [C(x, y) for y in range(614, 636) for x in range(250, 1030)]
+    row = [C(x, y) for y in range(614, 646) for x in range(240, 1040)]
     if (255, 255, 255) not in row or OUTLINE not in row:
         errors.append("no hint text")
 
@@ -208,6 +209,23 @@ elif case in ("social", "vacuum", "cards"):
     activity()
 elif case in ("s2", "s3", "s4"):
     front()
+elif case == "load":
+    # Frame 119 of the cards' quit: the game between Cards and the casino's panel, both screens
+    # black: only the backdrop, no frame, no hint.
+    for x in range(0, 256, 4):
+        for y in range(0, 192, 4):
+            if max(top(x, y)) > 8 or max(bottom(x, y)) > 8:
+                errors.append(f"the screens are not black at {x},{y}")
+                break
+        if errors:
+            break
+    for cy in range(0, 720, 8):
+        for cx in range(0, 1280, 8):
+            if C(cx, cy) != (16, 18, 24):
+                errors.append(f"not the bare backdrop at {cx},{cy}: {C(cx, cy)}")
+                break
+        if errors:
+            break
 elif case == "slots":
     big_over_dim()
     expect("touch screen frame", C(252, 300), OUTLINE)
