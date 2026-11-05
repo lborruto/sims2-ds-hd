@@ -59,7 +59,7 @@ FetchContent_MakeAvailable(sdl2)
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
     src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/controls.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
-    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/scene.cpp src/screens.cpp src/script.cpp
+    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/recorder.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)

@@ -38,6 +38,7 @@
 #include "picker.h"
 #include "script.h"
 #include "shots.h"
+#include "recorder.h"
 #include "state.h"
 #include "video.h"
 
@@ -65,6 +66,8 @@ static void Usage()
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
+        "  --record-dir DIR              where unmapped screens are recorded (a state + a picture each; default: the\n"
+        "                                settings folder's captures/; on in the window, off headless unless given)\n"
         "  --print-screen                print the recognised bottom screen when it changes (frame N: screen X)\n"
         "                                and CONSOLE's menu and focus (frame N: console menu open|closed, focus F)\n"
         "  --console-menu, --console-focus N  (checks) CONSOLE's menu shown, the focus ring on target N\n"
@@ -97,7 +100,8 @@ int main(int argc, char** argv)
         (void)freopen("CONOUT$", "w", stderr);
     }
 #endif
-    std::string romPath, inputPath, shotDir = "shots", stateLoad, stateSave, savePath, micArg;
+    std::string romPath, inputPath, shotDir = "shots", stateLoad, stateSave, savePath, micArg, recordDir;
+    long unknownAfter = -1; // (a check) from this frame the game reads as an unmapped screen
     bool headless = false, fast = false;
     long frames = -1;
     int shotEvery = 0;
@@ -131,6 +135,8 @@ int main(int argc, char** argv)
         else if (a == "--fast") fast = true;
         else if (a == "--print-screen") printScreen = true;
         else if (a == "--print-game") printGame = true;
+        else if (a == "--record-dir") recordDir = next();
+        else if (a == "--game-unknown-after") unknownAfter = atol(next().c_str());
         else if (a == "--console-menu") consoleMenu = consolePinned = true;
         else if (a == "--console-focus") { consoleFocus = atoi(next().c_str()); consolePinned = true; }
         else if (a == "--clock") { if (!clock::SetFixed(next())) { fprintf(stderr, "--clock wants \"YYYY-MM-DD HH:MM\"\n"); return 1; } }
@@ -247,6 +253,8 @@ int main(int argc, char** argv)
 
     // frame counts the game's frames (shots, scripts); iter every turn of the loop, paused too.
     long frame = 0;
+    std::unique_ptr<Recorder> recorder;
+    if (!headless || !recordDir.empty()) recorder = std::make_unique<Recorder>(recordDir);
     // The window keeps the DS's own pace, 59.83 frames a second: vsync alone would follow the
     // screen, and on a 120 Hz screen (ProMotion, gaming monitors) the game ran twice too fast.
     const double dsFrame = 1.0 / (33513982.0 / (6.0 * 355.0 * 263.0)); // seconds
@@ -337,8 +345,14 @@ int main(int argc, char** argv)
         {
             GameState before = app.game;
             app.game = ReadGameState({nds.MainRAM, nds.MainRAMMask});
+            if (unknownAfter >= 0 && frame >= unknownAfter)
+            {   // the check's fake: a new unmapped pair every 200 frames
+                app.game.valid = true; app.game.between = false; app.game.settled = true;
+                app.game.screen = GScreen::Unknown; app.game.overlay = 90; app.game.vtable = 0x02000000 + (u32)((frame - unknownAfter) / 200);
+            }
             if (printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
         }
+        if (recorder) recorder->Frame(app, frame, nds);
         const u32* top = app.Top();
         const u32* bottom = app.Bottom();
         {

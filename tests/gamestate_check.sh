@@ -93,4 +93,25 @@ else
     if [ "$got_seq" = "$want_seq" ]; then echo "ok   tabs: $got_seq"
     else echo "FAIL tabs: want '$want_seq', got '${got_seq:-nothing}'"; fail=1; fi
 fi
+
+# The recorder: --game-unknown-after N fakes an unmapped screen (a new pair every 200 frames);
+# --record-dir saves a state and a picture per pair, once, 30 frames in; the state loads.
+rec_run() { # DIR FRAMES [options]
+    local d=$1 n=$2; shift 2; mkdir -p "$d"
+    "$bin" "$rom" --headless --frames "$n" --state-load "$shots/s6.st" --save "$tmp/rec.sav" --record-dir "$d" --game-unknown-after 50 "$@" > "$d.log" 2>&1
+}
+count() { find "$1" -name "*.$2" | wc -l | tr -d ' '; }
+if [ -f "$shots/s6.st" ]; then
+    rec_run "$tmp/rec1" 200; rec_run "$tmp/rec2" 350
+    r1s=$(count "$tmp/rec1" st) r1p=$(count "$tmp/rec1" png) r2s=$(count "$tmp/rec2" st) r2p=$(count "$tmp/rec2" png)
+    if [ "$r1s $r1p $r2s $r2p" = "1 1 2 2" ]; then echo "ok   recorder: 1 + 1 after 200 frames, 2 + 2 after 350"
+    else echo "FAIL recorder: want '1 1 2 2', got '$r1s $r1p $r2s $r2p'"; fail=1; fi
+    st=$(find "$tmp/rec1" -name "*.st" | head -n 1)
+    if "$bin" "$rom" --headless --frames 10 --state-load "$st" --save "$tmp/rec.sav" > "$tmp/rec-load.log" 2>&1 && grep -q '^clock: ' "$tmp/rec-load.log"; then echo "ok   recorder: the recorded state loads"
+    else echo "FAIL recorder: the recorded state does not load"; fail=1; fi
+    # nothing unknown: nothing recorded
+    mkdir -p "$tmp/rec0"
+    "$bin" "$rom" --headless --frames 200 --state-load "$shots/s6.st" --save "$tmp/rec.sav" --record-dir "$tmp/rec0" > "$tmp/rec0.log" 2>&1
+    [ "$(count "$tmp/rec0" st)" = 0 ] && echo "ok   recorder: nothing recorded on a mapped screen" || { echo "FAIL recorder: recorded on a mapped screen"; fail=1; }
+else echo "FAIL recorder: no $shots/s6.st"; fail=1; fi
 exit $fail
