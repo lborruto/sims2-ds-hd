@@ -18,11 +18,24 @@ cards_save=${CARDS_SAVE:-$repo/saves/complete-play.sav}
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-# run NAME STATE FRAMES [options...]: the screens printed, one "frame N: screen X" per line.
+# run NAME STATE FRAMES [options...]: the whole log in NAME.log, the screens printed (one
+# "frame N: screen X" per line) in NAME.out, and NAME.ok only if the run went to its end (exit
+# status 0 and the headless end line, the DS clock's): an empty .out reads as None, so a crash
+# or a missing state must not pass for it.
 run() {
     local name=$1 state=$2 frames=$3; shift 3
+    if [ ! -f "$shots/$state.st" ]; then echo "no save state $shots/$state.st" > "$tmp/$name.log"; : > "$tmp/$name.out"; return; fi
     "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" \
-        --save "$tmp/$name.sav" --print-screen "$@" 2>&1 | grep -E '^frame [0-9]+: screen ' > "$tmp/$name.out"
+        --save "$tmp/$name.sav" --print-screen "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+    grep -E '^frame [0-9]+: screen ' "$tmp/$name.log" > "$tmp/$name.out"
+}
+
+# ended NAME: the run went to its end; otherwise says why and fails.
+ended() {
+    [ -f "$tmp/$1.ok" ] && return 0
+    echo "FAIL $1: the run did not end well: $(tail -n 1 "$tmp/$1.log")"
+    return 1
 }
 
 town=(--clock "2026-01-01 12:00")
@@ -38,7 +51,10 @@ for c in "${cases[@]}"; do
     st=${c%%:*}
     case $st in
         sit-hotel|act-vacuum|act-vacuum-clog) run "$st" "$st" 120 "${hotel[@]}" & ;;
-        act-cards) cp "$cards_save" "$tmp/act-cards.sav" 2>/dev/null; run "$st" "$st" 120 & ;;
+        act-cards)
+            if [ -f "$cards_save" ]; then cp "$cards_save" "$tmp/act-cards.sav"
+            else echo "warning: no $cards_save (CARDS_SAVE): act-cards runs without its save"; fi
+            run "$st" "$st" 120 & ;;
         *) run "$st" "$st" 120 "${town[@]}" & ;;
     esac
 done
@@ -48,6 +64,7 @@ wait
 fail=0
 for c in "${cases[@]}"; do
     st=${c%%:*} want=${c#*:}
+    ended "$st" || { fail=1; continue; }
     got=$(sed 's/^frame [0-9]*: screen //' "$tmp/$st.out" | tr '\n' ' ' | sed 's/ $//')
     [ "$want" = None ] && want=""
     if [ "$got" = "$want" ]; then echo "ok   $st: ${want:-None}"
@@ -58,7 +75,8 @@ done
 # the phone at 1250; each must be recognised within 60 frames of its touch.
 want_seq="Popup Panel/Interact Popup Panel/Interact Panel/Pockets Panel/Goals Panel/Relationships Panel/Options Phone"
 got_seq=$(sed 's/^frame [0-9]*: screen //' "$tmp/tabs.out" | tr '\n' ' ' | sed 's/ $//')
-if [ "$got_seq" != "$want_seq" ]; then echo "FAIL tabs: want '$want_seq', got '${got_seq:-None}'"; fail=1
+if ! ended tabs; then fail=1
+elif [ "$got_seq" != "$want_seq" ]; then echo "FAIL tabs: want '$want_seq', got '${got_seq:-None}'"; fail=1
 else
     late=0
     for pair in "Panel/Pockets:450" "Panel/Goals:650" "Panel/Relationships:850" "Panel/Options:1050" "Phone:1250"; do

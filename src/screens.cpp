@@ -122,11 +122,16 @@ ScreenState Recognise(const u32* top, const u32* bottom)
         return {Screen::Unknown};
     }
     // The phone: its green LCD, row 105 #9AB29A from x 34 to 221 (s7, and opened from the panel).
-    if (FlatRow(bottom, 105, 0x9AB29A, 34, 218)) return {Screen::Phone};
+    if (FlatRow(bottom, 105, 0x9AB29A, 34, 221)) return {Screen::Phone};
     // A popup (the goal unlocked box, the tip, Game Paused): the game dims the whole panel behind
     // its box; the panel's top and bottom edges, rows 0 and 191 from x 36 (right of the tab
-    // column), go from #6171B2 to #303859, wherever the box sits (s6, sit-pause).
-    if (FlatRow(bottom, 0, 0x303859, 40, 248) && FlatRow(bottom, 191, 0x303859, 40, 248)) return {Screen::Popup};
+    // column) to 252, go from #6171B2 to #303859, wherever the box sits (s6, sit-pause). The
+    // phone opening fades the panel to black through that same dim (2 frames), so the box must
+    // be there too: its fill, row 120 #828ACB from x 49 to 113 and 144 to 200 (left and right of
+    // the X, which sits at 126,110 or 126,126), the same in the goal box, the tip and Game Paused.
+    if (FlatRow(bottom, 0, 0x303859, 36, 252) && FlatRow(bottom, 191, 0x303859, 36, 252) &&
+        FlatRow(bottom, 120, 0x828ACB, 49, 113) && FlatRow(bottom, 120, 0x828ACB, 144, 200))
+        return {Screen::Popup};
     if (Tab t = SelectedTab(bottom); t != Tab::None) return {Screen::Panel, t};
     // A conversation: the blue "next" arrow bottom right, row 171 sampled every 3 pixels from
     // x 214 (s5, sit-dialogue, sit-concierge: the same on every frame).

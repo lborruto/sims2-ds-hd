@@ -155,10 +155,12 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   a 35 × 35 square around rows 22, 57, 92, 127, 162; 26 to 51 ring pixels, 16 needed; no other
   screen has that colour there); the phone, row 105 flat `#9AB29A` (its LCD) x 34-221; a popup
   (goal unlocked, tips, Game Paused), by the dimmed panel behind its box: rows 0 and 191 flat
-  `#303859` from x 36 (`#6171B2` undimmed), wherever the box sits; the X is not used (it turns
-  green when touched, and the box slides). A conversation, row 171's fixed samples every 3
-  pixels from x 214 (the blue arrow); Give Item, row 86's every 3 from x 112 (the bow button);
-  the catalogue, row 55 flat `#5961A2` x 9-247; Build Rooms, rows 10 `#695128` and 23
+  `#303859` x 36-252 (`#6171B2` undimmed), wherever the box sits, and the box's fill, row 120
+  `#828ACB` x 49-113 and 144-200 (the same in all three boxes): opening the phone fades the
+  panel to black through the very same dim for 2 frames, with no box. The X is not used (it
+  turns green when touched, and the box slides; while it slides the screen reads Unknown). A
+  conversation, row 171's fixed samples every 3 pixels from x 214 (the blue arrow); Give Item,
+  row 86's every 3 from x 112 (the bow button); the catalogue, row 55 flat `#5961A2` x 9-247; Build Rooms, rows 10 `#695128` and 23
   `#302008` x 36-219 (both also warm). Fades and slides between screens read `Unknown` for up
   to about 30 frames (the dim fading over 14 frames, the phone opening over 36): the tracker
   takes Unknown only after 60 agreeing frames, Popup and Dialogue after 3, the rest after 6.
