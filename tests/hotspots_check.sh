@@ -14,11 +14,11 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 bin=${SIMS2WIDE:-$repo/build/sims2wide}
 rom=${ROM:-$(find "$repo/roms" -name "*.nds" 2>/dev/null | head -n 1)}
 shots=${SHOTS:-$repo/shots}
-cards_save=${COMPLETE_SAVE:-${CARDS_SAVE:-$repo/saves/complete-play.sav}}
+complete_save=${COMPLETE_SAVE:-${CARDS_SAVE:-$repo/saves/complete-play.sav}}
 dir=$repo/scripts/hotspots
 [ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2wide)"; exit 2; }
 [ -f "$rom" ] || { echo "no ROM (set ROM)"; exit 2; }
-[ -f "$cards_save" ] || { echo "no $cards_save (COMPLETE_SAVE): the card game and casino checks need it"; exit 2; }
+[ -f "$complete_save" ] || { echo "no $complete_save (COMPLETE_SAVE): the card game and casino checks need it"; exit 2; }
 tmp=$(mktemp -d)
 # KEEP=1 keeps the runs (logs, pictures) and says where.
 [ -n "${KEEP:-}" ] && echo "keeping $tmp" || trap 'rm -rf "$tmp"' EXIT
@@ -108,7 +108,7 @@ run() {
     # was saved at (never earlier: CLAUDE.md, the clock), or the pictures would differ by the
     # second the run started.
     local opts=(--clock "2026-01-01 12:00")
-    [ "$state" = act-cards ] && { cp "$cards_save" "$out.sav"; opts=(--clock "2026-11-05 12:00"); }
+    [ "$state" = act-cards ] && { cp "$complete_save" "$out.sav"; opts=(--clock "2026-11-05 12:00"); }
     "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$out.sav" \
         --input "$dir/$name.txt" --print-screen --shot-dir "$out" --shot-at $((frames - 1)) "${opts[@]}" \
         > "$out.log" 2>&1 && grep -q '^clock: ' "$out.log" && touch "$out.ok"

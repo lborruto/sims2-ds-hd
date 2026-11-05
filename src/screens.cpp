@@ -22,13 +22,14 @@ static bool RowSamples(const u32* screen, int y, int x0, int step, const u32 (&r
 
 bool HudVisible(const u32* top)
 {
-    // The strip's bottom border, flat #415969 under the clock and the money (x 8 to 136); the
-    // rows above it carry their text and the motive bar. Under the motive bar's box (x 144 to
-    // 248) the border takes the bar's tint: #415969 with the red bar of the town's states,
-    // #495969 with the yellow one of the complete save (the casino, the late hotel lobby).
-    // Checked against every situation shot so far: only gameplay matches.
-    return FlatRow(top, 190, 0x415969, 8, 136) &&
-           (FlatRow(top, 190, 0x415969, 144, 248) || FlatRow(top, 190, 0x495969, 144, 248));
+    // The status bar's frame, none of it under the Sanity bar's tint: the strip's top edge, row
+    // 176 #597192, and the row under its bottom border, row 191 #384961, both flat from x 8 to
+    // 248; the bottom border itself, row 190 #415969, only under the clock and the money (x 8
+    // to 136). Rows 177 to 190 under the bar's box (from x 144) take the bar's colour: row 190
+    // is #415969 with the red bar, #495969 with the yellow one (the complete save's casino and
+    // late hotel lobby), and the green and silver levels were not seen. Checked on every frame of
+    // every situation shot so far: only gameplay matches, the three rows always together.
+    return FlatRow(top, 176, 0x597192) && FlatRow(top, 191, 0x384961) && FlatRow(top, 190, 0x415969, 8, 136);
 }
 
 bool SocialVisible(const u32* top)

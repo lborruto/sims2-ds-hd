@@ -46,6 +46,7 @@ the owner makes it public; write everything as if it were public already).
 | `src/screens.*` | Which bottom screen the game shows: `Recognise(top, bottom)` → `ScreenState` (`Screen`, panel `Tab`), `ScreenTracker` (hysteresis; `App::screens`, `--print-screen`), and the pixel rules AUTO shares (`HudVisible`, `SocialVisible`, `WarmMenuVisible`, `VacuumVisible`, `CardsVisible`) |
 | `tests/screens_check.sh` | Each save state's recognised screen, the panel's tabs from `s6` with `scripts/tabs.txt`, two-line catalogue entries from `sit-storebuy` (needs the ROM, `shots/` and the complete save: `ROM=… SHOTS=… MORE_SHOTS=… COMPLETE_SAVE=… bash tests/screens_check.sh`; `MORE_SHOTS`, default `shots/`, is looked in for states `SHOTS` lacks) |
 | `src/hotspots.*` | The touch targets of each recognised screen (`HotspotsFor`: tap point and the area the focus ring frames, DS bottom pixels), `Neighbour` (focus moves: nearest area centre within 60° of the direction), the constants the navigator uses (`kTabIcon`, `kPhoneIcon`, `kDialogueArrow`, `kPopupClose`, `kPhoneClose`) |
+| `tests/screens_test.cpp` | The HUD rule on synthetic top screens: any Sanity bar tint, no strip no HUD (`ninja -C build screens_test`) |
 | `tests/hotspots_test.cpp` | The tables lie on the screen, every target reachable by focus moves, `Neighbour`'s cone (`ninja -C build hotspots_test`) |
 | `tests/hotspots_check.sh`, `scripts/hotspots/*.txt` | Each target tapped in the game from a save state: the screens printed, or a last picture that differs from the same run without the tap (ROM, `shots/` and the complete save, as `screens_check.sh`) |
 | `src/scene.*` | AUTO's decision from those rules: `AutoLayout::Update(top, bottom, mainIsTop)` |
@@ -92,12 +93,15 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 
 - melonDS framebuffers are `0xAARRGGBB`, 256 × 192 each, `GPU.Framebuffer[FrontBuffer][0]` =
   top, `[1]` = bottom.
-- HUD detection uses row 190 only: `#415969` flat from x 8 to 136 (under the clock and the
-  money), and from x 144 to 248 (under the motive bar's box) flat `#415969` or `#495969`: that
-  part takes the bar's tint, `#415969` with the red Sanity bar of the town's states, `#495969`
-  with the yellow one of the complete save (the casino, the late hotel lobby). A bar of another
-  colour (not seen yet) may tint it otherwise: if a HUD reads `None`, look at row 190 first. Row
-  186 crosses the clock's white text; rows 189 and 191 are not flat.
+- HUD detection uses the status bar's frame, never what lies under the Sanity bar: row 176
+  `#597192` (the strip's top edge) and row 191 `#384961` (under the bottom border), both flat
+  x 8-248, and row 190 `#415969` x 8-136 (the bottom border under the clock and the money).
+  Rows 177 to 190 under the bar's box (from x 144) take the bar's colour: row 190 there is
+  `#415969` with the red bar of the town's states, `#495969` with the yellow one of the complete
+  save (the casino, the late hotel lobby); the green and silver levels were not seen, so nothing
+  from x 144 on those rows may be used (`tests/screens_test.cpp`, synthetic screens). The three
+  rows are on or off together on every frame of every state. Row 186 crosses the clock's white
+  text; row 189 is not flat.
 - The social reaction games keep the HUD: they are told by row 0 of the top screen (`#597192`
   from x 5 to 252, the top edge of the name and relationship box), not by the red bar, whose
   fill may change. The shop's catalogue and Build Rooms are told by warm, bright corners of

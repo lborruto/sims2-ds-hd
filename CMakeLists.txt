@@ -111,3 +111,7 @@ target_include_directories(touchscript_test PRIVATE melonDS/src src)
 # Checks of the touch targets and focus moves (not built by default): ninja -C build hotspots_test && ./build/hotspots_test
 add_executable(hotspots_test EXCLUDE_FROM_ALL tests/hotspots_test.cpp src/hotspots.cpp src/screens.cpp)
 target_include_directories(hotspots_test PRIVATE melonDS/src src)
+
+# Checks of the screen rules on synthetic screens (not built by default): ninja -C build screens_test && ./build/screens_test
+add_executable(screens_test EXCLUDE_FROM_ALL tests/screens_test.cpp src/screens.cpp)
+target_include_directories(screens_test PRIVATE melonDS/src src)
