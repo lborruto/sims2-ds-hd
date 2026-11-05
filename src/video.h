@@ -22,11 +22,14 @@ struct Video
     std::vector<OverlayTex> overlayTex;
     SDL_Texture* OverlayTexture(const Overlay& o, int w, int h);
     int overlayW = 0, overlayH = 0;
-    // The composition's UI layer (ui/kit.h) rasterised at output size over the items' bounds,
-    // made again only when its hash (items, pictures, size, place) changes.
+    // The composition's UI (ui/kit.h) at output size: the still items' layer over their bounds,
+    // made again only when its hash (items, size, place) changes; the pictures (live crops) each
+    // over their own bounds in their own texture, made again when that picture's pixels change.
     SDL_Texture* uiTex = nullptr;
     int uiTexW = 0, uiTexH = 0;
     u64 uiHash = 0;
+    struct ImageTex { SDL_Texture* tex; int w, h; u64 hash; };
+    std::vector<ImageTex> uiImages;
     void DrawUi(const Composition& c, const CanvasFit& fit);
     bool smooth = false;
 

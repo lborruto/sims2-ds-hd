@@ -98,12 +98,13 @@ void WriteCompose(const std::string& path, const Composition& c, const u32* top,
             }
     }
     overlaysBefore((int)c.pieces.size());
-    // The UI last, at the picture's size.
-    if (!c.ui.empty())
+    // The UI last, at the picture's size, as the window draws it: the still items over their
+    // bounds, then each picture over its own.
+    for (const ui::LayerAt& l : ui::LayersAt(c.ui, (float)k, 0, 0))
     {
-        std::vector<u32> layer((size_t)W * H);
-        ui::Rasterise(c.ui, (float)k, layer.data(), W, H);
-        Blend(rgb, W, H, 0, 0, layer.data(), W, H);
+        std::vector<u32> layer((size_t)l.w * l.h);
+        ui::Rasterise(l.items, (float)k, layer.data(), l.w, l.h, l.ox, l.oy);
+        Blend(rgb, W, H, l.x, l.y, layer.data(), l.w, l.h);
     }
     stbi_write_png(path.c_str(), W, H, 3, rgb.data(), W * 3);
 }

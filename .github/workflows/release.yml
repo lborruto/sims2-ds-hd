@@ -4,7 +4,8 @@ name: Release
 # (Sims 2 DS Wide.app, Apple silicon and Intel in one) and Windows x86_64, attests the archives'
 # build provenance, then creates the GitHub release with that version's section of CHANGELOG.md as
 # notes and the three archives attached. The version in CMakeLists.txt must be the tag's. The
-# archives hold the program, README.md and LICENSE: never a ROM, a save or anything from the game.
+# archives hold the program, README.md, LICENSE and the embedded font's licence (OFL-Nunito.txt):
+# never a ROM, a save or anything from the game.
 on:
   push:
     tags: ["v*.*.*"]
@@ -146,6 +147,7 @@ jobs:
           out="$RUNNER_TEMP/dist"
           mkdir -p "$out/$name"
           cp README.md LICENSE "$out/$name/"
+          cp assets/fonts/OFL.txt "$out/$name/OFL-Nunito.txt"
           if [ "$RUNNER_OS" = Linux ]; then
             cp build/sims2wide "$out/$name/"
             cd "$out"
@@ -204,6 +206,7 @@ jobs:
           out="$(cygpath -u "$RUNNER_TEMP")/dist"
           mkdir -p "$out/$name"
           cp build/sims2wide.exe README.md LICENSE "$out/$name/"
+          cp assets/fonts/OFL.txt "$out/$name/OFL-Nunito.txt"
           cd "$out"
           zip -qr "$name.zip" "$name"
           sha256sum "$name.zip" | tee "$name.sha256"

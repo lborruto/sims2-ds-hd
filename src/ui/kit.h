@@ -54,7 +54,10 @@ struct UiItem
 
     // Image: a rectangle of an ARGB picture (not copied: it must outlive the raster; a live crop
     // of a DS screen), scaled to `to` (nearest by the whole factor, then bilinear to the size),
-    // `fill` as its opacity's alpha (0: opaque).
+    // `fill` as its opacity's alpha (0: opaque). Images are drawn above every other item, in
+    // their own order, whatever their place in the list: the still items are one layer that
+    // the window keeps while they do not change, the images (live, they change every frame)
+    // are drawn over it on their own (Layers). Nothing of the UI may lie over a picture.
     const u32* src = nullptr;
     int srcW = 0, srcH = 0; // the picture's size (srcW is its stride)
     Rect from {};
@@ -65,20 +68,41 @@ UiItem WellItem(Rect to, const Theme& t = GameTheme());           // a darker in
 UiItem TextItem(Rect to, const std::string& utf8, float size, Align align = Align::Left, Weight w = Weight::Bold);
 // A chip at (x, y) with its label; its rectangle is the chip and the label together.
 // labelAt: the label's start from x (a column of hints lines its labels up), 0: after the chip.
-UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, float labelAt = 0);
-Rect ChipRect(int x, int y, Button b, const std::string& label, float size, float labelAt = 0);
+// w: the label's weight.
+UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, float labelAt = 0, Weight w = Weight::Bold);
+Rect ChipRect(int x, int y, Button b, const std::string& label, float size, float labelAt = 0, Weight w = Weight::Bold);
 UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from);
 
 // The items' bounds on the canvas (shadows included), empty when none draws anything.
 Rect Bounds(const std::vector<UiItem>& items);
-// A hash of everything that changes the raster (an image's pixels included).
+// A hash of everything that changes the still items' raster (images are left out: they are
+// drawn every frame, apart).
 u64 Hash(const std::vector<UiItem>& items);
+// An image item's hash, its pixels included (the window redraws a picture only when it changes).
+u64 HashImage(const UiItem& image);
+// The still items (Panel, Text, Chip, in order) and the images (in order), as drawn: the images
+// above the still items.
+void Layers(const std::vector<UiItem>& items, std::vector<UiItem>& still, std::vector<UiItem>& images);
 
 // The items drawn into argb (w x h, straight alpha, cleared first): canvas point (cx, cy) lands
 // on argb pixel ((cx - ox) * scale, (cy - oy) * scale). scale: output pixels per canvas pixel.
+// The still items first, then the images (Layers).
 void Rasterise(const std::vector<UiItem>& items, float scale, u32* argb, int w, int h, float ox = 0, float oy = 0);
+
+// What the window and --compose both draw: the still layer over its bounds, then each image
+// over its own, as whole output pixels (x, y, w, h) for a canvas whose origin is output pixel
+// (originX, originY); Rasterise(items, scale, …, w, h, ox, oy) draws one. Empty ones are left out.
+struct LayerAt
+{
+    std::vector<UiItem> items;
+    bool still;          // the still items (else one image)
+    int x, y, w, h;
+    float ox, oy;
+};
+std::vector<LayerAt> LayersAt(const std::vector<UiItem>& items, float scale, float originX, float originY);
 
 // A demonstration of the kit (--ui-demo): a panel, text, every chip and a live crop of `bottom`
 // (the DS's touch screen, 256 x 192; null: none).
 std::vector<UiItem> DemoItems(const u32* bottom);
+
 }

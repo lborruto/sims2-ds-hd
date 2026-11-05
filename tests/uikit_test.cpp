@@ -97,7 +97,9 @@ static void determinism()
     CHECK(Hash(other) != Hash(items));
     std::vector<u32> picture2 = picture;
     picture2[5] ^= 1;
-    CHECK(Hash(Sample(picture2.data())) != Hash(items));
+    CHECK(Hash(Sample(picture2.data())) == Hash(items)); // a picture's pixels: drawn apart, not hashed
+    CHECK(HashImage(Sample(picture2.data())[5]) != HashImage(items[5]));
+    CHECK(HashImage(Sample(picture.data())[5]) == HashImage(items[5]));
 }
 
 static u32 Rgb(u32 p) { return p & 0xFFFFFF; }
@@ -212,6 +214,96 @@ static void image_scaler()
     for (u32 p : px) CHECK(p == 0xFFFFFFFF);
 }
 
+static void edges()
+{
+    std::vector<u32> picture(16, 0xFF336699);
+    // Off the buffer (left, above, right, below, and huge): nothing drawn, no crash.
+    const std::vector<UiItem> away = {
+        PanelItem({-500, -500, 100, 100}), PanelItem({5000, 10, 100, 100}), TextItem({10, 9000, 200, 40}, "far", 24),
+        ChipItem(-300, 20, Button::Start, "Gone", 24), ImageItem({-90, -90, 40, 40}, picture.data(), 4, 4, {0, 0, 4, 4}),
+        PanelItem({-1000000, -1000000, 2000, 2000}),
+    };
+    std::vector<u32> px(200 * 100, 0xDEADBEEF);
+    Rasterise(away, 1, px.data(), 200, 100);
+    for (u32 p : px) CHECK(p == 0);
+    // Zero and negative sizes, an empty buffer, no buffer, a zero scale: nothing, no crash.
+    const std::vector<UiItem> empty = {PanelItem({10, 10, 0, 40}), TextItem({10, 10, -5, 20}, "x", 24), ImageItem({10, 10, 0, 0}, picture.data(), 4, 4, {0, 0, 4, 4}),
+                                       ImageItem({10, 10, 20, 20}, picture.data(), 4, 4, {0, 0, 0, 3}), ImageItem({10, 10, 20, 20}, nullptr, 4, 4, {0, 0, 4, 4})};
+    px.assign(200 * 100, 0xDEADBEEF);
+    Rasterise(empty, 1, px.data(), 200, 100);
+    for (u32 p : px) CHECK(p == 0);
+    Rasterise(Sample(picture.data()), 1, px.data(), 0, 100);
+    Rasterise(Sample(picture.data()), 1, px.data(), 200, 0);
+    Rasterise(Sample(picture.data()), 1, nullptr, 200, 100);
+    px.assign(200 * 100, 0);
+    Rasterise(Sample(picture.data()), 0, px.data(), 200, 100);
+    for (u32 p : px) CHECK(p == 0);
+    CHECK(LayersAt({}, 1, 0, 0).empty());
+    CHECK(LayersAt(empty, 1, 0, 0).empty());
+    // A tiny text box (narrower than the shadow's offset) and a 1 x 1 buffer.
+    Rasterise({TextItem({0, 0, 1, 1}, "W", 30)}, 2, px.data(), 1, 1);
+    Rasterise({TextItem({0, 0, 3, 40}, "Wide", 30)}, 4, px.data(), 2, 50);
+
+    // A half-pixel offset: the panel's left edge falls half way across a pixel.
+    UiItem p = PanelItem({10, 10, 100, 60});
+    p.raised = false;
+    px.assign(200 * 100, 0);
+    Rasterise({p}, 1, px.data(), 200, 100, 0.5f, 0);
+    const u32 half = px[(size_t)40 * 200 + 9];
+    CHECK((half >> 24) > 100 && (half >> 24) < 155);
+    CHECK(px[(size_t)40 * 200 + 8] == 0);
+
+    // The layers at a whole-pixel origin give exactly the whole raster's pixels; at any origin and
+    // scale they stay within the output and draw the same every time.
+    const std::vector<UiItem> items = Sample(picture.data());
+    std::vector<UiItem> still, images;
+    Layers(items, still, images);
+    CHECK(still.size() == 5 && images.size() == 1);
+    CHECK(Hash(items) == Hash(still)); // pictures are not in the still layer's hash
+    std::vector<u32> whole(400 * 300);
+    Rasterise(still, 1, whole.data(), 400, 300, -30, -20); // the canvas's origin at output (30, 20)
+    for (const LayerAt& l : LayersAt(items, 1, 30, 20))
+    {
+        std::vector<u32> part((size_t)l.w * l.h);
+        Rasterise(l.items, 1, part.data(), l.w, l.h, l.ox, l.oy);
+        if (!l.still) continue;
+        CHECK(l.x >= 0 && l.y >= 0 && l.x + l.w <= 400 && l.y + l.h <= 300);
+        bool same = true;
+        for (int y = 0; y < l.h; y++)
+            for (int x = 0; x < l.w; x++) same = same && part[(size_t)y * l.w + x] == whole[(size_t)(l.y + y) * 400 + l.x + x];
+        CHECK(same);
+    }
+    for (float origin : {0.37f, 13.61f})
+    {
+        const std::vector<LayerAt> ls = LayersAt(items, 1.37f, origin, origin * 0.5f);
+        CHECK(ls.size() == 2);
+        for (const LayerAt& l : ls)
+        {
+            // The bounds, at this scale and origin, hold every item.
+            for (const UiItem& it : l.items)
+            {
+                CHECK(l.x <= origin + it.to.x * 1.37f + 0.001f);
+                CHECK(l.x + l.w >= origin + (it.to.x + it.to.w) * 1.37f - 0.001f);
+            }
+            std::vector<u32> a((size_t)l.w * l.h), b((size_t)l.w * l.h, 7);
+            Rasterise(l.items, 1.37f, a.data(), l.w, l.h, l.ox, l.oy);
+            Rasterise(l.items, 1.37f, b.data(), l.w, l.h, l.ox, l.oy);
+            CHECK(a == b);
+            int drawn = 0;
+            for (u32 v : a) drawn += (v >> 24) != 0;
+            CHECK(drawn > 100);
+        }
+    }
+    // Images draw above the still items, wherever they are in the list.
+    std::vector<u32> first(100 * 100), last(100 * 100);
+    const UiItem img = ImageItem({20, 20, 40, 40}, picture.data(), 4, 4, {0, 0, 4, 4});
+    const UiItem box = PanelItem({10, 10, 80, 80});
+    Rasterise({img, box}, 1, first.data(), 100, 100);
+    Rasterise({box, img}, 1, last.data(), 100, 100);
+    CHECK(first == last);
+    CHECK(first[(size_t)40 * 100 + 40] == 0xFF336699);
+}
+
 int main()
 {
     wrap_cases();
@@ -220,6 +312,7 @@ int main()
     text_inside();
     chips();
     image_scaler();
+    edges();
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("uikit_test: all passed\n");
     return 0;

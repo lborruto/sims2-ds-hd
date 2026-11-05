@@ -165,36 +165,51 @@ SDL_Texture* Video::OverlayTexture(const Overlay& o, int w, int h)
 
 void Video::DrawUi(const Composition& c, const CanvasFit& fit)
 {
-    // The items' bounds on the canvas, as whole output pixels.
-    const Rect b = ui::Bounds(c.ui);
-    if (b.w <= 0 || b.h <= 0) return;
-    const int x0 = (int)std::floor(fit.ox + b.x * fit.scale), y0 = (int)std::floor(fit.oy + b.y * fit.scale);
-    const int x1 = (int)std::ceil(fit.ox + (b.x + b.w) * fit.scale), y1 = (int)std::ceil(fit.oy + (b.y + b.h) * fit.scale);
-    const int w = x1 - x0, h = y1 - y0;
-    if (w <= 0 || h <= 0) return;
-    u64 hash = ui::Hash(c.ui);
-    for (u64 v : {(u64)(u32)x0, (u64)(u32)y0, (u64)w, (u64)h, (u64)std::lround(fit.scale * 65536)}) hash = (hash ^ v) * 0x100000001B3ull;
-    if (!uiTex || hash != uiHash)
+    auto texture = [&](SDL_Texture*& t, int& tw, int& th, int w, int h) {
+        if (t && tw == w && th == h) return t;
+        if (t) SDL_DestroyTexture(t);
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
+        t = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, smooth ? "linear" : "nearest");
+        if (t) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+        tw = w;
+        th = h;
+        return t;
+    };
+    std::vector<u32> px;
+    size_t image = 0;
+    for (const ui::LayerAt& l : ui::LayersAt(c.ui, fit.scale, fit.ox, fit.oy))
     {
-        if (!uiTex || uiTexW != w || uiTexH != h)
+        SDL_Texture* t = nullptr;
+        bool draw = true;
+        if (l.still)
         {
-            if (uiTex) SDL_DestroyTexture(uiTex);
-            SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
-            uiTex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
-            SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, smooth ? "linear" : "nearest");
-            if (!uiTex) return;
-            SDL_SetTextureBlendMode(uiTex, SDL_BLENDMODE_BLEND);
-            uiTexW = w;
-            uiTexH = h;
+            u64 hash = ui::Hash(l.items);
+            for (u64 v : {(u64)(u32)l.x, (u64)(u32)l.y, (u64)l.w, (u64)l.h, (u64)std::lround(fit.scale * 65536)}) hash = (hash ^ v) * 0x100000001B3ull;
+            draw = !uiTex || hash != uiHash || uiTexW != l.w || uiTexH != l.h;
+            t = texture(uiTex, uiTexW, uiTexH, l.w, l.h);
+            uiHash = t ? hash : 0;
         }
-        std::vector<u32> px((size_t)w * h);
-        // Buffer pixel (0, 0) is output pixel (x0, y0): canvas point ((x0 - ox) / scale, ...).
-        ui::Rasterise(c.ui, fit.scale, px.data(), w, h, (x0 - fit.ox) / fit.scale, (y0 - fit.oy) / fit.scale);
-        SDL_UpdateTexture(uiTex, nullptr, px.data(), w * 4);
-        uiHash = hash;
+        else
+        {
+            if (image == uiImages.size()) uiImages.push_back({nullptr, 0, 0, 0});
+            ImageTex& e = uiImages[image++];
+            u64 hash = ui::HashImage(l.items[0]);
+            for (u64 v : {(u64)(u32)l.x, (u64)(u32)l.y, (u64)l.w, (u64)l.h, (u64)std::lround(fit.scale * 65536)}) hash = (hash ^ v) * 0x100000001B3ull;
+            draw = !e.tex || hash != e.hash || e.w != l.w || e.h != l.h;
+            t = texture(e.tex, e.w, e.h, l.w, l.h);
+            e.hash = t ? hash : 0;
+        }
+        if (!t) continue;
+        if (draw)
+        {
+            px.assign((size_t)l.w * l.h, 0);
+            ui::Rasterise(l.items, fit.scale, px.data(), l.w, l.h, l.ox, l.oy);
+            SDL_UpdateTexture(t, nullptr, px.data(), l.w * 4);
+        }
+        const SDL_Rect d {l.x, l.y, l.w, l.h};
+        SDL_RenderCopy(ren, t, nullptr, &d);
     }
-    const SDL_Rect d {x0, y0, w, h};
-    SDL_RenderCopy(ren, uiTex, nullptr, &d);
 }
 
 bool Video::TouchAt(const App& app, int wx, int wy, int& tx, int& ty, int* pieceIndex) const

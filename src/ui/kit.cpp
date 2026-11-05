@@ -142,8 +142,8 @@ void DrawTextBox(Layer& L, const std::vector<std::string>& lines, float size, We
         // One canvas pixel down and right, softened in proportion when scaled up.
         const int off = std::max(1, (int)std::lround(s));
         std::vector<u8> sh((size_t)mw * mh, 0);
-        for (int y = off; y < mh; y++)
-            memcpy(&sh[(size_t)y * mw + off], &mask[(size_t)(y - off) * mw], (size_t)std::max(mw - off, 0));
+        if (off < mw)
+            for (int y = off; y < mh; y++) memcpy(&sh[(size_t)y * mw + off], &mask[(size_t)(y - off) * mw], (size_t)(mw - off));
         Blur(sh, mw, mh, (int)std::floor(s * 0.6f));
         for (int y = 0; y < mh; y++)
             for (int x = 0; x < mw; x++)
@@ -330,17 +330,17 @@ UiItem TextItem(Rect to, const std::string& utf8, float size, Align align, Weigh
     return it;
 }
 
-Rect ChipRect(int x, int y, Button b, const std::string& label, float size, float labelAt)
+Rect ChipRect(int x, int y, Button b, const std::string& label, float size, float labelAt, Weight wt)
 {
     const float h = ChipHeight(size);
     float w = ChipWidth(b, size);
-    if (!label.empty()) w = std::max(w + LabelGap(size), labelAt) + std::ceil(TextWidth(label, size)) + std::max(1.0f, std::round(size / 24));
+    if (!label.empty()) w = std::max(w + LabelGap(size), labelAt) + std::ceil(TextWidth(label, size, wt)) + std::max(1.0f, std::round(size / 24));
     return {x, y, (int)std::ceil(w), (int)h};
 }
 
-UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, float labelAt)
+UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, float labelAt, Weight wt)
 {
-    UiItem it = TextItem(ChipRect(x, y, b, label, size, labelAt), label, size);
+    UiItem it = TextItem(ChipRect(x, y, b, label, size, labelAt, wt), label, size, Align::Left, wt);
     it.labelAt = labelAt;
     it.kind = UiItem::Chip;
     it.button = b;
@@ -367,6 +367,7 @@ Rect Bounds(const std::vector<UiItem>& items)
     for (const UiItem& it : items)
     {
         if (it.to.w <= 0 || it.to.h <= 0) continue;
+        if (it.kind == UiItem::Image && (!it.src || it.from.w <= 0 || it.from.h <= 0 || it.srcW <= 0 || it.srcH <= 0)) continue;
         // Room for the drop shadows (a panel's reaches 3 + 4 canvas pixels down).
         const int m = it.kind == UiItem::Panel ? 8 : it.kind == UiItem::Chip ? 4 : 0;
         const int a = it.to.x - m, b = it.to.y - m, c = it.to.x + it.to.w + m, d = it.to.y + it.to.h + m + 3;
@@ -381,6 +382,7 @@ u64 Hash(const std::vector<UiItem>& items)
     u64 h = 0xCBF29CE484222325ull;
     for (const UiItem& it : items)
     {
+        if (it.kind == UiItem::Image) continue; // drawn apart, every frame
         Mix(h, it.kind);
         Mix(h, ((u64)(u32)it.to.x << 32) | (u32)it.to.y);
         Mix(h, ((u64)(u32)it.to.w << 32) | (u32)it.to.h);
@@ -392,33 +394,73 @@ u64 Hash(const std::vector<UiItem>& items)
         Mix(h, FloatBits(it.labelAt));
         Mix(h, it.text.size());
         for (char c : it.text) Mix(h, (u8)c);
-        if (it.kind == UiItem::Image && it.src)
-        {
-            Mix(h, ((u64)(u32)it.from.x << 32) | (u32)it.from.y);
-            Mix(h, ((u64)(u32)it.from.w << 32) | (u32)it.from.h);
-            for (int y = 0; y < it.from.h; y++)
-                for (int x = 0; x < it.from.w; x++)
-                {
-                    const int X = std::clamp(it.from.x + x, 0, it.srcW - 1), Y = std::clamp(it.from.y + y, 0, it.srcH - 1);
-                    Mix(h, it.src[(size_t)Y * it.srcW + X]);
-                }
-        }
     }
     return h;
 }
 
+u64 HashImage(const UiItem& it)
+{
+    u64 h = 0xCBF29CE484222325ull;
+    Mix(h, ((u64)(u32)it.to.x << 32) | (u32)it.to.y);
+    Mix(h, ((u64)(u32)it.to.w << 32) | (u32)it.to.h);
+    Mix(h, ((u64)(u32)it.from.x << 32) | (u32)it.from.y);
+    Mix(h, ((u64)(u32)it.from.w << 32) | (u32)it.from.h);
+    Mix(h, ((u64)(u32)it.srcW << 32) | (u32)it.srcH);
+    Mix(h, it.fill);
+    if (it.src && it.srcW > 0 && it.srcH > 0)
+        for (int y = 0; y < it.from.h; y++)
+            for (int x = 0; x < it.from.w; x++)
+            {
+                const int X = std::clamp(it.from.x + x, 0, it.srcW - 1), Y = std::clamp(it.from.y + y, 0, it.srcH - 1);
+                Mix(h, it.src[(size_t)Y * it.srcW + X]);
+            }
+    return h;
+}
+
+void Layers(const std::vector<UiItem>& items, std::vector<UiItem>& still, std::vector<UiItem>& images)
+{
+    still.clear();
+    images.clear();
+    for (const UiItem& it : items) (it.kind == UiItem::Image ? images : still).push_back(it);
+}
+
+std::vector<LayerAt> LayersAt(const std::vector<UiItem>& items, float scale, float originX, float originY)
+{
+    std::vector<LayerAt> out;
+    if (!(scale > 0)) return out;
+    std::vector<UiItem> still, images;
+    Layers(items, still, images);
+    auto add = [&](std::vector<UiItem> part, bool isStill) {
+        const Rect b = Bounds(part);
+        if (b.w <= 0 || b.h <= 0) return;
+        const int x0 = (int)std::floor(originX + b.x * scale), y0 = (int)std::floor(originY + b.y * scale);
+        const int x1 = (int)std::ceil(originX + (b.x + b.w) * scale), y1 = (int)std::ceil(originY + (b.y + b.h) * scale);
+        if (x1 <= x0 || y1 <= y0) return;
+        out.push_back({std::move(part), isStill, x0, y0, x1 - x0, y1 - y0, (x0 - originX) / scale, (y0 - originY) / scale});
+    };
+    add(still, true);
+    for (const UiItem& im : images) add({im}, false);
+    return out;
+}
+
 void Rasterise(const std::vector<UiItem>& items, float scale, u32* argb, int w, int h, float ox, float oy)
 {
-    if (w <= 0 || h <= 0) return;
+    if (w <= 0 || h <= 0 || !argb) return;
     Layer L {w, h, std::vector<float>((size_t)w * h * 4, 0.0f)};
-    for (const UiItem& it : items)
-        switch (it.kind)
-        {
-        case UiItem::Panel: DrawPanel(L, it, scale, ox, oy); break;
-        case UiItem::Text: DrawText(L, it, scale, ox, oy); break;
-        case UiItem::Chip: DrawChip(L, it, scale, ox, oy); break;
-        case UiItem::Image: DrawImage(L, it, scale, ox, oy); break;
-        }
+    if (scale > 0)
+    {
+        // The still items in order, then the images above them (Layers).
+        for (const UiItem& it : items)
+            switch (it.kind)
+            {
+            case UiItem::Panel: DrawPanel(L, it, scale, ox, oy); break;
+            case UiItem::Text: DrawText(L, it, scale, ox, oy); break;
+            case UiItem::Chip: DrawChip(L, it, scale, ox, oy); break;
+            case UiItem::Image: break;
+            }
+        for (const UiItem& it : items)
+            if (it.kind == UiItem::Image) DrawImage(L, it, scale, ox, oy);
+    }
     // Back to straight alpha.
     for (size_t i = 0; i < (size_t)w * h; i++)
     {
