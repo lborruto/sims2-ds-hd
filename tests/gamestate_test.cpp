@@ -295,8 +295,12 @@ static void hud()
     // garbage: each field out of range invalidates
     auto bad = [&](u32 off, u32 v) { Ram q = r; q.W32(kG + off, v); return !ReadGameState(q.View()).hud.valid; };
     CHECK(bad(0x4800, 24) && bad(0x4804, 60) && bad(0x216C, 4) && bad(0x2168, 0) && bad(0x2164, 226u << 12));
-    { Ram q = r; q.W8(kG + 0x53, 0x01); CHECK(!ReadGameState(q.View()).hud.valid); }
-    { Ram q = r; for (int i = 0; i < 9; i++) q.W8(kG + 0x53 + i, 'A'); CHECK(!ReadGameState(q.View()).hud.valid); }   // no NUL in 8
+    // a bad name byte or no NUL within the 8-byte field blanks the name only
+    auto blank = [&](Ram q) { HudState x = ReadGameState(q.View()).hud; return x.valid && x.simName.empty() && x.money == -120 && x.hour == 15 && x.sanityMax == 225; };
+    { Ram q = r; q.W8(kG + 0x53, 0x01); CHECK(blank(q)); }
+    { Ram q = r; q.W8(kG + 0x54, 0xC3); CHECK(blank(q)); }
+    { Ram q = r; for (int i = 0; i < 8; i++) q.W8(kG + 0x53 + i, 'A'); CHECK(blank(q)); }
+    { Ram q = r; for (int i = 0; i < 7; i++) q.W8(kG + 0x53 + i, 'A'); q.W8(kG + 0x53 + 7, 0); CHECK(ReadGameState(q.View()).hud.simName == "AAAAAAA"); }
     { Ram q = r; q.W32(0x0213E434, 0xFFFFFF00); CHECK(!ReadGameState(q.View()).hud.valid); }
     { Ram q = r; q.W32(0x0213E434, 0); CHECK(!ReadGameState(q.View()).hud.valid); }
     // screen identity ignores the hud

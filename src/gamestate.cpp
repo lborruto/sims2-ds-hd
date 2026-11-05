@@ -21,9 +21,9 @@ struct EUTable
     u32 money, hour, minute, sanCur, sanMax, sanTier, simName;   // offsets from G (money s32, the clock u32, sanity 20.12 fixed)
     u32 simRecords, simRecordSize, simRecordName, simNameBase;   // Sim records from G; name id = simNameBase + u16 at +simRecordName
     u32 speechTable, speechCount;                           // 8-byte entries {u32 pages ptr, u8 count}, 216 of them
-    u32 dlgPageCounter, dlgOneOff, dlgOneOffSpeaker;        // from S: page counter u16 (1-based), u8 flag (1 = one-off), u8 speaker
+    u32 dlgOneOff, dlgOneOffSpeaker;                        // from S: u8 flag (1 = one-off), u8 speaker (dlgPage is the u16 1-based counter)
     u32 dlgMaxPages, dlgSpeakers;                           // bounds: pages per speech, Sim records
-    u32 simNameMax;
+    u32 simNameMax;                                         // name field bytes incl. the NUL (assumed)
     VtScreen plain[5];
     OvScreen overlays[8];
 };
@@ -37,7 +37,7 @@ constexpr EUTable kEU = {
     0x2F60, 0x4800, 0x4804, 0x2164, 0x2168, 0x216C, 0x53,
     0x21DC, 0x2C, 0x18, 323,
     0x0211F16C, 216,
-    0x36, 0x41, 0x3C,
+    0x41, 0x3C,
     16, 46,
     8,
     {
@@ -88,15 +88,17 @@ HudState ReadHud(const Reader& m)
         !m.R32(G + kEU.sanMax, max) || !m.R32(G + kEU.sanTier, tier))
         return h;
     if (hour > 23 || minute > 59 || tier > 3 || max == 0 || cur > max || max > (999u << 12)) return h;
+    // The name field is assumed 8 bytes including the NUL (research: layout, not checked against
+    // the CAS limit): printable ASCII then a NUL within it. Anything else blanks the name only.
     std::string name;
-    for (u32 i = 0; i < kEU.simNameMax + 1; i++)
+    bool terminated = false;
+    for (u32 i = 0; i < kEU.simNameMax && !terminated; i++)
     {
-        u32 c;
-        if (!m.R8(G + kEU.simName + i, c)) return h;
-        if (c == 0) break;
-        if (c < 0x20 || c > 0x7E || i == kEU.simNameMax) return h;   // printable, NUL within the field
-        name += (char)c;
+        u32 ch;
+        if (!m.R8(G + kEU.simName + i, ch) || (ch != 0 && (ch < 0x20 || ch > 0x7E))) { name.clear(); break; }
+        if (ch == 0) terminated = true; else name += (char)ch;
     }
+    if (!terminated) name.clear();
     h.valid = true;
     h.money = (int)money;
     h.hour = (int)hour; h.minute = (int)minute;
@@ -110,7 +112,7 @@ DialogueState ReadDialogue(const Reader& m, u32 S)
 {
     DialogueState d;
     u32 G, speech, counter, oneOff, speaker = kSpeakerNone, sid;
-    if (!m.R32(kEU.gameBlock, G) || !m.R16(S + kEU.dlgSpeech, speech) || !m.R16(S + kEU.dlgPageCounter, counter) ||
+    if (!m.R32(kEU.gameBlock, G) || !m.R16(S + kEU.dlgSpeech, speech) || !m.R16(S + kEU.dlgPage, counter) ||
         !m.R8(S + kEU.dlgOneOff, oneOff))
         return d;
     if (oneOff == 1)
