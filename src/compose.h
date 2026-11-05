@@ -71,7 +71,8 @@ void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasF
 // Whether an output pixel position is on a touchable top piece and no later piece covers it
 // (the mouse camera's area): the topmost piece under it decides, as for a click.
 bool OverTopComposition(const Composition& c, const CanvasFit& fit, float px, float py);
-// The first Src::Bottom piece's destination (where the stylus cursor is drawn); a zero Rect
-// without one.
-Rect BottomPieceRect(const Composition& c);
+// Where a DS touch position (tx, ty, fractions allowed) is drawn: through the topmost touchable
+// Src::Bottom piece whose source rectangle holds it, as a canvas position, with that piece's
+// scale (canvas pixels per DS pixel). False when no piece shows it (the stick cursor is hidden).
+bool CanvasFromTouch(const Composition& c, float tx, float ty, float& cx, float& cy, float& scale);
 }

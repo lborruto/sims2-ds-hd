@@ -3,10 +3,10 @@
 # --layout console --compose must hold the DS screens' own pixels where the composition puts
 # them (the same run without --compose gives the two screens), and the frames, the dimmed
 # backdrop and the focus ring in the game's colours:
-#   s7 (the phone, in town): the world, the rail of the touch screen's tab column and phone icon;
-#   sit-cityhall (the panel): the same rail; s7 with --console-menu --console-focus 0: the touch
-#   screen 3x over the dimmed world, the ring on the phone's first button; sit-gift: the same
-#   without the flags (Give Item); s5 (a conversation): the dialogue rebuilt wide;
+#   sit-cityhall (the panel, in town): the world, the rail of the touch screen's tab column and
+#   phone icon; the same with --console-menu: the menu, 3x over the dimmed world; s7 (the phone): the touch screen 3x over the dimmed world; the same with
+#   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item): 3x over the
+#   dimmed world; s5 (a conversation): the dialogue rebuilt wide;
 #   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
 #   top right; s3 (Create-a-Sim, no HUD): SIDE.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
@@ -50,7 +50,8 @@ hotel=(--clock "2026-01-01 14:00")
 late=(--clock "2026-11-05 12:05")
 run s7 s7 "${town[@]}" &
 run cityhall sit-cityhall "${town[@]}" &
-run s7-menu s7 "${town[@]}" --console-menu --console-focus 0 &
+run s7-menu s7 "${town[@]}" --console-focus 0 &
+run cityhall-menu sit-cityhall "${town[@]}" --console-menu &
 run gift sit-gift "${town[@]}" &
 run s5 s5 "${town[@]}" &
 run social act-social "${town[@]}" &
@@ -61,7 +62,7 @@ run s3 s3 "${town[@]}" &
 wait
 
 fails=0
-for name in s7 cityhall s7-menu gift s5 social vacuum cards s3; do
+for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s3; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -104,7 +105,7 @@ def world_full(rows=192):
 def rail():
     expect("rail outline", C(1170, 360), OUTLINE)
     expect("rail frame", C(1175, 360), FRAME)
-    piece("rail tabs", 0, 6, 34, 184, 1178, 208, 2)
+    piece("rail tabs", 0, 6, 35, 184, 1177, 208, 2, step=2)
     piece("rail phone", 222, 4, 30, 30, 1182, 144, 2)
     w = world_full()
     for cx, cy in ((400, 100), (700, 650), (1000, 300)):
@@ -127,9 +128,11 @@ def activity():
     for x, y in ((0, 0), (100, 50), (383, 287), (200, 280)):
         expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, y * 192 // 288))
 
-if case in ("s7", "cityhall"):
+if case == "cityhall":
     expect("canvas", comp.size, (1280, 720))
     rail()
+elif case in ("s7", "cityhall-menu"):
+    big_over_dim()
 elif case == "s7-menu":
     big_over_dim()
     # The ring around the phone's first button (up: x 12-79, y 140-189), 4 pixels outside it.
@@ -143,10 +146,10 @@ elif case == "s5":
     expect("dialogue frame top", C(640, 458), OUTLINE)
     expect("dialogue frame fill", C(118, 600), FRAME)
     expect("text box", C(700, 600), PANEL)
-    piece("name", 10, 6, 144, 16, 126, 464, 2, step=3)
-    piece("text", 8, 26, 152, 98, 122, 500, 2)
+    piece("name", 10, 6, 156, 20, 126, 462, 2, step=1)
+    piece("text", 8, 26, 152, 98, 122, 502, 2)
     piece("portrait", 164, 30, 76, 90, 1002, 494, 2)
-    piece("arrow", 214, 156, 30, 30, 918, 636, 2, step=3)
+    piece("arrow", 219, 155, 31, 32, 916, 634, 2, step=1)
     w = world_full(176)
     for cx, cy in ((400, 100), (1000, 300)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))

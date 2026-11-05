@@ -201,15 +201,21 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   (empty), Build Rooms' rows and arrows (no room to build), the Options button by the title.
 - CONSOLE (`console.cpp`): the world is drawn 720 high, centred (the DS's 4:3: 960 wide, dark
   sides) or, wider than 16:9, cropped at its sides (a conversation's world without its status
-  bar: 176 of 192 rows); never stretched. The small world of activities is 384 wide, its height
+  bar: 176 of 192 rows); stretched only when within 8 pixels of the canvas's width (under 1 %:
+  the widescreen world, 341 x 192, is 1279 wide at 720 high). The small world of activities is 384 wide, its height
   from its shape (288 at 4:3, 216 widescreen). The dialogue frame is 256 high, not the
   mockup's 236: name and text at 2x take 228 rows (the mockup's own picture hangs the text out
-  of its frame). The rail shows the bottom's x 0-34 and the phone icon whatever the screen: with
-  the phone open (Phone, e.g. `s7`) that is a strip of the phone and its X. Dialogue pieces as
-  measured: the name strip (10,6)-(154,22) cuts the name's lowest pixel row, the arrow piece
-  (214,156)-(244,186) the arrow's right edge (the arrow's area is x 220-250). The hints' box
-  (`kHintBox`) is left empty until hints are drawn. `menuOpen` shows the menu composition on any
-  screen with a HUD; Popup and Gift always do.
+  of its frame). The rail (the panel only) shows the tab column x 0-34 (35 columns: the selected
+  icon's ring takes them all) and the phone icon; the phone (Phone, `s7`) is the menu
+  composition, the touch screen 3x over the dimmed world. Dialogue pieces: the name bar whole,
+  x 10-165 rows 6-25 (the name's last pixel row is 24; its right part opens downwards into the
+  text box, so its bottom border stops at x 153); the text x 8-159 rows 26-123; the arrow x
+  219-249 rows 155-186 (its dark outline ends at x 249; column 250 holds only a one-pixel fringe
+  of `#6171B2` on rows 168-175, and row 187 seven such pixels, both left out because the screen
+  frame's rounded corner starts at 250,186 and 248,187). The hints' box (`kHintBox`) is left empty until
+  hints are drawn. `menuOpen` shows the menu composition on any screen with a HUD; Phone, Popup
+  and Gift always do. The stick cursor is drawn where the piece showing its point draws it
+  (`CanvasFromTouch`), hidden where no piece shows it.
 - The complete save's states (in git-ignored `shots/`; run them with
   `--save` a copy of `saves/complete-play.sav` and `--clock "2026-11-05 12:05"`): `sit-casino`
   (`act-cards` quit to the casino's panel, `scripts/hotspots/casino-base.txt`) and

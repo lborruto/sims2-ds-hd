@@ -224,12 +224,12 @@ bool PauseMenu::Draw(const App& app, const Video& video, const Input& input, lon
     canvas.Clear();
     const int sc = canvas.Scale();
     bool used = false;
-    if (!open && frame < input.cursorShownUntil)
+    int cx, cy, screenW;
+    // (Where the piece showing that point draws it; hidden when no piece shows it.)
+    if (!open && frame < input.cursorShownUntil && video.TouchToOutput(app, input.cursorX, input.cursorY, cx, cy, screenW))
     {
         // The stick cursor: a cross on the touch screen, yellow while pressing.
-        const SDL_Rect r = video.BottomRect(app);
-        const int cx = r.x + (int)(input.cursorX * r.w / SW), cy = r.y + (int)(input.cursorY * r.h / SH);
-        const int arm = r.w / 40 + 3, t = oh / 360 + 1;
+        const int arm = screenW / 40 + 3, t = oh / 360 + 1;
         const u32 col = input.cursorPress ? 0xFFFFD75E : 0xFFFFFFFF;
         canvas.Fill(cx - arm - 1, cy - t - 1, arm * 2 + 3, t * 2 + 3, 0xFF000000);
         canvas.Fill(cx - t - 1, cy - arm - 1, t * 2 + 3, arm * 2 + 3, 0xFF000000);

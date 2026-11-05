@@ -17,7 +17,8 @@ Overlay FrameAround(Rect r, int before) { return {{r.x - 6, r.y - 6, r.w + 12, r
 
 // The world (the top picture's first `rows` rows) 720 high: centred when narrower than the
 // canvas (the DS's own 4:3), its sides cropped to 16:9 when wider (a conversation's rows of the
-// widescreen world). A picture within a few pixels of 16:9 fills the canvas.
+// widescreen world). A picture within 8 pixels of the canvas's width at that height fills it,
+// stretched by under 1 % (the widescreen world: 341 x 192 is 1279 wide at 720).
 Piece World(int topW, int rows)
 {
     const int w = (int)std::lround(720.0 * topW / rows);
@@ -57,8 +58,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
 {
     if (s.screen == Screen::None) return FromPlacement(Place(Layout::Side, true, (float)topW / topH), topW, topH);
     Composition c {kConsoleW, kConsoleH, {}, {}};
-    const bool town = s.screen == Screen::Panel || s.screen == Screen::Phone;
-    if (menuOpen || s.screen == Screen::Popup || s.screen == Screen::Gift)
+    if (menuOpen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {
         // The world dimmed behind the touch screen: not playable, the mouse does nothing there.
         Piece world = World(topW, topH);
@@ -67,7 +67,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
     }
-    else if (town)
+    else if (s.screen == Screen::Panel)
     {
         c.pieces.push_back(World(topW, topH));
         c.overlays.push_back(Frame(kRailFrame, 1));

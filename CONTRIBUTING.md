@@ -160,8 +160,9 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   `--compose` alike; the mouse goes back through the same pieces (`TouchFromComposition`: the
   topmost piece under the pointer decides; `touch=false` swallows clicks and the camera). SIDE,
   STACKED and FOCUS are two-piece compositions made from `Place()`. CONSOLE (`--layout console`)
-  builds one per recognised screen (`screens.*`) on 1280 × 720: in town the world with a rail of
-  the touch screen's tab icons and phone (2x) at the right; the menu, a popup and Give Item the
+  builds one per recognised screen (`screens.*`) on 1280 × 720: in town (the panel) the world with
+  a rail of the touch screen's tab icons and phone (2x) at the right; the menu, the phone, a popup
+  and Give Item the
   whole touch screen 3x over the dimmed world; a conversation the world without its status bar
   and the dialogue's name, text, portrait and arrow (2x) in a wide frame; activities (and
   unknown screens) the touch screen 3x at the left and the world small at the top right; no HUD

@@ -107,10 +107,17 @@ void RasteriseOverlay(const Overlay& o, int w, int h, std::vector<u32>& px)
         }
 }
 
-Rect BottomPieceRect(const Composition& c)
+bool CanvasFromTouch(const Composition& c, float tx, float ty, float& cx, float& cy, float& scale)
 {
-    for (const Piece& q : c.pieces)
-        if (q.src == Src::Bottom) return q.to;
-    return {0, 0, 0, 0};
+    for (int i = (int)c.pieces.size() - 1; i >= 0; i--)
+    {
+        const Piece& q = c.pieces[i];
+        if (q.src != Src::Bottom || !q.touch || !Inside(q.from, tx, ty)) continue;
+        scale = (float)q.to.w / q.from.w;
+        cx = q.to.x + (tx - q.from.x) * scale;
+        cy = q.to.y + (ty - q.from.y) * q.to.h / q.from.h;
+        return true;
+    }
+    return false;
 }
 }

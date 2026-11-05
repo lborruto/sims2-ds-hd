@@ -191,13 +191,17 @@ bool Video::OverTop(const App& app, int wx, int wy) const
     return OverTopComposition(c, CanvasFit::For(c.cw, c.ch, ow, oh), px, py);
 }
 
-SDL_Rect Video::BottomRect(const App& app) const
+bool Video::TouchToOutput(const App& app, float tx, float ty, int& x, int& y, int& screenW) const
 {
     const Composition c = Composed(app);
+    float cx, cy, scale;
+    if (!CanvasFromTouch(c, tx, ty, cx, cy, scale)) return false;
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
-    SDL_Rect r;
-    CanvasFit::For(c.cw, c.ch, ow, oh).ToOutput(BottomPieceRect(c), r.x, r.y, r.w, r.h);
-    return r;
+    const CanvasFit fit = CanvasFit::For(c.cw, c.ch, ow, oh);
+    x = (int)(fit.ox + cx * fit.scale);
+    y = (int)(fit.oy + cy * fit.scale);
+    screenW = (int)(SW * scale * fit.scale);
+    return true;
 }
 }

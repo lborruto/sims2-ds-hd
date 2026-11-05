@@ -54,7 +54,8 @@ struct Video
     void TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& tx, int& ty) const;
     // Whether a window position is over the top (world) screen's picture.
     bool OverTop(const App& app, int wx, int wy) const;
-    // The bottom screen's rectangle in output pixels (where the touch cursor is drawn).
-    SDL_Rect BottomRect(const App& app) const;
+    // Where a DS touch position is drawn, in output pixels, and the drawn size of the whole touch
+    // screen's width at that scale (the stick cursor's); false when no piece shows that point.
+    bool TouchToOutput(const App& app, float tx, float ty, int& x, int& y, int& screenW) const;
 };
 }

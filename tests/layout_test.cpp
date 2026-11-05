@@ -168,13 +168,16 @@ int main()
         const Composition town = BuildConsole({Screen::Panel, Tab::Goals}, false, -1, 341, 192);
         CHECK(town.cw == kConsoleW && town.ch == kConsoleH);
         CHECK(town.pieces.size() == 3 && town.pieces[0].src == Src::Top && town.pieces[0].to.w == kConsoleW && town.pieces[0].to.h == kConsoleH);
-        CHECK(town.pieces[2].from.x == 0 && town.pieces[2].from.y == 6 && town.pieces[2].to.w == 68 && town.pieces[2].to.h == 368);
+        CHECK(town.pieces[2].from.x == 0 && town.pieces[2].from.y == 6 && town.pieces[2].from.w == 35 && town.pieces[2].to.w == 70 && town.pieces[2].to.h == 368);
         CHECK(town.overlays.size() == 1 && town.overlays[0].argb == kFrameArgb && town.overlays[0].borderArgb == kOutlineArgb && town.overlays[0].border == 6);
         const Rect f = town.overlays[0].to;
         CHECK(f.y + f.h / 2 == kConsoleH / 2 && f.x + f.w <= kConsoleW);
         // The DS's 4:3 world: 960 wide, centred.
-        const Composition t43 = BuildConsole({Screen::Phone, Tab::None}, false, -1, SW, SH);
+        const Composition t43 = BuildConsole({Screen::Panel, Tab::Interact}, false, -1, SW, SH);
         CHECK(t43.pieces[0].to.x == 160 && t43.pieces[0].to.w == 960);
+        // The phone is a menu: the touch screen 3x over the dimmed world.
+        const Composition phone = BuildConsole({Screen::Phone, Tab::None}, false, -1, SW, SH);
+        CHECK(phone.pieces.size() == 2 && !phone.pieces[0].touch && phone.pieces[1].to.x == 256 && phone.pieces[1].to.w == SW * 3);
         const Composition dlg = BuildConsole({Screen::Dialogue, Tab::None}, false, -1, SW, SH);
         CHECK(dlg.pieces[0].from.h == 176);
         CHECK(dlg.overlays[0].to.x == 110 && dlg.overlays[0].to.y == 456 && dlg.overlays[0].to.w == 1060);
@@ -253,6 +256,19 @@ int main()
                 TouchClampedComposition(odd, idx, f2, p, p, tx, ty);
                 CHECK(tx >= 0 && tx < SW && ty >= 0 && ty < SH);
             }
+    }
+    // The stick cursor: drawn through the piece that shows its point, hidden where none does.
+    {
+        float cx, cy, sc;
+        const Composition town = BuildConsole({Screen::Panel, Tab::Goals}, false, -1, SW, SH);
+        CHECK(CanvasFromTouch(town, 16, 22, cx, cy, sc) && sc == 2 && cx == kRailTabsTo.x + 32 && cy == kRailTabsTo.y + 32);
+        CHECK(CanvasFromTouch(town, 230, 20, cx, cy, sc) && cx == kRailPhoneTo.x + 16);
+        CHECK(!CanvasFromTouch(town, 128, 96, cx, cy, sc));
+        const Composition act = BuildConsole({Screen::Unknown, Tab::None}, false, -1, SW, SH);
+        CHECK(CanvasFromTouch(act, 10, 20, cx, cy, sc) && sc == 3 && cx == 36 + 30 && cy == 68 + 60);
+        const Composition side = FromPlacement(Place(Layout::Side, true, kDSAspect), SW, SH);
+        CHECK(CanvasFromTouch(side, 0, 0, cx, cy, sc) && cx == SW && cy == 0 && sc == 1);
+        CHECK(!CanvasFromTouch(side, SW, 0, cx, cy, sc));
     }
     // The overlay's pixels: border, fill, corners left empty.
     {
