@@ -1,0 +1,5 @@
+# casino: the third action (How to Play) opens the dealer's talk
+# from act-cards on the complete save: quit the card game to the casino's panel
+10 6 touch 178 48
+80 6 touch 93 92
+1000 6 touch 236 127

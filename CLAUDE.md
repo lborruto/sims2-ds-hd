@@ -45,6 +45,9 @@ the owner makes it public; write everything as if it were public already).
 | `patches/melonDS/*.patch` | Hooks in melonDS 1.1 for the looks, applied at configure time |
 | `src/screens.*` | Which bottom screen the game shows: `Recognise(top, bottom)` → `ScreenState` (`Screen`, panel `Tab`), `ScreenTracker` (hysteresis; `App::screens`, `--print-screen`), and the pixel rules AUTO shares (`HudVisible`, `SocialVisible`, `WarmMenuVisible`, `VacuumVisible`, `CardsVisible`) |
 | `tests/screens_check.sh` | Each save state's recognised screen, and the panel's tabs from `s6` with `scripts/tabs.txt` (needs the ROM and `shots/`: `ROM=… SHOTS=… bash tests/screens_check.sh`) |
+| `src/hotspots.*` | The touch targets of each recognised screen (`HotspotsFor`: tap point and the area the focus ring frames, DS bottom pixels), `Neighbour` (focus moves: nearest area centre within 60° of the direction), the constants the navigator uses (`kTabIcon`, `kPhoneIcon`, `kDialogueArrow`, `kPopupClose`, `kPhoneClose`) |
+| `tests/hotspots_test.cpp` | The tables lie on the screen, every target reachable by focus moves, `Neighbour`'s cone (`ninja -C build hotspots_test`) |
+| `tests/hotspots_check.sh`, `scripts/hotspots/*.txt` | Each target tapped in the game from a save state: the screens printed, or a last picture that differs from the same run without the tap (ROM, `shots/` and the complete save, as `screens_check.sh`) |
 | `src/scene.*` | AUTO's decision from those rules: `AutoLayout::Update(top, bottom, mainIsTop)` |
 | `src/script.*`, `src/shots.*`, `src/state.*`, `src/picker.*` | Headless input scripts (keys, `touch`, `blow`); PNG shots and `--compose`; save states (a load re-seeds the clock); ROM file picker and `Tell()` |
 | `src/mic.*` | What the DS hears: the blow key's signal, the computer's microphone (SDL capture, resampled), or silence |
@@ -165,6 +168,30 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   to about 30 frames (the dim fading over 14 frames, the phone opening over 36): the tracker
   takes Unknown only after 60 agreeing frames, Popup and Dialogue after 3, the rest after 6.
   `sit-pause` reads Popup.
+- Touch targets (`hotspots.cpp`, all checked by `tests/hotspots_check.sh` unless said). Popups:
+  the goal box's X spans y 104-127, the tips' and Game Paused's y 120-143 (x 120-143 in all);
+  `kPopupClose` (131,124) closes all three (Game Paused also resumes on Start, A or B); a tap
+  in the box elsewhere does nothing. Options: a volume slider moves only by a drag that
+  starts on its knob (taps on the track or the knob do nothing; the knob sits at full volume,
+  232 on rows 121/171, until moved); Save opens the slot screen and Quit a confirmation, both
+  read Unknown; the button by the title (193,17) shows no effect. Pockets: the bin (67,167)
+  throws the selected slot's item away; the hand uses the selected item (the Super Drencher
+  starts its game; a key item that cannot be used here gets a red ring). Catalogue: "Buy" and
+  "Sell" are only the mode, set by selecting a shop item or a bought one; the simoleon button
+  (147,128) buys or sells; buying the same item again fills the six owned places. Cards: hand
+  cards lift on a tap only after the draw; the play arrow (shown after the draw) takes a drag,
+  not a tap; X asks "Are you sure you want to quit?" (tick 93,92, cross 163,92) and still reads
+  Cards. Relationships: the up/down arrows select the previous/next Sim. Placed from shots only
+  (a tap shows nothing in every state we have): Pockets slots 2-6 (empty), the Goals lines (one
+  goal at a time seen; a goal takes one to three 16-pixel lines), the Interact strip (one target
+  near), Give Item's slots and bow (empty pockets), the cards' discard pile and tenth place
+  (empty), Build Rooms' rows and arrows (no room to build), the Options button by the title.
+- The complete save's casino (`act-cards`, quit to the casino's panel): the panel reads `None`,
+  not Panel: its HUD's row 190 is `#495969` from about x 144 (under the yellow motive bar), so
+  `HudVisible` fails. A catalogue item whose description takes two lines (Burgundy Ebony Bed,
+  Crimson Toilet) makes the catalogue read `Unknown` (row 55 crosses the text).
+- `act-cards` runs whose pictures are compared need `--clock` after the state's time
+  (`2026-11-05 12:00`): without it the HUD clock is the host's and two runs differ by it.
 - Looks: with all looks off the headless output must stay byte for byte the same (24-shot
   shasum check in CONTRIBUTING). Frame 0 after `--state-load` shows melonDS's uninitialised 3D
   buffer, so even the memory layout of melonDS's objects matters: patch state goes in globals

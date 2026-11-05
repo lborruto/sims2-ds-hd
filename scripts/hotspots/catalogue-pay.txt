@@ -1,0 +1,2 @@
+# sit-storebuy: the simoleon button buys the bed
+10 6 touch 147 128

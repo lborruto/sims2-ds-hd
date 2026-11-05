@@ -1,0 +1,2 @@
+# sit-pause: Game Paused's X
+20 6 touch 131 124

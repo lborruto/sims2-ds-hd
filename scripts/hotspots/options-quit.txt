@@ -1,0 +1,3 @@
+# sit-store: Options, then Quit asks first
+10 6 touch 16 162
+60 6 touch 234 69

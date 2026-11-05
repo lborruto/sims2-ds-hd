@@ -1,0 +1,2 @@
+# s7: the X closes the phone
+10 6 touch 238 18

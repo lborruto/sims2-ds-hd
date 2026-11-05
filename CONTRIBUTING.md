@@ -51,6 +51,8 @@ Before opening a pull request:
     ./build/sims2wide <rom> --headless --frames 1800 --shot-every 120 --shot-dir shots/boot
     ninja -C build layout_test && ./build/layout_test   # every touch pixel maps back to itself, in every layout
     bash tests/screens_check.sh              # the bottom screen recognised in every save state (needs the ROM and shots/)
+    ninja -C build hotspots_test && ./build/hotspots_test   # the touch targets' tables and focus moves
+    bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below). A change to the menu, the mouse or the keys is

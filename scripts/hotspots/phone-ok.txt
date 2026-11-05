@@ -1,0 +1,2 @@
+# s7: OK opens Messages
+10 6 touch 127 166

@@ -1,0 +1,2 @@
+# sit-storebuy: the down arrow
+10 6 touch 78 166

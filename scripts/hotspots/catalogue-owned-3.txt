@@ -1,0 +1,9 @@
+# sit-storebuy: six beds bought, the first selected, then the bed in owned place 3
+10 6 touch 147 128
+40 6 touch 147 128
+70 6 touch 147 128
+100 6 touch 147 128
+130 6 touch 147 128
+160 6 touch 147 128
+200 6 touch 194 89
+240 6 touch 194 128

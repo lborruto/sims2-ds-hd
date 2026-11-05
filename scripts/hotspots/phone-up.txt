@@ -1,0 +1,3 @@
+# s7: down, then up back to Messages
+10 6 touch 212 166
+40 6 touch 43 166

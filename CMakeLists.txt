@@ -58,7 +58,7 @@ FetchContent_MakeAvailable(sdl2)
 
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
-    src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/controls.cpp src/input.cpp src/layout.cpp
+    src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/controls.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
     src/looks.cpp src/menu.cpp src/mic.cpp src/picker.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
@@ -107,3 +107,7 @@ target_include_directories(layout_test PRIVATE melonDS/src src)
 # Checks of the synthesised touches (not built by default): ninja -C build touchscript_test && ./build/touchscript_test
 add_executable(touchscript_test EXCLUDE_FROM_ALL tests/touchscript_test.cpp src/touchscript.cpp)
 target_include_directories(touchscript_test PRIVATE melonDS/src src)
+
+# Checks of the touch targets and focus moves (not built by default): ninja -C build hotspots_test && ./build/hotspots_test
+add_executable(hotspots_test EXCLUDE_FROM_ALL tests/hotspots_test.cpp src/hotspots.cpp src/screens.cpp)
+target_include_directories(hotspots_test PRIVATE melonDS/src src)

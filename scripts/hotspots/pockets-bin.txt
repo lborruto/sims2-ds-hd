@@ -1,0 +1,7 @@
+# casino: slot 1 selected, then the bin throws its item away
+# from act-cards on the complete save: quit the card game to the casino's panel
+10 6 touch 178 48
+80 6 touch 93 92
+1000 6 touch 16 57
+1040 6 touch 67 89
+1080 6 touch 67 167
