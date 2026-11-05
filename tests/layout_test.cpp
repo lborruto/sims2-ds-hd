@@ -121,6 +121,25 @@ int main()
         TouchClampedComposition(c, 1, fit, 0, -50, tx, ty);
         CHECK(tx == 0 && ty == 96);
     }
+    // A drag begun on FOCUS top-big's panel (piece 1) when the layout flips to bottom-big (where
+    // piece 1 is the world): it stays on the touch screen, in DS coordinates.
+    for (float aspect : {kDSAspect, 16.0f / 9.0f})
+    {
+        const int tw = (int)(SH * aspect + 0.5f);
+        const Composition big = FromPlacement(Place(Layout::Focus, false, aspect), tw, SH);
+        const CanvasFit fit = CanvasFit::For(big.cw, big.ch, 1280, 720);
+        for (int idx : {1, 0, 5, -1})
+            for (float px : {-100.0f, 0.0f, 1000.0f, 1270.0f, 5000.0f})
+                for (float py : {-100.0f, 360.0f, 5000.0f})
+                {
+                    int tx = -1, ty = -1;
+                    TouchClampedComposition(big, idx, fit, px, py, tx, ty);
+                    CHECK(tx >= 0 && tx < SW && ty >= 0 && ty < SH);
+                }
+        int tx, ty;
+        TouchClampedComposition(big, 1, fit, 480, 360, tx, ty); // the middle of the big touch screen
+        CHECK(abs(tx - SW / 2) <= 1 && abs(ty - SH / 2) <= 1);
+    }
     // Overlapping pieces: the later one is hit.
     {
         Composition c {600, 400, {}, {}};

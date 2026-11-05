@@ -51,7 +51,8 @@ Composition Compose(Layout l, bool mainIsTop, float topAspect, int topW, int top
 // what is under it and takes the click). pieceIndex, when given, receives the piece hit.
 bool TouchFromComposition(const Composition& c, const CanvasFit& fit, float px, float py, int& tx, int& ty, int* pieceIndex = nullptr);
 // The same, held to one piece's source rectangle wherever the point is: a drag stays on the
-// piece it started on.
+// piece it started on. A stale index (the layout changed meanwhile) falls back to the last
+// touchable bottom piece; the result is always within the DS screen.
 void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty);
 // Whether an output pixel position is on a top piece and no later touchable bottom piece
 // covers it (the mouse camera's area).

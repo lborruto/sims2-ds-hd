@@ -44,12 +44,22 @@ bool TouchFromComposition(const Composition& c, const CanvasFit& fit, float px, 
 
 void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty)
 {
-    const Piece& q = c.pieces[pieceIndex];
+    // The piece must still be a touchable bottom one (the layout may have changed since the drag
+    // began, and the indices with it): else the last such piece, else the whole touch screen.
+    Piece whole {Src::Bottom, {0, 0, SW, SH}, {0, 0, SW, SH}};
+    const Piece* pq = &whole;
+    if (pieceIndex >= 0 && pieceIndex < (int)c.pieces.size() && c.pieces[pieceIndex].src == Src::Bottom && c.pieces[pieceIndex].touch)
+        pq = &c.pieces[pieceIndex];
+    else
+        for (const Piece& q : c.pieces)
+            if (q.src == Src::Bottom && q.touch) pq = &q;
+    const Piece& q = *pq;
     float cx, cy;
     fit.ToCanvas(px, py, cx, cy);
     const float x = q.from.x + (cx - q.to.x) * q.from.w / q.to.w, y = q.from.y + (cy - q.to.y) * q.from.h / q.to.h;
-    tx = std::clamp((int)std::floor(x), q.from.x, q.from.x + q.from.w - 1);
-    ty = std::clamp((int)std::floor(y), q.from.y, q.from.y + q.from.h - 1);
+    // (Always a DS touch position, whatever the piece's rectangle.)
+    tx = std::clamp((int)std::floor(x), std::max(q.from.x, 0), std::min(q.from.x + q.from.w, SW) - 1);
+    ty = std::clamp((int)std::floor(y), std::max(q.from.y, 0), std::min(q.from.y + q.from.h, SH) - 1);
 }
 
 bool OverTopComposition(const Composition& c, const CanvasFit& fit, float px, float py)

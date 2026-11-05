@@ -140,8 +140,7 @@ void Video::TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& 
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     float px, py;
     ToOutput(wx, wy, px, py);
-    // (The layout may have changed since the drag began: stay on a piece that exists.)
-    TouchClampedComposition(c, std::min(pieceIndex, (int)c.pieces.size() - 1), CanvasFit::For(c.cw, c.ch, ow, oh), px, py, tx, ty);
+    TouchClampedComposition(c, pieceIndex, CanvasFit::For(c.cw, c.ch, ow, oh), px, py, tx, ty);
 }
 
 bool Video::OverTop(const App& app, int wx, int wy) const
