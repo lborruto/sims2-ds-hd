@@ -44,6 +44,7 @@ struct ActivityState
     // Kept between frames (Cards): the hand's places lifted by a tap, and the quit question up.
     bool lifted[10] = {};
     bool confirm = false;
+    int blowFrames = 0; // Vacuum: frames of blow still to give after a Y press (the game needs 7)
     // Out, this frame (Vacuum): blow into the microphone; the stylus held at the hand; how far
     // the hand moves (DS pixels) besides the right stick.
     bool blow = false, grab = false;

@@ -25,6 +25,7 @@ bool Settings::Load(const std::string& path)
     std::ifstream in(path);
     if (!in) return false;
     std::string line;
+    bool hasLayout = false;
     while (std::getline(in, line))
     {
         while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
@@ -37,6 +38,7 @@ bool Settings::Load(const std::string& path)
         if (k == "mic") mic = v == "off" ? MicMode::Off : v == "real" ? MicMode::Real : MicMode::BlowKey;
         else if (k == "layout")
         {
+            hasLayout = true;
             for (Layout l : {Layout::Console, Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked})
                 if (v == LayoutName(l)) layout = l;
         }
@@ -58,6 +60,15 @@ bool Settings::Load(const std::string& path)
             }
         }
         else fprintf(stderr, "settings: unknown key %s\n", k.c_str());
+    }
+    // A file from before CONSOLE (no layout= line) whose looks are exactly what v0.1.1 wrote
+    // by default (1x, 4:3, 30 fps) was never changed by hand: it gets the new defaults.
+    if (!hasLayout && resolution3D == 1 && !widescreen && !interpolate60)
+    {
+        const Settings d;
+        resolution3D = d.resolution3D;
+        widescreen = d.widescreen;
+        interpolate60 = d.interpolate60;
     }
     return true;
 }

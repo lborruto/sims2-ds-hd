@@ -320,6 +320,7 @@ int main(int argc, char** argv)
         // "blow") and, in a window, the DS clock held to real time (fast forward, pauses).
         Host::MicMode = app.settings.mic;
         Host::MicBlow = app.micBlow || blow;
+        Host::MicForce = app.micForce;
         if (!headless || app.fast) clock::Frame(nds, app.fast);
 
         nds.SetKeyMask(~keys & 0xFFF);
@@ -344,6 +345,12 @@ int main(int argc, char** argv)
         {
             ScreenState before = app.screens.Current();
             ScreenState now = app.screens.Update(top, bottom);
+            // The navigator ran before the tracker: a new screen starts without the old menu and focus.
+            if (!(now == before) && !app.consolePinned && now.screen != Screen::Panel)
+            {
+                app.consoleMenu = false;
+                app.consoleFocus = -1;
+            }
             if (printScreen && !(now == before)) fprintf(stderr, "frame %ld: screen %s\n", frame, ScreenStateName(now).c_str());
             if (printScreen && (app.consoleMenu != lastMenu || app.consoleFocus != lastFocus))
                 fprintf(stderr, "frame %ld: console menu %s, focus %d\n", frame, app.consoleMenu ? "open" : "closed", app.consoleFocus);

@@ -123,7 +123,7 @@ screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs,
 | Vacuum | Arrows | left stick (or D-pad) | drive |
 | | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
 | | X (hold) | A (hold) | grab a find with the hand and drag it to the box |
-| | A (hold) | Y (hold) | blow: clears a clogged filter |
+| | A (hold) | Y (hold) | blow: clears a clogged filter (a tap is enough; works with any microphone setting) |
 
 <p align="center">
   <img src="docs/screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big at the left, the world small at the top right, the buttons' hints below it" width="440">

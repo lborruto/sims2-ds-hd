@@ -324,6 +324,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
         // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding).
         app.micBlow = navigator.Blow();
+        app.micForce = navigator.Blow();
     }
     else if (steering)
     {
@@ -332,6 +333,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         steering = false;
         if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
         app.micBlow = false;
+        app.micForce = false;
     }
 }
 
@@ -406,6 +408,7 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
             }
             cursorShownUntil = frame + 180;
         }
+        if (hand) cursorShownUntil = frame + 180; // the vacuum's hand never hides
         if (cursorPress && !touching) { touching = true; tx = (int)cursorX; ty = (int)cursorY; }
     }
     ScriptTouch(touching, tx, ty);

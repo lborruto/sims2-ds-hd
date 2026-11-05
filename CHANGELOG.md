@@ -7,6 +7,16 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+### Changed
+
+- CONSOLE is now the default layout (the other layouts stay in SETTINGS > DISPLAY > LAYOUT).
+- The pad's Back button now opens the TOUCH MENU, and Select moved to L3 (the left stick's
+  click), in every layout. Back does nothing outside CONSOLE.
+- Looks for existing settings: a settings file from before CONSOLE that still holds the old
+  defaults (3D at 1x, 4:3, 30 fps) is moved to the new ones (sharper, widescreen, 60 fps) the
+  first time it is loaded. To turn them off, change 3D RESOLUTION, WIDESCREEN WORLD and 60 FPS in
+  SETTINGS > GRAPHICS; a file that names a layout is never touched.
+
 ### Added
 
 - CONSOLE, now the default layout: the game played like a console game. The town fills the

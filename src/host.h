@@ -16,6 +16,7 @@ inline std::string SavePath;
 // blow key and the script's "blow").
 inline sims2wide::MicMode MicMode = sims2wide::MicMode::BlowKey;
 inline bool MicBlow = false;
+inline bool MicForce = false; // the CONSOLE vacuum's Y: a blow in any mic mode
 
 // melonDS calls this whenever the game writes its save memory; written straight to disk.
 inline void SaveDirty(const uint8_t* data, uint32_t len)

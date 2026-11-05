@@ -139,7 +139,7 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   (`act-vacuum-clog`). Holding `blow` 7 frames or more clears it (gone 17 frames after the blow
   starts); 6 frames do not; without it the clog stays. melonDS's recorded blow
   (`melonDS/src/frontend/mic_blow.h`) gives exactly the same thresholds, so the synthesised
-  wave stays. The blow key is verified in game.
+  wave stays. The blow key is verified in game. CONSOLE's Y holds the blow 8 frames from the press (a tap is 4-6) and blows in every mic mode (`Host::MicForce`); the M key only with mic=blow.
 - Navigation headless is slow: the camera follows, L/R turn it (about 156 frames a full turn),
   walls stop the Sim silently. Branch from saved states and try several scripts in parallel
   (background runs), comparing their last shots.

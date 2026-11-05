@@ -452,7 +452,17 @@ static void vacuum_blows_drives_and_grabs()
     CHECK(!(r.Frame(kVacuum, p) & (1u << kY)));
     CHECK(r.nav.Blow());
     r.Frame(kVacuum);
-    CHECK(!r.nav.Blow());
+    // A quick tap (2 frames) still blows 8 frames or more: the game needs 7.
+    {
+        for (int i = 0; i < 12; i++) r.Frame(kVacuum);
+        int blows = 0;
+        PadState y;
+        y.y = true;
+        for (int i = 0; i < 2; i++) { r.Frame(kVacuum, y); blows += r.nav.Blow(); }
+        for (int i = 0; i < 20; i++) { r.Frame(kVacuum); blows += r.nav.Blow(); }
+        CHECK(blows >= 8);
+        CHECK(!r.nav.Blow());
+    }
     // The D-pad and the stick drive; B, L and R stay the DS's.
     PadState d;
     d.up = d.b = d.lb = true;

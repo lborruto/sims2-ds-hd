@@ -39,6 +39,7 @@ void Social(const PadState& pad, TouchScript& touch, ActivityState& st, bool can
 {
     const std::vector<Hotspot>& h = HotspotsFor({Screen::Social, Tab::None});
     if (st.focus < 0 || st.focus >= (int)h.size()) st.focus = 0;
+    if (!canTap) return;
     int pick = -1;
     if (Left(pad) && !Left(st.prev)) pick = 0;
     else if (Up(pad) && !Up(st.prev)) pick = 1;
@@ -106,7 +107,10 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
 
 void Vacuum(const PadState& pad, u32& dsKeys, ActivityState& st)
 {
-    st.blow = pad.y;
+    // A tap on Y is 4-6 frames and the game wants 7: a press holds the blow for 8.
+    if (pad.y && !st.prev.y) st.blowFrames = 8;
+    st.blow = pad.y || st.blowFrames > 0;
+    if (st.blowFrames > 0) st.blowFrames--;
     st.grab = pad.a;
     // The D-pad moves the hand while X or A is held, and drives otherwise; the stick always drives.
     const bool hand = pad.x || pad.a;

@@ -51,6 +51,8 @@ Before opening a pull request:
     ./build/sims2wide <rom> --headless --frames 1800 --shot-every 120 --shot-dir shots/boot
     ninja -C build layout_test && ./build/layout_test   # every touch pixel maps back to itself, in every layout
     bash tests/screens_check.sh              # the bottom screen recognised in every save state (needs the ROM and shots/)
+    ninja -C build touchscript_test && ./build/touchscript_test   # the synthesised touches
+    ninja -C build screens_test && ./build/screens_test   # the HUD rule on synthetic top screens
     ninja -C build hotspots_test && ./build/hotspots_test   # the touch targets' tables and focus moves
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
     ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens

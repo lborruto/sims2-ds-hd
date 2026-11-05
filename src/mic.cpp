@@ -138,8 +138,8 @@ int Read(s16* out, int max)
     else if (device) CloseDevice();
 
     int n = max;
-    if (Host::MicMode == MicMode::Real) n = device ? ReadReal(out, max) : 0;
-    else if (Host::MicMode == MicMode::BlowKey && Host::MicBlow)
+    if (Host::MicMode == MicMode::Real && !Host::MicForce) n = device ? ReadReal(out, max) : 0;
+    else if (Host::MicForce || (Host::MicMode == MicMode::BlowKey && Host::MicBlow))
         for (int i = 0; i < max; i++) out[i] = BlowSample();
     else
     {

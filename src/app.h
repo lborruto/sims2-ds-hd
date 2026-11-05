@@ -35,6 +35,7 @@ struct App
     bool fast = false;             // fast forward held
     bool quit = false;
     bool micBlow = false;          // the "blow into the microphone" key is held
+    bool micForce = false;         // CONSOLE's vacuum Y: blows whatever the mic setting
 
     // The shape of the top screen's picture, width / height: 4/3 on the DS; wider when the
     // widescreen world is on. Layouts size the top screen from it.

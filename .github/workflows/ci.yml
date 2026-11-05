@@ -158,6 +158,19 @@ jobs:
             cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           fi
       - run: ninja -C build sims2wide
+      # The unit tests (plain executables; no ROM needed). On a Mac the app is universal but these
+      # are built for the host (Intel here), so they run as they are. controls_test opens SDL.
+      - name: Unit tests
+        env:
+          SDL_VIDEODRIVER: dummy
+        run: |
+          tests="layout_test touchscript_test hotspots_test screens_test navigator_test controls_test"
+          # shellcheck disable=SC2086
+          ninja -C build $tests
+          for t in $tests; do
+            echo "== $t"
+            "build/$t"
+          done
       # The version the program reports is the one in CMakeLists.txt. On a Mac the app holds both
       # halves; the Intel runner can only run its own (the Apple silicon one is checked present).
       - name: Version check

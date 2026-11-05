@@ -135,8 +135,29 @@ static void layout_round_trip()
     remove(path.c_str());
 }
 
+// A settings file from before CONSOLE (no layout= line) with the old default looks gets the new ones.
+static void upgrade_looks()
+{
+    const std::string path = "controls_test_upgrade.ini";
+    auto write = [&](const char* text) { FILE* f = fopen(path.c_str(), "w"); fputs(text, f); fclose(f); };
+    Settings a;
+    write("mic=blow\nresolution_3d=1\nwidescreen=0\ninterpolate_60=0\n");
+    CHECK(a.Load(path));
+    CHECK(a.resolution3D == 2 && a.widescreen && a.interpolate60);
+    Settings b; // a layout= line: the looks are the player's
+    write("layout=auto\nresolution_3d=1\nwidescreen=0\ninterpolate_60=0\n");
+    CHECK(b.Load(path));
+    CHECK(b.resolution3D == 1 && !b.widescreen && !b.interpolate60);
+    Settings c; // no layout= line, but not the old defaults
+    write("resolution_3d=1\nwidescreen=1\ninterpolate_60=0\n");
+    CHECK(c.Load(path));
+    CHECK(c.resolution3D == 1 && c.widescreen && !c.interpolate60);
+    remove(path.c_str());
+}
+
 int main(int, char**)
 {
+    upgrade_looks();
     layout_round_trip();
     defaults_one_each();
     old_file_with_back();
