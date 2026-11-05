@@ -58,6 +58,7 @@ Before opening a pull request:
     ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens
     ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
     bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts (ROM, shots/, the complete save, Pillow)
+    bash tests/romdata_check.sh              # the game's strings read from the ROM in its five languages (ROM; RESEARCH= the decoded lines to compare with, else that part is skipped)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below). A change to the menu, the mouse or the keys is

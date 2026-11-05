@@ -36,6 +36,7 @@
 #include "menu.h"
 #include "mic.h"
 #include "picker.h"
+#include "romdata.h"
 #include "script.h"
 #include "shots.h"
 #include "recorder.h"
@@ -73,6 +74,10 @@ static void Usage()
         "  --console-menu, --console-focus N  (checks) CONSOLE's menu shown, the focus ring on target N\n"
         "                                (pinned: the navigator no longer moves them)\n"
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
+        "  --strings-count               print how many strings the game's text table has, and stop\n"
+        "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
+        "  --language N                  the text's language for those: 0 Japanese (the English file), 1 English,\n"
+        "                                2 French, 3 German, 4 Italian, 5 Spanish (default: the firmware's)\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
         "      Esc menu (settings, save states, quit), Space fast forward, Tab swaps the big screen\n"
@@ -112,6 +117,8 @@ int main(int argc, char** argv)
     int consoleFocus = -1;
     int res3d = 0;
     bool wide = false, interp = false;
+    int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
+    bool stringsCount = false;
     for (int i = 1; i < argc; i++)
     {
         std::string a = argv[i];
@@ -140,6 +147,9 @@ int main(int argc, char** argv)
         else if (a == "--console-menu") consoleMenu = consolePinned = true;
         else if (a == "--console-focus") { consoleFocus = atoi(next().c_str()); consolePinned = true; }
         else if (a == "--clock") { if (!clock::SetFixed(next())) { fprintf(stderr, "--clock wants \"YYYY-MM-DD HH:MM\"\n"); return 1; } }
+        else if (a == "--language") language = atoi(next().c_str());
+        else if (a == "--strings-count") stringsCount = true;
+        else if (a == "--dump-string") dumpString = atoi(next().c_str());
         else if (a == "--layout")
         {
             std::string l = next();
@@ -227,6 +237,25 @@ int main(int argc, char** argv)
     clock::Seed(nds); // the DS clock: the computer's local time (or --clock); LoadState re-seeds it
     nds.SetupDirectBoot("game.nds");
     nds.Start();
+
+    // The game's text from the ROM (--strings-count, --dump-string ID): print it and stop.
+    if (stringsCount || dumpString >= 0)
+    {
+        RomData data;
+        if (!data.Open(rom)) { fprintf(stderr, "no rom.bin archive in this ROM\n"); return 1; }
+        const int lang = language >= 0 ? language : GameLanguage(nds);
+        if (!data.LoadStrings(lang)) { fprintf(stderr, "no strings for language %d\n", lang); return 1; }
+        fprintf(stderr, "strings: language %d from file %d, %d strings\n", lang, data.StringsFile(), data.StringCount());
+        if (dumpString >= data.StringCount()) { fprintf(stderr, "no string %d\n", dumpString); return 1; }
+        if (stringsCount) printf("%d\n", data.StringCount());
+        else
+        {
+            std::string s = data.String(dumpString);
+            for (size_t p = 0; (p = s.find('\n', p)) != std::string::npos; p += 2) s.replace(p, 1, "\\n");
+            printf("%s\n", s.c_str());
+        }
+        return 0;
+    }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
 
     std::vector<InputEvent> script;
