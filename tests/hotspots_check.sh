@@ -6,19 +6,19 @@
 # a list with one entry) are placed from shots only: CLAUDE.md, traps.
 # Needs the ROM and the save states (not in git, so not in CI):
 #   bash tests/hotspots_check.sh
-# Override with SIMS2WIDE, ROM, SHOTS and CARDS_SAVE as for tests/screens_check.sh. The casino
-# checks start from act-cards on its complete save and quit the card game first (CLAUDE.md:
-# the casino's panel is not recognised, so they compare pictures).
+# Override with SIMS2WIDE, ROM, SHOTS and COMPLETE_SAVE (or CARDS_SAVE) as for
+# tests/screens_check.sh. The casino checks start from act-cards on its complete save and quit
+# the card game first (the casino's panel reads Panel/Interact).
 set -u
 repo=$(cd "$(dirname "$0")/.." && pwd)
 bin=${SIMS2WIDE:-$repo/build/sims2wide}
 rom=${ROM:-$(find "$repo/roms" -name "*.nds" 2>/dev/null | head -n 1)}
 shots=${SHOTS:-$repo/shots}
-cards_save=${CARDS_SAVE:-$repo/saves/complete-play.sav}
+cards_save=${COMPLETE_SAVE:-${CARDS_SAVE:-$repo/saves/complete-play.sav}}
 dir=$repo/scripts/hotspots
 [ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2wide)"; exit 2; }
 [ -f "$rom" ] || { echo "no ROM (set ROM)"; exit 2; }
-[ -f "$cards_save" ] || { echo "no $cards_save (CARDS_SAVE): the card game and casino checks need it"; exit 2; }
+[ -f "$cards_save" ] || { echo "no $cards_save (COMPLETE_SAVE): the card game and casino checks need it"; exit 2; }
 tmp=$(mktemp -d)
 # KEEP=1 keeps the runs (logs, pictures) and says where.
 [ -n "${KEEP:-}" ] && echo "keeping $tmp" || trap 'rm -rf "$tmp"' EXIT
@@ -33,7 +33,7 @@ cases=(
     "tab-interact:sit-store:160:screens=Panel/Interact Panel/Pockets Panel/Interact"
     "panel-phone:sit-store:160:screens=Panel/Interact Phone"
     "interact-action-1:sit-store:200:differs=interact-base"
-    "interact-action-2:act-cards:1200:screens=Cards None Cards"
+    "interact-action-2:act-cards:1200:screens=Cards None Panel/Interact None Cards"
     "interact-action-3:act-cards:1200:differs=casino-base"
     "pockets-slot-1:act-cards:1200:differs=pockets-base"
     "pockets-bin:act-cards:1200:differs=pockets-slot-1"

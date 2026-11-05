@@ -44,7 +44,7 @@ the owner makes it public; write everything as if it were public already).
 | `src/melonds_ext/GPU3D_Wide.*` | FullDex's wide 3D rasteriser (CPU), built into melonDS's `core` |
 | `patches/melonDS/*.patch` | Hooks in melonDS 1.1 for the looks, applied at configure time |
 | `src/screens.*` | Which bottom screen the game shows: `Recognise(top, bottom)` → `ScreenState` (`Screen`, panel `Tab`), `ScreenTracker` (hysteresis; `App::screens`, `--print-screen`), and the pixel rules AUTO shares (`HudVisible`, `SocialVisible`, `WarmMenuVisible`, `VacuumVisible`, `CardsVisible`) |
-| `tests/screens_check.sh` | Each save state's recognised screen, and the panel's tabs from `s6` with `scripts/tabs.txt` (needs the ROM and `shots/`: `ROM=… SHOTS=… bash tests/screens_check.sh`) |
+| `tests/screens_check.sh` | Each save state's recognised screen, the panel's tabs from `s6` with `scripts/tabs.txt`, two-line catalogue entries from `sit-storebuy` (needs the ROM, `shots/` and the complete save: `ROM=… SHOTS=… MORE_SHOTS=… COMPLETE_SAVE=… bash tests/screens_check.sh`; `MORE_SHOTS`, default `shots/`, is looked in for states `SHOTS` lacks) |
 | `src/hotspots.*` | The touch targets of each recognised screen (`HotspotsFor`: tap point and the area the focus ring frames, DS bottom pixels), `Neighbour` (focus moves: nearest area centre within 60° of the direction), the constants the navigator uses (`kTabIcon`, `kPhoneIcon`, `kDialogueArrow`, `kPopupClose`, `kPhoneClose`) |
 | `tests/hotspots_test.cpp` | The tables lie on the screen, every target reachable by focus moves, `Neighbour`'s cone (`ninja -C build hotspots_test`) |
 | `tests/hotspots_check.sh`, `scripts/hotspots/*.txt` | Each target tapped in the game from a save state: the screens printed, or a last picture that differs from the same run without the tap (ROM, `shots/` and the complete save, as `screens_check.sh`) |
@@ -85,15 +85,19 @@ filter clogged). Pass `--clock "2026-01-01
 The layout check: from each state, `--headless --frames 200` must log `focus (top big)` for
 s5, s6, s7, sit-dialogue, sit-gift, sit-cityhall, sit-store, sit-pause, and (clock 2026-01-01
 14:00) sit-hotel, sit-concierge, sit-basement; `focus (bottom big)` for act-social, sit-build,
-sit-storebuy, and (14:00) act-vacuum, act-vacuum-clog; nothing (SIDE) for s2, s3, s4. From act-social, 2400
+sit-storebuy, and (14:00) act-vacuum, act-vacuum-clog; nothing (SIDE) for s2, s3, s4; on the complete save (clock 2026-11-05 12:05) `focus (top big)` for sit-casino, sit-hotel-late. From act-social, 2400
 frames go back to `top big` around frame 1570, when the game returns to town.
 
 ## Known traps
 
 - melonDS framebuffers are `0xAARRGGBB`, 256 × 192 each, `GPU.Framebuffer[FrontBuffer][0]` =
   top, `[1]` = bottom.
-- HUD detection uses row 190 only (`#415969` from x 8 to 248). Row 186 crosses the clock's
-  white text; rows 189 and 191 are not flat.
+- HUD detection uses row 190 only: `#415969` flat from x 8 to 136 (under the clock and the
+  money), and from x 144 to 248 (under the motive bar's box) flat `#415969` or `#495969`: that
+  part takes the bar's tint, `#415969` with the red Sanity bar of the town's states, `#495969`
+  with the yellow one of the complete save (the casino, the late hotel lobby). A bar of another
+  colour (not seen yet) may tint it otherwise: if a HUD reads `None`, look at row 190 first. Row
+  186 crosses the clock's white text; rows 189 and 191 are not flat.
 - The social reaction games keep the HUD: they are told by row 0 of the top screen (`#597192`
   from x 5 to 252, the top edge of the name and relationship box), not by the red bar, whose
   fill may change. The shop's catalogue and Build Rooms are told by warm, bright corners of
@@ -163,7 +167,10 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   panel to black through the very same dim for 2 frames, with no box. The X is not used (it
   turns green when touched, and the box slides; while it slides the screen reads Unknown). A
   conversation, row 171's fixed samples every 3 pixels from x 214 (the blue arrow); Give Item,
-  row 86's every 3 from x 112 (the bow button); the catalogue, row 55 flat `#5961A2` x 9-247; Build Rooms, rows 10 `#695128` and 23
+  row 86's every 3 from x 112 (the bow button); the catalogue, the bottom edge of the item's
+  description box, row 62 flat `#51518A` and row 63 flat `#302008` x 12-244, the same whether
+  the description takes one line or two (row 55, used before, crosses a second line: Red
+  Shower, Crimson Toilet); Build Rooms, rows 10 `#695128` and 23
   `#302008` x 36-219 (both also warm). Fades and slides between screens read `Unknown` for up
   to about 30 frames (the dim fading over 14 frames, the phone opening over 36): the tracker
   takes Unknown only after 60 agreeing frames, Popup and Dialogue after 3, the rest after 6.
@@ -186,10 +193,14 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   goal at a time seen; a goal takes one to three 16-pixel lines), the Interact strip (one target
   near), Give Item's slots and bow (empty pockets), the cards' discard pile and tenth place
   (empty), Build Rooms' rows and arrows (no room to build), the Options button by the title.
-- The complete save's casino (`act-cards`, quit to the casino's panel): the panel reads `None`,
-  not Panel: its HUD's row 190 is `#495969` from about x 144 (under the yellow motive bar), so
-  `HudVisible` fails. A catalogue item whose description takes two lines (Burgundy Ebony Bed,
-  Crimson Toilet) makes the catalogue read `Unknown` (row 55 crosses the text).
+- The complete save's states (in git-ignored `shots/`; run them with
+  `--save` a copy of `saves/complete-play.sav` and `--clock "2026-11-05 12:05"`): `sit-casino`
+  (`act-cards` quit to the casino's panel, `scripts/hotspots/casino-base.txt`) and
+  `sit-hotel-late` (`saves/complete-late.st`, the hotel lobby): both read `Panel/Interact`, and
+  AUTO shows `focus (top big)` there (SIDE before, the HUD's yellow-bar tint not being
+  recognised). Quitting the card game goes Cards → None (a black load, about 50 frames) →
+  Panel/Interact; Hotseat goes back through None to Cards. Hotel rooms and the penthouse were
+  not reached.
 - `act-cards` runs whose pictures are compared need `--clock` after the state's time
   (`2026-11-05 12:00`): without it the HUD clock is the host's and two runs differ by it.
 - Looks: with all looks off the headless output must stay byte for byte the same (24-shot

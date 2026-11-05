@@ -22,10 +22,13 @@ static bool RowSamples(const u32* screen, int y, int x0, int step, const u32 (&r
 
 bool HudVisible(const u32* top)
 {
-    // The strip's bottom border, one flat colour from edge to edge; the rows above it carry
-    // the clock's text and the motive bar. Checked against every situation shot so far: only
-    // gameplay matches.
-    return FlatRow(top, 190, 0x415969);
+    // The strip's bottom border, flat #415969 under the clock and the money (x 8 to 136); the
+    // rows above it carry their text and the motive bar. Under the motive bar's box (x 144 to
+    // 248) the border takes the bar's tint: #415969 with the red bar of the town's states,
+    // #495969 with the yellow one of the complete save (the casino, the late hotel lobby).
+    // Checked against every situation shot so far: only gameplay matches.
+    return FlatRow(top, 190, 0x415969, 8, 136) &&
+           (FlatRow(top, 190, 0x415969, 144, 248) || FlatRow(top, 190, 0x495969, 144, 248));
 }
 
 bool SocialVisible(const u32* top)
@@ -113,9 +116,10 @@ ScreenState Recognise(const u32* top, const u32* bottom)
     if (VacuumVisible(bottom)) return {Screen::Vacuum};
     if (WarmMenuVisible(bottom))
     {
-        // The catalogue: a blue band (#5961A2) across rows 53 to 58, x 9 to 247, between its
-        // header and the items (sit-storebuy).
-        if (FlatRow(bottom, 55, 0x5961A2, 9, 247)) return {Screen::Catalogue};
+        // The catalogue: the bottom edge of the item's description box, row 62 #51518A and row
+        // 63 #302008 flat from x 12 to 244, under the text whether it takes one line or two
+        // (sit-storebuy, items 3 and 4 selected).
+        if (FlatRow(bottom, 62, 0x51518A, 12, 244) && FlatRow(bottom, 63, 0x302008, 12, 244)) return {Screen::Catalogue};
         // Build Rooms: the wood's grain, row 10 #695128 and row 23 #302008 flat from x 36 to
         // 219, behind its title (sit-build).
         if (FlatRow(bottom, 10, 0x695128, 36, 219) && FlatRow(bottom, 23, 0x302008, 36, 219)) return {Screen::Build};
