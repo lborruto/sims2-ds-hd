@@ -58,7 +58,7 @@ FetchContent_MakeAvailable(sdl2)
 
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
-    src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/controls.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
+    src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/controls.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
     src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
@@ -126,3 +126,7 @@ target_include_directories(navigator_test PRIVATE melonDS/src src)
 add_executable(controls_test EXCLUDE_FROM_ALL tests/controls_test.cpp src/controls.cpp src/settings.cpp src/layout.cpp)
 target_include_directories(controls_test PRIVATE melonDS/src src)
 target_link_libraries(controls_test PRIVATE SDL2::SDL2-static)
+
+# Checks of the screen manager reader on a synthetic RAM (not built by default): ninja -C build gamestate_test && ./build/gamestate_test
+add_executable(gamestate_test EXCLUDE_FROM_ALL tests/gamestate_test.cpp src/gamestate.cpp)
+target_include_directories(gamestate_test PRIVATE melonDS/src src)
