@@ -230,7 +230,7 @@ void Input::Poll(const App& app, bool menuOpen)
 {
     const Settings& s = app.settings;
     prevPad = pad;
-    pad = PadState();
+    pad = PadRaw();
     if (pads.empty()) return;
     // Each button pressed on any controller; each stick as far as on the one pushed furthest.
     auto merge = [](float& to, float v) { if (std::fabs(v) > std::fabs(to)) to = v; };
@@ -256,10 +256,10 @@ void Input::Poll(const App& app, bool menuOpen)
     const bool combo = pad.btn[IN_START] && pad.btn[IN_BACK];
     if (PadPressed(s, MENU) || (combo && !prevCombo)) wantMenu = true;
     prevCombo = combo;
-    auto stickUp = [](const PadState& p) { return p.btn[IN_UP] || p.ly < -0.5f; };
-    auto stickDown = [](const PadState& p) { return p.btn[IN_DOWN] || p.ly > 0.5f; };
-    auto stickLeft = [](const PadState& p) { return p.btn[IN_LEFT] || p.lx < -0.5f; };
-    auto stickRight = [](const PadState& p) { return p.btn[IN_RIGHT] || p.lx > 0.5f; };
+    auto stickUp = [](const PadRaw& p) { return p.btn[IN_UP] || p.ly < -0.5f; };
+    auto stickDown = [](const PadRaw& p) { return p.btn[IN_DOWN] || p.ly > 0.5f; };
+    auto stickLeft = [](const PadRaw& p) { return p.btn[IN_LEFT] || p.lx < -0.5f; };
+    auto stickRight = [](const PadRaw& p) { return p.btn[IN_RIGHT] || p.lx > 0.5f; };
     if (menuOpen)
     {
         nav.up |= stickUp(pad) && !stickUp(prevPad);
@@ -274,16 +274,81 @@ void Input::Poll(const App& app, bool menuOpen)
     if (PadPressed(s, LOADSTATE)) wantLoad = true;
 }
 
+PadState Input::Actions(const Settings& s) const
+{
+    auto on = [&](int a) { return held[a] || PadOn(s, a); };
+    PadState p = scriptPad;
+    p.a |= on(A);
+    p.b |= on(B);
+    p.x |= on(X);
+    p.y |= on(Y);
+    p.lb |= on(L);
+    p.rb |= on(R);
+    p.start |= on(START);
+    p.select |= on(SELECT);
+    // (BACK with START is the pause menu, not the touch menu.)
+    p.menu |= on(PANEL) && !(pad.btn[IN_START] && pad.btn[IN_BACK]);
+    p.up |= on(UP);
+    p.down |= on(DOWN);
+    p.left |= on(LEFT);
+    p.right |= on(RIGHT);
+    // The sticks and triggers as read (the triggers past half way are buttons too).
+    if (!pads.empty())
+    {
+        p.lx = pad.lx;
+        p.ly = pad.ly;
+        p.rx = pad.rx;
+        p.ry = pad.ry;
+        p.lt = pad.btn[IN_LT] ? 1.0f : 0.0f;
+        p.rt = pad.btn[IN_RT] ? 1.0f : 0.0f;
+    }
+    return p;
+}
+
+void Input::Steer(App& app, const PadState& p, u32& keys)
+{
+    if (app.shown == Layout::Console)
+    {
+        navigator.Update(app.screens.Current(), p, touchScript, keys);
+        steering = true;
+        if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
+    }
+    else if (steering)
+    {
+        // CONSOLE left: no touch running on, no menu, no key held by the navigator.
+        navigator.Leave(touchScript);
+        steering = false;
+        if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
+    }
+}
+
+void Input::ScriptTouch(bool& touching, int& tx, int& ty)
+{
+    // A touch script (the console layout's navigator and activities) owns the stylus, through its
+    // released frames too, over the mouse, its tap latch and the stick: two taps stay two taps.
+    if (touchScript.Owns())
+    {
+        int sx, sy;
+        touching = touchScript.Next(sx, sy);
+        if (touching) { tx = sx; ty = sy; }
+    }
+}
+
 void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& touching, int& tx, int& ty)
 {
     const Settings& s = app.settings;
-    for (int a = 0; a < kKeyCount; a++)
-        if (held[a] || PadOn(s, a)) keys |= 1u << a;
-    // The left stick is the D-pad too.
-    if (pad.ly < -0.5f) keys |= 1u << kUp;
-    if (pad.ly > 0.5f) keys |= 1u << kDown;
-    if (pad.lx < -0.5f) keys |= 1u << kLeft;
-    if (pad.lx > 0.5f) keys |= 1u << kRight;
+    // CONSOLE: the buttons go through the navigator; elsewhere they are the DS's.
+    Steer(app, Actions(s), keys);
+    if (app.shown != Layout::Console)
+    {
+        for (int a = 0; a < kKeyCount; a++)
+            if (held[a] || PadOn(s, a)) keys |= 1u << a;
+        // The left stick is the D-pad too.
+        if (pad.ly < -0.5f) keys |= 1u << kUp;
+        if (pad.ly > 0.5f) keys |= 1u << kDown;
+        if (pad.lx < -0.5f) keys |= 1u << kLeft;
+        if (pad.lx > 0.5f) keys |= 1u << kRight;
+    }
     if (PadPressed(s, SWAP)) app.mainIsTop = !app.mainIsTop;
     const bool fastNow = held[FAST] || PadOn(s, FAST);
     if (fastNow != fastPrev) app.fast = fastNow;
@@ -302,8 +367,11 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     if (tapFrames > 0) tapFrames--;
 
     // The stick cursor: faster with a fuller deflection, for both precision and reach.
-    cursorPress = held[TOUCH] || PadOn(s, TOUCH);
-    if (s.stickCursor && !pads.empty())
+    // In CONSOLE only where no table of targets is (navigator.h), with A as its press there too.
+    const bool console = app.shown == Layout::Console;
+    cursorPress = held[TOUCH] || PadOn(s, TOUCH) || (console && navigator.CursorPress());
+    if (console && !navigator.CursorScreen()) cursorShownUntil = 0; // (not left over from a screen before)
+    if (s.stickCursor && !pads.empty() && (!console || navigator.CursorScreen()))
     {
         const float mag = std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry);
         if (mag > kStickDead || cursorPress)
@@ -318,14 +386,7 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
         }
         if (cursorPress && !touching) { touching = true; tx = (int)cursorX; ty = (int)cursorY; }
     }
-    // A touch script (the console layout's navigator and activities) owns the stylus, through its
-    // released frames too, over the mouse, its tap latch and the stick: two taps stay two taps.
-    if (touchScript.Owns())
-    {
-        int sx, sy;
-        touching = touchScript.Next(sx, sy);
-        if (touching) { tx = sx; ty = sy; }
-    }
+    ScriptTouch(touching, tx, ty);
 }
 
 void Input::EndFrame()

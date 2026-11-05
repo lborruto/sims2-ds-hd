@@ -37,8 +37,11 @@ the owner makes it public; write everything as if it were public already).
 | `src/backup.*` | Copies of the `.sav` in `backups/`, at start and every half hour, eight kept |
 | `src/layout.*` | `Place()` (canvas per layout, `topAspect`, FOCUS's overlaid panel), `CanvasFit`, `TouchFromOutput`, `OverTop` |
 | `src/compose.*` | `Composition`: pieces (a rectangle of one DS screen at a canvas rectangle, opacity, touchable or not) in drawing order, and overlays (rounded frames, boxes, the dimmed backdrop, the focus ring; `RasteriseOverlay`, each drawn before the piece it names); `FromPlacement`/`Compose`, `TouchFromComposition`, `TouchClampedComposition`, `OverTopComposition`; what `Video`, `--compose` and the mouse use |
-| `src/console.*` | CONSOLE (`--layout console`): `BuildConsole(ScreenState, menuOpen, focus, topW, topH)`, the 1280 × 720 composition per recognised screen (town and its rail, the menu over the dimmed world, the dialogue rebuilt wide, activities, SIDE for None), its geometry and the game's colours; `App::consoleMenu` / `consoleFocus` (set by `--console-menu` / `--console-focus N` for checks; the navigator will drive them) |
-| `tests/console_check.sh` | CONSOLE's pictures from save states: the DS pixels where each piece puts them, the frames, the dimmed world, the focus ring, SIDE without a HUD (ROM, `shots/`, the complete save and Pillow: `PYTHON=…`) |
+| `src/console.*` | CONSOLE (`--layout console`): `BuildConsole(ScreenState, menuOpen, focus, topW, topH)`, the 1280 × 720 composition per recognised screen (town and its rail, the menu over the dimmed world, the dialogue rebuilt wide, activities, SIDE for None), its geometry and the game's colours; `App::consoleMenu` / `consoleFocus` (the navigator drives them; `--console-menu` / `--console-focus N` pin them for checks' pictures, `App::consolePinned`) |
+| `src/navigator.*` | CONSOLE's navigator: `PadState` (the actions held: DS buttons, MENU = the PANEL action, sticks), `Navigator::Update(ScreenState, pad, TouchScript&, dsKeys)`: per screen the DS's buttons passed on, or a focus over `HotspotsFor` moved by the D-pad and tapped with A; `Leave` when CONSOLE goes; `Input::Steer` runs it (window and headless) |
+| `tests/navigator_test.cpp` | The navigator on synthetic screen states: menu, focus moves, taps, tabs, popup, phone, town keys, Unknown's cursor, leaving CONSOLE (`ninja -C build navigator_test`) |
+| `scripts/console/*.txt` | `pad` scripts for `tests/console_check.sh`'s navigator cases |
+| `tests/console_check.sh` | CONSOLE's pictures from save states: the DS pixels where each piece puts them, the frames, the dimmed world, the focus ring, SIDE without a HUD; then the navigator from `pad` scripts (`--print-screen`: tabs from `s7`, the popup from `s6`, CONSOLE → FOCUS → CONSOLE) (ROM, `shots/`, the complete save and Pillow: `PYTHON=…`) |
 | `src/touchscript.*` | `TouchScript` (`Input::touchScript`): taps, holds and drags over game frames, queued (8 at most), one released frame between; wins over the mouse and the stick in `Input::Frame` |
 | `tests/layout_test.cpp` | Touch mapping of every pixel in every layout and size, and of every piece of every CONSOLE composition (`ninja -C build layout_test`) |
 | `tests/touchscript_test.cpp` | The synthesised touches (`ninja -C build touchscript_test`) |
@@ -52,7 +55,7 @@ the owner makes it public; write everything as if it were public already).
 | `tests/hotspots_test.cpp` | The tables lie on the screen, every target reachable by focus moves, `Neighbour`'s cone (`ninja -C build hotspots_test`) |
 | `tests/hotspots_check.sh`, `scripts/hotspots/*.txt` | Each target tapped in the game from a save state: the screens printed, or a last picture that differs from the same run without the tap (ROM, `shots/` and the complete save, as `screens_check.sh`) |
 | `src/scene.*` | AUTO's decision from those rules: `AutoLayout::Update(top, bottom, mainIsTop)` |
-| `src/script.*`, `src/shots.*`, `src/state.*`, `src/picker.*` | Headless input scripts (keys, `touch`, `blow`); PNG shots and `--compose`; save states (a load re-seeds the clock); ROM file picker and `Tell()` |
+| `src/script.*`, `src/shots.*`, `src/state.*`, `src/picker.*` | Headless input scripts (keys, `touch`, `blow`, CONSOLE's `pad <action>`, `layout <name>`); PNG shots and `--compose`; save states (a load re-seeds the clock); ROM file picker and `Tell()` |
 | `src/mic.*` | What the DS hears: the blow key's signal, the computer's microphone (SDL capture, resampled), or silence |
 | `src/clock.*` | The DS clock: the host's time at boot and after a state load, held to real time during fast forward; `--clock` |
 | `src/platform.cpp` | melonDS Platform interface (files, threads, save, the microphone through `mic.*`), adapted from pokemon-fulldex |
@@ -216,6 +219,27 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   hints are drawn. `menuOpen` shows the menu composition on any screen with a HUD; Phone, Popup
   and Gift always do. The stick cursor is drawn where the piece showing its point draws it
   (`CanvasFromTouch`), hidden where no piece shows it.
+- The navigator (`navigator.cpp`, CONSOLE only; `Input::Steer`, before the mouse, and the touch
+  script last as ever). Panel with the menu closed, Dialogue, None, Vacuum: the buttons are the
+  DS's (LB / RB the camera's L / R; A advances a conversation itself). MENU (the PANEL action:
+  E, the pad's Back) opens the panel's menu only; Esc / Guide / Start + Back stay the pause
+  menu. Focus screens (the panel's menu, Phone, Gift, Catalogue, Build, Social, Cards): the
+  D-pad or left stick moves the focus (`Neighbour`; held: again after 18 frames, then every 6),
+  A taps, on the panel LB / RB tap the previous / next tab icon (in a ring) and B / MENU close
+  the menu (no tap); on the Phone B / MENU tap `kPhoneClose` and close the menu; elsewhere B taps
+  the screen's `close` target if it has one. Popup: A / B tap `kPopupClose`, Start stays the
+  DS's (Game Paused). Unknown: the DS's buttons but A, which presses the stick cursor; the stick
+  cursor works in CONSOLE only on screens without a table (None, Vacuum, Unknown). The menu
+  stays open only while the panel changes tab; any other screen change closes it and puts the
+  focus back on the screen's first target. A tap is queued only when the touch script does not
+  own the stylus (presses meanwhile are dropped); after a closing tap (popup, phone, X) A and B
+  wait for the screen to change (90 frames at most): the popup box slides away still reading
+  Popup and a second tap would land on the panel. Volume sliders and the cards' play arrow take
+  a drag only (`Hotspot::dragOnly`): the focus skips them (the mouse or, later, Task 7 does
+  them). Presses are edges against the previous `PadState`; after `Leave` (another layout) or
+  the pause menu, buttons still held are not presses. The DS's Select moved to the left stick's
+  click (Back is the touch menu's). From `s7`, `pad b` closes the phone (Panel/Interact about 50
+  frames later, the phone slides).
 - The complete save's states (in git-ignored `shots/`; run them with
   `--save` a copy of `saves/complete-play.sav` and `--clock "2026-11-05 12:05"`): `sit-casino`
   (`act-cards` quit to the casino's panel, `scripts/hotspots/casino-base.txt`) and

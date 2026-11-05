@@ -23,6 +23,7 @@ enum Action
     LOADSTATE,
     BLOW,      // blow into the microphone while held (App::micBlow)
     TOUCH,     // presses the stick touch cursor while held
+    PANEL,     // CONSOLE: opens and closes the touch screen's menu (navigator.h); MENU stays the pause menu
     COUNT
 };
 

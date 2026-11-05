@@ -80,7 +80,8 @@ them.
 | Arrows | D-pad or left stick | +Control Pad |
 | X / Z / S / A (AZERTY: X / W / S / Q) | A / B / X / Y (as labelled) | A / B / X / Y |
 | Q / W (AZERTY: A / Z) | LB / RB | L / R |
-| Enter / Right Shift | Start / Back | Start / Select |
+| Enter / Right Shift | Start / left stick click | Start / Select |
+| E | Back | `--layout console`: the touch screen's menu (D-pad moves, A taps, LB / RB tabs, B closes) |
 | Mouse | right stick + LT (the cursor) | the touch screen, wherever it is shown |
 | Mouse wheel, over the world | | zoom in / out (the game's X / Y) |
 | Right button drag, over the world | | turn the camera (the game's L / R) |

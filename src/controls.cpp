@@ -12,14 +12,15 @@ namespace Controls
 const char* ActionKey(int a)
 {
     static const char* k[COUNT] = {"a", "b", "select", "start", "right", "left", "up", "down", "r", "l", "x", "y",
-                                   "menu", "fast", "swap", "savestate", "loadstate", "blow", "touch"};
+                                   "menu", "fast", "swap", "savestate", "loadstate", "blow", "touch", "panel"};
     return a >= 0 && a < COUNT ? k[a] : "";
 }
 
 const char* ActionName(int a)
 {
     static const char* n[COUNT] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L", "X", "Y",
-                                   "MENU", "FAST FORWARD", "SWAP SCREENS", "SAVE STATE", "LOAD STATE", "BLOW (MIC)", "CURSOR PRESS"};
+                                   "MENU", "FAST FORWARD", "SWAP SCREENS", "SAVE STATE", "LOAD STATE", "BLOW (MIC)", "CURSOR PRESS",
+                                   "TOUCH MENU"};
     return a >= 0 && a < COUNT ? n[a] : "";
 }
 
@@ -65,6 +66,8 @@ int DefaultKey(int a)
     case Y: return SDL_GetKeyFromScancode(SDL_SCANCODE_A);
     case L: return SDL_GetKeyFromScancode(SDL_SCANCODE_Q);
     case R: return SDL_GetKeyFromScancode(SDL_SCANCODE_W);
+    // CONSOLE's touch menu: beside them, where E is on QWERTY.
+    case PANEL: return SDL_GetKeyFromScancode(SDL_SCANCODE_E);
     case START: return SDLK_RETURN;
     case SELECT: return SDLK_RSHIFT;
     case UP: return SDLK_UP;
@@ -92,7 +95,10 @@ int DefaultPad(int a)
     case L: return IN_LB;
     case R: return IN_RB;
     case START: return IN_START;
-    case SELECT: return IN_BACK;
+    // BACK (View, Share, -) opens CONSOLE's touch menu; the DS's Select, seldom used, goes to
+    // the left stick's click.
+    case SELECT: return IN_LS;
+    case PANEL: return IN_BACK;
     case UP: return IN_UP;
     case DOWN: return IN_DOWN;
     case LEFT: return IN_LEFT;

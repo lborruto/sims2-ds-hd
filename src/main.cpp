@@ -56,7 +56,7 @@ static void Usage()
         "  --interp                      60 fps in-between frames for the 3D\n"
         "  --headless                    no window; with --frames and the shot options\n"
         "  --frames N                    stop after N frames\n"
-        "  --input FILE                  input script (frame len key[+key] | frame len touch x y)\n"
+        "  --input FILE                  input script (frame len key[+key] | frame len touch x y | frame len pad action)\n"
         "  --shot-dir DIR                where shots go (default shots)\n"
         "  --shot-every N | --shot-at a,b,c\n"
         "  --state-load FILE / --state-save FILE (saved at the end)\n"
@@ -64,11 +64,14 @@ static void Usage()
         "  --mic off|blow|real           what the DS hears: silence, the blow key, the computer's microphone\n"
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-screen                print the recognised bottom screen when it changes (frame N: screen X)\n"
+        "                                and CONSOLE's menu and focus (frame N: console menu open|closed, focus F)\n"
         "  --console-menu, --console-focus N  (checks) CONSOLE's menu shown, the focus ring on target N\n"
+        "                                (pinned: the navigator no longer moves them)\n"
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
         "      Esc menu (settings, save states, quit), Space fast forward, Tab swaps the big screen\n"
+        "      CONSOLE: E opens the touch screen's menu (arrows move, A taps, L/R tabs, B closes)\n"
         "      0 auto, 1/2/3 layouts, F5/F7 save/load state, F11 fullscreen, F12 screenshot\n"
         "      mouse: the touch screen; over the world, wheel zooms and a right-button drag turns\n");
 }
@@ -98,7 +101,7 @@ int main(int argc, char** argv)
     int shotEvery = 0;
     std::set<long> shotAt;
     Layout layout = Layout::Auto;
-    bool compose = false, printScreen = false, consoleMenu = false;
+    bool compose = false, printScreen = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int res3d = 0;
     bool wide = false, interp = false;
@@ -124,8 +127,8 @@ int main(int argc, char** argv)
         else if (a == "--mic") micArg = next();
         else if (a == "--fast") fast = true;
         else if (a == "--print-screen") printScreen = true;
-        else if (a == "--console-menu") consoleMenu = true;
-        else if (a == "--console-focus") consoleFocus = atoi(next().c_str());
+        else if (a == "--console-menu") consoleMenu = consolePinned = true;
+        else if (a == "--console-focus") { consoleFocus = atoi(next().c_str()); consolePinned = true; }
         else if (a == "--clock") { if (!clock::SetFixed(next())) { fprintf(stderr, "--clock wants \"YYYY-MM-DD HH:MM\"\n"); return 1; } }
         else if (a == "--layout")
         {
@@ -175,9 +178,10 @@ int main(int argc, char** argv)
     App app;
     app.layout = layout;
     app.shown = layout == Layout::Auto ? Layout::Side : layout;
-    // (For the checks: the navigator, still to come, will drive these in a window.)
+    // (For the checks' pictures: pinned, the navigator no longer moves them; it still steers.)
     app.consoleMenu = consoleMenu;
     app.consoleFocus = consoleFocus;
+    app.consolePinned = consolePinned;
     app.quickState = quickState;
     app.shotFile = shotFile;
     // The settings file (not headless: those runs stay the same on every machine).
@@ -232,6 +236,9 @@ int main(int argc, char** argv)
     const double dsFrame = 1.0 / (33513982.0 / (6.0 * 355.0 * 263.0)); // seconds
     const double perfFreq = (double)SDL_GetPerformanceFrequency();
     double nextFrameAt = 0; // in seconds of the performance counter; 0: not started
+    bool wasPaused = false; // the pause menu was open: buttons held on leaving it are not presses
+    bool lastMenu = app.consoleMenu;
+    int lastFocus = app.consoleFocus;
     auto keepPace = [&]() {
         if (headless || app.fast) { nextFrameAt = 0; return; }
         double now = SDL_GetPerformanceCounter() / perfFreq;
@@ -247,7 +254,15 @@ int main(int argc, char** argv)
         bool blow = false, touching = false;
         int tx = 0, ty = 0;
         ApplyScript(script, frame, keys, blow, touching, tx, ty);
-        if (!headless)
+        ScriptPad(script, frame, input.scriptPad);
+        if (const int l = ScriptLayout(script, frame); l >= 0) app.layout = (Layout)l;
+        if (headless)
+        {
+            // CONSOLE's navigator from the script's "pad" events; its taps over the script's touch.
+            input.Steer(app, input.scriptPad, keys);
+            input.ScriptTouch(touching, tx, ty);
+        }
+        else
         {
             SDL_Event ev;
             input.PushScript(script, iter, video);
@@ -269,6 +284,7 @@ int main(int argc, char** argv)
                 menu.Draw(app, video, input, frame);
                 video.Present(app, &menu.canvas);
                 keepPace();
+                wasPaused = true;
                 continue;
             }
             if (input.wantSave) menu.Say(SaveState(nds, quickState) ? "STATE SAVED" : "STATE NOT SAVED", frame);
@@ -281,6 +297,7 @@ int main(int argc, char** argv)
                 video.SetFullscreen(app.settings.fullscreen);
                 app.settings.Save(settingsPath);
             }
+            if (wasPaused) { input.navigator.Resync(); wasPaused = false; }
             input.Frame(app, video, frame, keys, touching, tx, ty);
             input.EndFrame();
             backups.Tick(SDL_GetTicks());
@@ -315,6 +332,10 @@ int main(int argc, char** argv)
             ScreenState before = app.screens.Current();
             ScreenState now = app.screens.Update(top, bottom);
             if (printScreen && !(now == before)) fprintf(stderr, "frame %ld: screen %s\n", frame, ScreenStateName(now).c_str());
+            if (printScreen && (app.consoleMenu != lastMenu || app.consoleFocus != lastFocus))
+                fprintf(stderr, "frame %ld: console menu %s, focus %d\n", frame, app.consoleMenu ? "open" : "closed", app.consoleFocus);
+            lastMenu = app.consoleMenu;
+            lastFocus = app.consoleFocus;
         }
         if (shotAt.count(frame) || (shotEvery && frame % shotEvery == 0))
         {

@@ -8,7 +8,13 @@
 #   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item): 3x over the
 #   dimmed world; s5 (a conversation): the dialogue rebuilt wide;
 #   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
-#   top right; s3 (Create-a-Sim, no HUD): SIDE.
+#   top right; s3 (Create-a-Sim, no HUD): SIDE. (The pictures pin the menu and the focus with
+#   --console-focus / --console-menu: the navigator does not move them.)
+# Then the navigator, driven by the scripts' "pad" events (scripts/console/), from what
+# --print-screen prints: from s7, B closes the phone, MENU opens the menu, R twice goes to
+# Goals, B closes the menu; from s6, A closes the popup; from s7, CONSOLE -> FOCUS -> CONSOLE
+# with the menu open and A held: the menu closes on leaving, nothing is tapped on coming back,
+# MENU opens it again.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
 #   bash tests/console_check.sh
 # Override with SIMS2WIDE, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh) and
@@ -37,7 +43,7 @@ run() {
     local save=$tmp/$name.sav
     if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
-        --compose --shot-at 119 --shot-dir "$tmp/$name/c" "$@" > "$tmp/$name.log" 2>&1 &&
+        --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
     [ "$state" = act-cards ] && cp "$complete_save" "$save"
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
@@ -164,5 +170,49 @@ sys.exit(1 if errors else 0)
 EOF
     then echo "ok   $name"; else echo "FAIL $name"; fails=$((fails + 1)); fi
 done
+# pad NAME STATE SCRIPT FRAMES: a CONSOLE run with --print-screen (NAME.log; NAME.ok if it ended).
+pad() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
+        --layout console --print-screen "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+# in_order NAME LINE...: each line (a grep -E pattern) is printed, after the one before.
+in_order() {
+    local name=$1 from=0 n; shift
+    for want in "$@"; do
+        n=$(tail -n +$((from + 1)) "$tmp/$name.log" | grep -n -m 1 -E "$want" | cut -d: -f1)
+        [ -n "$n" ] || { echo "  $name: no \"$want\" after line $from"; return 1; }
+        from=$((from + n))
+    done
+}
+pad pad-tabs s7 tabs 320 &
+pad pad-popup s6 popup 120 &
+pad pad-leave s7 leave 300 &
+wait
+check_pad() {
+    local name=$1; shift
+    if [ ! -f "$tmp/$name.ok" ]; then
+        echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
+        fails=$((fails + 1))
+    elif "$@"; then echo "ok   $name"
+    else echo "FAIL $name"; fails=$((fails + 1)); fi
+}
+tabs() {
+    in_order pad-tabs 'screen Phone' 'screen Panel/Interact' 'console menu open' 'screen Panel/Pockets' \
+        'screen Panel/Goals' 'console menu closed'
+}
+popup() { in_order pad-popup 'screen Popup' 'screen Panel/'; }
+leave() {
+    in_order pad-leave 'console menu open' 'layout focus' 'console menu closed, focus -1' 'layout console' \
+        'console menu open' || return 1
+    # Nothing tapped from leaving on: the screen stays the panel's Interact tab.
+    if sed -n '/layout focus/,$p' "$tmp/pad-leave.log" | grep -q 'screen '; then
+        echo "  pad-leave: the screen changed after leaving CONSOLE"; return 1
+    fi
+}
+check_pad pad-tabs tabs
+check_pad pad-popup popup
+check_pad pad-leave leave
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

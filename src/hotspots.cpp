@@ -94,8 +94,8 @@ const List kOptions = Panel({
     {"settings", 193, 17, {182, 6, 23, 23}},
     {"save", 57, 44, {44, 29, 167, 30}},
     {"quit", 234, 69, {45, 55, 204, 28}},
-    {"music volume", 232, 121, {58, 109, 190, 25}},
-    {"sound volume", 232, 171, {58, 159, 190, 25}},
+    {"music volume", 232, 121, {58, 109, 190, 25}, true},
+    {"sound volume", 232, 171, {58, 159, 190, 25}, true},
 });
 
 const List kPanelNone = Panel({});
@@ -147,7 +147,7 @@ const List kCards = {
     {"card 8", 128, 161, {110, 135, 37, 54}},
     {"card 9", 176, 161, {158, 135, 37, 54}},
     {"card 10", 224, 161, {206, 135, 37, 54}},
-    {"play", 37, 28, {12, 6, 51, 46}},
+    {"play", 37, 28, {12, 6, 51, 46}, true},
 };
 
 // The shop's catalogue: its six items, the arrows that scroll them, the simoleon button (buys the

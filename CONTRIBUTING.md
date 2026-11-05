@@ -53,7 +53,8 @@ Before opening a pull request:
     bash tests/screens_check.sh              # the bottom screen recognised in every save state (needs the ROM and shots/)
     ninja -C build hotspots_test && ./build/hotspots_test   # the touch targets' tables and focus moves
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
-    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (ROM, shots/, the complete save, Pillow)
+    ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens
+    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong, the navigator's pad scripts (ROM, shots/, the complete save, Pillow)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below). A change to the menu, the mouse or the keys is
@@ -106,6 +107,7 @@ The headless mode runs the game without a window, about four times faster than r
 |---|---|
 | `--headless --frames N` | run N frames, no window |
 | `--input FILE` | an input script, one event per line: `frame frames-held key[+key]` or `frame frames-held touch x y` (`scripts/` has examples); the key `blow` blows into the microphone |
+| (in a script, CONSOLE) | `pad ACTION` (`a`, `b`, `x`, `y`, `l`/`lb`, `r`/`rb`, `start`, `select`, `menu`, `up`, `down`, `left`, `right`): the action held as on a controller, through the navigator; `layout NAME` (`auto`, `focus`, `side`, `stacked`, `console`) switches the layout at that frame. Headless and window alike; `--print-screen` also prints the navigator's menu and focus |
 | (in a script, window only) | `press KEY` (SDL's key names: `Escape`, `Return`, `F11`, `X`), `move x y` and `click x y` (window points), `wheel n`, `winshot` (the window's picture, `w<frame>.png`): real SDL events for the frontend; their frame counts the loop's turns, paused ones too |
 | `--shot-every N`, `--shot-at a,b,c`, `--shot-dir DIR` | both screens as PNG (256 × 384) |
 | `--compose` | the window's picture instead (the layout AUTO would show) |
@@ -167,15 +169,24 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   and the dialogue's name, text, portrait and arrow (2x) in a wide frame; activities (and
   unknown screens) the touch screen 3x at the left and the world small at the top right; no HUD
   (title, Create-a-Sim): SIDE. The focus ring frames a hotspot's area (`hotspots.*`) where the
-  piece showing it draws it. `--console-menu` and `--console-focus N` show the menu and the ring
-  in checks (`tests/console_check.sh`); `tests/layout_test.cpp` maps every pixel of every piece
+  piece showing it draws it. The navigator (below) opens the menu and moves the ring;
+  `--console-menu` and `--console-focus N` pin them for the checks' pictures (`tests/console_check.sh`); `tests/layout_test.cpp` maps every pixel of every piece
   of every CONSOLE composition back to itself.
+- **The navigator** (`navigator.*`): in CONSOLE the buttons go through it (`Input::Steer`, from
+  the keyboard, the controllers and a script's `pad` events alike, as a `PadState` of actions).
+  For each recognised screen it either passes them on as the DS's (town, conversations) or keeps
+  a focus on one of the screen's touch targets (`hotspots.*`), moved by the D-pad with
+  `Neighbour` and tapped with A through the touch script; the panel's menu opens with the TOUCH
+  MENU action (E, Back), LB / RB tap the tabs there, B closes. Presses are edges against the
+  previous frame; taps are dropped while the touch script owns the stylus. Leaving CONSOLE
+  cancels the touch script and closes the menu. `tests/navigator_test.cpp` drives it on
+  synthetic screen states; `tests/console_check.sh` from save states with `pad` scripts.
 - **Settings** (`settings.*`): one `Settings` struct for every option, whoever uses it; loaded
   from `settings.ini` (plain `key=value`) in SDL's per-user folder when the window opens, never
   headless, saved on every change from the menu and when the program closes (with the window's
   size). Add a field with its default, its two lines in `Load` and `Save`, its row in `menu.cpp`.
 - **Controls** (`controls.*`, `input.*`): each action (the 12 DS buttons, MENU, FAST FORWARD,
-  SWAP SCREENS, SAVE STATE, LOAD STATE, BLOW, CURSOR PRESS) has a key (an SDL keycode, so the
+  SWAP SCREENS, SAVE STATE, LOAD STATE, BLOW, CURSOR PRESS, TOUCH MENU) has a key (an SDL keycode, so the
   key's label on any layout) and a controller input; giving an action a key another one had
   swaps them. Controllers are read through SDL_GameController, labels by SDL's convention (A is
   the button printed A). The right stick moves a cursor on the touch screen, pressed with

@@ -1,0 +1,8 @@
+# From s7, CONSOLE: the phone closed, the menu opened, then FOCUS with A held, then CONSOLE again
+# with A still held (not a press: nothing is tapped), then MENU opens the menu again.
+20 2 pad b
+100 2 pad menu
+140 1 layout focus
+140 100 pad a
+200 1 layout console
+260 2 pad menu

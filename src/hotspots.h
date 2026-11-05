@@ -15,6 +15,9 @@ struct Hotspot
     const char* name;
     int x, y;  // where the tap goes
     Rect area; // what the focus ring frames (holds x, y); navigation uses its centre
+    // Moved only by a drag that starts on it, a tap does nothing (the volume sliders' knobs, the
+    // cards' play arrow): the navigator's focus skips it.
+    bool dragOnly = false;
 };
 
 // The targets of a screen, the tab's own first (the navigator's first focus), then for the

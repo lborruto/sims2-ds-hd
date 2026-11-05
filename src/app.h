@@ -26,6 +26,9 @@ struct App
     ScreenTracker screens;         // which screen the touch screen shows (screens.h), every frame
     bool consoleMenu = false;      // CONSOLE: the menu is up (the touch screen 3x over the dimmed world)
     int consoleFocus = -1;         // CONSOLE: the focused target, an index in HotspotsFor (-1: none)
+    // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
+    // pinned them for a check's picture.
+    bool consolePinned = false;
 
     Settings settings;
 

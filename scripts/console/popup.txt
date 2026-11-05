@@ -1,0 +1,2 @@
+# From s6 (a goal popup), CONSOLE: A taps the popup's X.
+30 2 pad a

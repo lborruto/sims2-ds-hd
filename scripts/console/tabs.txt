@@ -1,0 +1,7 @@
+# From s7 (the phone open), CONSOLE: B closes the phone (its X), MENU opens the touch menu,
+# R twice taps the next tab's icon (Interact -> Pockets -> Goals), B closes the menu.
+20 2 pad b
+100 2 pad menu
+140 2 pad rb
+200 2 pad rb
+260 2 pad b
