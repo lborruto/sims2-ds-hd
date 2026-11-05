@@ -63,6 +63,7 @@ static void Usage()
         "  --save FILE                   the game's save (default beside the ROM, .sav)\n"
         "  --mic off|blow|real           what the DS hears: silence, the blow key, the computer's microphone\n"
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
+        "  --print-screen                print the recognised bottom screen when it changes (frame N: screen X)\n"
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
@@ -96,7 +97,7 @@ int main(int argc, char** argv)
     int shotEvery = 0;
     std::set<long> shotAt;
     Layout layout = Layout::Auto;
-    bool compose = false;
+    bool compose = false, printScreen = false;
     int res3d = 0;
     bool wide = false, interp = false;
     for (int i = 1; i < argc; i++)
@@ -120,6 +121,7 @@ int main(int argc, char** argv)
         else if (a == "--save") savePath = next();
         else if (a == "--mic") micArg = next();
         else if (a == "--fast") fast = true;
+        else if (a == "--print-screen") printScreen = true;
         else if (a == "--clock") { if (!clock::SetFixed(next())) { fprintf(stderr, "--clock wants \"YYYY-MM-DD HH:MM\"\n"); return 1; } }
         else if (a == "--layout")
         {
@@ -301,6 +303,11 @@ int main(int argc, char** argv)
             if (app.shown != before || (app.shown == Layout::Focus && app.mainIsTop != bigBefore))
                 fprintf(stderr, "frame %ld: layout %s%s\n", frame, LayoutName(app.shown),
                         app.shown != Layout::Focus ? "" : app.mainIsTop ? " (top big)" : " (bottom big)");
+        }
+        {
+            ScreenState before = app.screens.Current();
+            ScreenState now = app.screens.Update(top, bottom);
+            if (printScreen && !(now == before)) fprintf(stderr, "frame %ld: screen %s\n", frame, ScreenStateName(now).c_str());
         }
         if (shotAt.count(frame) || (shotEvery && frame % shotEvery == 0))
         {

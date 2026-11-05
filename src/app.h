@@ -10,6 +10,7 @@
 #include "common.h"
 #include "layout.h"
 #include "scene.h"
+#include "screens.h"
 #include "settings.h"
 
 namespace sims2wide
@@ -22,6 +23,7 @@ struct App
     Layout shown = Layout::Side;   // what the window shows this frame (AUTO resolved)
     bool mainIsTop = true;         // FOCUS: which screen is big
     AutoLayout autoLayout;
+    ScreenTracker screens;         // which screen the touch screen shows (screens.h), every frame
 
     Settings settings;
 

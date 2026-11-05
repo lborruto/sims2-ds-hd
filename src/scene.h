@@ -2,27 +2,10 @@
 #pragma once
 #include "common.h"
 #include "layout.h"
+#include "screens.h" // the rules AUTO uses: HudVisible, SocialVisible, WarmMenuVisible, VacuumVisible, CardsVisible
 
 namespace sims2wide
 {
-// The status bar under the world view (clock, money, motive bar) is on the top screen: free roam
-// or a conversation in town, where the bottom screen is only a menu panel.
-bool HudVisible(const u32* top);
-
-// A social reaction (Impress, Cheer Up, Calm…): the top screen keeps the status bar and gets a
-// name and relationship box on its first rows; the bottom screen is the timed three-icon game.
-bool SocialVisible(const u32* top);
-
-// A full-screen touch menu over the town: the shop's catalogue, Build Rooms (warm, bright
-// corners; the panel, the phone, dialogues and popups are purple or grey).
-bool WarmMenuVisible(const u32* bottom);
-
-// The hotel's vacuum: the bowl on the touch screen (dust, items to drag into the bag, the filter
-// to blow clear); the world and the HUD stay on top.
-bool VacuumVisible(const u32* bottom);
-// The casino's card game (Keelhaulin' Cards): its score bar on the top screen.
-bool CardsVisible(const u32* top);
-
 // A screen sampled on a coarse grid: its brightness, and how much of it changed since the last
 // take (SIMS2WIDE_PROBE=N prints both every N frames, to study a situation).
 struct Sample

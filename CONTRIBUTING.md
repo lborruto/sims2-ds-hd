@@ -50,6 +50,7 @@ Before opening a pull request:
     ./build/sims2wide --help                 # prints the usage (with no ROM it opens the file picker)
     ./build/sims2wide <rom> --headless --frames 1800 --shot-every 120 --shot-dir shots/boot
     ninja -C build layout_test && ./build/layout_test   # every touch pixel maps back to itself, in every layout
+    bash tests/screens_check.sh              # the bottom screen recognised in every save state (needs the ROM and shots/)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below). A change to the menu, the mouse or the keys is
@@ -111,6 +112,7 @@ The headless mode runs the game without a window, about four times faster than r
 | `--clock "YYYY-MM-DD HH:MM"` | fix the DS clock's start, so that two runs show the same time |
 | `--mic off\|blow\|real` | what the DS hears (the setting otherwise) |
 | `--fast` | start with fast forward held; headless, it exercises the clock's hold |
+| `--print-screen` | print the recognised bottom screen (`screens.h`) when it changes: `frame N: screen Panel/Pockets` |
 | `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
 
 A headless run ends with a line that says what the DS clock reads, how often the hold wrote
@@ -131,8 +133,8 @@ Keep your ROM in `roms/` and your shots and states in `shots/`: both are ignored
 over the last picture). Each part has its own file pair: `app.h` (the shared state: the DS,
 the layout chosen and shown, fast forward), `settings.*` (every option, the file),
 `controls.*` (the key and button bindings), `input.*` (keyboard, mouse, controller),
-`video.*` (the window), `audio.*` (with `audiostretch.h`), `layout.*`, `scene.*` (AUTO's
-detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `script.*`,
+`video.*` (the window), `audio.*` (with `audiostretch.h`), `layout.*`, `screens.*` (which
+bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `script.*`,
 `shots.*`, `state.*`, `picker.*`.
 
 - **Input script** (`script.*`): parses `--input` files; the window events in it are pushed as

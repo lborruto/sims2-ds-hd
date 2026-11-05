@@ -43,7 +43,9 @@ the owner makes it public; write everything as if it were public already).
 | `src/looks.*` | Sharper / widescreen 3D and 60 fps: applies the Looks settings, builds `App::TopImage` |
 | `src/melonds_ext/GPU3D_Wide.*` | FullDex's wide 3D rasteriser (CPU), built into melonDS's `core` |
 | `patches/melonDS/*.patch` | Hooks in melonDS 1.1 for the looks, applied at configure time |
-| `src/scene.*` | AUTO's detection from the screens' pixels: `HudVisible()`, `SocialVisible()`, `WarmMenuVisible()`, `VacuumVisible()`, `AutoLayout::Update(top, bottom, mainIsTop)` |
+| `src/screens.*` | Which bottom screen the game shows: `Recognise(top, bottom)` → `ScreenState` (`Screen`, panel `Tab`), `ScreenTracker` (hysteresis; `App::screens`, `--print-screen`), and the pixel rules AUTO shares (`HudVisible`, `SocialVisible`, `WarmMenuVisible`, `VacuumVisible`, `CardsVisible`) |
+| `tests/screens_check.sh` | Each save state's recognised screen, and the panel's tabs from `s6` with `scripts/tabs.txt` (needs the ROM and `shots/`: `ROM=… SHOTS=… bash tests/screens_check.sh`) |
+| `src/scene.*` | AUTO's decision from those rules: `AutoLayout::Update(top, bottom, mainIsTop)` |
 | `src/script.*`, `src/shots.*`, `src/state.*`, `src/picker.*` | Headless input scripts (keys, `touch`, `blow`); PNG shots and `--compose`; save states (a load re-seeds the clock); ROM file picker and `Tell()` |
 | `src/mic.*` | What the DS hears: the blow key's signal, the computer's microphone (SDL capture, resampled), or silence |
 | `src/clock.*` | The DS clock: the host's time at boot and after a state load, held to real time during fast forward; `--clock` |
@@ -130,7 +132,7 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   vacuum, the music mixer). `--mic real` needs `NSMicrophoneUsageDescription` in the Mac app's
   plist (there) and the terminal's permission on a Mac for the CLI program.
 - `SIMS2WIDE_PROBE=N` prints AUTO's signals every N frames (HUD, social, warm menu, motion and
-  brightness of each screen).
+  brightness of each screen); `--print-screen` prints the recognised bottom screen on change.
 - Touch mapping goes through the same composition (`compose.h`, from `Place()`) as drawing: change one, the other follows. The topmost piece under the pointer decides (a top piece or an untouchable one takes the click); a drag keeps the piece it began on.
   The stylus goes down only when the left button is pressed on the touch screen; until release
   it follows the pointer clamped to that screen (`TouchClamped`), wherever the pointer goes.
@@ -147,6 +149,20 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 - Fullscreen keeps the pointer visible: the mouse is the stylus.
 - In town the bottom screen often has a popup to close (the X near 126,110 or 126,126) before
   the D-pad moves the Sim.
+- The bottom screen (`Recognise`, `screens.cpp`; HUD first: without it only Cards or None).
+  Measured on every frame of the save states (1200 frames each), each rule matching nothing
+  else: the panel's tab, by the selected icon's green ring `#309A41` in the tab column (x 0-34,
+  a 35 × 35 square around rows 22, 57, 92, 127, 162; 26 to 51 ring pixels, 16 needed; no other
+  screen has that colour there); the phone, row 105 flat `#9AB29A` (its LCD) x 34-221; a popup
+  (goal unlocked, tips, Game Paused), by the dimmed panel behind its box: rows 0 and 191 flat
+  `#303859` from x 36 (`#6171B2` undimmed), wherever the box sits; the X is not used (it turns
+  green when touched, and the box slides). A conversation, row 171's fixed samples every 3
+  pixels from x 214 (the blue arrow); Give Item, row 86's every 3 from x 112 (the bow button);
+  the catalogue, row 55 flat `#5961A2` x 9-247; Build Rooms, rows 10 `#695128` and 23
+  `#302008` x 36-219 (both also warm). Fades and slides between screens read `Unknown` for up
+  to about 30 frames (the dim fading over 14 frames, the phone opening over 36): the tracker
+  takes Unknown only after 60 agreeing frames, Popup and Dialogue after 3, the rest after 6.
+  `sit-pause` reads Popup.
 - Looks: with all looks off the headless output must stay byte for byte the same (24-shot
   shasum check in CONTRIBUTING). Frame 0 after `--state-load` shows melonDS's uninitialised 3D
   buffer, so even the memory layout of melonDS's objects matters: patch state goes in globals
