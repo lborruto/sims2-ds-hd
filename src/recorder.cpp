@@ -3,6 +3,7 @@
 #include <SDL.h>
 
 #include <cstdio>
+#include <cstring>
 #include <ctime>
 #include <filesystem>
 
@@ -17,6 +18,7 @@ constexpr int kUnknownFrames = 30;   // a settled unmapped screen, this long
 constexpr int kInvalidFrames = 300;  // RAM not reading (not a load, not black), this long
 constexpr long kInvalidFrom = 600;   // ... after the boot
 constexpr int kMaxPerRun = 20;
+constexpr int kMaxInFolder = 200;
 }
 
 Recorder::Recorder(std::string dir) : dir_(std::move(dir))
@@ -41,7 +43,19 @@ void Recorder::Frame(const App& app, long frame, melonDS::NDS& nds)
     if (++run_ != need || done_.count(pair)) return;
     done_.insert(pair);
 
+    // Once per screen across sessions: a capture of this pair already in the folder, or a full folder.
     std::error_code ec;
+    char tag[48];
+    snprintf(tag, sizeof tag, "-ov%d-vt%08X.st", pair.first, pair.second);
+    int inFolder = 0;
+    for (const auto& e : std::filesystem::directory_iterator(dir_, ec))
+    {
+        const std::string f = e.path().filename().string();
+        if (e.path().extension() != ".st") continue;
+        inFolder++;
+        if (f.size() > strlen(tag) && f.compare(f.size() - strlen(tag), strlen(tag), tag) == 0) return;
+    }
+    if (inFolder >= kMaxInFolder) return;
     std::filesystem::create_directories(dir_, ec);
     char stamp[32];
     const time_t t = time(nullptr);
@@ -55,10 +69,20 @@ void Recorder::Frame(const App& app, long frame, melonDS::NDS& nds)
     char name[96];
     snprintf(name, sizeof name, "%s-ov%d-vt%08X", stamp, pair.first, pair.second);
     const std::string base = (std::filesystem::path(dir_) / name).string();
-    const bool ok = SaveState(nds, base + ".st");
+    if (!SaveState(nds, base + ".st"))
+    {
+        std::filesystem::remove(base + ".st", ec);
+        fprintf(stderr, "recorder: cannot save %s.st\n", base.c_str());
+        return;
+    }
     WriteShot(base + ".png", app.Top(), app.Bottom());
+    if (!std::filesystem::exists(base + ".png", ec))
+    {
+        std::filesystem::remove(base + ".st", ec);
+        fprintf(stderr, "recorder: cannot save %s.png\n", base.c_str());
+        return;
+    }
     count_++;
-    if (ok) fprintf(stderr, "recorded: %s.st\n", base.c_str());
-    else fprintf(stderr, "recorder: cannot save %s.st\n", base.c_str());
+    fprintf(stderr, "recorded: %s.st\n", base.c_str());
 }
 }

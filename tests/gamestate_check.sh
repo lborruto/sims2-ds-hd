@@ -106,6 +106,8 @@ if [ -f "$shots/s6.st" ]; then
     r1s=$(count "$tmp/rec1" st) r1p=$(count "$tmp/rec1" png) r2s=$(count "$tmp/rec2" st) r2p=$(count "$tmp/rec2" png)
     if [ "$r1s $r1p $r2s $r2p" = "1 1 2 2" ]; then echo "ok   recorder: 1 + 1 after 200 frames, 2 + 2 after 350"
     else echo "FAIL recorder: want '1 1 2 2', got '$r1s $r1p $r2s $r2p'"; fail=1; fi
+    rec_run "$tmp/rec2" 350
+    [ "$(count "$tmp/rec2" st)" = 2 ] && echo "ok   recorder: a second session records nothing new" || { echo "FAIL recorder: a second session recorded again"; fail=1; }
     st=$(find "$tmp/rec1" -name "*.st" | head -n 1)
     if "$bin" "$rom" --headless --frames 10 --state-load "$st" --save "$tmp/rec.sav" > "$tmp/rec-load.log" 2>&1 && grep -q '^clock: ' "$tmp/rec-load.log"; then echo "ok   recorder: the recorded state loads"
     else echo "FAIL recorder: the recorded state does not load"; fail=1; fi
