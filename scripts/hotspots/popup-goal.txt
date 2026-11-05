@@ -1,0 +1,2 @@
+# s6: the goal box's X
+20 6 touch 131 124

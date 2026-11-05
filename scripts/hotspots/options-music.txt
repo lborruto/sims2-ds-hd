@@ -1,0 +1,6 @@
+# sit-store: Options, then a drag from the music knob to the middle (a tap does nothing)
+10 6 touch 16 162
+60 4 touch 232 121
+64 4 touch 200 121
+68 4 touch 160 121
+72 4 touch 130 121

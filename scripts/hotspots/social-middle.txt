@@ -1,0 +1,2 @@
+# act-social: the middle answer
+10 6 touch 128 77

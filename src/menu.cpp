@@ -71,8 +71,8 @@ void PauseMenu::Build(const App& app, const Input& input)
     case DISPLAY:
         add(M_FULLSCREEN, "FULLSCREEN", OnOff(s.fullscreen), "THE WHOLE SCREEN, NO BORDER (F11)");
         add(M_SMOOTH, "SMOOTH SCALING", OnOff(s.smoothScaling), "SOFTER PIXELS WHEN SCALED");
-        add(M_LAYOUT, "LAYOUT", app.layout == Layout::Auto ? "AUTO" : app.layout == Layout::Focus ? "FOCUS" : app.layout == Layout::Side ? "SIDE" : "STACKED",
-            "AUTO: FOCUS IN TOWN, SIDE ELSEWHERE (KEYS 0-3)");
+        add(M_LAYOUT, "LAYOUT", app.layout == Layout::Auto ? "AUTO" : app.layout == Layout::Focus ? "FOCUS" : app.layout == Layout::Side ? "SIDE" : app.layout == Layout::Console ? "CONSOLE" : "STACKED",
+            "CONSOLE (KEY 4), AUTO (0), FOCUS (1), SIDE (2), STACKED (3)");
         add(M_BACK, "BACK");
         break;
     case GRAPHICS:
@@ -180,11 +180,12 @@ void PauseMenu::Frame(App& app, Video& video, Input& input, const std::string& s
     case M_SMOOTH: s.smoothScaling = !s.smoothScaling; video.SetSmooth(s.smoothScaling); break;
     case M_LAYOUT:
     {
-        static const Layout order[] = {Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked};
+        static const Layout order[] = {Layout::Console, Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked};
         int i = 0;
-        while (order[i] != app.layout) i++;
-        app.layout = order[(i + 4 + (dir < 0 ? -1 : 1)) % 4];
-        changed = false;
+        while (i < 5 && order[i] != app.layout) i++;
+        if (i == 5) i = 0;
+        app.layout = order[(i + 5 + (dir < 0 ? -1 : 1)) % 5];
+        s.layout = app.layout;
         break;
     }
     case M_RES3D: s.resolution3D = std::clamp(s.resolution3D + (dir < 0 ? -1 : 1), 1, 4); break;
@@ -223,12 +224,12 @@ bool PauseMenu::Draw(const App& app, const Video& video, const Input& input, lon
     canvas.Clear();
     const int sc = canvas.Scale();
     bool used = false;
-    if (!open && frame < input.cursorShownUntil)
+    int cx, cy, screenW;
+    // (Where the piece showing that point draws it; hidden when no piece shows it.)
+    if (!open && frame < input.cursorShownUntil && video.TouchToOutput(app, input.cursorX, input.cursorY, cx, cy, screenW))
     {
         // The stick cursor: a cross on the touch screen, yellow while pressing.
-        const SDL_Rect r = video.BottomRect(app);
-        const int cx = r.x + (int)(input.cursorX * r.w / SW), cy = r.y + (int)(input.cursorY * r.h / SH);
-        const int arm = r.w / 40 + 3, t = oh / 360 + 1;
+        const int arm = screenW / 40 + 3, t = oh / 360 + 1;
         const u32 col = input.cursorPress ? 0xFFFFD75E : 0xFFFFFFFF;
         canvas.Fill(cx - arm - 1, cy - t - 1, arm * 2 + 3, t * 2 + 3, 0xFF000000);
         canvas.Fill(cx - t - 1, cy - arm - 1, t * 2 + 3, arm * 2 + 3, 0xFF000000);

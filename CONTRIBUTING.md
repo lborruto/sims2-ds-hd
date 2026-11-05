@@ -50,6 +50,14 @@ Before opening a pull request:
     ./build/sims2wide --help                 # prints the usage (with no ROM it opens the file picker)
     ./build/sims2wide <rom> --headless --frames 1800 --shot-every 120 --shot-dir shots/boot
     ninja -C build layout_test && ./build/layout_test   # every touch pixel maps back to itself, in every layout
+    bash tests/screens_check.sh              # the bottom screen recognised in every save state (needs the ROM and shots/)
+    ninja -C build touchscript_test && ./build/touchscript_test   # the synthesised touches
+    ninja -C build screens_test && ./build/screens_test   # the HUD rule on synthetic top screens
+    ninja -C build hotspots_test && ./build/hotspots_test   # the touch targets' tables and focus moves
+    bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
+    ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens
+    ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
+    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts (ROM, shots/, the complete save, Pillow)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below). A change to the menu, the mouse or the keys is
@@ -57,8 +65,9 @@ checked in the window with a script of window events (`press`, `click`, `winshot
 table below) and `--frames`, which closes the window by itself.
 
 A change to the core's patches or to the looks keeps the looks-off output byte for byte the
-same: from save states of Create-a-Sim, a conversation and free roam, `--frames 200
---shot-every 50` with and without `--compose`, shasums compared before and after the change.
+same: from save states of Create-a-Sim, a conversation and free roam, `--layout auto --frames 200
+--shot-every 50` with and without `--compose` (24 shots; headless runs start with the looks off
+and default to CONSOLE, so name the layout), shasums compared before and after the change.
 
 CI runs on every pull request and push to `main`: actionlint and shellcheck on the workflows,
 gitleaks over the whole history, CodeQL on `src/` (once the repository is public: code
@@ -79,7 +88,7 @@ issue.
   messages. `.gitignore` covers `roms/`, `shots/`, `*.sav` and `*.st`; never force-add what it
   ignores. Screenshots in `docs/screenshots` are fine. Nothing that tells people where to get
   a ROM.
-- **The single window is the default.** AUTO stays the default layout; the others are there by
+- **The single window is the default.** CONSOLE is the default layout; the others are there by
   choice.
 - **Learn from the picture, not from the game's code.** Situations are recognised from the
   screens' pixels (like the status bar). A rule comes with the shots that show it holds, in
@@ -102,15 +111,18 @@ The headless mode runs the game without a window, about four times faster than r
 |---|---|
 | `--headless --frames N` | run N frames, no window |
 | `--input FILE` | an input script, one event per line: `frame frames-held key[+key]` or `frame frames-held touch x y` (`scripts/` has examples); the key `blow` blows into the microphone |
+| (in a script, CONSOLE) | `pad ACTION` (`a`, `b`, `x`, `y`, `l`/`lb`, `r`/`rb`, `start`, `select`, `menu`, `up`, `down`, `left`, `right`): the action held as on a controller, through the navigator; `layout NAME` (`auto`, `focus`, `side`, `stacked`, `console`) switches the layout at that frame. Headless and window alike; `--print-screen` also prints the navigator's menu and focus |
 | (in a script, window only) | `press KEY` (SDL's key names: `Escape`, `Return`, `F11`, `X`), `move x y` and `click x y` (window points), `wheel n`, `winshot` (the window's picture, `w<frame>.png`): real SDL events for the frontend; their frame counts the loop's turns, paused ones too |
 | `--shot-every N`, `--shot-at a,b,c`, `--shot-dir DIR` | both screens as PNG (256 × 384) |
-| `--compose` | the window's picture instead (the layout AUTO would show) |
+| `--layout console\|auto\|focus\|side\|stacked` | the layout (default CONSOLE; the checks that need another name it) |
+| `--compose` | the window's picture instead (the layout's) |
 | `--res3d N`, `--wide`, `--interp` | the looks; shots then also write the top picture at its size (`fNNNNNN-top.png`) |
 | `--state-load FILE`, `--state-save FILE` | start from a save state, save one at the end |
 | `--save FILE` | the game's save (use a scratch one for tests) |
 | `--clock "YYYY-MM-DD HH:MM"` | fix the DS clock's start, so that two runs show the same time |
 | `--mic off\|blow\|real` | what the DS hears (the setting otherwise) |
 | `--fast` | start with fast forward held; headless, it exercises the clock's hold |
+| `--print-screen` | print the recognised bottom screen (`screens.h`) when it changes: `frame N: screen Panel/Pockets` |
 | `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
 
 A headless run ends with a line that says what the DS clock reads, how often the hold wrote
@@ -131,8 +143,8 @@ Keep your ROM in `roms/` and your shots and states in `shots/`: both are ignored
 over the last picture). Each part has its own file pair: `app.h` (the shared state: the DS,
 the layout chosen and shown, fast forward), `settings.*` (every option, the file),
 `controls.*` (the key and button bindings), `input.*` (keyboard, mouse, controller),
-`video.*` (the window), `audio.*` (with `audiostretch.h`), `layout.*`, `scene.*` (AUTO's
-detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `script.*`,
+`video.*` (the window), `audio.*` (with `audiostretch.h`), `layout.*`, `screens.*` (which
+bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `script.*`,
 `shots.*`, `state.*`, `picker.*`.
 
 - **Input script** (`script.*`): parses `--input` files; the window events in it are pushed as
@@ -148,12 +160,50 @@ detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `s
   touch-screen position (`tests/layout_test.cpp` checks every pixel in every layout). A press on
   the touch screen keeps the stylus down until the button is released, held to the screen's
   edges (`TouchClamped()`), so a drag that overshoots does not drop what it carries.
+- **Compositions and CONSOLE** (`compose.*`, `console.*`): what the window shows is a
+  `Composition`, a list of pieces (a rectangle of one DS screen drawn at a rectangle of the
+  canvas, whole-number scaled for the touch screen) and overlays (rounded frames and boxes in the
+  game's colours, the dimmed backdrop, the focus ring), drawn in order by the window and by
+  `--compose` alike; the mouse goes back through the same pieces (`TouchFromComposition`: the
+  topmost piece under the pointer decides; `touch=false` swallows clicks and the camera). SIDE,
+  STACKED and FOCUS are two-piece compositions made from `Place()`. CONSOLE (`--layout console`)
+  builds one per recognised screen (`screens.*`) on 1280 × 720: in town (the panel) the world with
+  a rail of the touch screen's tab icons and phone (2x) at the right; the menu, the phone, a popup
+  and Give Item the
+  whole touch screen 3x over the dimmed world; a conversation the world without its status bar
+  and the dialogue's name, text, portrait and arrow (2x) in a wide frame; activities (and
+  unknown screens) the touch screen 3x at the left and the world small at the top right; no HUD
+  (title, Create-a-Sim): SIDE. The focus ring frames a hotspot's area (`hotspots.*`) where the
+  piece showing it draws it. The navigator (below) opens the menu and moves the ring;
+  `--console-menu` and `--console-focus N` pin them for the checks' pictures (`tests/console_check.sh`); `tests/layout_test.cpp` maps every pixel of every piece
+  of every CONSOLE composition back to itself.
+- **The navigator** (`navigator.*`): in CONSOLE the buttons go through it (`Input::Steer`, from
+  the keyboard, the controllers and a script's `pad` events alike, as a `PadState` of actions).
+  For each recognised screen it either passes them on as the DS's (town, conversations) or keeps
+  a focus on one of the screen's touch targets (`hotspots.*`), moved by the D-pad with
+  `Neighbour` and tapped with A through the touch script; the panel's menu opens with the TOUCH
+  MENU action (E on its press, Back on its release unless Start joined it: Start + Back is the
+  pause menu), LB / RB tap the tabs there, B closes. Presses are edges against the
+  previous frame; taps are dropped while the touch script owns the stylus. Leaving CONSOLE
+  cancels the touch script and closes the menu. `tests/navigator_test.cpp` drives it on
+  synthetic screen states; `tests/console_check.sh` from save states with `pad` scripts.
+- **Activities** (`activities.*`): the navigator hands the social reaction, Keelhaulin' Cards
+  and the vacuum to `ActivityInput`, which keeps its own `ActivityState` (the previous
+  `PadState`, the focus, the cards' lifted places and quit question) and turns buttons into the
+  game's touches: taps, and drags through `TouchScript::Drag` (a card onto the play arrow or the
+  discard pile); the vacuum's hand is the stick cursor (`Navigator::Hand`, moved by the right
+  stick or by the D-pad with X or A held, so the keyboard needs no stick; A held presses it), its
+  Y blows (`Navigator::Blow` into `App::micBlow`). `ActivityHints` gives the hints' box its rows
+  (`AddHints`, `console.*`: text overlays in the 5 × 7 font, `Overlay::text`, lines split by hand).
+  `PadState` is in `padstate.h` (both use it).
 - **Settings** (`settings.*`): one `Settings` struct for every option, whoever uses it; loaded
   from `settings.ini` (plain `key=value`) in SDL's per-user folder when the window opens, never
   headless, saved on every change from the menu and when the program closes (with the window's
-  size). Add a field with its default, its two lines in `Load` and `Save`, its row in `menu.cpp`.
+  size). Add a field with its default, its two lines in `Load` and `Save`, its row in `menu.cpp`. The defaults are CONSOLE's: `layout=console`, widescreen on,
+  3D resolution 2, 60 fps on; `--layout` overrides the layout for one run. Headless never loads
+  settings and starts with the looks off (main.cpp), so its output does not depend on them.
 - **Controls** (`controls.*`, `input.*`): each action (the 12 DS buttons, MENU, FAST FORWARD,
-  SWAP SCREENS, SAVE STATE, LOAD STATE, BLOW, CURSOR PRESS) has a key (an SDL keycode, so the
+  SWAP SCREENS, SAVE STATE, LOAD STATE, BLOW, CURSOR PRESS, TOUCH MENU) has a key (an SDL keycode, so the
   key's label on any layout) and a controller input; giving an action a key another one had
   swaps them. Controllers are read through SDL_GameController, labels by SDL's convention (A is
   the button printed A). The right stick moves a cursor on the touch screen, pressed with

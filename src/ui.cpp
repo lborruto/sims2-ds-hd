@@ -37,8 +37,7 @@ void Canvas::Fill(int x, int y, int rw, int rh, u32 argb)
         std::fill(px.begin() + (size_t)yy * w + x0, px.begin() + (size_t)yy * w + x1, argb);
 }
 
-// 5 x 7 glyphs, one row per byte, bit 4 the leftmost pixel.
-static const u8* Glyph(char c)
+const u8* Glyph(char c)
 {
     static const u8 font[][7] = {
         {0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11}, // A

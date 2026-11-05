@@ -10,6 +10,7 @@
 #include "common.h"
 #include "layout.h"
 #include "scene.h"
+#include "screens.h"
 #include "settings.h"
 
 namespace sims2wide
@@ -22,12 +23,19 @@ struct App
     Layout shown = Layout::Side;   // what the window shows this frame (AUTO resolved)
     bool mainIsTop = true;         // FOCUS: which screen is big
     AutoLayout autoLayout;
+    ScreenTracker screens;         // which screen the touch screen shows (screens.h), every frame
+    bool consoleMenu = false;      // CONSOLE: the menu is up (the touch screen 3x over the dimmed world)
+    int consoleFocus = -1;         // CONSOLE: the focused target, an index in HotspotsFor (-1: none)
+    // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
+    // pinned them for a check's picture.
+    bool consolePinned = false;
 
     Settings settings;
 
     bool fast = false;             // fast forward held
     bool quit = false;
     bool micBlow = false;          // the "blow into the microphone" key is held
+    bool micForce = false;         // CONSOLE's vacuum Y: blows whatever the mic setting
 
     // The shape of the top screen's picture, width / height: 4/3 on the DS; wider when the
     // widescreen world is on. Layouts size the top screen from it.

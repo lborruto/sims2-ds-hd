@@ -1,0 +1,7 @@
+# casino: Sim 2 selected, then portrait 1
+# from act-cards on the complete save: quit the card game to the casino's panel
+10 6 touch 178 48
+80 6 touch 93 92
+1000 6 touch 16 127
+1040 6 touch 56 78
+1080 6 touch 56 41

@@ -2,20 +2,24 @@
 // (menu, fast forward, swapping the screens, save states, blowing into the microphone), through
 // the remappable bindings (controls.h). The mouse also works the game's camera over the world
 // screen: the wheel zooms (X / Y), a right-button drag turns it (L / R). A controller's right
-// stick moves a cursor on the touch screen, which its CURSOR PRESS button touches.
+// stick moves a cursor on the touch screen, which its CURSOR PRESS button touches. In CONSOLE the
+// DS's buttons go through the navigator (navigator.h) first: it drives the touch screen's menu.
 #pragma once
 #include <SDL.h>
 
 #include <vector>
 
 #include "app.h"
+#include "navigator.h"
 #include "script.h"
+#include "touchscript.h"
 #include "ui.h"
 #include "video.h"
 
 namespace sims2wide
 {
-struct PadState
+// The controllers' inputs as read (the navigator's PadState is the actions they make).
+struct PadRaw
 {
     bool btn[Controls::IN_COUNT] = {};
     float lx = 0, ly = 0, rx = 0, ry = 0;
@@ -28,7 +32,7 @@ struct Input
     bool fastPrev = false; // (App::fast follows the key only when it changes: --fast holds until then)
     // Controllers (any number: each button pressed on any of them counts).
     std::vector<SDL_GameController*> pads;
-    PadState pad, prevPad;
+    PadRaw pad, prevPad;
     bool prevCombo = false;       // START and BACK together (the menu, like GUIDE)
     int padStyle = Controls::XBOX; // the last controller's labels, for the menu
 
@@ -36,10 +40,20 @@ struct Input
     // The left button went down on the touch screen: until it is released the stylus stays on
     // it, held to its edges (a drag that overshoots does not lift the stylus).
     bool stylusDrag = false;
+    int dragPiece = 0;             // the composition piece the stylus drag began on
     // A press on the touch screen keeps the stylus down for at least this many game frames,
     // where it was pressed: a quick click or a trackpad tap sends the button down and up within
     // milliseconds, before the next frame, and the DS would never see the touch.
     int tapFrames = 0, tapX = 0, tapY = 0;
+    // Touches made from code (taps, holds, drags over game frames); they win over the mouse and the stick.
+    TouchScript touchScript;
+    // CONSOLE: the touch screen's menu, focus and taps from the buttons (Steer).
+    Navigator navigator;
+    bool steering = false;        // the navigator ran last frame (CONSOLE was shown)
+    PadState scriptPad;           // this frame's "pad" events of the input script (script.h)
+    // The pad's TOUCH MENU acts on release, unless Start was held meanwhile (the pause menu).
+    ReleasePulse panelButton;
+    bool panelPulse = false;      // this frame
     int mouseX = 0, mouseY = 0, dragX = 0;
     int zoom = 0;   // frames of X (> 0, zoom in) or Y (< 0, zoom out) still to hold, from the wheel
     float zoomAcc = 0;
@@ -71,6 +85,14 @@ struct Input
     // Adds this frame's DS keys and touch from the keyboard, the mouse, the controller and
     // the stick cursor; sets App::fast and App::micBlow.
     void Frame(App& app, const Video& video, long frame, u32& keys, bool& touching, int& tx, int& ty);
+    // What the keyboard, the controllers and the script's "pad" events hold, as the navigator's actions.
+    PadState Actions(const Settings& s) const;
+    // CONSOLE shown: the navigator turns the actions into DS keys (OR-ed into keys) and taps,
+    // and App::consoleMenu / consoleFocus follow it (unless pinned by --console-menu or
+    // --console-focus). CONSOLE left: the navigator lets go of everything (Navigator::Leave).
+    void Steer(App& app, const PadState& p, u32& keys);
+    // The touch script's touch this frame, over any other while it owns the stylus.
+    void ScriptTouch(bool& touching, int& tx, int& ty);
     // Clears the one-frame requests and the menu's input.
     void EndFrame();
 

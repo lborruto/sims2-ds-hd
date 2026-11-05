@@ -1,0 +1,2 @@
+# sit-store: the Goals icon
+10 6 touch 16 92

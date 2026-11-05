@@ -1,0 +1,3 @@
+# act-cards: the deck, then card 9 is lifted
+10 6 touch 127 30
+120 6 touch 176 161

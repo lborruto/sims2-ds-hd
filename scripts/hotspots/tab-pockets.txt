@@ -1,0 +1,2 @@
+# sit-store: the Pockets icon
+10 6 touch 16 57

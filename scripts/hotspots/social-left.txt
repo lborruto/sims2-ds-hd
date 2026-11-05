@@ -1,0 +1,2 @@
+# act-social: the left answer
+10 6 touch 48 123

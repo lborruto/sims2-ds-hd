@@ -152,6 +152,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
         else if (k == SDLK_1) wantLayout = (int)Layout::Focus;
         else if (k == SDLK_2) wantLayout = (int)Layout::Side;
         else if (k == SDLK_3) wantLayout = (int)Layout::Stacked;
+        else if (k == SDLK_4) wantLayout = (int)Layout::Console;
         else if (k == SDLK_F11) wantFullscreen = true;
         else if (k == SDLK_F12) wantShot = true;
     }
@@ -192,7 +193,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
             }
             mouseDown = down && !menuOpen;
             int tx, ty;
-            stylusDrag = mouseDown && video.TouchAt(app, mouseX, mouseY, tx, ty);
+            stylusDrag = mouseDown && video.TouchAt(app, mouseX, mouseY, tx, ty, &dragPiece);
             if (stylusDrag) { tapFrames = 3; tapX = tx; tapY = ty; }
         }
         else if (ev.button.button == SDL_BUTTON_RIGHT)
@@ -230,8 +231,9 @@ void Input::Poll(const App& app, bool menuOpen)
 {
     const Settings& s = app.settings;
     prevPad = pad;
-    pad = PadState();
-    if (pads.empty()) return;
+    pad = PadRaw();
+    panelPulse = false;
+    if (pads.empty()) { panelButton = ReleasePulse(); return; }
     // Each button pressed on any controller; each stick as far as on the one pushed furthest.
     auto merge = [](float& to, float v) { if (std::fabs(v) > std::fabs(to)) to = v; };
     for (SDL_GameController* c : pads)
@@ -245,6 +247,13 @@ void Input::Poll(const App& app, bool menuOpen)
         pad.btn[IN_LT] |= axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 0.5f;
         pad.btn[IN_RT] |= axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.5f;
     }
+    // TOUCH MENU on the pad: on release, spoiled by Start (Start + Back opens the pause menu
+    // whichever goes down first), by the pause menu and by a binding being captured.
+    {
+        const int in = s.controls.Pad(PANEL);
+        const bool spoil = (pad.btn[IN_START] && in != IN_START) || capturing || menuOpen;
+        panelPulse = panelButton.Update(in >= 0 && pad.btn[in], spoil);
+    }
     if (capturing)
     {
         // (Any button, the menu's too: it may be what the action is being given.)
@@ -256,10 +265,10 @@ void Input::Poll(const App& app, bool menuOpen)
     const bool combo = pad.btn[IN_START] && pad.btn[IN_BACK];
     if (PadPressed(s, MENU) || (combo && !prevCombo)) wantMenu = true;
     prevCombo = combo;
-    auto stickUp = [](const PadState& p) { return p.btn[IN_UP] || p.ly < -0.5f; };
-    auto stickDown = [](const PadState& p) { return p.btn[IN_DOWN] || p.ly > 0.5f; };
-    auto stickLeft = [](const PadState& p) { return p.btn[IN_LEFT] || p.lx < -0.5f; };
-    auto stickRight = [](const PadState& p) { return p.btn[IN_RIGHT] || p.lx > 0.5f; };
+    auto stickUp = [](const PadRaw& p) { return p.btn[IN_UP] || p.ly < -0.5f; };
+    auto stickDown = [](const PadRaw& p) { return p.btn[IN_DOWN] || p.ly > 0.5f; };
+    auto stickLeft = [](const PadRaw& p) { return p.btn[IN_LEFT] || p.lx < -0.5f; };
+    auto stickRight = [](const PadRaw& p) { return p.btn[IN_RIGHT] || p.lx > 0.5f; };
     if (menuOpen)
     {
         nav.up |= stickUp(pad) && !stickUp(prevPad);
@@ -274,21 +283,92 @@ void Input::Poll(const App& app, bool menuOpen)
     if (PadPressed(s, LOADSTATE)) wantLoad = true;
 }
 
+PadState Input::Actions(const Settings& s) const
+{
+    auto on = [&](int a) { return held[a] || PadOn(s, a); };
+    PadState p = scriptPad;
+    p.a |= on(A);
+    p.b |= on(B);
+    p.x |= on(X);
+    p.y |= on(Y);
+    p.lb |= on(L);
+    p.rb |= on(R);
+    p.start |= on(START);
+    p.select |= on(SELECT);
+    // The keyboard's on the press; the pad's on release (Poll: Start + Back is the pause menu).
+    p.menu |= held[PANEL] || panelPulse;
+    p.up |= on(UP);
+    p.down |= on(DOWN);
+    p.left |= on(LEFT);
+    p.right |= on(RIGHT);
+    // The sticks and triggers as read (the triggers past half way are buttons too).
+    if (!pads.empty())
+    {
+        p.lx = pad.lx;
+        p.ly = pad.ly;
+        p.rx = pad.rx;
+        p.ry = pad.ry;
+        p.lt = pad.btn[IN_LT] ? 1.0f : 0.0f;
+        p.rt = pad.btn[IN_RT] ? 1.0f : 0.0f;
+    }
+    p.cursor = s.stickCursor && !pads.empty();
+    return p;
+}
+
+void Input::Steer(App& app, const PadState& p, u32& keys)
+{
+    if (app.shown == Layout::Console)
+    {
+        navigator.Update(app.screens.Current(), p, touchScript, keys);
+        steering = true;
+        if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
+        // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding).
+        app.micBlow = navigator.Blow();
+        app.micForce = navigator.Blow();
+    }
+    else if (steering)
+    {
+        // CONSOLE left: no touch running on, no menu, no key held by the navigator.
+        navigator.Leave(touchScript);
+        steering = false;
+        if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
+        app.micBlow = false;
+        app.micForce = false;
+    }
+}
+
+void Input::ScriptTouch(bool& touching, int& tx, int& ty)
+{
+    // A touch script (the console layout's navigator and activities) owns the stylus, through its
+    // released frames too, over the mouse, its tap latch and the stick: two taps stay two taps.
+    if (touchScript.Owns())
+    {
+        int sx, sy;
+        touching = touchScript.Next(sx, sy);
+        if (touching) { tx = sx; ty = sy; }
+    }
+}
+
 void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& touching, int& tx, int& ty)
 {
     const Settings& s = app.settings;
-    for (int a = 0; a < kKeyCount; a++)
-        if (held[a] || PadOn(s, a)) keys |= 1u << a;
-    // The left stick is the D-pad too.
-    if (pad.ly < -0.5f) keys |= 1u << kUp;
-    if (pad.ly > 0.5f) keys |= 1u << kDown;
-    if (pad.lx < -0.5f) keys |= 1u << kLeft;
-    if (pad.lx > 0.5f) keys |= 1u << kRight;
+    // CONSOLE: the buttons go through the navigator; elsewhere they are the DS's.
+    Steer(app, Actions(s), keys);
+    if (app.shown != Layout::Console)
+    {
+        for (int a = 0; a < kKeyCount; a++)
+            if (held[a] || PadOn(s, a)) keys |= 1u << a;
+        // The left stick is the D-pad too.
+        if (pad.ly < -0.5f) keys |= 1u << kUp;
+        if (pad.ly > 0.5f) keys |= 1u << kDown;
+        if (pad.lx < -0.5f) keys |= 1u << kLeft;
+        if (pad.lx > 0.5f) keys |= 1u << kRight;
+    }
     if (PadPressed(s, SWAP)) app.mainIsTop = !app.mainIsTop;
     const bool fastNow = held[FAST] || PadOn(s, FAST);
     if (fastNow != fastPrev) app.fast = fastNow;
     fastPrev = fastNow;
-    app.micBlow = held[BLOW] || PadOn(s, BLOW);
+    app.micBlow = held[BLOW] || PadOn(s, BLOW) || (app.shown == Layout::Console && navigator.Blow());
 
     // The mouse's camera: the wheel's zoom and the drag's turn, as the game's own buttons.
     if (zoom > 0) { keys |= 1u << kX; zoom--; }
@@ -297,16 +377,23 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     else if (rotate < 0) { keys |= 1u << kL; rotate++; }
 
     int mx, my;
-    if (mouseDown && stylusDrag) { video.TouchClampedAt(app, mouseX, mouseY, mx, my); touching = true; tx = mx; ty = my; }
+    if (mouseDown && stylusDrag) { video.TouchClampedAt(app, dragPiece, mouseX, mouseY, mx, my); touching = true; tx = mx; ty = my; }
     else if (tapFrames > 0) { touching = true; tx = tapX; ty = tapY; }
     if (tapFrames > 0) tapFrames--;
 
     // The stick cursor: faster with a fuller deflection, for both precision and reach.
-    cursorPress = held[TOUCH] || PadOn(s, TOUCH);
-    if (s.stickCursor && !pads.empty())
+    // In CONSOLE only where no table of targets is (navigator.h), with A as its press there too;
+    // in the vacuum it is the hand, there without a controller too (the D-pad moves it while X or
+    // A is held: activities.h).
+    const bool console = app.shown == Layout::Console;
+    const bool hand = console && navigator.Hand();
+    cursorPress = held[TOUCH] || PadOn(s, TOUCH) || (console && navigator.CursorPress());
+    if (console && !navigator.CursorScreen()) cursorShownUntil = 0; // (not left over from a screen before)
+    if ((s.stickCursor && !pads.empty() && (!console || navigator.CursorScreen())) || hand)
     {
-        const float mag = std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry);
-        if (mag > kStickDead || cursorPress)
+        const float mag = pads.empty() ? 0.0f : std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry);
+        const bool stepped = hand && (navigator.HandDx() != 0 || navigator.HandDy() != 0);
+        if (mag > kStickDead || stepped || cursorPress)
         {
             if (mag > kStickDead)
             {
@@ -314,10 +401,17 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
                 cursorX = std::clamp(cursorX + pad.rx * step, 0.0f, (float)(SW - 1));
                 cursorY = std::clamp(cursorY + pad.ry * step, 0.0f, (float)(SH - 1));
             }
+            if (stepped)
+            {
+                cursorX = std::clamp(cursorX + navigator.HandDx(), 0.0f, (float)(SW - 1));
+                cursorY = std::clamp(cursorY + navigator.HandDy(), 0.0f, (float)(SH - 1));
+            }
             cursorShownUntil = frame + 180;
         }
+        if (hand) cursorShownUntil = frame + 180; // the vacuum's hand never hides
         if (cursorPress && !touching) { touching = true; tx = (int)cursorX; ty = (int)cursorY; }
     }
+    ScriptTouch(touching, tx, ty);
 }
 
 void Input::EndFrame()

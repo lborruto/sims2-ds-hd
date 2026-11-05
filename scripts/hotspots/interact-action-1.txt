@@ -1,0 +1,2 @@
+# sit-store: the first action (Buy) opens the catalogue
+10 6 touch 236 59

@@ -1,0 +1,2 @@
+# From act-social, CONSOLE: RIGHT answers with the right-hand icon (it lights green).
+30 2 pad right

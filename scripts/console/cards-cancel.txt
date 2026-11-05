@@ -1,0 +1,4 @@
+# From act-cards, CONSOLE: B asks to quit, B again answers no; the game goes on: X draws.
+20 2 pad b
+80 2 pad b
+140 2 pad x

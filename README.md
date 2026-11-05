@@ -2,7 +2,7 @@
 
 <p align="center">
   <strong>The Sims 2 for the Nintendo DS in a single window.</strong><br>
-  The town fills the screen, the touch screen's menus sit beside it and work with the mouse. No more two tiny stacked screens.
+  Played like a console game: the town fills the window and every menu opens big on a button, with a controller or a keyboard, or with the mouse. No more two tiny stacked screens.
 </p>
 
 <p align="center">
@@ -16,13 +16,14 @@
 
 ## What it does
 
-- **One window, the right screen big.** In town, the 3D world takes the window and the touch
-  screen's panel (Interact, Pockets, Goals, Relationships, Options, the phone, conversations)
-  sits beside it. When the game moves to the touch screen (a social reaction to pick in time,
-  the shop's catalogue, Build Rooms) that one takes the window. Title, menus and Create-a-Sim
-  show both screens side by side, since both matter there.
-- **It switches on its own.** It sees what the game shows (its status bar, a social game, a
-  shop) from the screens themselves, so the layout follows the game with nothing to set.
+- **Like a console game (CONSOLE, the default).** In town the 3D world fills the window, widescreen
+  and sharper, with a small rail of the touch screen's tabs and phone beside it. One button
+  (Back, or E) opens the touch screen's menu big over the town; conversations, popups and the
+  games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
+- **It follows the game.** It sees what the game shows (its status bar, a social game, a shop,
+  the vacuum, the cards) from the screens themselves, so the picture changes with nothing to set.
+  Title, menus and Create-a-Sim show both screens side by side.
+- **The old layouts are still there.** AUTO, FOCUS, SIDE and STACKED: SETTINGS > DISPLAY > LAYOUT.
 - **The DS clock is your clock.** The game lives by the time of day (rooms take real hours,
   skill points come at set hours), so it reads your computer's time, also after a save state,
   and fast forward never runs it ahead: the game never sees its clock go back.
@@ -39,6 +40,11 @@
 
 It runs the game on the [melonDS](https://melonds.kuribo64.net/) emulator core, built in.
 It is an early version: see [Good to know](#good-to-know).
+
+<p align="center">
+  <img src="docs/screenshots/console-menu.webp" alt="CONSOLE: the touch screen's menu opened big over the dimmed town" width="440">
+  <img src="docs/screenshots/console-dialogue.webp" alt="CONSOLE: a conversation, the world wide with the dialogue box below" width="440">
+</p>
 
 <p align="center">
   <img src="docs/screenshots/create-a-sim.webp" alt="Create-a-Sim side by side: the Sim on the left, the name keyboard on the right" width="700">
@@ -75,28 +81,54 @@ them.
 
 ## Controls
 
+Keyboard and controller do the same things. The DS's buttons are placed by position, not by
+letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
+
 | Key | Controller | Does |
 |---|---|---|
-| Arrows | D-pad or left stick | +Control Pad |
-| X / Z / S / A (AZERTY: X / W / S / Q) | A / B / X / Y (as labelled) | A / B / X / Y |
-| Q / W (AZERTY: A / Z) | LB / RB | L / R |
-| Enter / Right Shift | Start / Back | Start / Select |
-| Mouse | right stick + LT (the cursor) | the touch screen, wherever it is shown |
-| Mouse wheel, over the world | | zoom in / out (the game's X / Y) |
-| Right button drag, over the world | | turn the camera (the game's L / R) |
+| Arrows | D-pad or left stick | walk (town); move the highlight (menus, games) |
+| X / Z / S / A (AZERTY: X / W / S / Q) | A / B / X / Y (as labelled) | the DS's A / B / X / Y |
+| Q / W (AZERTY: A / Z) | LB / RB | L / R: turn the camera in town; switch tabs while the menu is open |
+| Enter / Right Shift | Start / left stick click | Start / Select |
+| E | Back (let go) | open the touch screen's menu (the PANEL); B closes it |
+| Esc | Guide, or Start + Back | the frontend's pause menu: save states, settings, quit |
 | M (hold) | | blow into the microphone |
-| Esc | Guide, or Start + Back | the pause menu: save states, settings, quit |
-| Tab | right stick click | swap which screen is big |
+| Tab | right stick click | swap which screen is big (the old layouts) |
 | Space (hold) | RT | fast forward |
 | F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
-| 0 / 1 / 2 / 3 | | layout: AUTO / FOCUS / SIDE / STACKED |
-| F11 | | fullscreen |
-| F12 | | screenshot of both screens (beside the ROM, `-shot.png`) |
+| F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
+| 0 to 4 | | layout: AUTO / FOCUS / SIDE / STACKED / CONSOLE |
+| Mouse | right stick + LT (the cursor) | the touch screen, wherever it is shown |
+| Mouse wheel / right button drag, over the world | | zoom / turn the camera |
 
-The DS's buttons are placed by position, not by letter: on an AZERTY or QWERTZ keyboard they
-sit in the same places as on QWERTY. Every row but the last four can be changed in the menu (SETTINGS > CONTROLS > KEYS AND
+Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND
 BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation and Switch
 controllers are known by their own button names.
+
+**In town** the buttons are the DS's. **The menu** (phone, tabs, shop, the rest of the touch
+screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes.
+**A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or B.
+
+**The activities** are played on the buttons too, with a box of hints beside them:
+
+| Activity | Key | Controller | Does |
+|---|---|---|---|
+| Social reaction | Left / Up / Right | D-pad or left stick | the left / top / right answer |
+| | X | A | the chosen answer again |
+| Keelhaulin' Cards | Arrows | D-pad or left stick | choose a card (or the deck, the discard pile, ? and X) |
+| | X | A | pick the card up; again: play it on the stairs |
+| | S | X | draw from the deck |
+| | A | Y | discard the chosen card |
+| | Z | B | quit (then X / A: yes, Z / B: no) |
+| Vacuum | Arrows | left stick (or D-pad) | drive |
+| | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
+| | X (hold) | A (hold) | grab a find with the hand and drag it to the box |
+| | A (hold) | Y (hold) | blow: clears a clogged filter (a tap is enough; works with any microphone setting) |
+
+<p align="center">
+  <img src="docs/screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big at the left, the world small at the top right, the buttons' hints below it" width="440">
+  <img src="docs/screenshots/console-vacuum.webp" alt="CONSOLE: the hotel's vacuum big, with its hints" width="440">
+</p>
 
 The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another
 emulator or a flash cart works if you put it there. A copy is made in `backups/` beside it when
@@ -125,22 +157,24 @@ They are kept in `settings.ini` in your user folder (the window's size too): on 
 
 | Layout | What you see |
 |---|---|
-| **AUTO** (default) | FOCUS in town (the touch screen big during a social game, in the shop's catalogue or Build Rooms), SIDE everywhere else |
+| **CONSOLE** (default) | the window as a console game: the world big (widescreen, sharper, 60 fps), the touch screen's menu, conversations, popups and games laid out big, with hints; title and Create-a-Sim side by side |
+| **AUTO** | FOCUS in town (the touch screen big during a social game, in the shop's catalogue or Build Rooms), SIDE everywhere else |
 | **FOCUS** | the world big, the touch screen at twice its size over the world's right edge, a little see-through (Tab makes the touch screen the big one instead) |
 | **SIDE** | both screens side by side |
 | **STACKED** | as on the DS, one above the other |
 
-Start with another one: `--layout focus`. Run `sims2wide --help` to see every option,
-including the headless mode used to study the game's screens
-([CONTRIBUTING.md](CONTRIBUTING.md#studying-the-screens)).
+Change it in SETTINGS > DISPLAY > LAYOUT or with the 0 to 4 keys; or start with one:
+`--layout focus`. Run `sims2wide --help` to see every option, including the headless mode used
+to study the game's screens ([CONTRIBUTING.md](CONTRIBUTING.md#studying-the-screens)).
 
 ## Looks
 
-Three options make the game look better without changing it. All are off by default.
+Three options make the game look better without changing it. They are on by default; switch them off
+in SETTINGS > GRAPHICS. The options below turn them on for one run.
 
 | Option | What it does | On the command line |
 |---|---|---|
-| **Sharper 3D** | draws the 3D world 2, 3 or 4 times sharper | `--res3d 3` |
+| **Sharper 3D** | draws the 3D world 2, 3 or 4 times sharper | `--res3d 3` (default 2) |
 | **Widescreen** | shows more of the town left and right, 16:9 instead of 4:3; the status bar stays in the middle | `--wide` |
 | **60 fps** | adds in-between frames: the game draws its 3D at 30 frames a second | `--interp` |
 
@@ -158,8 +192,8 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
   hotel's lobby and basement, the vacuum and the casino's card game are checked; not everything
   the game has is yet.
 - **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
-  world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it.
-- **Widescreen is opt-in.** See [Looks](#looks).
+  world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it. (CONSOLE has no such strip.)
+- **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).
 - **Most minigames not checked yet.** The social reactions, the shop, Build Rooms and the vacuum
   (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
   filter clear) and the casino's cards are; painting, the music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows

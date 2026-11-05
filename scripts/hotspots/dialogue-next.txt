@@ -1,0 +1,2 @@
+# sit-dialogue: the arrow (the last line ends the talk)
+10 6 touch 235 171

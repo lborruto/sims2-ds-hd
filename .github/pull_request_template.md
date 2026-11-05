@@ -12,6 +12,6 @@
       `docs/screenshots`
 - [ ] No personal path, host name or account detail
 - [ ] No new dependency (or it was discussed in an issue first); melonDS unmodified
-- [ ] AUTO is still the default layout
+- [ ] CONSOLE is still the default layout
 - [ ] `CHANGELOG.md` has a line under `## [Unreleased]` if players will notice the change;
       README.md updated if it changes what it says

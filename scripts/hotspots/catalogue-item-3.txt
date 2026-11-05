@@ -1,0 +1,2 @@
+# sit-storebuy: item 3 is selected
+10 6 touch 101 89

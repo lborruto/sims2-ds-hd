@@ -1,0 +1,4 @@
+# nothing more (the base the casino's checks compare with)
+# from act-cards on the complete save: quit the card game to the casino's panel
+10 6 touch 178 48
+80 6 touch 93 92

@@ -42,10 +42,10 @@ Placement Place(Layout l, bool mainIsTop, float topAspect)
     }
 }
 
-CanvasFit CanvasFit::For(const Placement& p, int ow, int oh)
+CanvasFit CanvasFit::For(int cw, int ch, int ow, int oh)
 {
-    float scale = std::min((float)ow / p.cw, (float)oh / p.ch);
-    return {scale, (ow - p.cw * scale) / 2, (oh - p.ch * scale) / 2};
+    float scale = std::min((float)ow / cw, (float)oh / ch);
+    return {scale, (ow - cw * scale) / 2, (oh - ch * scale) / 2};
 }
 
 void CanvasFit::ToOutput(const Rect& r, int& x, int& y, int& w, int& h) const
@@ -94,6 +94,7 @@ const char* LayoutName(Layout l)
     case Layout::Stacked: return "stacked";
     case Layout::Side: return "side";
     case Layout::Focus: return "focus";
+    case Layout::Console: return "console";
     default: return "auto";
     }
 }

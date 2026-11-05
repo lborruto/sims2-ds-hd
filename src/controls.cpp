@@ -12,14 +12,15 @@ namespace Controls
 const char* ActionKey(int a)
 {
     static const char* k[COUNT] = {"a", "b", "select", "start", "right", "left", "up", "down", "r", "l", "x", "y",
-                                   "menu", "fast", "swap", "savestate", "loadstate", "blow", "touch"};
+                                   "menu", "fast", "swap", "savestate", "loadstate", "blow", "touch", "panel"};
     return a >= 0 && a < COUNT ? k[a] : "";
 }
 
 const char* ActionName(int a)
 {
     static const char* n[COUNT] = {"A", "B", "SELECT", "START", "RIGHT", "LEFT", "UP", "DOWN", "R", "L", "X", "Y",
-                                   "MENU", "FAST FORWARD", "SWAP SCREENS", "SAVE STATE", "LOAD STATE", "BLOW (MIC)", "CURSOR PRESS"};
+                                   "MENU", "FAST FORWARD", "SWAP SCREENS", "SAVE STATE", "LOAD STATE", "BLOW (MIC)", "CURSOR PRESS",
+                                   "TOUCH MENU"};
     return a >= 0 && a < COUNT ? n[a] : "";
 }
 
@@ -65,6 +66,8 @@ int DefaultKey(int a)
     case Y: return SDL_GetKeyFromScancode(SDL_SCANCODE_A);
     case L: return SDL_GetKeyFromScancode(SDL_SCANCODE_Q);
     case R: return SDL_GetKeyFromScancode(SDL_SCANCODE_W);
+    // CONSOLE's touch menu: beside them, where E is on QWERTY.
+    case PANEL: return SDL_GetKeyFromScancode(SDL_SCANCODE_E);
     case START: return SDLK_RETURN;
     case SELECT: return SDLK_RSHIFT;
     case UP: return SDLK_UP;
@@ -92,7 +95,10 @@ int DefaultPad(int a)
     case L: return IN_LB;
     case R: return IN_RB;
     case START: return IN_START;
-    case SELECT: return IN_BACK;
+    // BACK (View, Share, -) opens CONSOLE's touch menu; the DS's Select, seldom used, goes to
+    // the left stick's click.
+    case SELECT: return IN_LS;
+    case PANEL: return IN_BACK;
     case UP: return IN_UP;
     case DOWN: return IN_DOWN;
     case LEFT: return IN_LEFT;
@@ -145,10 +151,27 @@ bool Bindings::Apply(const std::string& k, const std::string& v)
     for (int a = 0; a < COUNT; a++)
         if (name == ActionKey(a))
         {
-            if (isKey) { const long kc = atol(v.c_str()); key[a] = kc > 0 ? (int)kc : kNone; }
-            else { const int in = InputFromKey(v); pad[a] = in >= 0 ? in : kNone; }
+            // Through the swap, so that a file written before a default changed (an action given
+            // the key or input a newer action now has by default) still binds one action each.
+            if (isKey) { const long kc = atol(v.c_str()); if (kc > 0) SetKey(a, (int)kc); else key[a] = kNone; }
+            else { const int in = InputFromKey(v); if (in >= 0) SetPad(a, in); else pad[a] = kNone; }
         }
     return true;
+}
+
+void Bindings::ResolveKeys()
+{
+    // As if the file were loaded now: from the defaults, each given key through the swap, in
+    // the actions' order (the file's). A consistent file comes back as it was. (A 0 is a
+    // positional default the load's swap handed on while it was still unknown: a default.)
+    int given[COUNT];
+    for (int a = 0; a < COUNT; a++)
+    {
+        given[a] = key[a] == SDLK_UNKNOWN ? kDefault : key[a];
+        key[a] = given[a] == kNone ? kNone : kDefault;
+    }
+    for (int a = 0; a < COUNT; a++)
+        if (given[a] != kDefault && given[a] != kNone) SetKey(a, given[a]);
 }
 
 std::string Bindings::Lines() const

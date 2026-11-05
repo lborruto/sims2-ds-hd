@@ -4,6 +4,8 @@
 #include <SDL.h>
 
 #include "app.h"
+#include "compose.h"
+#include "console.h"
 #include "ui.h"
 
 namespace sims2wide
@@ -14,6 +16,11 @@ struct Video
     SDL_Renderer* ren = nullptr;
     SDL_Texture* tex[2] = {};
     SDL_Texture* overlay = nullptr;
+    // The composition's overlays (frames, the backdrop, the ring) as textures at output size,
+    // made again only when one changes.
+    struct OverlayTex { Overlay o; int w, h; SDL_Texture* tex; };
+    std::vector<OverlayTex> overlayTex;
+    SDL_Texture* OverlayTexture(const Overlay& o, int w, int h);
     int overlayW = 0, overlayH = 0;
     bool smooth = false;
 
@@ -27,17 +34,28 @@ struct Video
     // The window's size into the settings, when it is a window.
     void RememberSize(Settings& s) const;
 
-    Placement Placed(const App& app) const { return Place(app.shown, app.mainIsTop, app.topAspect); }
+    // What the window shows now: the shown layout's pieces, for the top picture's current size
+    // (CONSOLE: for the recognised screen, the menu and the focus). No SDL needed: --compose too.
+    Composition Composed(const App& app) const
+    {
+        int tw, th;
+        app.TopImage(tw, th);
+        if (app.shown == Layout::Console) return BuildConsole(app.screens.Current(), app.consoleMenu, app.consoleFocus, tw, th);
+        return Compose(app.shown, app.mainIsTop, app.topAspect, tw, th);
+    }
     void OutputSize(int& ow, int& oh) const;
     // Window points -> output pixels (they differ on HiDPI screens).
     void ToOutput(int wx, int wy, float& px, float& py) const;
     // A window position on the touch screen, as a DS touch position.
-    bool TouchAt(const App& app, int wx, int wy, int& tx, int& ty) const;
-    // A window position as a DS touch position held to the touch screen's edges (a drag).
-    void TouchClampedAt(const App& app, int wx, int wy, int& tx, int& ty) const;
+    // pieceIndex (when given) receives the piece of the composition it is on.
+    bool TouchAt(const App& app, int wx, int wy, int& tx, int& ty, int* pieceIndex = nullptr) const;
+    // A window position as a DS touch position held to the edges of the piece (from TouchAt) a
+    // drag started on.
+    void TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& tx, int& ty) const;
     // Whether a window position is over the top (world) screen's picture.
     bool OverTop(const App& app, int wx, int wy) const;
-    // The bottom screen's rectangle in output pixels (where the touch cursor is drawn).
-    SDL_Rect BottomRect(const App& app) const;
+    // Where a DS touch position is drawn, in output pixels, and the drawn size of the whole touch
+    // screen's width at that scale (the stick cursor's); false when no piece shows that point.
+    bool TouchToOutput(const App& app, float tx, float ty, int& x, int& y, int& screenW) const;
 };
 }

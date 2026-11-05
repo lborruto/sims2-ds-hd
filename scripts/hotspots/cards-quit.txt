@@ -1,0 +1,2 @@
+# act-cards: X asks whether to quit
+10 6 touch 178 48
