@@ -93,6 +93,7 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 | E | Back (let go) | open the touch screen's menu (the PANEL); B closes it |
 | Esc | Guide, or Start + Back | the frontend's pause menu: save states, settings, quit |
 | M (hold) | | blow into the microphone |
+| Tab | right stick click | swap which screen is big (the old layouts) |
 | Space (hold) | RT | fast forward |
 | F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
 | F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
@@ -113,12 +114,13 @@ screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs,
 | Activity | Key | Controller | Does |
 |---|---|---|---|
 | Social reaction | Left / Up / Right | D-pad or left stick | the left / top / right answer |
+| | X | A | the chosen answer again |
 | Keelhaulin' Cards | Arrows | D-pad or left stick | choose a card (or the deck, the discard pile, ? and X) |
 | | X | A | pick the card up; again: play it on the stairs |
 | | S | X | draw from the deck |
 | | A | Y | discard the chosen card |
 | | Z | B | quit (then X / A: yes, Z / B: no) |
-| Vacuum | Arrows | left stick | drive |
+| Vacuum | Arrows | left stick (or D-pad) | drive |
 | | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
 | | X (hold) | A (hold) | grab a find with the hand and drag it to the box |
 | | A (hold) | Y (hold) | blow: clears a clogged filter |

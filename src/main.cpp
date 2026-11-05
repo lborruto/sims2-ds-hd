@@ -51,7 +51,7 @@ static void Usage()
         "usage: sims2wide [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
         "  --layout console|auto|focus|side|stacked  window layout (default console)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
-        "  --res3d N                     3D drawn N times sharper (1 = the DS's own, default)\n"
+        "  --res3d N                     3D drawn N times sharper (1 = the DS's own; default 2 in the window, 1 headless)\n"
         "  --wide                        widescreen 16:9 world\n"
         "  --interp                      60 fps in-between frames for the 3D\n"
         "  --headless                    no window; with --frames and the shot options\n"

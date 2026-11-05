@@ -341,7 +341,7 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 | 1 | POC: melonDS + SDL frontend, headless study of the screens, AUTO layout (CONSOLE is the default now) | ✅ |
 | 2 | Repository template (docs, CI, release, issue templates); portfolio page in `lborruto/docs` waits on a local branch until the repo is public | ✅ / 🔄 |
 | 3 | Bigger side panel: the touch screen at 2x over the world's right edge | ✅ |
-| 4 | Looks: widescreen 3D from FullDex's `GPU3D_Wide.cpp`, sharper 3D, 60 fps (opt-in) | ✅ |
+| 4 | Looks: widescreen 3D from FullDex's `GPU3D_Wide.cpp`, sharper 3D, 60 fps (on by default in CONSOLE) | ✅ |
 | 5 | Survey the minigames and the other situations: social reactions, the shop, Build Rooms, City Hall, pause, the hotel's lobby, basement and vacuum done; the vacuum's goal, hotel rooms, cards, painting, mixer… not reached | 🔄 |
 | 6 | Desktop apps: file picker, universal Mac app, Windows .exe (CI and release) | ✅ |
 | 7 | Comfort: pause menu, settings file, controllers, mouse camera, fullscreen, sound stretching, save backups | ✅ (controller untested on hardware) |
