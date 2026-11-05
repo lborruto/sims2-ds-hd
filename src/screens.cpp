@@ -166,7 +166,8 @@ ScreenState ScreenTracker::Update(const u32* top, const u32* bottom)
 const char* ScreenName(Screen s)
 {
     static const char* const kNames[] = {"None", "Panel", "Phone", "Dialogue", "Popup", "Gift", "Social",
-                                         "Vacuum", "Cards", "Catalogue", "Build", "Unknown"};
+                                         "Vacuum", "Cards", "Catalogue", "Build", "FrontEnd", "CreateASim",
+                                         "SaveSlots", "ItemHand", "Unknown"};
     return kNames[(int)s];
 }
 

@@ -90,7 +90,8 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH)
 {
-    if (s.screen == Screen::None) return FromPlacement(Place(Layout::Side, true, (float)topW / topH), topW, topH);
+    // No HUD (title, main menu, Create-a-Sim): both screens matter alike.
+    if (s.screen == Screen::None || s.screen == Screen::FrontEnd || s.screen == Screen::CreateASim) return FromPlacement(Place(Layout::Side, true, (float)topW / topH), topW, topH);
     Composition c {kConsoleW, kConsoleH, {}, {}};
     if (menuOpen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {
@@ -121,7 +122,8 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     }
     else
     {
-        // Social, Vacuum, Cards, Catalogue, Build, Unknown; the hints' box for the activities.
+        // Social, Vacuum, Cards, Catalogue, Build, SaveSlots, ItemHand, Unknown; the hints' box for
+        // the activities.
         const int h = (int)std::lround((double)kActivityTopW * topH / topW);
         const Rect topTo {kActivityTopX, kActivityTopY, kActivityTopW, h};
         c.overlays.push_back({kCanvas, kPanelArgb, 0, 0, 0, 0});

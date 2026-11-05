@@ -62,6 +62,6 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // The composition for screen s. menuOpen: the menu is up (in town: the touch screen 3x over the
 // dimmed world). focus: the index in HotspotsFor(s) the focus ring frames (-1: none; no ring
 // when no touchable bottom piece shows it). topW x topH: the top picture's size (App::TopImage).
-// Screen::None (no HUD: title, Create-a-Sim): SIDE.
+// Screen::None, FrontEnd, CreateASim (no HUD: title, main menu, Create-a-Sim): SIDE.
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH);
 }

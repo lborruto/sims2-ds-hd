@@ -4,6 +4,8 @@
 #include <cstdio>
 #include <cstring>
 #include <random>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "gamestate.h"
@@ -167,6 +169,44 @@ static void random_ram()
     }
 }
 
+static void to_screen_state()
+{
+    // CONSOLE's screen: the panel with its tab, the rest by name; a tab out of 0..4, an
+    // unmapped screen or no reading: Unknown.
+    GameState g;
+    CHECK(ToScreenState(g) == (ScreenState{Screen::Unknown}));
+    g.valid = true;
+    g.screen = GScreen::Panel;
+    for (int t = 0; t < 5; t++)
+    {
+        g.tab = t;
+        CHECK(ToScreenState(g) == (ScreenState{Screen::Panel, (Tab)((int)Tab::Interact + t)}));
+    }
+    g.tab = -1;
+    CHECK(ToScreenState(g) == (ScreenState{Screen::Unknown}));
+    g.tab = 2;
+    CHECK(ScreenStateName(ToScreenState(g)) == "Panel/Goals");
+    const std::pair<GScreen, Screen> same[] = {
+        {GScreen::Popup, Screen::Popup}, {GScreen::Phone, Screen::Phone}, {GScreen::Dialogue, Screen::Dialogue},
+        {GScreen::Gift, Screen::Gift}, {GScreen::Catalogue, Screen::Catalogue}, {GScreen::Build, Screen::Build},
+        {GScreen::Vacuum, Screen::Vacuum}, {GScreen::Social, Screen::Social}, {GScreen::Cards, Screen::Cards},
+        {GScreen::FrontEnd, Screen::FrontEnd}, {GScreen::CreateASim, Screen::CreateASim},
+        {GScreen::SaveSlots, Screen::SaveSlots}, {GScreen::ItemHand, Screen::ItemHand}, {GScreen::Unknown, Screen::Unknown}};
+    for (auto [gs, sc] : same)
+    {
+        g.screen = gs;
+        CHECK(ToScreenState(g) == (ScreenState{sc}));
+        CHECK(std::string(ScreenName(sc)) == GScreenName(gs));
+    }
+    // The pixels' answers that go with the game's screens.
+    g.screen = GScreen::FrontEnd;
+    CHECK(PixelsAgree(g, {Screen::None}) && !PixelsAgree(g, {Screen::Unknown}));
+    g.screen = GScreen::SaveSlots;
+    CHECK(PixelsAgree(g, {Screen::Unknown}) && !PixelsAgree(g, {Screen::Panel, Tab::Options}));
+    g.screen = GScreen::Phone;
+    CHECK(PixelsAgree(g, {Screen::Phone}) && !PixelsAgree(g, {Screen::Unknown}));
+}
+
 int main()
 {
     panel_and_popup();
@@ -175,6 +215,7 @@ int main()
     overlay_screens();
     invalid_chains();
     random_ram();
+    to_screen_state();
     if (failures) { fprintf(stderr, "%d failed\n", failures); return 1; }
     printf("all passed\n");
     return 0;

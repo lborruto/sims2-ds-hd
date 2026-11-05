@@ -64,6 +64,7 @@ static void Usage()
         "  --mic off|blow|real           what the DS hears: silence, the blow key, the computer's microphone\n"
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
+        "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
         "  --print-screen                print the recognised bottom screen when it changes (frame N: screen X)\n"
         "                                and CONSOLE's menu and focus (frame N: console menu open|closed, focus F)\n"
         "  --console-menu, --console-focus N  (checks) CONSOLE's menu shown, the focus ring on target N\n"
@@ -254,6 +255,7 @@ int main(int argc, char** argv)
     bool wasPaused = false; // the pause menu was open: buttons held on leaving it are not presses
     bool lastMenu = app.consoleMenu;
     int lastFocus = app.consoleFocus;
+    int disagree = 0; // frames the game's settled screen and the pixels' answer have disagreed
     auto keepPace = [&]() {
         if (headless || app.fast) { nextFrameAt = 0; return; }
         double now = SDL_GetPerformanceCounter() / perfFreq;
@@ -331,6 +333,7 @@ int main(int argc, char** argv)
         nds.RunFrame();
         looks.Frame(app);
 
+        const ScreenState consoleBefore = app.ConsoleScreen();
         {
             GameState before = app.game;
             app.game = ReadGameState({nds.MainRAM, nds.MainRAMMask});
@@ -352,13 +355,22 @@ int main(int argc, char** argv)
         {
             ScreenState before = app.screens.Current();
             ScreenState now = app.screens.Update(top, bottom);
-            // The navigator ran before the tracker: a new screen starts without the old menu and focus.
-            if (!(now == before) && !app.consolePinned && now.screen != Screen::Panel)
+            // The navigator ran before this frame's screen was known: a new screen (CONSOLE's, the
+            // game's when it reads) starts without the old menu and focus.
+            const ScreenState consoleNow = app.ConsoleScreen();
+            if (!(consoleNow == consoleBefore) && !app.consolePinned && consoleNow.screen != Screen::Panel)
             {
                 app.consoleMenu = false;
                 app.consoleFocus = -1;
             }
             if (printScreen && !(now == before)) fprintf(stderr, "frame %ld: screen %s\n", frame, ScreenStateName(now).c_str());
+            // The game's screen and the pixels' answer apart for more than 90 frames while the
+            // game's screen is settled: said once (RAM leads the pixels by up to about 60 frames).
+            // (Counted again from either side's change.)
+            if (!(consoleNow == consoleBefore) || !(now == before)) disagree = 0;
+            if (app.game.valid && app.game.settled && !PixelsAgree(app.game, now)) disagree++;
+            else disagree = 0;
+            if (printGame && disagree == 91) fprintf(stderr, "frame %ld: pixels disagree: %s\n", frame, ScreenStateName(now).c_str());
             if (printScreen && (app.consoleMenu != lastMenu || app.consoleFocus != lastFocus))
                 fprintf(stderr, "frame %ld: console menu %s, focus %d\n", frame, app.consoleMenu ? "open" : "closed", app.consoleFocus);
             lastMenu = app.consoleMenu;

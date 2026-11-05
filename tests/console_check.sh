@@ -11,10 +11,11 @@
 #   top right, the hints' box; s3 (Create-a-Sim, no HUD): SIDE. (The pictures pin the menu and the focus with
 #   --console-focus / --console-menu: the navigator does not move them.)
 # Then the navigator, driven by the scripts' "pad" events (scripts/console/), from what
-# --print-screen prints: from s7, B closes the phone, MENU opens the menu, R twice goes to
-# Goals, B closes the menu; from s6, A closes the popup; from s7, CONSOLE -> FOCUS -> CONSOLE
-# with the menu open and A held: the menu closes on leaving, nothing is tapped on coming back,
-# MENU opens it again.
+# --print-game (the game's screen, which CONSOLE acts on) and --print-screen (the pixels') print:
+# from s7, B closes the phone, MENU opens the menu, R twice goes to Goals, B closes the menu;
+# from s6, A closes the popup; from s7, CONSOLE -> FOCUS -> CONSOLE with the menu open and A
+# held: the menu closes on leaving, nothing is tapped on coming back, MENU opens it again. In
+# none of them do the pixels disagree with the game for long ("pixels disagree").
 # Then the activities on buttons (src/activities.*, scripts/console/): from act-social, RIGHT
 # answers with the right icon (it lights green; the game itself plays on for about 1600
 # frames whatever the answers); from act-cards, X draws (Jun's count on the score bar changes),
@@ -188,7 +189,7 @@ done
 pad() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4
     "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
-        --layout console --print-screen "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        --layout console --print-screen --print-game "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
 # in_order NAME LINE...: each line (a grep -E pattern) is printed, after the one before.
@@ -209,14 +210,19 @@ check_pad() {
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
+    elif grep -q 'pixels disagree' "$tmp/$name.log"; then
+        echo "FAIL $name: $(grep -m 1 'pixels disagree' "$tmp/$name.log")"
+        fails=$((fails + 1))
     elif "$@"; then echo "ok   $name"
     else echo "FAIL $name"; fails=$((fails + 1)); fi
 }
 tabs() {
     in_order pad-tabs 'screen Phone' 'screen Panel/Interact' 'console menu open' 'screen Panel/Pockets' \
-        'screen Panel/Goals' 'console menu closed'
+        'screen Panel/Goals' 'console menu closed' || return 1
+    in_order pad-tabs 'game Phone' 'game Panel/Interact' 'console menu open' 'game Panel/Pockets' \
+        'game Panel/Goals' 'console menu closed'
 }
-popup() { in_order pad-popup 'screen Popup' 'screen Panel/'; }
+popup() { in_order pad-popup 'screen Popup' 'screen Panel/' && in_order pad-popup 'game Popup' 'game Panel/'; }
 leave() {
     in_order pad-leave 'console menu open' 'layout focus' 'console menu closed, focus -1' 'layout console' \
         'console menu open' || return 1
@@ -237,7 +243,7 @@ act() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
     "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$save" --layout console \
-        --print-screen --clock "$clock" --input "$input" --shot-at "$at" --shot-dir "$tmp/$name" \
+        --print-screen --print-game --clock "$clock" --input "$input" --shot-at "$at" --shot-dir "$tmp/$name" \
         > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
 act act-social act-social social 50 34,36,38,40,42,44 "2026-01-01 12:00" &
@@ -300,7 +306,11 @@ EOF
 check_pad act-social pixels act-social social
 check_pad act-draw pixels act-draw draw
 check_pad act-discard pixels act-discard discard
-check_pad act-quit in_order act-quit 'screen Cards' 'screen None' 'screen Panel/Interact'
+quit() {
+    in_order act-quit 'screen Cards' 'screen None' 'screen Panel/Interact' &&
+        in_order act-quit 'game Cards' 'game Panel/Interact'
+}
+check_pad act-quit quit
 cancelled() {
     pixels act-cancel cancel || return 1
     if grep -q 'screen None' "$tmp/act-cancel.log"; then echo "  act-cancel: the game quit"; return 1; fi

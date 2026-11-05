@@ -4,6 +4,7 @@
 #include <string>
 
 #include "common.h"
+#include "screens.h"
 
 namespace sims2wide
 {
@@ -29,4 +30,10 @@ struct RamView { const u8* ram; u32 mask; };
 GameState ReadGameState(RamView ram);           // EU table
 const char* GScreenName(GScreen);
 std::string GameStateName(const GameState&);   // "Panel/Goals", "Popup", "Unknown(ov=8,vt=0x0214B1C4)"
+// CONSOLE's screen from the game's: Panel with its tab, the rest by name; not valid, a Panel
+// whose tab is not 0..4, or an unmapped screen: Unknown (the DS's buttons, the stick cursor).
+ScreenState ToScreenState(const GameState&);
+// Whether the pixel tracker's answer (screens.h) is what the game's screen looks like:
+// the same, or None for FrontEnd / CreateASim (no HUD), Unknown for SaveSlots / ItemHand.
+bool PixelsAgree(const GameState&, ScreenState pixels);
 }

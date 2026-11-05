@@ -11,7 +11,10 @@ namespace sims2wide
 // None: no HUD and no known screen (title, Create-a-Sim, loading): both screens matter alike.
 // Unknown: the HUD is up but the touch screen is none of the others (fades, slides, screens not
 // measured yet).
-enum class Screen { None, Panel, Phone, Dialogue, Popup, Gift, Social, Vacuum, Cards, Catalogue, Build, Unknown };
+// FrontEnd (title, main menu), CreateASim, SaveSlots (Options > Save), ItemHand (Pockets > the
+// item in hand): only from the game's RAM (gamestate.h, ToScreenState), never from pixels.
+enum class Screen { None, Panel, Phone, Dialogue, Popup, Gift, Social, Vacuum, Cards, Catalogue, Build,
+                    FrontEnd, CreateASim, SaveSlots, ItemHand, Unknown };
 // The panel's tab (only with Screen::Panel).
 enum class Tab { None, Interact, Pockets, Goals, Relationships, Options };
 

@@ -137,4 +137,42 @@ std::string GameStateName(const GameState& g)
         return std::string("Panel/") + (g.tab >= 0 && g.tab < 5 ? kTabs[g.tab] : "?");
     return GScreenName(g.screen);
 }
+
+ScreenState ToScreenState(const GameState& g)
+{
+    if (!g.valid) return {Screen::Unknown};
+    switch (g.screen)
+    {
+    case GScreen::Panel:
+        if (g.tab < 0 || g.tab > 4) return {Screen::Unknown};
+        return {Screen::Panel, (Tab)((int)Tab::Interact + g.tab)};
+    case GScreen::Popup: return {Screen::Popup};
+    case GScreen::Phone: return {Screen::Phone};
+    case GScreen::Dialogue: return {Screen::Dialogue};
+    case GScreen::Gift: return {Screen::Gift};
+    case GScreen::Catalogue: return {Screen::Catalogue};
+    case GScreen::Build: return {Screen::Build};
+    case GScreen::Vacuum: return {Screen::Vacuum};
+    case GScreen::Social: return {Screen::Social};
+    case GScreen::Cards: return {Screen::Cards};
+    case GScreen::FrontEnd: return {Screen::FrontEnd};
+    case GScreen::CreateASim: return {Screen::CreateASim};
+    case GScreen::SaveSlots: return {Screen::SaveSlots};
+    case GScreen::ItemHand: return {Screen::ItemHand};
+    case GScreen::Unknown: break;
+    }
+    return {Screen::Unknown};
+}
+
+bool PixelsAgree(const GameState& g, ScreenState pixels)
+{
+    const ScreenState r = ToScreenState(g);
+    if (r == pixels) return true;
+    switch (r.screen)
+    {
+    case Screen::FrontEnd: case Screen::CreateASim: return pixels.screen == Screen::None;
+    case Screen::SaveSlots: case Screen::ItemHand: return pixels.screen == Screen::Unknown;
+    default: return false;
+    }
+}
 }

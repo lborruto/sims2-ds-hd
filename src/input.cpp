@@ -319,7 +319,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
 {
     if (app.shown == Layout::Console)
     {
-        navigator.Update(app.screens.Current(), p, touchScript, keys);
+        navigator.Update(app.ConsoleScreen(), p, touchScript, keys, app.Settled());
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
         // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding).
