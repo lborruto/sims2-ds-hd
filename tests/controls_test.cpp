@@ -6,12 +6,11 @@
 #include <SDL.h>
 
 #include <cstdio>
-#include <string>
-
-#include "controls.h"
 #include <fstream>
 #include <iterator>
 #include <string>
+
+#include "controls.h"
 
 #include "settings.h"
 

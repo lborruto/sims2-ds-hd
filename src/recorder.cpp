@@ -31,7 +31,7 @@ Recorder::Recorder(std::string dir) : dir_(std::move(dir))
 
 void Recorder::Frame(const App& app, long frame, melonDS::NDS& nds)
 {
-    if (dir_.empty() || count_ >= kMaxPerRun) return;
+    if (dir_.empty() || count_ >= kMaxPerRun || !app.portSupported) return; // (no RAM map on other ROMs)
     const GameState& g = app.game;
     // The pair to watch, or none: loads (between, or black) are never unmapped screens.
     bool watch = false; int need = 0;

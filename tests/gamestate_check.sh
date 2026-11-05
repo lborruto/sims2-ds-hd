@@ -131,5 +131,10 @@ if [ -f "$shots/s6.st" ] && [ -f "$tmp/other.nds" ]; then
     said=$(grep -c 'NOT THE EUROPEAN ONE' "$tmp/other.log")
     if [ "$st" = 0 ] && [ "$games" = 0 ] && [ "$said" = 1 ] && grep -q '^clock: ' "$tmp/other.log"; then echo "ok   rom gate: another game code reads no game state, said once"
     else echo "FAIL rom gate: exit $st, game lines $games, messages $said"; fail=1; fi
+    # the recorder's invalid-RAM watch (600 + 300 frames) must not fire without the map
+    mkdir -p "$tmp/rec-other"
+    "$bin" "$tmp/other.nds" --headless --frames 1100 --state-load "$shots/s6.st" --save "$tmp/other.sav" --record-dir "$tmp/rec-other" > "$tmp/rec-other.log" 2>&1
+    if [ "$(count "$tmp/rec-other" st)" = 0 ] && grep -q '^clock: ' "$tmp/rec-other.log"; then echo "ok   rom gate: another game code records nothing"
+    else echo "FAIL rom gate: recorded on another game code"; fail=1; fi
 else echo "FAIL rom gate: no $shots/s6.st or no copy"; fail=1; fi
 exit $fail
