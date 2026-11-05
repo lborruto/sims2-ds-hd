@@ -13,8 +13,7 @@ Composition FromPlacement(const Placement& p, int topW, int topH)
     // The one drawn second may lie over the first, with the placement's opacity.
     c.pieces = p.topFirst ? std::vector<Piece> {top, bottom} : std::vector<Piece> {bottom, top};
     c.pieces[1].alpha = p.alpha;
-    // (The top screen drawn over the bottom one is not touchable through.)
-    c.pieces[p.topFirst ? 0 : 1].touch = false;
+    // (The top screen is the camera; drawn over the bottom one, it takes the clicks there.)
     return c;
 }
 
@@ -44,22 +43,36 @@ bool TouchFromComposition(const Composition& c, const CanvasFit& fit, float px, 
 
 void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty)
 {
-    // The piece must still be a touchable bottom one (the layout may have changed since the drag
-    // began, and the indices with it): else the last such piece, else the whole touch screen.
-    Piece whole {Src::Bottom, {0, 0, SW, SH}, {0, 0, SW, SH}};
-    const Piece* pq = &whole;
-    if (pieceIndex >= 0 && pieceIndex < (int)c.pieces.size() && c.pieces[pieceIndex].src == Src::Bottom && c.pieces[pieceIndex].touch)
-        pq = &c.pieces[pieceIndex];
-    else
-        for (const Piece& q : c.pieces)
-            if (q.src == Src::Bottom && q.touch) pq = &q;
-    const Piece& q = *pq;
     float cx, cy;
     fit.ToCanvas(px, py, cx, cy);
+    auto usable = [&](int i) { return i >= 0 && i < (int)c.pieces.size() && c.pieces[i].src == Src::Bottom && c.pieces[i].touch; };
+    // The piece the drag began on; if the layout changed since (the indices with it), the
+    // touchable bottom piece under the point, else the largest, else the whole touch screen.
+    Piece whole {Src::Bottom, {0, 0, SW, SH}, {0, 0, SW, SH}};
+    const Piece* pq = &whole;
+    if (usable(pieceIndex))
+        pq = &c.pieces[pieceIndex];
+    else
+    {
+        int under = -1, largest = -1;
+        long largestArea = -1;
+        for (int i = 0; i < (int)c.pieces.size(); i++)
+        {
+            if (!usable(i)) continue;
+            const Rect& r = c.pieces[i].to;
+            if (Inside(r, cx, cy)) under = i; // the later one is on top
+            if ((long)r.w * r.h > largestArea) { largestArea = (long)r.w * r.h; largest = i; }
+        }
+        if (under >= 0) pq = &c.pieces[under];
+        else if (largest >= 0) pq = &c.pieces[largest];
+    }
+    const Piece& q = *pq;
     const float x = q.from.x + (cx - q.to.x) * q.from.w / q.to.w, y = q.from.y + (cy - q.to.y) * q.from.h / q.to.h;
-    // (Always a DS touch position, whatever the piece's rectangle.)
-    tx = std::clamp((int)std::floor(x), std::max(q.from.x, 0), std::min(q.from.x + q.from.w, SW) - 1);
-    ty = std::clamp((int)std::floor(y), std::max(q.from.y, 0), std::min(q.from.y + q.from.h, SH) - 1);
+    // Held to the piece's source rectangle, itself held to the DS screen (lo <= hi always).
+    const int x0 = std::clamp(q.from.x, 0, SW - 1), x1 = std::clamp(q.from.x + q.from.w - 1, x0, SW - 1);
+    const int y0 = std::clamp(q.from.y, 0, SH - 1), y1 = std::clamp(q.from.y + q.from.h - 1, y0, SH - 1);
+    tx = (int)std::clamp(std::floor(x), (float)x0, (float)x1);
+    ty = (int)std::clamp(std::floor(y), (float)y0, (float)y1);
 }
 
 bool OverTopComposition(const Composition& c, const CanvasFit& fit, float px, float py)
@@ -70,10 +83,28 @@ bool OverTopComposition(const Composition& c, const CanvasFit& fit, float px, fl
     {
         const Piece& q = c.pieces[i];
         if (!Inside(q.to, cx, cy)) continue;
-        if (q.src == Src::Top) return true;
-        if (q.touch) return false;
+        return q.src == Src::Top && q.touch;
     }
     return false;
+}
+
+void RasteriseOverlay(const Overlay& o, int w, int h, std::vector<u32>& px)
+{
+    px.assign((size_t)std::max(w, 0) * std::max(h, 0), 0);
+    if (w <= 0 || h <= 0 || o.to.w <= 0 || o.to.h <= 0) return;
+    const float sx = (float)w / o.to.w, sy = (float)h / o.to.h, s = std::min(sx, sy);
+    const float r = std::min(o.radius * s, std::min(w, h) / 2.0f), b = o.border * s;
+    for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++)
+        {
+            // The signed distance from the pixel's centre to the rounded rectangle's edge
+            // (negative inside).
+            const float qx = std::fabs(x + 0.5f - w / 2.0f) - (w / 2.0f - r), qy = std::fabs(y + 0.5f - h / 2.0f) - (h / 2.0f - r);
+            const float ox = std::max(qx, 0.0f), oy = std::max(qy, 0.0f);
+            const float d = std::sqrt(ox * ox + oy * oy) + std::min(std::max(qx, qy), 0.0f) - r;
+            if (d > 0) continue;
+            px[(size_t)y * w + x] = b > 0 && d > -b ? o.borderArgb : o.argb;
+        }
 }
 
 Rect BottomPieceRect(const Composition& c)

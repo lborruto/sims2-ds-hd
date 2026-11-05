@@ -49,7 +49,7 @@ static void Usage()
     fprintf(stderr,
         "sims2wide " SIMS2WIDE_VERSION "\n"
         "usage: sims2wide [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
-        "  --layout auto|focus|side|stacked  window layout (default auto)\n"
+        "  --layout auto|focus|side|stacked|console  window layout (default auto)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
         "  --res3d N                     3D drawn N times sharper (1 = the DS's own, default)\n"
         "  --wide                        widescreen 16:9 world\n"
@@ -64,6 +64,7 @@ static void Usage()
         "  --mic off|blow|real           what the DS hears: silence, the blow key, the computer's microphone\n"
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-screen                print the recognised bottom screen when it changes (frame N: screen X)\n"
+        "  --console-menu, --console-focus N  (checks) CONSOLE's menu shown, the focus ring on target N\n"
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
@@ -97,7 +98,8 @@ int main(int argc, char** argv)
     int shotEvery = 0;
     std::set<long> shotAt;
     Layout layout = Layout::Auto;
-    bool compose = false, printScreen = false;
+    bool compose = false, printScreen = false, consoleMenu = false;
+    int consoleFocus = -1;
     int res3d = 0;
     bool wide = false, interp = false;
     for (int i = 1; i < argc; i++)
@@ -122,11 +124,13 @@ int main(int argc, char** argv)
         else if (a == "--mic") micArg = next();
         else if (a == "--fast") fast = true;
         else if (a == "--print-screen") printScreen = true;
+        else if (a == "--console-menu") consoleMenu = true;
+        else if (a == "--console-focus") consoleFocus = atoi(next().c_str());
         else if (a == "--clock") { if (!clock::SetFixed(next())) { fprintf(stderr, "--clock wants \"YYYY-MM-DD HH:MM\"\n"); return 1; } }
         else if (a == "--layout")
         {
             std::string l = next();
-            layout = l == "side" ? Layout::Side : l == "stacked" ? Layout::Stacked : l == "focus" ? Layout::Focus : Layout::Auto;
+            layout = l == "side" ? Layout::Side : l == "stacked" ? Layout::Stacked : l == "focus" ? Layout::Focus : l == "console" ? Layout::Console : Layout::Auto;
         }
         else if (a.rfind("-psn_", 0) == 0) {} // older macOS adds this to an app started from the Finder
         else if (a[0] != '-' && romPath.empty()) romPath = a;
@@ -171,6 +175,9 @@ int main(int argc, char** argv)
     App app;
     app.layout = layout;
     app.shown = layout == Layout::Auto ? Layout::Side : layout;
+    // (For the checks: the navigator, still to come, will drive these in a window.)
+    app.consoleMenu = consoleMenu;
+    app.consoleFocus = consoleFocus;
     app.quickState = quickState;
     app.shotFile = shotFile;
     // The settings file (not headless: those runs stay the same on every machine).
@@ -315,7 +322,8 @@ int main(int argc, char** argv)
             snprintf(name, sizeof name, "/f%06ld.png", frame);
             int tw, th;
             const u32* big = app.TopImage(tw, th);
-            if (compose) WriteCompose(shotDir + name, app.shown, app.mainIsTop, big, tw, th, bottom);
+            // (The other layouts sized from the picture itself, as they always were here.)
+            if (compose) WriteCompose(shotDir + name, app.shown == Layout::Console ? video.Composed(app) : Compose(app.shown, app.mainIsTop, (float)tw / th, tw, th), big, tw, th, bottom);
             else WriteShot(shotDir + name, top, bottom);
             // The looks' top picture at its size, beside the DS's screens.
             if (!compose && !app.topBig.empty())

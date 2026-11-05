@@ -87,15 +87,28 @@ void Video::Present(const App& app, const Canvas* over)
     const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, ow, oh);
     SDL_SetRenderDrawColor(ren, 16, 18, 24, 255);
     SDL_RenderClear(ren);
-    // The pieces in order: a later one lies over an earlier one, with its opacity.
-    for (const Piece& q : comp.pieces)
+    // The pieces in order: a later one lies over an earlier one, with its opacity; each overlay
+    // just before the piece it names, or after them all.
+    auto overlaysBefore = [&](int i) {
+        for (const Overlay& o : comp.overlays)
+        {
+            if (!(o.before == i || (i == (int)comp.pieces.size() && (o.before < 0 || o.before >= i)))) continue;
+            SDL_Rect d;
+            fit.ToOutput(o.to, d.x, d.y, d.w, d.h);
+            if (SDL_Texture* t = OverlayTexture(o, d.w, d.h)) SDL_RenderCopy(ren, t, nullptr, &d);
+        }
+    };
+    for (int pi = 0; pi < (int)comp.pieces.size(); pi++)
     {
+        overlaysBefore(pi);
+        const Piece& q = comp.pieces[pi];
         SDL_Rect d, f {q.from.x, q.from.y, q.from.w, q.from.h};
         fit.ToOutput(q.to, d.x, d.y, d.w, d.h);
         SDL_Texture* t = tex[q.src == Src::Top ? 0 : 1];
         SDL_SetTextureAlphaMod(t, q.alpha);
         SDL_RenderCopy(ren, t, &f, &d);
     }
+    overlaysBefore((int)comp.pieces.size());
     if (over && over->Dirty())
     {
         if (!overlay || overlayW != over->w || overlayH != over->h)
@@ -121,6 +134,31 @@ void Video::Present(const App& app, const Canvas* over)
         shotPath.clear();
     }
     SDL_RenderPresent(ren);
+}
+
+SDL_Texture* Video::OverlayTexture(const Overlay& o, int w, int h)
+{
+    if (w <= 0 || h <= 0) return nullptr;
+    auto same = [&](const OverlayTex& e) {
+        return e.w == w && e.h == h && e.o.to.w == o.to.w && e.o.to.h == o.to.h && e.o.argb == o.argb && e.o.radius == o.radius &&
+               e.o.border == o.border && e.o.borderArgb == o.borderArgb;
+    };
+    for (const OverlayTex& e : overlayTex)
+        if (same(e)) return e.tex;
+    // A new one (a resize or a new ring makes a few): keep the cache small.
+    if (overlayTex.size() >= 24)
+    {
+        for (OverlayTex& e : overlayTex) SDL_DestroyTexture(e.tex);
+        overlayTex.clear();
+    }
+    std::vector<u32> px;
+    RasteriseOverlay(o, w, h, px);
+    SDL_Texture* t = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STATIC, w, h);
+    if (!t) return nullptr;
+    SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+    SDL_UpdateTexture(t, nullptr, px.data(), w * 4);
+    overlayTex.push_back({o, w, h, t});
+    return t;
 }
 
 bool Video::TouchAt(const App& app, int wx, int wy, int& tx, int& ty, int* pieceIndex) const

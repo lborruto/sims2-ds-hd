@@ -36,9 +36,11 @@ the owner makes it public; write everything as if it were public already).
 | `src/audio.*`, `src/audiostretch.h` | SDL sound queue, WSOLA stretching when slow (from FullDex), volume, fast forward |
 | `src/backup.*` | Copies of the `.sav` in `backups/`, at start and every half hour, eight kept |
 | `src/layout.*` | `Place()` (canvas per layout, `topAspect`, FOCUS's overlaid panel), `CanvasFit`, `TouchFromOutput`, `OverTop` |
-| `src/compose.*` | `Composition`: pieces (a rectangle of one DS screen at a canvas rectangle, opacity, touchable or not) in drawing order; `FromPlacement`/`Compose`, `TouchFromComposition`, `TouchClampedComposition`, `OverTopComposition`; what `Video`, `--compose` and the mouse use |
+| `src/compose.*` | `Composition`: pieces (a rectangle of one DS screen at a canvas rectangle, opacity, touchable or not) in drawing order, and overlays (rounded frames, boxes, the dimmed backdrop, the focus ring; `RasteriseOverlay`, each drawn before the piece it names); `FromPlacement`/`Compose`, `TouchFromComposition`, `TouchClampedComposition`, `OverTopComposition`; what `Video`, `--compose` and the mouse use |
+| `src/console.*` | CONSOLE (`--layout console`): `BuildConsole(ScreenState, menuOpen, focus, topW, topH)`, the 1280 × 720 composition per recognised screen (town and its rail, the menu over the dimmed world, the dialogue rebuilt wide, activities, SIDE for None), its geometry and the game's colours; `App::consoleMenu` / `consoleFocus` (set by `--console-menu` / `--console-focus N` for checks; the navigator will drive them) |
+| `tests/console_check.sh` | CONSOLE's pictures from save states: the DS pixels where each piece puts them, the frames, the dimmed world, the focus ring, SIDE without a HUD (ROM, `shots/`, the complete save and Pillow: `PYTHON=…`) |
 | `src/touchscript.*` | `TouchScript` (`Input::touchScript`): taps, holds and drags over game frames, queued (8 at most), one released frame between; wins over the mouse and the stick in `Input::Frame` |
-| `tests/layout_test.cpp` | Touch mapping of every pixel in every layout and size (`ninja -C build layout_test`) |
+| `tests/layout_test.cpp` | Touch mapping of every pixel in every layout and size, and of every piece of every CONSOLE composition (`ninja -C build layout_test`) |
 | `tests/touchscript_test.cpp` | The synthesised touches (`ninja -C build touchscript_test`) |
 | `src/looks.*` | Sharper / widescreen 3D and 60 fps: applies the Looks settings, builds `App::TopImage` |
 | `src/melonds_ext/GPU3D_Wide.*` | FullDex's wide 3D rasteriser (CPU), built into melonDS's `core` |
@@ -144,7 +146,7 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   plist (there) and the terminal's permission on a Mac for the CLI program.
 - `SIMS2WIDE_PROBE=N` prints AUTO's signals every N frames (HUD, social, warm menu, motion and
   brightness of each screen); `--print-screen` prints the recognised bottom screen on change.
-- Touch mapping goes through the same composition (`compose.h`, from `Place()`) as drawing: change one, the other follows. The topmost piece under the pointer decides (a top piece or an untouchable one takes the click); a drag keeps the piece it began on.
+- Touch mapping goes through the same composition (`compose.h`, from `Place()` or `BuildConsole`) as drawing: change one, the other follows. The topmost piece under the pointer decides, for a click and for the camera alike: a touchable bottom piece is the stylus, a touchable top piece the camera (wheel, right drag), an untouchable piece (`touch=false`: CONSOLE's dimmed world behind the menu) neither, and it hides what lies under it. Overlays never take the mouse. A drag keeps the piece it began on; if that piece is gone (the layout or the screen changed mid-drag), the touchable bottom piece under the pointer, else the largest; always held to the piece's source rectangle and the DS screen.
   The stylus goes down only when the left button is pressed on the touch screen; until release
   it follows the pointer clamped to that screen (`TouchClamped`), wherever the pointer goes.
   Window points and renderer pixels differ on HiDPI; `Video::ToOutput` converts. FOCUS's panel
@@ -197,6 +199,17 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   goal at a time seen; a goal takes one to three 16-pixel lines), the Interact strip (one target
   near), Give Item's slots and bow (empty pockets), the cards' discard pile and tenth place
   (empty), Build Rooms' rows and arrows (no room to build), the Options button by the title.
+- CONSOLE (`console.cpp`): the world is drawn 720 high, centred (the DS's 4:3: 960 wide, dark
+  sides) or, wider than 16:9, cropped at its sides (a conversation's world without its status
+  bar: 176 of 192 rows); never stretched. The small world of activities is 384 wide, its height
+  from its shape (288 at 4:3, 216 widescreen). The dialogue frame is 256 high, not the
+  mockup's 236: name and text at 2x take 228 rows (the mockup's own picture hangs the text out
+  of its frame). The rail shows the bottom's x 0-34 and the phone icon whatever the screen: with
+  the phone open (Phone, e.g. `s7`) that is a strip of the phone and its X. Dialogue pieces as
+  measured: the name strip (10,6)-(154,22) cuts the name's lowest pixel row, the arrow piece
+  (214,156)-(244,186) the arrow's right edge (the arrow's area is x 220-250). The hints' box
+  (`kHintBox`) is left empty until hints are drawn. `menuOpen` shows the menu composition on any
+  screen with a HUD; Popup and Gift always do.
 - The complete save's states (in git-ignored `shots/`; run them with
   `--save` a copy of `saves/complete-play.sav` and `--clock "2026-11-05 12:05"`): `sit-casino`
   (`act-cards` quit to the casino's panel, `scripts/hotspots/casino-base.txt`) and

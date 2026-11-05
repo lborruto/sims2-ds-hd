@@ -71,7 +71,7 @@ void PauseMenu::Build(const App& app, const Input& input)
     case DISPLAY:
         add(M_FULLSCREEN, "FULLSCREEN", OnOff(s.fullscreen), "THE WHOLE SCREEN, NO BORDER (F11)");
         add(M_SMOOTH, "SMOOTH SCALING", OnOff(s.smoothScaling), "SOFTER PIXELS WHEN SCALED");
-        add(M_LAYOUT, "LAYOUT", app.layout == Layout::Auto ? "AUTO" : app.layout == Layout::Focus ? "FOCUS" : app.layout == Layout::Side ? "SIDE" : "STACKED",
+        add(M_LAYOUT, "LAYOUT", app.layout == Layout::Auto ? "AUTO" : app.layout == Layout::Focus ? "FOCUS" : app.layout == Layout::Side ? "SIDE" : app.layout == Layout::Console ? "CONSOLE" : "STACKED",
             "AUTO: FOCUS IN TOWN, SIDE ELSEWHERE (KEYS 0-3)");
         add(M_BACK, "BACK");
         break;
@@ -181,8 +181,9 @@ void PauseMenu::Frame(App& app, Video& video, Input& input, const std::string& s
     case M_LAYOUT:
     {
         static const Layout order[] = {Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked};
-        int i = 0;
-        while (order[i] != app.layout) i++;
+        int i = 0; // (CONSOLE, from --layout, is not in the cycle yet: it goes on from AUTO)
+        while (i < 4 && order[i] != app.layout) i++;
+        if (i == 4) i = 0;
         app.layout = order[(i + 4 + (dir < 0 ? -1 : 1)) % 4];
         changed = false;
         break;

@@ -18,18 +18,29 @@ struct Piece
     Rect from;        // in the source's own pixels (for Src::Top: the top picture's size, App::TopImage)
     Rect to;          // in canvas pixels
     u8 alpha = 255;
-    bool touch = true; // false: the mouse is not a stylus here and does not reach what lies under
+    // What the mouse does here. true: a Src::Bottom piece is the stylus, a Src::Top piece the
+    // camera (wheel, right drag). false: nothing at all, and the mouse does not reach what lies
+    // under it either (a click is swallowed, the camera does not turn): the console's dimmed
+    // world behind its menu, which is not playable while the menu is up.
+    bool touch = true;
 };
 
-// A frame drawn in the game's colours around or behind pieces (filled in by the console layout).
+// A rounded rectangle drawn in the game's colours over, between or behind pieces: a frame, a
+// box, the dimmed backdrop, the focus ring. Never touchable: the mouse goes to the pieces.
 struct Overlay
 {
-    Rect to;
-    u32 argb;
-    int radius;
-    int border;
+    Rect to;          // in canvas pixels
+    u32 argb;         // the fill (0: none), with its opacity
+    int radius;       // the corners' radius, canvas pixels
+    int border;       // the border's width inside `to`, canvas pixels (0: none)
     u32 borderArgb;
+    int before = -1;  // drawn just before pieces[before]; -1: after every piece
 };
+
+// An overlay as w x h pixels of 0xAARRGGBB (straight alpha; 0 outside its rounded corners), for
+// `to` drawn at w x h output pixels: radius and border scaled with it. What --compose and the
+// window both draw.
+void RasteriseOverlay(const Overlay& o, int w, int h, std::vector<u32>& px);
 
 struct Composition
 {
@@ -49,13 +60,16 @@ Composition Compose(Layout l, bool mainIsTop, float topAspect, int topW, int top
 // An output pixel position as a DS touch position: the topmost piece under it decides, and it
 // must be a touchable Src::Bottom piece (the top screen, or an untouchable piece, lies over
 // what is under it and takes the click). pieceIndex, when given, receives the piece hit.
+// Overlays are not looked at: the gaps between pieces (frames, the canvas) touch nothing.
 bool TouchFromComposition(const Composition& c, const CanvasFit& fit, float px, float py, int& tx, int& ty, int* pieceIndex = nullptr);
 // The same, held to one piece's source rectangle wherever the point is: a drag stays on the
-// piece it started on. A stale index (the layout changed meanwhile) falls back to the last
-// touchable bottom piece; the result is always within the DS screen.
+// piece it started on. A stale index (the layout changed meanwhile: no longer a touchable
+// bottom piece) falls back to the touchable bottom piece under the point, else the largest one
+// on the canvas, else the whole touch screen; the result is always within the DS screen,
+// whatever the piece's source rectangle.
 void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty);
-// Whether an output pixel position is on a top piece and no later touchable bottom piece
-// covers it (the mouse camera's area).
+// Whether an output pixel position is on a touchable top piece and no later piece covers it
+// (the mouse camera's area): the topmost piece under it decides, as for a click.
 bool OverTopComposition(const Composition& c, const CanvasFit& fit, float px, float py);
 // The first Src::Bottom piece's destination (where the stylus cursor is drawn); a zero Rect
 // without one.

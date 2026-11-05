@@ -40,14 +40,40 @@ void WriteImage(const std::string& path, const u32* px, int w, int h)
     stbi_write_png(path.c_str(), w, h, 3, rgb.data(), w * 3);
 }
 
-void WriteCompose(const std::string& path, Layout l, bool mainIsTop, const u32* top, int topW, int topH, const u32* bottom)
+// An overlay blended over the picture (straight alpha), clipped to the canvas.
+static void DrawOverlay(std::vector<u8>& rgb, int cw, int ch, const Overlay& o)
 {
-    const Composition c = Compose(l, mainIsTop, (float)topW / topH, topW, topH);
+    std::vector<u32> px;
+    RasteriseOverlay(o, o.to.w, o.to.h, px);
+    for (int y = 0; y < o.to.h; y++)
+        for (int x = 0; x < o.to.w; x++)
+        {
+            const int X = o.to.x + x, Y = o.to.y + y;
+            const u32 p = px[(size_t)y * o.to.w + x];
+            const int a = p >> 24;
+            if (X < 0 || Y < 0 || X >= cw || Y >= ch || a == 0) continue;
+            u8* d = &rgb[((size_t)Y * cw + X) * 3];
+            d[0] = (u8)((((p >> 16) & 0xFF) * a + d[0] * (255 - a)) / 255);
+            d[1] = (u8)((((p >> 8) & 0xFF) * a + d[1] * (255 - a)) / 255);
+            d[2] = (u8)(((p & 0xFF) * a + d[2] * (255 - a)) / 255);
+        }
+}
+
+void WriteCompose(const std::string& path, const Composition& c, const u32* top, int topW, int topH, const u32* bottom)
+{
+    (void)topH;
     std::vector<u8> rgb(c.cw * c.ch * 3, 0);
     for (int i = 0; i < c.cw * c.ch; i++) { rgb[i * 3] = 16; rgb[i * 3 + 1] = 18; rgb[i * 3 + 2] = 24; }
-    // The pieces in order: a later one may overlap an earlier one, with its opacity.
-    for (const Piece& q : c.pieces)
+    // The pieces in order: a later one may overlap an earlier one, with its opacity; each
+    // overlay just before the piece it names, or after them all.
+    auto overlaysBefore = [&](int i) {
+        for (const Overlay& o : c.overlays)
+            if (o.before == i || (i == (int)c.pieces.size() && (o.before < 0 || o.before >= i))) DrawOverlay(rgb, c.cw, c.ch, o);
+    };
+    for (int pi = 0; pi < (int)c.pieces.size(); pi++)
     {
+        overlaysBefore(pi);
+        const Piece& q = c.pieces[pi];
         const Rect& r = q.to;
         const u32* src = q.src == Src::Top ? top : bottom;
         const int iw = q.src == Src::Top ? topW : SW;
@@ -62,6 +88,7 @@ void WriteCompose(const std::string& path, Layout l, bool mainIsTop, const u32* 
                 d[2] = (u8)(((px & 0xFF) * a + d[2] * (255 - a)) / 255);
             }
     }
+    overlaysBefore((int)c.pieces.size());
     stbi_write_png(path.c_str(), c.cw, c.ch, 3, rgb.data(), c.cw * 3);
 }
 }

@@ -53,6 +53,7 @@ Before opening a pull request:
     bash tests/screens_check.sh              # the bottom screen recognised in every save state (needs the ROM and shots/)
     ninja -C build hotspots_test && ./build/hotspots_test   # the touch targets' tables and focus moves
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
+    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (ROM, shots/, the complete save, Pillow)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below). A change to the menu, the mouse or the keys is
@@ -152,6 +153,22 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   touch-screen position (`tests/layout_test.cpp` checks every pixel in every layout). A press on
   the touch screen keeps the stylus down until the button is released, held to the screen's
   edges (`TouchClamped()`), so a drag that overshoots does not drop what it carries.
+- **Compositions and CONSOLE** (`compose.*`, `console.*`): what the window shows is a
+  `Composition`, a list of pieces (a rectangle of one DS screen drawn at a rectangle of the
+  canvas, whole-number scaled for the touch screen) and overlays (rounded frames and boxes in the
+  game's colours, the dimmed backdrop, the focus ring), drawn in order by the window and by
+  `--compose` alike; the mouse goes back through the same pieces (`TouchFromComposition`: the
+  topmost piece under the pointer decides; `touch=false` swallows clicks and the camera). SIDE,
+  STACKED and FOCUS are two-piece compositions made from `Place()`. CONSOLE (`--layout console`)
+  builds one per recognised screen (`screens.*`) on 1280 × 720: in town the world with a rail of
+  the touch screen's tab icons and phone (2x) at the right; the menu, a popup and Give Item the
+  whole touch screen 3x over the dimmed world; a conversation the world without its status bar
+  and the dialogue's name, text, portrait and arrow (2x) in a wide frame; activities (and
+  unknown screens) the touch screen 3x at the left and the world small at the top right; no HUD
+  (title, Create-a-Sim): SIDE. The focus ring frames a hotspot's area (`hotspots.*`) where the
+  piece showing it draws it. `--console-menu` and `--console-focus N` show the menu and the ring
+  in checks (`tests/console_check.sh`); `tests/layout_test.cpp` maps every pixel of every piece
+  of every CONSOLE composition back to itself.
 - **Settings** (`settings.*`): one `Settings` struct for every option, whoever uses it; loaded
   from `settings.ini` (plain `key=value`) in SDL's per-user folder when the window opens, never
   headless, saved on every change from the menu and when the program closes (with the window's

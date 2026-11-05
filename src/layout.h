@@ -6,7 +6,9 @@
 
 namespace sims2wide
 {
-enum class Layout { Stacked, Side, Focus, Auto };
+// Console: one 16:9 screen built per recognised bottom screen (console.h); Place() gives it
+// FOCUS's placement, which nothing draws.
+enum class Layout { Stacked, Side, Focus, Auto, Console };
 struct Rect { int x, y, w, h; };
 struct Placement
 {

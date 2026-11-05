@@ -5,6 +5,7 @@
 
 #include "app.h"
 #include "compose.h"
+#include "console.h"
 #include "ui.h"
 
 namespace sims2wide
@@ -15,6 +16,11 @@ struct Video
     SDL_Renderer* ren = nullptr;
     SDL_Texture* tex[2] = {};
     SDL_Texture* overlay = nullptr;
+    // The composition's overlays (frames, the backdrop, the ring) as textures at output size,
+    // made again only when one changes.
+    struct OverlayTex { Overlay o; int w, h; SDL_Texture* tex; };
+    std::vector<OverlayTex> overlayTex;
+    SDL_Texture* OverlayTexture(const Overlay& o, int w, int h);
     int overlayW = 0, overlayH = 0;
     bool smooth = false;
 
@@ -28,11 +34,13 @@ struct Video
     // The window's size into the settings, when it is a window.
     void RememberSize(Settings& s) const;
 
-    // What the window shows now: the shown layout's pieces, for the top picture's current size.
+    // What the window shows now: the shown layout's pieces, for the top picture's current size
+    // (CONSOLE: for the recognised screen, the menu and the focus). No SDL needed: --compose too.
     Composition Composed(const App& app) const
     {
         int tw, th;
         app.TopImage(tw, th);
+        if (app.shown == Layout::Console) return BuildConsole(app.screens.Current(), app.consoleMenu, app.consoleFocus, tw, th);
         return Compose(app.shown, app.mainIsTop, app.topAspect, tw, th);
     }
     void OutputSize(int& ow, int& oh) const;

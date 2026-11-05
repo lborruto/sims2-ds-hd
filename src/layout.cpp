@@ -94,6 +94,7 @@ const char* LayoutName(Layout l)
     case Layout::Stacked: return "stacked";
     case Layout::Side: return "side";
     case Layout::Focus: return "focus";
+    case Layout::Console: return "console";
     default: return "auto";
     }
 }
