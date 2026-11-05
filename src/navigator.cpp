@@ -39,8 +39,10 @@ Mode ModeOf(Screen s, bool menuOpen)
     case Screen::Social: case Screen::Cards: case Screen::Vacuum: return Mode::Activity;
     case Screen::Popup: return Mode::Popup;
     case Screen::Unknown: return Mode::Cursor;
-    case Screen::ItemHand: case Screen::SaveSlots: return Mode::Cursor; // no table yet: as Unknown
-    case Screen::None: case Screen::Dialogue: case Screen::FrontEnd: case Screen::CreateASim: case Screen::Loading: return Mode::Pass;
+    // No table yet: as Unknown. The front end (title, main menu, Create-a-Sim, None) is
+    // touch-only: the DS's buttons there change nothing, so A presses the stick cursor.
+    case Screen::ItemHand: case Screen::SaveSlots: case Screen::FrontEnd: case Screen::CreateASim: case Screen::None: return Mode::Cursor;
+    case Screen::Dialogue: case Screen::Loading: return Mode::Pass;
     }
     return Mode::Pass;
 }

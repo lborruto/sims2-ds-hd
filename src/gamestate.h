@@ -20,7 +20,7 @@ struct GameState
     GScreen screen = GScreen::Unknown;
     u32 vtable = 0; int overlay = -1;   // raw, for Unknown logging
     u8 popup = 0;                  // P+0x8 (0xFF front end, 0 none, 1 opening, 2 shown, 3 closing)
-    bool settled = false;          // P+0xE42 == 3
+    bool settled = false;          // P+0xE42 == 3 and popup 0, 2 or 0xFF (none sliding)
     int tab = -1;                  // Panel: S+0x64 (0..4)
     int selection = -1;            // per screen: catalogue S+0x254, phone S+0x89, cards S+0x2E0, relationships S+0xD0 (Sim id), pockets *(S+0x38)+0xE0
     int scroll = -1, list = -1;    // catalogue S+0x268, S+0x258

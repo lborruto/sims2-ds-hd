@@ -22,8 +22,9 @@
   games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
-  nothing to set, and it never puts two screens side by side. Title, menus and Create-a-Sim show
-  the top screen and the touch screen big, each in its frame; a black load shows only the backdrop.
+  nothing to set, and it never falls back to the bare two-screen layout. Title, menus and
+  Create-a-Sim show the top screen and the touch screen big, each in its frame; a black load
+  shows only the backdrop.
   This needs the European game (see [Good to know](#good-to-know)).
 - **The old layouts are still there.** AUTO, FOCUS, SIDE and STACKED: SETTINGS > DISPLAY > LAYOUT.
 - **The DS clock is your clock.** The game lives by the time of day (rooms take real hours,
@@ -100,7 +101,7 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 | F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
 | F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
 | 0 to 4 | | layout: AUTO / FOCUS / SIDE / STACKED / CONSOLE |
-| Mouse | right stick + LT (the cursor) | the touch screen, wherever it is shown |
+| Mouse | right stick + LT (the cursor; A too on the title, menus and Create-a-Sim) | the touch screen, wherever it is shown |
 | Mouse wheel / right button drag, over the world | | zoom / turn the camera |
 
 Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND

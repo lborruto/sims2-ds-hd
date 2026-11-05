@@ -11,14 +11,15 @@
 //     in the menu, the vacuum's hand is the stick cursor.
 //   Popup (a goal, tips, Game Paused): A or B tap its X; Start stays the DS's (it resumes a pause).
 //   Dialogue: every button is the DS's (A is the game's own "next").
-//   None: every button is the DS's.
-//   FrontEnd, CreateASim (from RAM; no table yet): every button is the DS's.
+//   FrontEnd, CreateASim (from RAM), None: touch-only (the DS's buttons change nothing there),
+//     no table yet: as Unknown.
 //   SaveSlots, ItemHand (from RAM; no table yet): as Unknown.
+//   Loading (a black load): every button is the DS's.
 //   Unknown: the DS's buttons, but A presses the stick cursor when there is one (the fallback for
 //     unmeasured screens); without a controller A stays the DS's.
 // Presses are edges of the PadState (pressed now, not on the previous Update). While the touch
 // script owns the stylus, presses that would tap are dropped, never queued behind it. While the
-// game's bottom slot switches (not settled), they wait for it (90 frames at most).
+// game's bottom slot switches or a popup slides (not settled), they wait (90 frames at most).
 #pragma once
 #include "activities.h"
 #include "common.h"
@@ -71,7 +72,8 @@ public:
     int Focus() const { return focus_; }
     // Unknown: A asks for the stick cursor's press.
     bool CursorPress() const { return cursorPress_; }
-    // The stick cursor is the way to touch here (no table of targets: None, Vacuum, Unknown).
+    // The stick cursor is the way to touch here (no table of targets: the front end, None,
+    // Vacuum, Unknown).
     bool CursorScreen() const { return cursorScreen_; }
     // The vacuum: the stick cursor is its hand, shown and moved even without a controller (the
     // D-pad moves it while X or A is held: HandDx / HandDy, DS pixels this frame); CursorPress

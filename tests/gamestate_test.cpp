@@ -85,6 +85,11 @@ static void settled_only_for_3()
 {
     for (u32 s : {0u, 3u, 4u, 5u})
         CHECK(ReadGameState(Make(0x0213203C, -1, 0, s).View()).settled == (s == 3));
+    // A popup opening (1) or closing (3) is not settled: the game reads Popup about 13 frames
+    // before the box is drawn, and a tap then lands on the panel underneath.
+    for (u32 p : {0u, 1u, 2u, 3u, 0xFFu})
+        CHECK(ReadGameState(Make(0x0213203C, -1, p, 3).View()).settled == (p == 0 || p == 2 || p == 0xFF));
+    CHECK(!ReadGameState(Make(0x0213203C, -1, 2, 0).View()).settled);
 }
 
 static void plain_screens()

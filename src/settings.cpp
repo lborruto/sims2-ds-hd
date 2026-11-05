@@ -72,9 +72,10 @@ bool Settings::Load(const std::string& path)
         widescreen = d.widescreen;
         interpolate60 = d.interpolate60;
     }
-    // v0.1.1 wrote layout=auto on any change (AUTO was the default then), so a file without a
-    // settings_version that says auto is an upgrader's, not a choice: CONSOLE, once (the next
-    // save writes version 2 and the file then says what the player chose).
+    // layout= is written since CONSOLE became the default (after v0.1.1, which never wrote it);
+    // a file without a settings_version that says auto comes from a build before version 2:
+    // by the owner's choice it starts in CONSOLE, once (the next save writes version 2 and the
+    // file then says what the player chose).
     if (version < 2 && layout == Layout::Auto) layout = Layout::Console;
     return true;
 }

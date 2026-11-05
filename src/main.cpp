@@ -143,6 +143,8 @@ int main(int argc, char** argv)
         else if (a == "--print-screen") printScreen = true;
         else if (a == "--print-game") printGame = true;
         else if (a == "--record-dir") recordDir = next();
+        // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
+        // every 200 frames from frame N, to drive the recorder.
         else if (a == "--game-unknown-after") unknownAfter = atol(next().c_str());
         else if (a == "--console-menu") consoleMenu = consolePinned = true;
         else if (a == "--console-focus") { consoleFocus = atoi(next().c_str()); consolePinned = true; }

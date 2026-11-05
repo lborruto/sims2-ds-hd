@@ -19,6 +19,11 @@ constexpr int kInvalidFrames = 300;  // RAM not reading (not a load, not black),
 constexpr long kInvalidFrom = 600;   // ... after the boot
 constexpr int kMaxPerRun = 20;
 constexpr int kMaxInFolder = 200;
+
+// The folder is UTF-8 (SDL's pref path): a path made from the u8 string, never the narrow one
+// (on Windows that is the ANSI code page, which breaks a user folder with non-ASCII letters).
+std::filesystem::path U8Path(const std::string& s) { return std::filesystem::path(std::u8string(s.begin(), s.end())); }
+std::string U8String(const std::filesystem::path& p) { const std::u8string u = p.u8string(); return std::string(u.begin(), u.end()); }
 }
 
 Recorder::Recorder(std::string dir) : dir_(std::move(dir))
@@ -48,15 +53,17 @@ void Recorder::Frame(const App& app, long frame, melonDS::NDS& nds)
     char tag[48];
     snprintf(tag, sizeof tag, "-ov%d-vt%08X.st", pair.first, pair.second);
     int inFolder = 0;
-    for (const auto& e : std::filesystem::directory_iterator(dir_, ec))
+    const std::filesystem::path dir = U8Path(dir_);
+    // increment(ec), not ++: an entry that cannot be read ends the count instead of throwing.
+    for (std::filesystem::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec))
     {
-        const std::string f = e.path().filename().string();
-        if (e.path().extension() != ".st") continue;
+        const std::string f = U8String(it->path().filename());
+        if (it->path().extension() != ".st") continue;
         inFolder++;
         if (f.size() > strlen(tag) && f.compare(f.size() - strlen(tag), strlen(tag), tag) == 0) return;
     }
     if (inFolder >= kMaxInFolder) return;
-    std::filesystem::create_directories(dir_, ec);
+    std::filesystem::create_directories(dir, ec);
     char stamp[32];
     const time_t t = time(nullptr);
     struct tm lt;
@@ -68,17 +75,17 @@ void Recorder::Frame(const App& app, long frame, melonDS::NDS& nds)
     strftime(stamp, sizeof stamp, "%Y%m%d-%H%M%S", &lt);
     char name[96];
     snprintf(name, sizeof name, "%s-ov%d-vt%08X", stamp, pair.first, pair.second);
-    const std::string base = (std::filesystem::path(dir_) / name).string();
+    const std::string base = U8String(dir / name);
     if (!SaveState(nds, base + ".st"))
     {
-        std::filesystem::remove(base + ".st", ec);
+        std::filesystem::remove(U8Path(base + ".st"), ec);
         fprintf(stderr, "recorder: cannot save %s.st\n", base.c_str());
         return;
     }
     WriteShot(base + ".png", app.Top(), app.Bottom());
-    if (!std::filesystem::exists(base + ".png", ec))
+    if (!std::filesystem::exists(U8Path(base + ".png"), ec))
     {
-        std::filesystem::remove(base + ".st", ec);
+        std::filesystem::remove(U8Path(base + ".st"), ec);
         fprintf(stderr, "recorder: cannot save %s.png\n", base.c_str());
         return;
     }

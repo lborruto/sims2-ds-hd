@@ -81,7 +81,10 @@ GameState ReadGameState(RamView ram)
     g.vtable = vt;
     g.overlay = (int)ovRaw;   // 0xFFFFFFFF is -1
     g.popup = (u8)pop;
-    g.settled = m.R8(P + kEU.slotState, slot) && slot == 3;
+    // Settled: the bottom slot is in place and no popup is sliding. A popup opening (1) reads
+    // Popup about 13 frames before its box is drawn, and closing (3) still draws it: a tap then
+    // lands on the panel underneath. 0xFF is the front end's (no popup there).
+    g.settled = m.R8(P + kEU.slotState, slot) && slot == 3 && (pop == 0 || pop == 2 || pop == 0xFF);
 
     for (const auto& e : kEU.plain) if (e.vt == vt) { g.screen = e.screen; break; }
     if (g.screen == GScreen::Unknown)

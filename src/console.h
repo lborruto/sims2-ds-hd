@@ -57,11 +57,12 @@ constexpr int kHintPad = 14, kHintGap = 8, kHintChipH = 33, kHintTextX = kHintBo
 
 // No HUD (FrontEnd, CreateASim, None: the title, the main menu, Create-a-Sim, unmapped screens):
 // the top screen in kFrontTopBox at its own shape (fitted, centred), the touch screen 2.5x at
-// the right, both framed on the dark canvas, and the buttons' hint in a box centred below.
+// the right, both framed on the dark canvas, and the buttons' hint in a box centred below (these
+// screens are touch-only: the navigator's A presses the stick cursor there).
 constexpr Rect kFrontBottomTo {616, 72, SW * 5 / 2, SH * 5 / 2};
 constexpr Rect kFrontTopBox {24, 72, 568, SH * 5 / 2};
 constexpr int kFrontHintY = 600, kFrontHintPad = 14;
-constexpr const char* kFrontHint = "A / B / D-PAD: GAME BUTTONS - STICK: CURSOR";
+constexpr const char* kFrontHint = "STICK: CURSOR - A: TOUCH";
 
 // The hints' box for an activity, at kHintBox's top, as high as its rows (at most kHintBox's):
 // a row per hint, its button in a chip of the panel's colour (round for one letter), what it

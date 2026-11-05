@@ -76,7 +76,7 @@ table is reported as `Unknown(ov=N,vt=0x...)`: log it, it is a new screen to map
 | Catalogue | `S+0x268` | | scroll: first visible item, step 3 | high |
 | Catalogue | `S+0x258` | | list: 1 shop, 2 owned | high |
 | Phone | `S+0x89` | u8 | highlighted entry 0..3 | high |
-| Phone | `S+0x88` | u8 | page (0 menu, 2 messages, 0x0A leaving) | medium |
+| Phone | `S+0x88` | u8 | page (0 menu, 2 when Messages opened, 0x0A leaving) | medium |
 | Dialogue | `S+0x0C` (= u16 `S+0x36`) | u8 | speech index | medium |
 | Dialogue | `S+0x34` | u16 | page, 1-based | medium |
 | Cards | `S+0x2E0` | s32 | lifted card 0..8, -1 none | medium |
@@ -95,8 +95,8 @@ Popup share 0x0009. Kept as a cross-check; the manager above is the source.
 
 ## Unknown
 
-Not seen in any state: other shops, other minigames, later towns, the phonebook and messages,
-Goals and Relationships sub-pages, save slot and Quit choices, Build and Gift selections,
+Not seen in any state: other shops, other minigames, later towns, the phonebook, the messages'
+own pages (only the phone's page value as Messages opened), Goals and Relationships sub-pages, save slot and Quit choices, Build and Gift selections,
 Create-a-Sim pages, game over, credits. Not found: the highlighted Social answer, the dialogue's
 page count, the Pockets counted item or slot, the Relationships list index, the title/menu
 cursor, the Options sliders. `P+0x54C` (0x0219C388) is 8 with a popup and 7 between popups;

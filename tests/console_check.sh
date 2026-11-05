@@ -17,9 +17,11 @@
 # Then the navigator, driven by the scripts' "pad" events (scripts/console/), from what
 # --print-game (the game's screen, which CONSOLE acts on) and --print-screen (the pixels') print:
 # from s7, B closes the phone, MENU opens the menu, R twice goes to Goals, B closes the menu;
-# from s6, A closes the popup; from s7, CONSOLE -> FOCUS -> CONSOLE with the menu open and A
-# held: the menu closes on leaving, nothing is tapped on coming back, MENU opens it again. In
-# none of them do the pixels disagree with the game for long ("pixels disagree").
+# from s6, A closes the popup; from s6, a touch closes the popup and A, pressed while the next
+# one opens (the game reads Popup before the box is drawn), waits and closes it; from s7,
+# CONSOLE -> FOCUS -> CONSOLE with the menu open and A held: the menu closes on leaving, nothing
+# is tapped on coming back, MENU opens it again. In none of them do the pixels disagree with the
+# game for long ("pixels disagree").
 # Then the activities on buttons (src/activities.*, scripts/console/): from act-social, RIGHT
 # answers with the right icon (it lights green; the game itself plays on for about 1600
 # frames whatever the answers); from act-cards, X draws (Jun's count on the score bar changes),
@@ -254,6 +256,7 @@ in_order() {
 }
 pad pad-tabs s7 tabs 320 &
 pad pad-popup s6 popup 120 &
+pad pad-opening s6 popup-opening 200 &
 pad pad-leave s7 leave 300 &
 wait
 check_pad() {
@@ -274,6 +277,11 @@ tabs() {
         'game Panel/Goals' 'console menu closed'
 }
 popup() { in_order pad-popup 'screen Popup' 'screen Panel/' && in_order pad-popup 'game Popup' 'game Panel/'; }
+# The second popup closed too: A pressed while it opened waited for its box.
+opening() {
+    in_order pad-opening 'screen Popup' 'screen Panel/' 'screen Popup' 'screen Panel/' &&
+        in_order pad-opening 'game Popup' 'game Panel/' 'game Popup' 'game Panel/'
+}
 leave() {
     in_order pad-leave 'console menu open' 'layout focus' 'console menu closed, focus -1' 'layout console' \
         'console menu open' || return 1
@@ -284,6 +292,7 @@ leave() {
 }
 check_pad pad-tabs tabs
 check_pad pad-popup popup
+check_pad pad-opening opening
 check_pad pad-leave leave
 
 # The activities on buttons (src/activities.*): act NAME STATE SCRIPT FRAMES SHOTS CLOCK, a

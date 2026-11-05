@@ -5,7 +5,8 @@
 // CONSOLE releases everything; the activities (activities.h): the social answers on LEFT / UP /
 // RIGHT, the cards' draw, lift, play, discard and quit question, the vacuum's blow, hand and
 // steering; presses that would tap wait for a settled screen (90 frames at most), DS buttons do
-// not; the front end's screens keep the DS's buttons, save slots and the quit question the cursor.
+// not (a popup opening waits); the front end's screens, save slots and the quit question the
+// cursor, a black load the DS's buttons.
 //   ninja -C build navigator_test && ./build/navigator_test
 #include <cstdio>
 #include <cstdlib>
@@ -630,25 +631,67 @@ static void save_slots_and_quit_keep_the_cursor()
     }
 }
 
-static void front_end_screens_pass_the_buttons()
+static void front_end_screens_touch_with_a()
 {
-    // Title / main menu, Create-a-Sim, a black load: no table of targets, the DS's own buttons
-    // (A, B, the D-pad), even with a stick cursor.
-    for (ScreenState s : {kFrontEnd, kCreateASim, ScreenState {Screen::Loading, Tab::None}})
+    // Title / main menu, Create-a-Sim, None (an unmapped front-end screen): touch-only screens
+    // with no table of targets, so as Unknown: A presses the stick cursor with a controller and
+    // stays the DS's without one; B and the D-pad stay the DS's.
+    for (ScreenState s : {kFrontEnd, kCreateASim, ScreenState {Screen::None, Tab::None}})
     {
+        Rig r;
+        r.Frame(s);
+        CHECK(r.nav.CursorScreen());
+        PadState p;
+        p.a = p.b = p.up = p.left = p.cursor = true;
+        const u32 k = r.Frame(s, p);
+        CHECK(!(k & (1u << kA)));
+        for (int key : {kB, kUp, kLeft}) CHECK(k & (1u << key));
+        CHECK(r.nav.CursorPress());
+        CHECK(!r.touch.Owns());
+        CHECK(r.nav.Focus() == -1);
+        CHECK(HotspotsFor(s).empty());
+        Rig n;
+        n.Frame(s);
+        PadState a;
+        a.a = true;
+        CHECK(n.Frame(s, a) & (1u << kA));
+        CHECK(!n.nav.CursorPress());
+    }
+    // A black load: nothing to touch, every button the DS's.
+    {
+        const ScreenState s {Screen::Loading, Tab::None};
         Rig r;
         r.Frame(s);
         PadState p;
         p.a = p.b = p.up = p.left = p.cursor = true;
         const u32 k = r.Frame(s, p);
         for (int key : {kA, kB, kUp, kLeft}) CHECK(k & (1u << key));
-        CHECK(!r.touch.Owns());
-        CHECK(r.nav.Focus() == -1);
         CHECK(!r.nav.CursorPress());
-        CHECK(HotspotsFor(s).empty());
+        CHECK(!r.touch.Owns());
     }
     CHECK(std::string(ScreenName(Screen::SaveSlots)) == "SaveSlots");
     CHECK(std::string(ScreenName(Screen::Loading)) == "Loading");
+}
+
+static void popup_opening_holds_a()
+{
+    // A popup opening (the game reads Popup about 13 frames before the box is drawn: not settled,
+    // GameState::settled): A is held, then taps the popup's X once the box is shown.
+    Rig r;
+    r.Frame(kInteract);
+    r.Frame(kPopup, {}, false);
+    PadState a;
+    a.a = true;
+    r.Frame(kPopup, a, false);
+    for (int i = 0; i < 10; i++) r.Frame(kPopup, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(kPopup, {}, true);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == kPopupClose.x && y == kPopupClose.y);
+    r.Drain();
+    r.Frame(kPopup, {}, true);
+    CHECK(!r.touch.Owns());
 }
 
 int main()
@@ -673,7 +716,8 @@ int main()
     unsettled_ds_buttons_pass();
     unsettled_press_dropped_on_screen_change();
     save_slots_and_quit_keep_the_cursor();
-    front_end_screens_pass_the_buttons();
+    front_end_screens_touch_with_a();
+    popup_opening_holds_a();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;
