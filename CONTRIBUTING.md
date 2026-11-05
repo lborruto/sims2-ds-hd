@@ -58,6 +58,8 @@ Before opening a pull request:
     ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens
     ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
     bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts (ROM, shots/, the complete save, Pillow)
+    ninja -C build gamestate_test && ./build/gamestate_test   # the RAM reader and its screen names on a synthetic RAM
+    bash tests/gamestate_check.sh            # each save state's game state read from RAM, the recorder's captures (ROM, shots/, the complete save)
     ninja -C build romdata_test && ./build/romdata_test       # the ROM's archive and string tables on a synthetic ROM: decoded, and every broken table refused
     bash tests/romdata_check.sh              # the game's strings read from the ROM in its five languages (ROM; RESEARCH= the decoded lines to compare with, else that part is skipped)
 
@@ -125,6 +127,9 @@ The headless mode runs the game without a window, about four times faster than r
 | `--mic off\|blow\|real` | what the DS hears (the setting otherwise) |
 | `--fast` | start with fast forward held; headless, it exercises the clock's hold |
 | `--print-screen` | print the recognised bottom screen (`screens.h`) when it changes: `frame N: screen Panel/Pockets` |
+| `--print-game` | print what the game says is up, read from its RAM (European ROM only), at frame 0 and whenever it changes: `frame N: game X` |
+| `--record-dir DIR` | where unmapped screens are recorded (a window run records by default; headless only with this) |
+| `--strings-count`, `--dump-string ID`, `--language N` | the game's own strings read from the ROM (`romdata.h`), printed; they stop the run |
 | `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
 
 A headless run ends with a line that says what the DS clock reads, how often the hold wrote

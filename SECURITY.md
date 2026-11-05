@@ -29,7 +29,8 @@ with, endorsed by or supported by Electronic Arts, Maxis, Nintendo or the melonD
   would any file an emulator opens.
 - **It writes in a few known places.** Beside the ROM: the game's save (or `--save`),
   `<rom>.quick.st` (F5) and `<rom>-shot.png` (F12). In its per-user settings folder:
-  `last-rom.txt`, the path of the ROM chosen last time. Where you say: the `--state-save` file and
+  `last-rom.txt`, the path of the ROM chosen last time, and `captures/`, a picture and a save
+  state of each screen the game shows that the program does not know yet (at most 200). Where you say: the `--state-save` file and
   the `--shot-dir` folder (default `shots`, in the folder you run it from). Nothing else.
 - **Not signed by Apple or Microsoft.** The Mac app is ad-hoc signed and not notarised, the
   Windows program not signed: the systems warn the first time. Check a download with

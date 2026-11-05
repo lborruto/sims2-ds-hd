@@ -112,6 +112,18 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   the recorder records nothing, `--print-game` prints nothing, and one toast / stderr line says
   so. `tests/gamestate_check.sh` runs a copy with `XXXX` as game code (melonDS does not check
   the header CRC for direct boot).
+- The game's screen object `S` lives on the heap: `ReadGameState` reads it again every frame and
+  checks its vtable, never cached (`docs/research/ram-map.md`). A slot that is not settled is
+  mid-switch: CONSOLE holds taps until it settles (the gate, below); the recorder only records a
+  settled pair.
+- The recorder writes to the player's pref folder: once per (overlay, vtable) pair across
+  sessions, 20 a run, 200 in all. It writes nothing on another ROM and, headless, nothing without
+  `--record-dir`. A capture's `.st` holds the game's memory: never commit or attach one; the
+  `.png` is what a player sends.
+- Known limits of CONSOLE's RAM-led screen: (1) quitting the cards shows about 10 frames of the
+  cards' layout over black (the pixels go black before RAM leaves Cards); (2) a goal popup over
+  the Options tab reads Unknown (the stick cursor, not the popup's close); (3) the frame's
+  corner radius is a literal (16, `Frame()` in `console.cpp`), not derived from the piece.
 - melonDS framebuffers are `0xAARRGGBB`, 256 × 192 each, `GPU.Framebuffer[FrontBuffer][0]` =
   top, `[1]` = bottom.
 - HUD detection uses the status bar's frame, never what lies under the Sanity bar: row 176
@@ -164,7 +176,8 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   vacuum, the music mixer). `--mic real` needs `NSMicrophoneUsageDescription` in the Mac app's
   plist (there) and the terminal's permission on a Mac for the CLI program.
 - `SIMS2WIDE_PROBE=N` prints AUTO's signals every N frames (HUD, social, warm menu, motion and
-  brightness of each screen); `--print-screen` prints the recognised bottom screen on change.
+  brightness of each screen); `--print-screen` prints the recognised bottom screen on change, and
+  `--print-game` what the game's RAM says (also at frame 0; `pixels disagree` when the two part for 90 settled frames).
 - Touch mapping goes through the same composition (`compose.h`, from `Place()` or `BuildConsole`) as drawing: change one, the other follows. The topmost piece under the pointer decides, for a click and for the camera alike: a touchable bottom piece is the stylus, a touchable top piece the camera (wheel, right drag), an untouchable piece (`touch=false`: CONSOLE's dimmed world behind the menu) neither, and it hides what lies under it. Overlays never take the mouse. A drag keeps the piece it began on; if that piece is gone (the layout or the screen changed mid-drag), the touchable bottom piece under the pointer, else the largest; always held to the piece's source rectangle and the DS screen.
   The stylus goes down only when the left button is pressed on the touch screen; until release
   it follows the pointer clamped to that screen (`TouchClamped`), wherever the pointer goes.
