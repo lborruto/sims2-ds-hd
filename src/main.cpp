@@ -67,6 +67,8 @@ static void Usage()
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
+        "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
+        "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
         "  --record-dir DIR              where unmapped screens are recorded (a state + a picture each; default: the\n"
         "                                settings folder's captures/; on in the window, off headless unless given)\n"
         "  --print-screen                print the recognised bottom screen when it changes (frame N: screen X)\n"
@@ -113,7 +115,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int res3d = 0;
     bool wide = false, interp = false;
@@ -142,6 +144,7 @@ int main(int argc, char** argv)
         else if (a == "--fast") fast = true;
         else if (a == "--print-screen") printScreen = true;
         else if (a == "--print-game") printGame = true;
+        else if (a == "--print-hud") printHud = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -395,6 +398,21 @@ int main(int argc, char** argv)
             {   // the check's fake: a new unmapped pair every 200 frames
                 app.game.valid = true; app.game.between = false; app.game.settled = true;
                 app.game.screen = GScreen::Unknown; app.game.overlay = 90; app.game.vtable = 0x02000000 + (u32)((frame - unknownAfter) / 200);
+            }
+            if (app.portSupported && printHud)
+            {
+                const HudState& h = app.game.hud;
+                if (h.valid != before.hud.valid || (h.valid && !(h == before.hud)))
+                {
+                    if (h.valid) fprintf(stderr, "frame %ld: hud money=%d time=%02d:%02d sanity=%d/%d tier=%d name=%s\n", frame, h.money, h.hour, h.minute, h.sanity, h.sanityMax, h.tier, h.simName.c_str());
+                    else fprintf(stderr, "frame %ld: hud none\n", frame);
+                }
+                const DialogueState& d = app.game.dialogue;
+                if (d.valid != before.dialogue.valid || (d.valid && !(d == before.dialogue)))
+                {
+                    if (d.valid) fprintf(stderr, "frame %ld: dialogue speech=%d page=%d/%d id=%d speaker=%d name=%d last=%d\n", frame, d.speech, d.page, d.pages, d.stringId, d.speaker, d.speakerNameId, d.last ? 1 : 0);
+                    else fprintf(stderr, "frame %ld: dialogue none\n", frame);
+                }
             }
             if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
         }

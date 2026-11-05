@@ -94,6 +94,38 @@ else
     else echo "FAIL tabs: want '$want_seq', got '${got_seq:-nothing}'"; fail=1; fi
 fi
 
+# The status bar and the conversation (--print-hud): the clock follows --clock, the complete
+# save's money, tier and Sim, and the conversations' page / string id / speaker series. The
+# lines are `frame N: hud ...` and `frame N: dialogue ...`; the frame numbers are not asserted.
+hud_run() { # NAME STATE FRAMES [options]: the hud and dialogue lines in NAME.hud
+    local name=$1 state=$2 frames=$3 file; shift 3
+    file=$shots/$state.st; [ -f "$file" ] || file=$more_shots/$state.st
+    if [ ! -f "$file" ]; then echo "no save state $state.st" > "$tmp/$name.hud"; return; fi
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$tmp/$name.sav" --print-hud "$@" > "$tmp/$name.hudlog" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.hudlog" && touch "$tmp/$name.hudok"
+    grep -E '^frame [0-9]+: (hud|dialogue) ' "$tmp/$name.hudlog" | sed 's/^frame [0-9]*: //' > "$tmp/$name.hud"
+}
+# hud_want NAME PATTERN LABEL: the last hud line matches (grep -E).
+hud_want() {
+    if [ -f "$tmp/$1.hudok" ] && grep '^hud ' "$tmp/$1.hud" | tail -n 1 | grep -q -E "$2"; then echo "ok   $3"
+    else echo "FAIL $3: got '$(grep '^hud ' "$tmp/$1.hud" 2>/dev/null | tail -n 1)'"; fail=1; fi
+}
+hud_run hud-s7 s7 120 "${town[@]/12:00/15:37}"
+cp "$complete_save" "$tmp/hud-complete.sav" 2>/dev/null
+hud_run hud-complete sit-hotel-late 150 "${late[@]}"
+hud_run hud-s5 s5 520 "${town[@]}" --input "$repo/scripts/dlg-taps.txt"
+hud_run hud-conc sit-concierge 60 "${hotel[@]}"
+hud_run hud-sit sit-dialogue 60 "${town[@]}"
+hud_want hud-s7 '^hud money=2000 time=15:37 sanity=[0-9]+/100 tier=0 name=Sim$' "hud: s7 on a 15:37 clock reads 15:37, money 2000, tier 0"
+hud_want hud-complete '^hud money=14798 time=12:0[5-9] sanity=[0-9]+/225 tier=2 name=Jun$' "hud: the complete save reads money 14798, max 225, tier 2, Jun"
+dlg_want() { # NAME SERIES LABEL: the dialogue lines folded to speech page id speaker name last
+    local got; got=$(grep '^dialogue ' "$tmp/$1.hud" | grep -v none | sed -E 's/^dialogue speech=([0-9]+) page=([0-9]+)\/([0-9]+) id=([0-9]+) speaker=([0-9]+) name=(-?[0-9]+) last=([01])/\1:\2\/\3:\4:\5:\6:\7/' | tr '\n' ' ' | sed 's/ $//')
+    if [ "$got" = "$2" ]; then echo "ok   $3"; else echo "FAIL $3: want '$2', got '$got'"; fail=1; fi
+}
+dlg_want hud-s5 '0:1/4:1183:22:345:0 0:2/4:1184:22:345:0 0:3/4:1185:22:345:0 0:4/4:1186:22:345:1 1:1/3:1187:22:345:0 1:2/3:1188:22:345:0 1:3/3:1189:22:345:1' "dialogue: s5 tapped through, pages 1183-1186 then 1187-1189, last flags"
+dlg_want hud-conc '4:1/5:1198:45:368:0' "dialogue: the concierge, speaker 45 = name id 368"
+dlg_want hud-sit '2:1/1:1190:22:345:1' "dialogue: the sit conversation, one page, last"
+
 # The recorder: --game-unknown-after N fakes an unmapped screen (a new pair every 200 frames);
 # --record-dir saves a state and a picture per pair, once, 30 frames in; the state loads.
 rec_run() { # DIR FRAMES [options]
