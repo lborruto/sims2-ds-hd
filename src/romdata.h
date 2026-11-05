@@ -44,5 +44,6 @@ private:
 
 // The language the game shows: the firmware's user language (0 Japanese to 5 Spanish), which
 // the game reads at start; any other value (Chinese, reserved) is taken as English.
+// (romdata_nds.cpp: the only part that needs melonDS.)
 int GameLanguage(melonDS::NDS& nds);
 }

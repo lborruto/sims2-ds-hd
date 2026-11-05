@@ -147,9 +147,16 @@ int main(int argc, char** argv)
         else if (a == "--console-menu") consoleMenu = consolePinned = true;
         else if (a == "--console-focus") { consoleFocus = atoi(next().c_str()); consolePinned = true; }
         else if (a == "--clock") { if (!clock::SetFixed(next())) { fprintf(stderr, "--clock wants \"YYYY-MM-DD HH:MM\"\n"); return 1; } }
-        else if (a == "--language") language = atoi(next().c_str());
+        else if (a == "--language" || a == "--dump-string")
+        {
+            // A whole number, 0 or more; anything else is a usage error, not a 0.
+            const std::string v = next();
+            char* rest = nullptr;
+            const long number = strtol(v.c_str(), &rest, 10);
+            if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            (a == "--language" ? language : dumpString) = (int)number;
+        }
         else if (a == "--strings-count") stringsCount = true;
-        else if (a == "--dump-string") dumpString = atoi(next().c_str());
         else if (a == "--layout")
         {
             std::string l = next();
