@@ -223,6 +223,9 @@ int main(int argc, char** argv)
     if (!headless)
     {
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
+        // The keymap is known now: the keys asked by position have their values, so the swap
+        // can move them out of the way of a key the settings file gave another action.
+        app.settings.controls.ResolveKeys();
         if (!video.Open(app.settings)) return 1;
         audio.Open();
         input.OpenPads();

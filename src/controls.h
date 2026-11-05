@@ -101,6 +101,10 @@ struct Bindings
     }
     // One line of the settings file; whether it was one of these.
     bool Apply(const std::string& k, const std::string& v);
+    // The keys given again through the swap, from the defaults, once the keyboard's keymap is
+    // known (after SDL's video is up): the settings load before it, when the defaults asked by
+    // position (A, B, X, Y, L, R, TOUCH MENU) are still 0 and cannot be swapped out of the way.
+    void ResolveKeys();
     // The lines for the settings file (only what differs from the defaults).
     std::string Lines() const;
 };

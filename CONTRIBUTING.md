@@ -54,7 +54,7 @@ Before opening a pull request:
     ninja -C build hotspots_test && ./build/hotspots_test   # the touch targets' tables and focus moves
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
     ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens
-    ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap
+    ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
     bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong, the navigator's pad scripts (ROM, shots/, the complete save, Pillow)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save

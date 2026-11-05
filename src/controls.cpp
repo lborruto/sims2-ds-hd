@@ -159,6 +159,21 @@ bool Bindings::Apply(const std::string& k, const std::string& v)
     return true;
 }
 
+void Bindings::ResolveKeys()
+{
+    // As if the file were loaded now: from the defaults, each given key through the swap, in
+    // the actions' order (the file's). A consistent file comes back as it was. (A 0 is a
+    // positional default the load's swap handed on while it was still unknown: a default.)
+    int given[COUNT];
+    for (int a = 0; a < COUNT; a++)
+    {
+        given[a] = key[a] == SDLK_UNKNOWN ? kDefault : key[a];
+        key[a] = given[a] == kNone ? kNone : kDefault;
+    }
+    for (int a = 0; a < COUNT; a++)
+        if (given[a] != kDefault && given[a] != kNone) SetKey(a, given[a]);
+}
+
 std::string Bindings::Lines() const
 {
     std::string s;

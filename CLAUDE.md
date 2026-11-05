@@ -245,7 +245,11 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   the pause menu, buttons still held are not presses. The DS's Select moved to the left stick's
   click (Back is the touch menu's). `Bindings::Apply` loads settings through `SetKey`/`SetPad`
   (the swap), so an older file giving an action Back or E (now TOUCH MENU's defaults) still binds
-  each input to one action (`tests/controls_test.cpp`). From `s7`, `pad b` closes the phone (Panel/Interact about 50
+  each input to one action (`tests/controls_test.cpp`). Keys need one more step: settings load
+  before SDL's video is up, when the keys asked by position (A, B, X, Y, L, R, TOUCH MENU's E)
+  are still 0, so the window gives the keys again through the swap right after `SDL_Init`
+  (`Bindings::ResolveKeys`; a 0 left by the load counts as a default). The test gets the keymap
+  from SDL's dummy video driver. From `s7`, `pad b` closes the phone (Panel/Interact about 50
   frames later, the phone slides).
 - The complete save's states (in git-ignored `shots/`; run them with
   `--save` a copy of `saves/complete-play.sav` and `--clock "2026-11-05 12:05"`): `sit-casino`

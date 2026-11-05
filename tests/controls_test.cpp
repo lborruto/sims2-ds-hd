@@ -6,6 +6,7 @@
 #include <SDL.h>
 
 #include <cstdio>
+#include <string>
 
 #include "controls.h"
 
@@ -16,13 +17,13 @@ static int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond); failures++; } } while (0)
 
 // No two actions share a pad input (or a key, among those with one).
-static bool OneEach(const Bindings& b)
+static bool OneEach(const Bindings& b, bool quiet = false)
 {
     for (int a = 0; a < COUNT; a++)
         for (int c = a + 1; c < COUNT; c++)
         {
-            if (b.Pad(a) >= 0 && b.Pad(a) == b.Pad(c)) { fprintf(stderr, "  pad %s: %s and %s\n", InputKey(b.Pad(a)), ActionKey(a), ActionKey(c)); return false; }
-            if (b.Key(a) > 0 && b.Key(a) == b.Key(c)) { fprintf(stderr, "  key %d: %s and %s\n", b.Key(a), ActionKey(a), ActionKey(c)); return false; }
+            if (b.Pad(a) >= 0 && b.Pad(a) == b.Pad(c)) { if (!quiet) fprintf(stderr, "  pad %s: %s and %s\n", InputKey(b.Pad(a)), ActionKey(a), ActionKey(c)); return false; }
+            if (b.Key(a) > 0 && b.Key(a) == b.Key(c)) { if (!quiet) fprintf(stderr, "  key %d: %s and %s\n", b.Key(a), ActionKey(a), ActionKey(c)); return false; }
         }
     return true;
 }
@@ -82,11 +83,42 @@ static void saved_file_loads_back()
     CHECK(OneEach(n));
 }
 
+static void old_file_with_e_once_keys_known()
+{
+    // An older file giving A the key E (TOUCH MENU's default since, asked by position). Settings
+    // load before SDL's video is up, when the positional defaults are still 0: the window
+    // resolves the keys again once the keymap is known (main.cpp, after SDL_Init).
+    Bindings b;
+    b.Apply("key_a", std::to_string((int)SDLK_e));
+    b.Apply("key_b", std::to_string((int)SDLK_ESCAPE));
+    SDL_SetHint(SDL_HINT_VIDEODRIVER, "dummy");
+    if (SDL_Init(SDL_INIT_VIDEO) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); failures++; return; }
+    CHECK(DefaultKey(PANEL) == SDLK_e); // the keymap is known now
+    CHECK(b.ActionOfKey(SDLK_e) == A);
+    CHECK(!OneEach(b, true));                 // before: A and TOUCH MENU on E
+    b.ResolveKeys();
+    CHECK(OneEach(b));
+    CHECK(b.ActionOfKey(SDLK_e) == A);
+    CHECK(b.ActionOfKey(SDLK_ESCAPE) == B);
+    CHECK(b.Key(PANEL) == DefaultKey(A)); // the swap: TOUCH MENU took A's place (X), MENU B's (Z)
+    CHECK(b.Key(MENU) == DefaultKey(B));
+    // A consistent file resolves to itself.
+    Bindings c;
+    c.SetKey(PANEL, SDLK_F2);
+    c.SetKey(A, SDLK_e);
+    Bindings d = c;
+    d.ResolveKeys();
+    for (int a = 0; a < COUNT; a++) CHECK(d.Key(a) == c.Key(a));
+    CHECK(OneEach(d));
+    SDL_Quit();
+}
+
 int main(int, char**)
 {
     defaults_one_each();
     old_file_with_back();
     saved_file_loads_back();
+    old_file_with_e_once_keys_known();
     if (failures) { fprintf(stderr, "controls_test: %d failure(s)\n", failures); return 1; }
     printf("controls_test: ok\n");
     return 0;
