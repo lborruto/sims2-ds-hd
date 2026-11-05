@@ -40,6 +40,7 @@ the owner makes it public; write everything as if it were public already).
 | `src/console.*` | CONSOLE (`--layout console`): `BuildConsole(ScreenState, menuOpen, focus, topW, topH)`, the 1280 × 720 composition per recognised screen (town and its rail, the menu over the dimmed world, the dialogue rebuilt wide, activities, SIDE for None), its geometry and the game's colours; `App::consoleMenu` / `consoleFocus` (the navigator drives them; `--console-menu` / `--console-focus N` pin them for checks' pictures, `App::consolePinned`) |
 | `src/navigator.*` | CONSOLE's navigator: `PadState` (the actions held: DS buttons, MENU = the PANEL action, sticks), `Navigator::Update(ScreenState, pad, TouchScript&, dsKeys)`: per screen the DS's buttons passed on, or a focus over `HotspotsFor` moved by the D-pad and tapped with A; `Leave` when CONSOLE goes; `Input::Steer` runs it (window and headless) |
 | `tests/navigator_test.cpp` | The navigator on synthetic screen states: menu, focus moves, taps, tabs, popup, phone, town keys, Unknown's cursor, leaving CONSOLE (`ninja -C build navigator_test`) |
+| `tests/controls_test.cpp` | The bindings: one action per input, by default and after loading an older settings file (`ninja -C build controls_test`) |
 | `scripts/console/*.txt` | `pad` scripts for `tests/console_check.sh`'s navigator cases |
 | `tests/console_check.sh` | CONSOLE's pictures from save states: the DS pixels where each piece puts them, the frames, the dimmed world, the focus ring, SIDE without a HUD; then the navigator from `pad` scripts (`--print-screen`: tabs from `s7`, the popup from `s6`, CONSOLE → FOCUS → CONSOLE) (ROM, `shots/`, the complete save and Pillow: `PYTHON=…`) |
 | `src/touchscript.*` | `TouchScript` (`Input::touchScript`): taps, holds and drags over game frames, queued (8 at most), one released frame between; wins over the mouse and the stick in `Input::Frame` |
@@ -223,12 +224,16 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   script last as ever). Panel with the menu closed, Dialogue, None, Vacuum: the buttons are the
   DS's (LB / RB the camera's L / R; A advances a conversation itself). MENU (the PANEL action:
   E, the pad's Back) opens the panel's menu only; Esc / Guide / Start + Back stay the pause
-  menu. Focus screens (the panel's menu, Phone, Gift, Catalogue, Build, Social, Cards): the
+  menu; the pad's TOUCH MENU acts on Back's release, and not at all if Start was held meanwhile
+  (`ReleasePulse`: Start + Back in either order is the pause menu); the key E acts on its press.
+  Focus screens (the panel's menu, Phone, Gift, Catalogue, Build, Social, Cards): the
   D-pad or left stick moves the focus (`Neighbour`; held: again after 18 frames, then every 6),
   A taps, on the panel LB / RB tap the previous / next tab icon (in a ring) and B / MENU close
   the menu (no tap); on the Phone B / MENU tap `kPhoneClose` and close the menu; elsewhere B taps
   the screen's `close` target if it has one. Popup: A / B tap `kPopupClose`, Start stays the
-  DS's (Game Paused). Unknown: the DS's buttons but A, which presses the stick cursor; the stick
+  DS's (Game Paused). Unknown: the DS's buttons but A, which presses the stick cursor when one
+  exists (a controller and the setting on: `PadState::cursor`; otherwise A stays the DS's, so
+  the keyboard alone still answers Save and Quit); the stick
   cursor works in CONSOLE only on screens without a table (None, Vacuum, Unknown). The menu
   stays open only while the panel changes tab; any other screen change closes it and puts the
   focus back on the screen's first target. A tap is queued only when the touch script does not
@@ -238,7 +243,9 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   a drag only (`Hotspot::dragOnly`): the focus skips them (the mouse or, later, Task 7 does
   them). Presses are edges against the previous `PadState`; after `Leave` (another layout) or
   the pause menu, buttons still held are not presses. The DS's Select moved to the left stick's
-  click (Back is the touch menu's). From `s7`, `pad b` closes the phone (Panel/Interact about 50
+  click (Back is the touch menu's). `Bindings::Apply` loads settings through `SetKey`/`SetPad`
+  (the swap), so an older file giving an action Back or E (now TOUCH MENU's defaults) still binds
+  each input to one action (`tests/controls_test.cpp`). From `s7`, `pad b` closes the phone (Panel/Interact about 50
   frames later, the phone slides).
 - The complete save's states (in git-ignored `shots/`; run them with
   `--save` a copy of `saves/complete-play.sav` and `--clock "2026-11-05 12:05"`): `sit-casino`

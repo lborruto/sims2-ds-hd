@@ -119,3 +119,8 @@ target_include_directories(screens_test PRIVATE melonDS/src src)
 # Checks of CONSOLE's navigator (not built by default): ninja -C build navigator_test && ./build/navigator_test
 add_executable(navigator_test EXCLUDE_FROM_ALL tests/navigator_test.cpp src/navigator.cpp src/hotspots.cpp src/screens.cpp src/touchscript.cpp)
 target_include_directories(navigator_test PRIVATE melonDS/src src)
+
+# Checks of the bindings and the settings file's loading (not built by default): ninja -C build controls_test && ./build/controls_test
+add_executable(controls_test EXCLUDE_FROM_ALL tests/controls_test.cpp src/controls.cpp)
+target_include_directories(controls_test PRIVATE melonDS/src src)
+target_link_libraries(controls_test PRIVATE SDL2::SDL2-static)

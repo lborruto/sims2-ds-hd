@@ -1,7 +1,8 @@
 // Checks CONSOLE's navigator on synthetic screen states: the menu opens and closes, the D-pad
 // moves the focus, A taps the focused target, L / R tap the tab icons, a popup closes with A, the
-// town keeps the DS's buttons, the phone closes with B, Unknown presses the stick cursor, and
-// leaving CONSOLE releases everything.
+// town keeps the DS's buttons, the phone closes with B, Unknown presses the stick cursor (A stays
+// the DS's without one), the pad's touch menu acts on release unless Start joins it, and leaving
+// CONSOLE releases everything.
 //   ninja -C build navigator_test && ./build/navigator_test
 #include <cstdio>
 #include <cstdlib>
@@ -222,7 +223,7 @@ static void unknown_presses_the_cursor()
     r.Frame(kUnknown);
     CHECK(r.nav.CursorScreen());
     PadState a;
-    a.a = true;
+    a.a = a.cursor = true;
     const u32 k = r.Frame(kUnknown, a);
     CHECK(!(k & (1u << kA)));
     CHECK(r.nav.CursorPress());
@@ -231,6 +232,52 @@ static void unknown_presses_the_cursor()
     CHECK(!r.nav.CursorPress());
     r.Frame(kInteract);
     CHECK(!r.nav.CursorScreen());
+}
+
+static void unknown_without_a_cursor_keeps_a()
+{
+    // The keyboard alone (no controller, or the cursor off): A stays the DS's on Unknown screens.
+    Rig r;
+    r.Frame(kUnknown);
+    PadState a;
+    a.a = true;
+    CHECK(r.Frame(kUnknown, a) & (1u << kA));
+    CHECK(!r.nav.CursorPress());
+}
+
+static void touch_menu_on_release_unless_start()
+{
+    // Back alone: the touch menu, once, when it goes up.
+    ReleasePulse back;
+    CHECK(!back.Update(true, false));
+    CHECK(!back.Update(true, false));
+    CHECK(back.Update(false, false));
+    CHECK(!back.Update(false, false));
+    // Back, then Start with it (the pause menu): nothing, whichever is released first.
+    CHECK(!back.Update(true, false));
+    CHECK(!back.Update(true, true));
+    CHECK(!back.Update(true, false));
+    CHECK(!back.Update(false, false));
+    // Start first, then Back.
+    CHECK(!back.Update(true, true));
+    CHECK(!back.Update(false, false));
+    // A fresh press is not spoiled by the last one.
+    CHECK(!back.Update(true, false));
+    CHECK(back.Update(false, false));
+    // The pulse opens the menu through the navigator's edge.
+    Rig r;
+    r.Frame(kInteract);
+    ReleasePulse b;
+    PadState p;
+    p.menu = b.Update(true, false);
+    r.Frame(kInteract, p);
+    CHECK(!r.nav.MenuOpen());
+    p.menu = b.Update(false, false);
+    r.Frame(kInteract, p);
+    CHECK(r.nav.MenuOpen());
+    p.menu = b.Update(false, false);
+    r.Frame(kInteract, p);
+    CHECK(r.nav.MenuOpen());
 }
 
 static void leaving_console_releases_all()
@@ -267,6 +314,8 @@ int main()
     phone_closed_by_b();
     town_and_dialogue_keep_the_buttons();
     unknown_presses_the_cursor();
+    unknown_without_a_cursor_keeps_a();
+    touch_menu_on_release_unless_start();
     leaving_console_releases_all();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");

@@ -231,7 +231,8 @@ void Input::Poll(const App& app, bool menuOpen)
     const Settings& s = app.settings;
     prevPad = pad;
     pad = PadRaw();
-    if (pads.empty()) return;
+    panelPulse = false;
+    if (pads.empty()) { panelButton = ReleasePulse(); return; }
     // Each button pressed on any controller; each stick as far as on the one pushed furthest.
     auto merge = [](float& to, float v) { if (std::fabs(v) > std::fabs(to)) to = v; };
     for (SDL_GameController* c : pads)
@@ -244,6 +245,13 @@ void Input::Poll(const App& app, bool menuOpen)
         merge(pad.ry, axis(SDL_CONTROLLER_AXIS_RIGHTY));
         pad.btn[IN_LT] |= axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 0.5f;
         pad.btn[IN_RT] |= axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.5f;
+    }
+    // TOUCH MENU on the pad: on release, spoiled by Start (Start + Back opens the pause menu
+    // whichever goes down first), by the pause menu and by a binding being captured.
+    {
+        const int in = s.controls.Pad(PANEL);
+        const bool spoil = (pad.btn[IN_START] && in != IN_START) || capturing || menuOpen;
+        panelPulse = panelButton.Update(in >= 0 && pad.btn[in], spoil);
     }
     if (capturing)
     {
@@ -286,8 +294,8 @@ PadState Input::Actions(const Settings& s) const
     p.rb |= on(R);
     p.start |= on(START);
     p.select |= on(SELECT);
-    // (BACK with START is the pause menu, not the touch menu.)
-    p.menu |= on(PANEL) && !(pad.btn[IN_START] && pad.btn[IN_BACK]);
+    // The keyboard's on the press; the pad's on release (Poll: Start + Back is the pause menu).
+    p.menu |= held[PANEL] || panelPulse;
     p.up |= on(UP);
     p.down |= on(DOWN);
     p.left |= on(LEFT);
@@ -302,6 +310,7 @@ PadState Input::Actions(const Settings& s) const
         p.lt = pad.btn[IN_LT] ? 1.0f : 0.0f;
         p.rt = pad.btn[IN_RT] ? 1.0f : 0.0f;
     }
+    p.cursor = s.stickCursor && !pads.empty();
     return p;
 }
 

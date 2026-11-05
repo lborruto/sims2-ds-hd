@@ -11,7 +11,8 @@
 //   Popup (a goal, tips, Game Paused): A or B tap its X; Start stays the DS's (it resumes a pause).
 //   Dialogue: every button is the DS's (A is the game's own "next").
 //   None, Vacuum: every button is the DS's.
-//   Unknown: the DS's buttons, but A presses the stick cursor (the fallback for unmeasured screens).
+//   Unknown: the DS's buttons, but A presses the stick cursor when there is one (the fallback for
+//     unmeasured screens); without a controller A stays the DS's.
 // Presses are edges of the PadState (pressed now, not on the previous Update). While the touch
 // script owns the stylus, presses that would tap are dropped, never queued behind it.
 #pragma once
@@ -28,6 +29,32 @@ struct PadState
     bool a = false, b = false, x = false, y = false, lb = false, rb = false, start = false, select = false,
          menu = false, up = false, down = false, left = false, right = false;
     float lx = 0, ly = 0, rx = 0, ry = 0, lt = 0, rt = 0;
+    // A stick cursor exists (a controller and the setting on): Unknown gives A to it. Without one
+    // A stays the DS's there (the keyboard alone must still answer a Save or a Quit question).
+    bool cursor = false;
+};
+
+// A button that acts once, on its release, and only if `spoil` was never true while it was held:
+// the pad's TOUCH MENU on Back, since Start + Back (in either order) is the pause menu.
+class ReleasePulse
+{
+public:
+    // Once a frame; true on the frame the button goes up unspoiled.
+    bool Update(bool down, bool spoil)
+    {
+        bool fire = false;
+        if (down)
+        {
+            if (!down_) spoiled_ = false;
+            spoiled_ |= spoil;
+        }
+        else if (down_) fire = !spoiled_;
+        down_ = down;
+        return fire;
+    }
+
+private:
+    bool down_ = false, spoiled_ = false;
 };
 
 class Navigator

@@ -151,8 +151,10 @@ bool Bindings::Apply(const std::string& k, const std::string& v)
     for (int a = 0; a < COUNT; a++)
         if (name == ActionKey(a))
         {
-            if (isKey) { const long kc = atol(v.c_str()); key[a] = kc > 0 ? (int)kc : kNone; }
-            else { const int in = InputFromKey(v); pad[a] = in >= 0 ? in : kNone; }
+            // Through the swap, so that a file written before a default changed (an action given
+            // the key or input a newer action now has by default) still binds one action each.
+            if (isKey) { const long kc = atol(v.c_str()); if (kc > 0) SetKey(a, (int)kc); else key[a] = kNone; }
+            else { const int in = InputFromKey(v); if (in >= 0) SetPad(a, in); else pad[a] = kNone; }
         }
     return true;
 }

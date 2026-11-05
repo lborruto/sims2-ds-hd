@@ -179,8 +179,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         if (pad.start) dsKeys |= 1u << kStart; // Game Paused also resumes on Start
         break;
     case Mode::Cursor:
-        dsKeys |= DsKeys(pad, false);
-        cursorPress_ = pad.a;
+        dsKeys |= DsKeys(pad, !pad.cursor);
+        cursorPress_ = pad.cursor && pad.a;
         break;
     }
 

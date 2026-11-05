@@ -54,6 +54,7 @@ Before opening a pull request:
     ninja -C build hotspots_test && ./build/hotspots_test   # the touch targets' tables and focus moves
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
     ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens
+    ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap
     bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong, the navigator's pad scripts (ROM, shots/, the complete save, Pillow)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
@@ -177,7 +178,8 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   For each recognised screen it either passes them on as the DS's (town, conversations) or keeps
   a focus on one of the screen's touch targets (`hotspots.*`), moved by the D-pad with
   `Neighbour` and tapped with A through the touch script; the panel's menu opens with the TOUCH
-  MENU action (E, Back), LB / RB tap the tabs there, B closes. Presses are edges against the
+  MENU action (E on its press, Back on its release unless Start joined it: Start + Back is the
+  pause menu), LB / RB tap the tabs there, B closes. Presses are edges against the
   previous frame; taps are dropped while the touch script owns the stylus. Leaving CONSOLE
   cancels the touch script and closes the menu. `tests/navigator_test.cpp` drives it on
   synthetic screen states; `tests/console_check.sh` from save states with `pad` scripts.

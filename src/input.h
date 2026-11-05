@@ -51,6 +51,9 @@ struct Input
     Navigator navigator;
     bool steering = false;        // the navigator ran last frame (CONSOLE was shown)
     PadState scriptPad;           // this frame's "pad" events of the input script (script.h)
+    // The pad's TOUCH MENU acts on release, unless Start was held meanwhile (the pause menu).
+    ReleasePulse panelButton;
+    bool panelPulse = false;      // this frame
     int mouseX = 0, mouseY = 0, dragX = 0;
     int zoom = 0;   // frames of X (> 0, zoom in) or Y (< 0, zoom out) still to hold, from the wheel
     float zoomAcc = 0;
