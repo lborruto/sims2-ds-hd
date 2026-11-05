@@ -1,0 +1,5 @@
+# From s6 (a goal popup), CONSOLE: a touch on its X closes it, the next goal's popup opens (the
+# game reads Popup from frame 48, its box is drawn about 13 frames later); A pressed while it
+# opens waits for the box and closes it.
+10 6 touch 126 110
+50 2 pad a

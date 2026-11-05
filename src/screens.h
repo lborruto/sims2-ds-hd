@@ -11,7 +11,11 @@ namespace sims2wide
 // None: no HUD and no known screen (title, Create-a-Sim, loading): both screens matter alike.
 // Unknown: the HUD is up but the touch screen is none of the others (fades, slides, screens not
 // measured yet).
-enum class Screen { None, Panel, Phone, Dialogue, Popup, Gift, Social, Vacuum, Cards, Catalogue, Build, Unknown };
+// FrontEnd (title, main menu), CreateASim, SaveSlots (Options > Save), ItemHand (Pockets > the
+// item in hand): only from the game's RAM (gamestate.h, ToScreenState), never from pixels.
+// Loading comes only from RAM and the pixels together (ConsoleScreenOf: a black load).
+enum class Screen { None, Panel, Phone, Dialogue, Popup, Gift, Social, Vacuum, Cards, Catalogue, Build,
+                    FrontEnd, CreateASim, SaveSlots, ItemHand, Unknown, Loading };
 // The panel's tab (only with Screen::Panel).
 enum class Tab { None, Interact, Pockets, Goals, Relationships, Options };
 
@@ -59,4 +63,8 @@ bool WarmMenuVisible(const u32* bottom);
 bool VacuumVisible(const u32* bottom);
 // The casino's card game (Keelhaulin' Cards): its score bar on the top screen.
 bool CardsVisible(const u32* top);
+// Both screens black, every pixel's R, G and B at most kBlackMax: the game's loads between
+// screens (measured: exactly 0, after a fade of 60, 28, 0 over 4 frames).
+constexpr int kBlackMax = 8;
+bool ScreensBlack(const u32* top, const u32* bottom);
 }

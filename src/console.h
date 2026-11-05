@@ -2,7 +2,8 @@
 // of pieces of the two DS screens on a 1280 x 720 canvas, as in the approved mockup: in town (the
 // panel) the world fills the canvas with a rail of the touch screen's tab icons and phone at the
 // right; the menu, the phone, popups and Give Item are the whole touch screen 3x over the dimmed
-// world; a conversation is the world with the
+// world (framed for SaveSlots, ItemHand and Unknown); a black load is the bare backdrop; without a
+// HUD (the front end) the top screen at the left and the touch screen 2.5x at the right, each in its frame; a conversation is the world with the
 // game's dialogue box rebuilt wide at the bottom; an activity is the touch screen 3x at the left
 // with the world small at the top right. DS pieces are drawn as the game draws them, 2x or 3x;
 // frames and the focus ring are overlays in the game's colours.
@@ -54,6 +55,15 @@ constexpr Rect kHintBox {850, 400, 400, 252};
 // a character, so 14 fit beside a chip and 20 in a note (activities.cpp wraps them by hand).
 constexpr int kHintPad = 14, kHintGap = 8, kHintChipH = 33, kHintTextX = kHintBox.x + kHintPad + 98 + 10;
 
+// No HUD (FrontEnd, CreateASim, None: the title, the main menu, Create-a-Sim, unmapped screens):
+// the top screen in kFrontTopBox at its own shape (fitted, centred), the touch screen 2.5x at
+// the right, both framed on the dark canvas, and the buttons' hint in a box centred below (these
+// screens are touch-only: the navigator's A presses the stick cursor there).
+constexpr Rect kFrontBottomTo {616, 72, SW * 5 / 2, SH * 5 / 2};
+constexpr Rect kFrontTopBox {24, 72, 568, SH * 5 / 2};
+constexpr int kFrontHintY = 600, kFrontHintPad = 14;
+constexpr const char* kFrontHint = "STICK: CURSOR - A: TOUCH";
+
 // The hints' box for an activity, at kHintBox's top, as high as its rows (at most kHintBox's):
 // a row per hint, its button in a chip of the panel's colour (round for one letter), what it
 // does beside it at 3x; a hint without a button is a note across the box.
@@ -62,6 +72,8 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // The composition for screen s. menuOpen: the menu is up (in town: the touch screen 3x over the
 // dimmed world). focus: the index in HotspotsFor(s) the focus ring frames (-1: none; no ring
 // when no touchable bottom piece shows it). topW x topH: the top picture's size (App::TopImage).
-// Screen::None (no HUD: title, Create-a-Sim): SIDE.
+// Screen::Loading (a black load): the bare backdrop, no piece.
+// Screen::None, FrontEnd, CreateASim: the front end's view (kFront*); SaveSlots, ItemHand, Unknown:
+// the menu composition with a frame (the stick cursor's screens); never SIDE's bare pair of screens.
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH);
 }

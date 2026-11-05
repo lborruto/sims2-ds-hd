@@ -69,7 +69,8 @@ static void tables_inside_screen()
 {
     std::vector<ScreenState> all;
     for (Screen s : {Screen::None, Screen::Phone, Screen::Dialogue, Screen::Popup, Screen::Gift, Screen::Social,
-                     Screen::Vacuum, Screen::Cards, Screen::Catalogue, Screen::Build, Screen::Unknown})
+                     Screen::Vacuum, Screen::Cards, Screen::Catalogue, Screen::Build, Screen::FrontEnd,
+                     Screen::CreateASim, Screen::SaveSlots, Screen::ItemHand, Screen::Unknown})
         all.push_back({s, Tab::None});
     for (Tab t : {Tab::None, Tab::Interact, Tab::Pockets, Tab::Goals, Tab::Relationships, Tab::Options})
         all.push_back({Screen::Panel, t});

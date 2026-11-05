@@ -20,9 +20,12 @@
   and sharper, with a small rail of the touch screen's tabs and phone beside it. One button
   (Back, or E) opens the touch screen's menu big over the town; conversations, popups and the
   games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
-- **It follows the game.** It sees what the game shows (its status bar, a social game, a shop,
-  the vacuum, the cards) from the screens themselves, so the picture changes with nothing to set.
-  Title, menus and Create-a-Sim show both screens side by side.
+- **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
+  social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
+  nothing to set, and it never falls back to the bare two-screen layout. Title, menus and
+  Create-a-Sim show the top screen and the touch screen big, each in its frame; a black load
+  shows only the backdrop.
+  This needs the European game (see [Good to know](#good-to-know)).
 - **The old layouts are still there.** AUTO, FOCUS, SIDE and STACKED: SETTINGS > DISPLAY > LAYOUT.
 - **The DS clock is your clock.** The game lives by the time of day (rooms take real hours,
   skill points come at set hours), so it reads your computer's time, also after a save state,
@@ -47,7 +50,7 @@ It is an early version: see [Good to know](#good-to-know).
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/create-a-sim.webp" alt="Create-a-Sim side by side: the Sim on the left, the name keyboard on the right" width="700">
+  <img src="docs/screenshots/create-a-sim.webp" alt="CONSOLE in Create-a-Sim: the Sim in a frame on the left, the name keyboard big in a frame on the right, the buttons' hint below" width="700">
 </p>
 
 ## Get started
@@ -98,7 +101,7 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 | F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
 | F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
 | 0 to 4 | | layout: AUTO / FOCUS / SIDE / STACKED / CONSOLE |
-| Mouse | right stick + LT (the cursor) | the touch screen, wherever it is shown |
+| Mouse | right stick + LT (the cursor; A too on the title, menus and Create-a-Sim) | the touch screen, wherever it is shown |
 | Mouse wheel / right button drag, over the world | | zoom / turn the camera |
 
 Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND
@@ -157,7 +160,7 @@ They are kept in `settings.ini` in your user folder (the window's size too): on 
 
 | Layout | What you see |
 |---|---|
-| **CONSOLE** (default) | the window as a console game: the world big (widescreen, sharper, 60 fps), the touch screen's menu, conversations, popups and games laid out big, with hints; title and Create-a-Sim side by side |
+| **CONSOLE** (default) | the window as a console game: the world big (widescreen, sharper, 60 fps), the touch screen's menu, conversations, popups and games laid out big, with hints; title and Create-a-Sim framed, the touch screen big |
 | **AUTO** | FOCUS in town (the touch screen big during a social game, in the shop's catalogue or Build Rooms), SIDE everywhere else |
 | **FOCUS** | the world big, the touch screen at twice its size over the world's right edge, a little see-through (Tab makes the touch screen the big one instead) |
 | **SIDE** | both screens side by side |
@@ -198,11 +201,22 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
   (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
   filter clear) and the casino's cards are; painting, the music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows
   both.
-- **Tested with the European game** (code `ASJP`). The American one should work; its automatic
-  layout is untested. A save from the American game loads in the European one.
+- **CONSOLE needs the European game** (code `ASJP`): it reads the game's screens from its memory,
+  and that map is the European one. With another version, CONSOLE falls back to recognising the
+  screens by their pixels (as before) and the program says so. The American one should work
+  otherwise; its automatic layout is untested. A save from the American game loads in the European one.
 - **Not signed by Apple or Microsoft.** Hence the extra click the first time. Once the project
   is public, each download comes with a build attestation from GitHub instead
   ([SECURITY.md](SECURITY.md)).
+
+## Screens it does not know yet
+
+When the game shows a screen CONSOLE has no name for, it frames it as best it can and, once for
+that screen, saves a picture and a save state into a `captures` folder in your user folder (the
+one `settings.ini` is in; at most 20 a run, 200 in all, never twice the same screen). If you
+see odd screens, send the `.png` files and what you were doing in an
+[issue](https://github.com/lborruto/sims2-ds-wide/issues). Never send the `.st` files: a save
+state holds a copy of the game's memory.
 
 ## Help and docs
 

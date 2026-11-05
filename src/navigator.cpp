@@ -14,6 +14,9 @@ namespace
 // screen changes, or this many frames if it does not (the tap missed). A popup's box slides away
 // for a while and still reads Popup: a second tap would land on the panel behind it.
 constexpr int kClosingFrames = 90;
+// A press that would tap while the game's bottom slot is switching (GameState::settled false):
+// held this many frames at most, then dropped.
+constexpr int kHoldFrames = 90;
 // A direction held: one focus move, then one every kRepeatEvery frames after kRepeatAfter.
 constexpr int kRepeatAfter = 18, kRepeatEvery = 6;
 constexpr float kStick = 0.5f;
@@ -36,7 +39,10 @@ Mode ModeOf(Screen s, bool menuOpen)
     case Screen::Social: case Screen::Cards: case Screen::Vacuum: return Mode::Activity;
     case Screen::Popup: return Mode::Popup;
     case Screen::Unknown: return Mode::Cursor;
-    case Screen::None: case Screen::Dialogue: return Mode::Pass;
+    // No table yet: as Unknown. The front end (title, main menu, Create-a-Sim, None) is
+    // touch-only: the DS's buttons there change nothing, so A presses the stick cursor.
+    case Screen::ItemHand: case Screen::SaveSlots: case Screen::FrontEnd: case Screen::CreateASim: case Screen::None: return Mode::Cursor;
+    case Screen::Dialogue: case Screen::Loading: return Mode::Pass;
     }
     return Mode::Pass;
 }
@@ -89,6 +95,19 @@ int CloseOf(const std::vector<Hotspot>& h)
 }
 }
 
+// Mirrors the taps of Update's Mode::Focus and Mode::Popup cases: change one, change the other.
+bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
+{
+    const Mode mode = ModeOf(s.screen, menuOpen_);
+    if (mode == Mode::Popup) return b == &PadState::a || b == &PadState::b;
+    if (mode != Mode::Focus) return false;
+    const std::vector<Hotspot>& h = HotspotsFor(s);
+    if (b == &PadState::a) return First(h) >= 0;
+    if (s.screen == Screen::Panel) return b == &PadState::lb || b == &PadState::rb; // B / MENU close the menu, no tap
+    if (s.screen == Screen::Phone) return b == &PadState::b || b == &PadState::menu;
+    return b == &PadState::b && CloseOf(h) >= 0;
+}
+
 void Navigator::Move(ScreenState s, int dx, int dy)
 {
     // Neighbour over the targets the focus may rest on, mapped back to HotspotsFor's indices.
@@ -107,7 +126,7 @@ void Navigator::Move(ScreenState s, int dx, int dy)
     focus_ = index[Neighbour(list, from, dx, dy)];
 }
 
-void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys)
+void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys, bool settled)
 {
     if (fresh_)
     {
@@ -116,7 +135,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         repeatFrames_ = 0;
         fresh_ = false;
     }
-    auto pressed = [&](bool PadState::*b) { return pad.*b && !(prev_.*b); };
+    auto edge = [&](bool PadState::*b) { return pad.*b && !(prev_.*b); };
 
     if (!(s == screen_))
     {
@@ -126,8 +145,34 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         closing_ = 0;
         screen_ = s;
         activity_ = ActivityState();
+        held_ = nullptr; // a held press was meant for the screen that went
     }
     else if (closing_ > 0) closing_--;
+
+    // The gate: on a focus screen or a popup, a press that would tap waits while the game's
+    // bottom slot is switching (the RAM leads the pixels) and is replayed on the first settled
+    // frame; the latest one wins, and after kHoldFrames it is dropped. Focus moves and the DS's
+    // own buttons never wait.
+    const Mode mode = ModeOf(s.screen, menuOpen_);
+    bool PadState::*replay = nullptr;
+    if (held_ && ++heldFrames_ > kHoldFrames) held_ = nullptr;
+    if (mode == Mode::Focus || mode == Mode::Popup)
+    {
+        static bool PadState::*const kTapButtons[] = {&PadState::a, &PadState::b, &PadState::menu, &PadState::lb, &PadState::rb};
+        if (!settled)
+        {
+            for (bool PadState::*b : kTapButtons)
+                if (edge(b) && WouldTap(s, b)) { held_ = b; heldFrames_ = 0; }
+        }
+        else if (held_) { replay = held_; held_ = nullptr; }
+    }
+    else held_ = nullptr; // a screen that does not tap (or no longer): nothing to replay
+    auto pressed = [&](bool PadState::*b)
+    {
+        if (b == replay) return true;
+        if (!settled && (mode == Mode::Focus || mode == Mode::Popup) && WouldTap(s, b)) return false;
+        return edge(b);
+    };
 
     const std::vector<Hotspot>& h = HotspotsFor(s);
     cursorScreen_ = h.empty();
@@ -143,13 +188,13 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     if (dir != repeatDir_) { repeatDir_ = dir; repeatFrames_ = 0; move = dir >= 0; }
     else if (dir >= 0 && ++repeatFrames_ >= kRepeatAfter && (repeatFrames_ - kRepeatAfter) % kRepeatEvery == 0) move = true;
 
-    switch (ModeOf(s.screen, menuOpen_))
+    switch (mode)
     {
     case Mode::Pass:
         dsKeys |= DsKeys(pad, true);
         if (s.screen == Screen::Panel && pressed(&PadState::menu)) menuOpen_ = true;
         break;
-    case Mode::Focus:
+    case Mode::Focus: // (the taps here are listed again in WouldTap, for the gate)
     {
         if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);
         if (move && focus_ >= 0)
@@ -224,6 +269,7 @@ void Navigator::Leave(TouchScript& touch)
     activity_ = ActivityState();
     focus_ = -1;
     closing_ = 0;
+    held_ = nullptr;
     screen_ = ScreenState();
     fresh_ = true;
 }

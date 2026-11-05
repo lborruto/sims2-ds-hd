@@ -36,8 +36,10 @@
 #include "menu.h"
 #include "mic.h"
 #include "picker.h"
+#include "romdata.h"
 #include "script.h"
 #include "shots.h"
+#include "recorder.h"
 #include "state.h"
 #include "video.h"
 
@@ -63,11 +65,19 @@ static void Usage()
         "  --save FILE                   the game's save (default beside the ROM, .sav)\n"
         "  --mic off|blow|real           what the DS hears: silence, the blow key, the computer's microphone\n"
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
+        "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
+        "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
+        "  --record-dir DIR              where unmapped screens are recorded (a state + a picture each; default: the\n"
+        "                                settings folder's captures/; on in the window, off headless unless given)\n"
         "  --print-screen                print the recognised bottom screen when it changes (frame N: screen X)\n"
         "                                and CONSOLE's menu and focus (frame N: console menu open|closed, focus F)\n"
         "  --console-menu, --console-focus N  (checks) CONSOLE's menu shown, the focus ring on target N\n"
         "                                (pinned: the navigator no longer moves them)\n"
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
+        "  --strings-count               print how many strings the game's text table has, and stop\n"
+        "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
+        "  --language N                  the text's language for those: 0 Japanese (the English file), 1 English,\n"
+        "                                2 French, 3 German, 4 Italian, 5 Spanish (default: the firmware's)\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
         "      Esc menu (settings, save states, quit), Space fast forward, Tab swaps the big screen\n"
@@ -95,17 +105,20 @@ int main(int argc, char** argv)
         (void)freopen("CONOUT$", "w", stderr);
     }
 #endif
-    std::string romPath, inputPath, shotDir = "shots", stateLoad, stateSave, savePath, micArg;
+    std::string romPath, inputPath, shotDir = "shots", stateLoad, stateSave, savePath, micArg, recordDir;
+    long unknownAfter = -1; // (a check) from this frame the game reads as an unmapped screen
     bool headless = false, fast = false;
     long frames = -1;
     int shotEvery = 0;
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int res3d = 0;
     bool wide = false, interp = false;
+    int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
+    bool stringsCount = false;
     for (int i = 1; i < argc; i++)
     {
         std::string a = argv[i];
@@ -128,9 +141,24 @@ int main(int argc, char** argv)
         else if (a == "--mic") micArg = next();
         else if (a == "--fast") fast = true;
         else if (a == "--print-screen") printScreen = true;
+        else if (a == "--print-game") printGame = true;
+        else if (a == "--record-dir") recordDir = next();
+        // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
+        // every 200 frames from frame N, to drive the recorder.
+        else if (a == "--game-unknown-after") unknownAfter = atol(next().c_str());
         else if (a == "--console-menu") consoleMenu = consolePinned = true;
         else if (a == "--console-focus") { consoleFocus = atoi(next().c_str()); consolePinned = true; }
         else if (a == "--clock") { if (!clock::SetFixed(next())) { fprintf(stderr, "--clock wants \"YYYY-MM-DD HH:MM\"\n"); return 1; } }
+        else if (a == "--language" || a == "--dump-string")
+        {
+            // A whole number, 0 or more; anything else is a usage error, not a 0.
+            const std::string v = next();
+            char* rest = nullptr;
+            const long number = strtol(v.c_str(), &rest, 10);
+            if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            (a == "--language" ? language : dumpString) = (int)number;
+        }
+        else if (a == "--strings-count") stringsCount = true;
         else if (a == "--layout")
         {
             std::string l = next();
@@ -207,6 +235,8 @@ int main(int argc, char** argv)
     else if (micArg == "blow") app.settings.mic = MicMode::BlowKey;
     else if (micArg == "real") app.settings.mic = MicMode::Real;
     else if (!micArg.empty()) { Usage(); return 1; }
+    if (rom.size() >= 0x10) app.romCode.assign((const char*)rom.data() + 0x0C, 4);
+    app.portSupported = app.romCode == "ASJP";
     melonDS::NDSArgs args;
     args.JIT = std::nullopt;
     app.nds = std::make_unique<NDS>(std::move(args), nullptr);
@@ -216,6 +246,25 @@ int main(int argc, char** argv)
     clock::Seed(nds); // the DS clock: the computer's local time (or --clock); LoadState re-seeds it
     nds.SetupDirectBoot("game.nds");
     nds.Start();
+
+    // The game's text from the ROM (--strings-count, --dump-string ID): print it and stop.
+    if (stringsCount || dumpString >= 0)
+    {
+        RomData data;
+        if (!data.Open(rom)) { fprintf(stderr, "no rom.bin archive in this ROM\n"); return 1; }
+        const int lang = language >= 0 ? language : GameLanguage(nds);
+        if (!data.LoadStrings(lang)) { fprintf(stderr, "no strings for language %d\n", lang); return 1; }
+        fprintf(stderr, "strings: language %d from file %d, %d strings\n", lang, data.StringsFile(), data.StringCount());
+        if (dumpString >= data.StringCount()) { fprintf(stderr, "no string %d\n", dumpString); return 1; }
+        if (stringsCount) printf("%d\n", data.StringCount());
+        else
+        {
+            std::string s = data.String(dumpString);
+            for (size_t p = 0; (p = s.find('\n', p)) != std::string::npos; p += 2) s.replace(p, 1, "\\n");
+            printf("%s\n", s.c_str());
+        }
+        return 0;
+    }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
 
     std::vector<InputEvent> script;
@@ -229,6 +278,12 @@ int main(int argc, char** argv)
     Audio audio;
     Input input;
     PauseMenu menu;
+    if (!app.portSupported)
+    {   // the pause menu's font: capitals, digits and a few signs only
+        const char* msg = "THIS ROM IS NOT THE EUROPEAN ONE: CONSOLE USES ITS OLD SCREEN RULES";
+        fprintf(stderr, "rom %s: %s\n", app.romCode.c_str(), msg);
+        menu.Say(msg, 0);
+    }
     Backups backups;
     if (!headless)
     {
@@ -244,6 +299,8 @@ int main(int argc, char** argv)
 
     // frame counts the game's frames (shots, scripts); iter every turn of the loop, paused too.
     long frame = 0;
+    std::unique_ptr<Recorder> recorder;
+    if (!headless || !recordDir.empty()) recorder = std::make_unique<Recorder>(recordDir);
     // The window keeps the DS's own pace, 59.83 frames a second: vsync alone would follow the
     // screen, and on a 120 Hz screen (ProMotion, gaming monitors) the game ran twice too fast.
     const double dsFrame = 1.0 / (33513982.0 / (6.0 * 355.0 * 263.0)); // seconds
@@ -252,6 +309,7 @@ int main(int argc, char** argv)
     bool wasPaused = false; // the pause menu was open: buttons held on leaving it are not presses
     bool lastMenu = app.consoleMenu;
     int lastFocus = app.consoleFocus;
+    int disagree = 0; // frames the game's settled screen and the pixels' answer have disagreed
     auto keepPace = [&]() {
         if (headless || app.fast) { nextFrameAt = 0; return; }
         double now = SDL_GetPerformanceCounter() / perfFreq;
@@ -329,6 +387,18 @@ int main(int argc, char** argv)
         nds.RunFrame();
         looks.Frame(app);
 
+        const ScreenState consoleBefore = app.ConsoleScreen();
+        {
+            GameState before = app.game;
+            app.game = app.portSupported ? ReadGameState({nds.MainRAM, nds.MainRAMMask}) : GameState{};
+            if (app.portSupported && unknownAfter >= 0 && frame >= unknownAfter)
+            {   // the check's fake: a new unmapped pair every 200 frames
+                app.game.valid = true; app.game.between = false; app.game.settled = true;
+                app.game.screen = GScreen::Unknown; app.game.overlay = 90; app.game.vtable = 0x02000000 + (u32)((frame - unknownAfter) / 200);
+            }
+            if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
+        }
+        if (recorder) recorder->Frame(app, frame, nds);
         const u32* top = app.Top();
         const u32* bottom = app.Bottom();
         {
@@ -345,13 +415,22 @@ int main(int argc, char** argv)
         {
             ScreenState before = app.screens.Current();
             ScreenState now = app.screens.Update(top, bottom);
-            // The navigator ran before the tracker: a new screen starts without the old menu and focus.
-            if (!(now == before) && !app.consolePinned && now.screen != Screen::Panel)
+            // The navigator ran before this frame's screen was known: a new screen (CONSOLE's, the
+            // game's when it reads) starts without the old menu and focus.
+            const ScreenState consoleNow = app.ConsoleScreen();
+            if (!(consoleNow == consoleBefore) && !app.consolePinned && consoleNow.screen != Screen::Panel)
             {
                 app.consoleMenu = false;
                 app.consoleFocus = -1;
             }
             if (printScreen && !(now == before)) fprintf(stderr, "frame %ld: screen %s\n", frame, ScreenStateName(now).c_str());
+            // The game's screen and the pixels' answer apart for more than 90 frames while the
+            // game's screen is settled: said once (RAM leads the pixels by up to about 60 frames).
+            // (Counted again from either side's change.)
+            if (!(consoleNow == consoleBefore) || !(now == before)) disagree = 0;
+            if (app.game.valid && app.game.settled && !PixelsAgree(app.game, now)) disagree++;
+            else disagree = 0;
+            if (printGame && disagree == 91) fprintf(stderr, "frame %ld: pixels disagree: %s\n", frame, ScreenStateName(now).c_str());
             if (printScreen && (app.consoleMenu != lastMenu || app.consoleFocus != lastFocus))
                 fprintf(stderr, "frame %ld: console menu %s, focus %d\n", frame, app.consoleMenu ? "open" : "closed", app.consoleFocus);
             lastMenu = app.consoleMenu;

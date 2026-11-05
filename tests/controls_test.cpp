@@ -6,9 +6,12 @@
 #include <SDL.h>
 
 #include <cstdio>
+#include <fstream>
+#include <iterator>
 #include <string>
 
 #include "controls.h"
+
 #include "settings.h"
 
 using namespace sims2wide;
@@ -155,9 +158,41 @@ static void upgrade_looks()
     remove(path.c_str());
 }
 
+// v0.1.1 wrote layout=auto on any change: without settings_version it means CONSOLE, once;
+// a version-2 file keeps what it says; a save writes the version.
+static void upgrade_layout()
+{
+    const std::string path = "controls_test_version.ini";
+    auto write = [&](const char* text) { FILE* f = fopen(path.c_str(), "w"); fputs(text, f); fclose(f); };
+    Settings a;
+    write("layout=auto\nresolution_3d=1\nwidescreen=1\ninterpolate_60=0\n");
+    CHECK(a.Load(path));
+    CHECK(a.layout == Layout::Console && a.resolution3D == 1 && !a.interpolate60);
+    Settings b;
+    write("settings_version=2\nlayout=auto\n");
+    CHECK(b.Load(path));
+    CHECK(b.layout == Layout::Auto);
+    Settings c; // an old file with another layout keeps it
+    write("layout=side\n");
+    CHECK(c.Load(path));
+    CHECK(c.layout == Layout::Side);
+    // the upgraded settings save as version 2, and reload as chosen
+    CHECK(a.Save(path));
+    std::ifstream in(path);
+    std::string text((std::istreambuf_iterator<char>(in)), {});
+    CHECK(text.find("settings_version=2\n") != std::string::npos);
+    a.layout = Layout::Auto;
+    CHECK(a.Save(path));
+    Settings d;
+    CHECK(d.Load(path));
+    CHECK(d.layout == Layout::Auto);
+    remove(path.c_str());
+}
+
 int main(int, char**)
 {
     upgrade_looks();
+    upgrade_layout();
     layout_round_trip();
     defaults_one_each();
     old_file_with_back();

@@ -19,6 +19,18 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
+- CONSOLE now asks the game what it is showing, read from its memory, instead of guessing from
+  the pixels: every screen is known, the front end (title, menus, Create-a-Sim, save slots) and
+  screens not yet named are framed, never the bare two-screen layout, a black load shows only
+  the backdrop, and a press waits until the game's screen has settled. It needs the
+  European game; on another version CONSOLE falls back to the pixel rules.
+- Unknown screens are recorded: a picture and a save state, once per screen, in `captures/` in
+  the user folder (at most 20 a run, 200 in all), so they can be sent in and named.
+- The game's own texts, read from your ROM at run time in its five languages (nothing of them in
+  the program), for the screens to come; `--strings-count`, `--dump-string`, `--language`.
+- `--print-game` prints what the game's memory says is up.
+- A settings file from a development build before this release that says `layout=auto` (and
+  no `settings_version`) starts in CONSOLE, once; v0.1.1's files never named a layout.
 - CONSOLE, now the default layout: the game played like a console game. The town fills the
   window, widescreen, sharper and at 60 fps (these are now on by default), with a small rail of
   the touch screen's tabs and phone. One button (Back, or E) opens the touch screen's menu big

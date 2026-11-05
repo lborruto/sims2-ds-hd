@@ -11,11 +11,15 @@
 //     in the menu, the vacuum's hand is the stick cursor.
 //   Popup (a goal, tips, Game Paused): A or B tap its X; Start stays the DS's (it resumes a pause).
 //   Dialogue: every button is the DS's (A is the game's own "next").
-//   None: every button is the DS's.
+//   FrontEnd, CreateASim (from RAM), None: touch-only (the DS's buttons change nothing there),
+//     no table yet: as Unknown.
+//   SaveSlots, ItemHand (from RAM; no table yet): as Unknown.
+//   Loading (a black load): every button is the DS's.
 //   Unknown: the DS's buttons, but A presses the stick cursor when there is one (the fallback for
 //     unmeasured screens); without a controller A stays the DS's.
 // Presses are edges of the PadState (pressed now, not on the previous Update). While the touch
-// script owns the stylus, presses that would tap are dropped, never queued behind it.
+// script owns the stylus, presses that would tap are dropped, never queued behind it. While the
+// game's bottom slot switches or a popup slides (not settled), they wait (90 frames at most).
 #pragma once
 #include "activities.h"
 #include "common.h"
@@ -52,8 +56,10 @@ class Navigator
 {
 public:
     // Once per game frame while CONSOLE is shown: the DS keys to press are OR-ed into dsKeys,
-    // taps are queued on touch.
-    void Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys);
+    // taps are queued on touch. settled: the game's bottom slot is not switching
+    // (GameState::settled; true without a RAM reading); while it is, a press that would tap is
+    // held (the latest wins) and replayed on the first settled frame, or dropped after 90.
+    void Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys, bool settled = true);
     // CONSOLE left (another layout): the touch script cancelled, the menu closed, nothing held;
     // buttons still held when CONSOLE comes back are not taken as presses.
     void Leave(TouchScript& touch);
@@ -66,7 +72,8 @@ public:
     int Focus() const { return focus_; }
     // Unknown: A asks for the stick cursor's press.
     bool CursorPress() const { return cursorPress_; }
-    // The stick cursor is the way to touch here (no table of targets: None, Vacuum, Unknown).
+    // The stick cursor is the way to touch here (no table of targets: the front end, None,
+    // Vacuum, Unknown).
     bool CursorScreen() const { return cursorScreen_; }
     // The vacuum: the stick cursor is its hand, shown and moved even without a controller (the
     // D-pad moves it while X or A is held: HandDx / HandDy, DS pixels this frame); CursorPress
@@ -79,6 +86,8 @@ public:
 
 private:
     void Move(ScreenState s, int dx, int dy);
+    // Whether a press of b would tap on s (the gate holds only those).
+    bool WouldTap(ScreenState s, bool PadState::*b) const;
 
     PadState prev_;
     bool fresh_ = true;  // take the next pad as the previous one (no presses)
@@ -89,5 +98,7 @@ private:
     int focus_ = -1;
     int closing_ = 0;    // frames left in which A / B do nothing after a tap that closes the screen
     int repeatDir_ = -1, repeatFrames_ = 0; // the held direction (0-3) and how long, for the repeat
+    bool PadState::*held_ = nullptr; // a press that would tap, waiting for a settled screen
+    int heldFrames_ = 0;
 };
 }

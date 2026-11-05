@@ -90,15 +90,39 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH)
 {
-    if (s.screen == Screen::None) return FromPlacement(Place(Layout::Side, true, (float)topW / topH), topW, topH);
     Composition c {kConsoleW, kConsoleH, {}, {}};
-    if (menuOpen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
+    // A black load (both screens black, RAM between screens): the bare backdrop.
+    if (s.screen == Screen::Loading) return c;
+    const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::ItemHand || s.screen == Screen::Unknown;
+    if (s.screen == Screen::None || s.screen == Screen::FrontEnd || s.screen == Screen::CreateASim)
+    {
+        // No HUD (title, main menu, Create-a-Sim, an unmapped front-end screen; None from the pixels
+        // when RAM does not read): both screens matter alike. The top
+        // screen fitted in its box at its own shape, centred; the touch screen 2.5x; both framed.
+        const double k = std::min((double)kFrontTopBox.w / topW, (double)kFrontTopBox.h / topH);
+        const int w = std::min(kFrontTopBox.w, (int)std::lround(topW * k)), h = std::min(kFrontTopBox.h, (int)std::lround(topH * k));
+        const Rect topTo {kFrontTopBox.x + (kFrontTopBox.w - w) / 2, kFrontTopBox.y + (kFrontTopBox.h - h) / 2, w, h};
+        c.overlays.push_back(FrameAround(topTo, 0));
+        c.overlays.push_back(FrameAround(kFrontBottomTo, 0));
+        c.pieces.push_back({Src::Top, {0, 0, topW, topH}, topTo});
+        c.pieces.push_back(Bottom({0, 0, SW, SH}, kFrontBottomTo));
+        // The hint's box: the text with its shadow (TextRect) and, on each side, the padding and
+        // the box's 4-pixel border, centred.
+        constexpr int border = 4;
+        const Rect t = TextRect(0, 0, kFrontHint, 3);
+        const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset, bx = (kConsoleW - bw) / 2;
+        c.overlays.push_back({{bx, kFrontHintY, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
+        c.overlays.push_back(Text(bx + inset, kFrontHintY + inset, kFrontHint, 3));
+    }
+    else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {
         // The world dimmed behind the touch screen: not playable, the mouse does nothing there.
+        // The stick cursor's screens (no table: SaveSlots, ItemHand, Unknown) get a frame.
         Piece world = World(topW, topH);
         world.touch = false;
         c.pieces.push_back(world);
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
+        if (cursorScreen) c.overlays.push_back(FrameAround(kMenuTo, 1));
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
     }
     else if (s.screen == Screen::Panel)
@@ -121,7 +145,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     }
     else
     {
-        // Social, Vacuum, Cards, Catalogue, Build, Unknown; the hints' box for the activities.
+        // Social, Vacuum, Cards, Catalogue, Build; the hints' box for the activities.
         const int h = (int)std::lround((double)kActivityTopW * topH / topW);
         const Rect topTo {kActivityTopX, kActivityTopY, kActivityTopW, h};
         c.overlays.push_back({kCanvas, kPanelArgb, 0, 0, 0, 0});

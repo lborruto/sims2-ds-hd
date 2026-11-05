@@ -35,12 +35,12 @@ struct Video
     void RememberSize(Settings& s) const;
 
     // What the window shows now: the shown layout's pieces, for the top picture's current size
-    // (CONSOLE: for the recognised screen, the menu and the focus). No SDL needed: --compose too.
+    // (CONSOLE: for the game's screen, the menu and the focus). No SDL needed: --compose too.
     Composition Composed(const App& app) const
     {
         int tw, th;
         app.TopImage(tw, th);
-        if (app.shown == Layout::Console) return BuildConsole(app.screens.Current(), app.consoleMenu, app.consoleFocus, tw, th);
+        if (app.shown == Layout::Console) return BuildConsole(app.ConsoleScreen(), app.consoleMenu, app.consoleFocus, tw, th);
         return Compose(app.shown, app.mainIsTop, app.topAspect, tw, th);
     }
     void OutputSize(int& ow, int& oh) const;

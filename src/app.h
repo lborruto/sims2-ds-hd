@@ -8,6 +8,7 @@
 #include "GPU.h"
 #include "NDS.h"
 #include "common.h"
+#include "gamestate.h"
 #include "layout.h"
 #include "scene.h"
 #include "screens.h"
@@ -23,14 +24,24 @@ struct App
     Layout shown = Layout::Side;   // what the window shows this frame (AUTO resolved)
     bool mainIsTop = true;         // FOCUS: which screen is big
     AutoLayout autoLayout;
+    GameState game;                // what the game itself says is up, read from RAM every frame (gamestate.h)
     ScreenTracker screens;         // which screen the touch screen shows (screens.h), every frame
     bool consoleMenu = false;      // CONSOLE: the menu is up (the touch screen 3x over the dimmed world)
     int consoleFocus = -1;         // CONSOLE: the focused target, an index in HotspotsFor (-1: none)
     // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
     // pinned them for a check's picture.
     bool consolePinned = false;
+    // CONSOLE's screen: the game's own (RAM) when it reads, else the pixel tracker's (gamestate.h).
+    ScreenState ConsoleScreen() const { return ConsoleScreenOf(game, screens.Current(), HudVisible(Top()), (game.valid || game.between) && ScreensBlack(Top(), Bottom())); }
+    // The game's bottom slot is not switching (true without a RAM reading): the navigator's gate.
+    bool Settled() const { return !game.valid || game.settled; }
 
     Settings settings;
+
+    // The ROM's game code (header 0x0C) and whether the RAM map fits it: only the European ROM
+    // (ASJP) has its addresses; any other: GameState is never read (not valid, not between).
+    std::string romCode;
+    bool portSupported = false;
 
     bool fast = false;             // fast forward held
     bool quit = false;

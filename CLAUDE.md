@@ -28,7 +28,7 @@ the owner makes it public; write everything as if it were public already).
 | --- | --- |
 | `src/main.cpp` | Command line, starting the DS, the frame loop (input → `RunFrame` → layout → shots → sound → picture; paused: menu only) |
 | `src/app.h` | Shared state: the `NDS`, layout chosen/shown, `mainIsTop`, fast forward, quit, `micBlow`, `topAspect`, F5/F12 paths |
-| `src/settings.*` | `Settings`: every option with its default (CONSOLE's: `layout=console`, widescreen on, 3D resolution 2, 60 fps on); `settings.ini` load/save (SDL pref path), not headless; `layout=` round-trips (`tests/controls_test.cpp`) |
+| `src/settings.*` | `Settings`: every option with its default (CONSOLE's: `layout=console`, widescreen on, 3D resolution 2, 60 fps on); `settings.ini` load/save (SDL pref path), not headless; `layout=` round-trips (`tests/controls_test.cpp`); `settings_version=2` is written on save, and a file without it that says `layout=auto` (from a build before version 2: `layout=` came with CONSOLE as the default, v0.1.1 never wrote it) loads as CONSOLE, once, by the owner's choice |
 | `src/controls.*` | Actions, key and controller bindings, defaults, names (from FullDex) |
 | `src/input.*` | Keyboard, mouse (stylus; wheel and right drag as the camera), SDL_GameController, stick cursor, script window events |
 | `src/video.*` | The SDL window: draws the shown layout and the overlay, fullscreen, scaling, maps window points to touch positions |
@@ -37,20 +37,26 @@ the owner makes it public; write everything as if it were public already).
 | `src/backup.*` | Copies of the `.sav` in `backups/`, at start and every half hour, eight kept |
 | `src/layout.*` | `Place()` (canvas per layout, `topAspect`, FOCUS's overlaid panel), `CanvasFit`, `TouchFromOutput`, `OverTop` |
 | `src/compose.*` | `Composition`: pieces (a rectangle of one DS screen at a canvas rectangle, opacity, touchable or not) in drawing order, and overlays (rounded frames, boxes, the dimmed backdrop, the focus ring; `RasteriseOverlay`, each drawn before the piece it names); `FromPlacement`/`Compose`, `TouchFromComposition`, `TouchClampedComposition`, `OverTopComposition`; what `Video`, `--compose` and the mouse use |
-| `src/console.*` | CONSOLE (`--layout console`): `BuildConsole(ScreenState, menuOpen, focus, topW, topH)`, the 1280 × 720 composition per recognised screen (town and its rail, the menu over the dimmed world, the dialogue rebuilt wide, activities, SIDE for None), its geometry and the game's colours; `App::consoleMenu` / `consoleFocus` (the navigator drives them; `--console-menu` / `--console-focus N` pin them for checks' pictures, `App::consolePinned`) |
-| `src/navigator.*` | CONSOLE's navigator: `PadState` (the actions held: DS buttons, MENU = the PANEL action, sticks), `Navigator::Update(ScreenState, pad, TouchScript&, dsKeys)`: per screen the DS's buttons passed on, or a focus over `HotspotsFor` moved by the D-pad and tapped with A; `Leave` when CONSOLE goes; `Input::Steer` runs it (window and headless) |
+| `src/console.*` | CONSOLE (`--layout console`): `BuildConsole(ScreenState, menuOpen, focus, topW, topH)`, the 1280 × 720 composition per screen (`App::ConsoleScreen()`: the game's from RAM, `ConsoleScreenOf(App::game, …)`, the pixel tracker's only when RAM does not read; town and its rail, the menu over the dimmed world (framed for SaveSlots / ItemHand / Unknown), the dialogue rebuilt wide, activities, the front end's view for None, FrontEnd, CreateASim, the bare backdrop for Loading; never SIDE), its geometry and the game's colours; `App::consoleMenu` / `consoleFocus` (the navigator drives them; `--console-menu` / `--console-focus N` pin them for checks' pictures, `App::consolePinned`) |
+| `src/navigator.*` | CONSOLE's navigator: `PadState` (the actions held: DS buttons, MENU = the PANEL action, sticks), `Navigator::Update(ScreenState, pad, TouchScript&, dsKeys, settled)`: per screen the DS's buttons passed on, or a focus over `HotspotsFor` moved by the D-pad and tapped with A; the gate (a press that would tap waits for `settled`, `App::Settled()`); `Leave` when CONSOLE goes; `Input::Steer` runs it (window and headless) |
 | `src/activities.*`, `src/padstate.h` | CONSOLE's activities on buttons: `ActivityInput(Screen, PadState, TouchScript&, dsKeys, ActivityState&)` (social answers, the cards' draw / lift / play / discard / quit question, the vacuum's drive, hand, grab and blow), `ActivityHints` (the hints' box rows); `PadState` (shared with the navigator) |
-| `tests/navigator_test.cpp` | The navigator on synthetic screen states: menu, focus moves, taps, tabs, popup, phone, town keys, Unknown's cursor, leaving CONSOLE, the activities (`ninja -C build navigator_test`) |
+| `tests/navigator_test.cpp` | The navigator on synthetic screen states: menu, focus moves, taps, tabs, popup, phone, town keys, Unknown's cursor, leaving CONSOLE, the activities, the gate (unsettled presses held, replayed, dropped after 90 or on a screen or mode change; DS buttons not held), a popup opening held, the front end's screens, save slots and the quit question on the cursor (`ninja -C build navigator_test`) |
 | `tests/controls_test.cpp` | The bindings: one action per input, by default and after loading an older settings file (`ninja -C build controls_test`) |
 | `scripts/console/*.txt` | `pad` scripts for `tests/console_check.sh`'s navigator cases |
-| `tests/console_check.sh` | CONSOLE's pictures from save states: the DS pixels where each piece puts them, the frames, the dimmed world, the focus ring, SIDE without a HUD; then the navigator from `pad` scripts (`--print-screen`: tabs from `s7`, the popup from `s6`, CONSOLE → FOCUS → CONSOLE) and the activities' (a social answer, the cards' draw, discard, quit and its cancel, the vacuum's blow), the hints' box (ROM, `shots/`, the complete save and Pillow: `PYTHON=…`) |
+| `tests/console_check.sh` | CONSOLE's pictures from save states: the DS pixels where each piece puts them, the frames, the dimmed world, the focus ring, the front end's view (`s2`, `s3`, `s4`), the save slots framed over the dimmed world (`sit-store`, Options > Save), the bare backdrop in the cards' quit load (`act-cards`, frame 119); then the navigator from `pad` scripts (`--print-game` and `--print-screen`, no `pixels disagree`: tabs from `s7`, the popup from `s6`, from `s6` again A pressed while the next popup opens (held, then it closes it), CONSOLE → FOCUS → CONSOLE) and the activities' (a social answer, the cards' draw, discard, quit and its cancel, the vacuum's blow), the hints' box (ROM, `shots/`, the complete save and Pillow: `PYTHON=…`) |
 | `src/touchscript.*` | `TouchScript` (`Input::touchScript`): taps, holds and drags over game frames, queued (8 at most), one released frame between; wins over the mouse and the stick in `Input::Frame` |
 | `tests/layout_test.cpp` | Touch mapping of every pixel in every layout and size, and of every piece of every CONSOLE composition (`ninja -C build layout_test`) |
 | `tests/touchscript_test.cpp` | The synthesised touches (`ninja -C build touchscript_test`) |
 | `src/looks.*` | Sharper / widescreen 3D and 60 fps: applies the Looks settings, builds `App::TopImage` |
 | `src/melonds_ext/GPU3D_Wide.*` | FullDex's wide 3D rasteriser (CPU), built into melonDS's `core` |
 | `patches/melonDS/*.patch` | Hooks in melonDS 1.1 for the looks, applied at configure time |
-| `src/screens.*` | Which bottom screen the game shows: `Recognise(top, bottom)` → `ScreenState` (`Screen`, panel `Tab`), `ScreenTracker` (hysteresis; `App::screens`, `--print-screen`), and the pixel rules AUTO shares (`HudVisible`, `SocialVisible`, `WarmMenuVisible`, `VacuumVisible`, `CardsVisible`) |
+| `src/gamestate.*` | `ReadGameState(RamView)`: the game's own screen manager read from main RAM (EU addresses, `kEU`) → `GameState` (`GScreen`, panel tab, selections, `settled`: the bottom slot in place and no popup sliding, decided there and nowhere else); `ToScreenState` (CONSOLE's screen: Panel + tab, the rest by name, tab -1, unmapped or Options > Quit's popup → Unknown), `ConsoleScreenOf` (that; without the HUD and both screens black, `GameState::between` or an Unknown → Loading, an Unknown not black → None; the pixels without RAM), `PixelsAgree`; `App::game` every frame, `--print-game` logs changes (`frame N: game X`) and a pixel tracker that disagrees over 90 settled frames (`frame N: pixels disagree: X`); the map is in `docs/research/ram-map.md` |
+| `src/recorder.*` | `Recorder::Frame` (window runs; headless only with `--record-dir`): a settled unmapped (overlay, vtable) pair for 30 frames, or RAM not reading (not `between`, not black) for 300 frames after frame 600, saves a state + PNG once per pair (max 20 per run, skipped when the folder already holds that pair or 200 captures) to `<SDL pref path>/captures/<YYYYMMDD-HHMMSS>-ov<ov>-vt<vt>.st/.png` and logs `recorded: <path>`; `--record-dir DIR` overrides the folder; `--game-unknown-after N` (check only) fakes a new unmapped pair every 200 frames from frame N (checked in `tests/gamestate_check.sh`) |
+| `tests/gamestate_test.cpp`, `tests/gamestate_check.sh` | The reader on a synthetic RAM, `ToScreenState`, `ConsoleScreenOf` (`ninja -C build gamestate_test`); each save state's game state and the panel's tabs from `s6` (ROM, `shots/`, the complete save, as `screens_check.sh`) |
+| `src/romdata.*` | `RomData`: the game's own data read from the player's ROM at run time (nothing of it in git): `Open(rom)` finds `rom.bin` in the cartridge's file system (the game's archive: a u32 offset table, resource id = index, 8867 entries), `Resource(id)`; `LoadStrings(language)` (0 JP → the EN file, 1 EN, 2 FR, 3 DE, 4 IT, 5 ES: the game's own table, files 123, 123, 3496, 3593, 4184, 7599; each u32 N, a Huffman tree of u16 pairs to N, u32 offsets, LSB-first bit streams, no compression header), `StringCount()` (3127), `String(id)` as UTF-8 (the game's 1-byte charset, `kCharset`: Latin-1's order of the accented letters less a few, worked out from FR/DE/IT/ES words; an unknown byte stays visible as `{xx}`, a 2-byte escape ≥ 0xF0 as `{F0xx}`). Every size and offset is checked before use and a table that does not fit is refused (a string over 4 KB, a table over 4 MB too); nothing in `romdata.cpp` touches melonDS: `GameLanguage(nds)` = the firmware's user language (bits 0-2 of its settings word; melonDS's built-in firmware: English) is in `romdata_nds.cpp`. `--language N`, `--strings-count`, `--dump-string ID` (whole numbers, else the usage) print and stop |
+| `tests/romdata_test.cpp` | `RomData` on a synthetic ROM written by hand (header, name and file tables, archive, a tiny string table of made-up text; no game data): the valid one decodes (the charset, `{xx}`, `{F0xx}`, the bit order), and every truncated, oversize, out-of-range, non-monotonic or cyclic table is refused without a crash (`ninja -C build romdata_test`; CI runs it) |
+| `tests/romdata_check.sh` | 3127 strings in each language 1-5, in language 0 (the EN file) and in the firmware's; language 6, string 3127, `--language fr` and `--dump-string -1` refused; three English strings and a French one with "é" against the research's decoded lines, read at run time from `RESEARCH=` (a folder holding `text/strings_00123.txt`, `strings_03496.txt`; never in git: skipped with a message without it). Needs the ROM |
+| `src/screens.*` | Which bottom screen the game shows: `Recognise(top, bottom)` → `ScreenState` (`Screen`, panel `Tab`), `ScreenTracker` (hysteresis; `App::screens`, `--print-screen`; CONSOLE uses it only when RAM does not read), the `Screen` values (FrontEnd, CreateASim, SaveSlots, ItemHand come only from RAM; Loading from RAM and `ScreensBlack`), and the pixel rules AUTO shares (`HudVisible`, `SocialVisible`, `WarmMenuVisible`, `VacuumVisible`, `CardsVisible`; `ScreensBlack` is CONSOLE's) |
 | `tests/screens_check.sh` | Each save state's recognised screen, the panel's tabs from `s6` with `scripts/tabs.txt`, two-line catalogue entries from `sit-storebuy` (needs the ROM, `shots/` and the complete save: `ROM=… SHOTS=… MORE_SHOTS=… COMPLETE_SAVE=… bash tests/screens_check.sh`; `MORE_SHOTS`, default `shots/`, is looked in for states `SHOTS` lacks) |
 | `src/hotspots.*` | The touch targets of each recognised screen (`HotspotsFor`: tap point and the area the focus ring frames, DS bottom pixels), `Neighbour` (focus moves: nearest area centre within 60° of the direction), the constants the navigator uses (`kTabIcon`, `kPhoneIcon`, `kDialogueArrow`, `kPopupClose`, `kPhoneClose`) |
 | `tests/screens_test.cpp` | The HUD rule on synthetic top screens: any Sanity bar tint, no strip no HUD (`ninja -C build screens_test`) |
@@ -101,6 +107,26 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 
 ## Known traps
 
+- The RAM map is the European ROM's (game code `ASJP`, header 0x0C): `App::portSupported`. On any
+  other ROM `App::game` stays default (not valid, not between), CONSOLE uses the pixel tracker,
+  the recorder records nothing, `--print-game` prints nothing, and one toast / stderr line says
+  so. `tests/gamestate_check.sh` runs a copy with `XXXX` as game code (melonDS does not check
+  the header CRC for direct boot).
+- The game's screen object `S` lives on the heap: `ReadGameState` reads it again every frame and
+  checks its vtable, never cached (`docs/research/ram-map.md`). Settled (`GameState::settled`,
+  `ReadGameState`): the bottom slot `P+0xE42` is 3 and the popup state `P+0x8` is 0, 2 or 0xFF.
+  A popup opening (1) reads Popup about 13 frames before its box is drawn (`s6`, the second goal
+  popup: Popup from frame 48, drawn from 61) and closing (3) still draws it: a tap then would land
+  on the panel underneath. Not settled is mid-switch: CONSOLE holds taps until it settles (the gate, below); the recorder only records a
+  settled pair.
+- The recorder writes to the player's pref folder: once per (overlay, vtable) pair across
+  sessions, 20 a run, 200 in all. It writes nothing on another ROM and, headless, nothing without
+  `--record-dir`. A capture's `.st` holds the game's memory: never commit or attach one; the
+  `.png` is what a player sends.
+- Known limits of CONSOLE's RAM-led screen: (1) quitting the cards shows about 10 frames of the
+  cards' layout over black (the pixels go black before RAM leaves Cards); (2) a goal popup over
+  the Options tab reads Unknown (the stick cursor, not the popup's close); (3) the frame's
+  corner radius is a literal (16, `Frame()` in `console.cpp`), not derived from the piece.
 - melonDS framebuffers are `0xAARRGGBB`, 256 × 192 each, `GPU.Framebuffer[FrontBuffer][0]` =
   top, `[1]` = bottom.
 - HUD detection uses the status bar's frame, never what lies under the Sanity bar: row 176
@@ -153,7 +179,8 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   vacuum, the music mixer). `--mic real` needs `NSMicrophoneUsageDescription` in the Mac app's
   plist (there) and the terminal's permission on a Mac for the CLI program.
 - `SIMS2WIDE_PROBE=N` prints AUTO's signals every N frames (HUD, social, warm menu, motion and
-  brightness of each screen); `--print-screen` prints the recognised bottom screen on change.
+  brightness of each screen); `--print-screen` prints the recognised bottom screen on change, and
+  `--print-game` what the game's RAM says (also at frame 0; `pixels disagree` when the two part for 90 settled frames).
 - Touch mapping goes through the same composition (`compose.h`, from `Place()` or `BuildConsole`) as drawing: change one, the other follows. The topmost piece under the pointer decides, for a click and for the camera alike: a touchable bottom piece is the stylus, a touchable top piece the camera (wheel, right drag), an untouchable piece (`touch=false`: CONSOLE's dimmed world behind the menu) neither, and it hides what lies under it. Overlays never take the mouse. A drag keeps the piece it began on; if that piece is gone (the layout or the screen changed mid-drag), the touchable bottom piece under the pointer, else the largest; always held to the piece's source rectangle and the DS screen.
   The stylus goes down only when the left button is pressed on the touch screen; until release
   it follows the pointer clamped to that screen (`TouchClamped`), wherever the pointer goes.
@@ -197,7 +224,8 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   in the box elsewhere does nothing. Options: a volume slider moves only by a drag that
   starts on its knob (taps on the track or the knob do nothing; the knob sits at full volume,
   232 on rows 121/171, until moved); Save opens the slot screen and Quit a confirmation, both
-  read Unknown; the button by the title (193,17) shows no effect. Pockets: the bin (67,167)
+  read Unknown in pixels; CONSOLE (from RAM) sees SaveSlots and, for Quit, a popup over the
+  Options tab that it takes as Unknown: both give A to the stick cursor; the button by the title (193,17) shows no effect. Pockets: the bin (67,167)
   throws the selected slot's item away; the hand uses the selected item (the Super Drencher
   starts its game; a key item that cannot be used here gets a red ring). Catalogue: "Buy" and
   "Sell" are only the mode, set by selecting a shop item or a bought one; the simoleon button
@@ -228,10 +256,37 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   `#383869` shadow one font pixel off), drawn as text overlays (`Overlay::text`: the 5 × 7
   font, literal strings, lines split by hand with `\n`: 14 characters beside a chip, 20 in a
   note). The window's overlay texture cache holds 64 (an activity's hints are some twenty). `menuOpen` shows the menu composition on any screen with a HUD; Phone, Popup
-  and Gift always do. The stick cursor is drawn where the piece showing its point draws it
+  and Gift always do, and SaveSlots, ItemHand, Unknown (the stick cursor's screens) with a frame
+  around the touch screen (`FrameAround(kMenuTo)`). CONSOLE never shows the two screens side by
+  side as SIDE does: a black load (Loading) is the bare backdrop (no piece, no overlay: nothing to
+  touch, no cursor); without a HUD (FrontEnd, CreateASim, None: title, main menu, Create-a-Sim,
+  an unmapped front-end screen, the pixels' None when RAM does not read) the front end's view, the top screen fitted at its own shape in `kFrontTopBox`
+  (24,72, 568 × 480: 568 × 426 at 4:3, 568 × 320 widescreen, centred; touchable as the camera,
+  as SIDE's was) and the touch screen 2.5x at `kFrontBottomTo` (616,72, 640 × 480, the only
+  stylus piece; 3x would not fit beside the top), both framed on the dark canvas, and a box at
+  y 600 with `kFrontHint` at 3x ("STICK: CURSOR - A: TOUCH": these screens are touch-only, the
+  DS's A, Start and D-pad change nothing on the title, `s2`, `s3`, `s4`; the font has no
+  apostrophe and no middle dot). The stick cursor is drawn where the piece showing its point draws it
   (`CanvasFromTouch`), hidden where no piece shows it.
 - The navigator (`navigator.cpp`, CONSOLE only; `Input::Steer`, before the mouse, and the touch
-  script last as ever). Panel with the menu closed, Dialogue, None: the buttons are the
+  script last as ever). Its screen is the game's (`App::ConsoleScreen()`, from RAM; the pixel
+  tracker only when RAM does not read). RAM leads the pixels by up to about 60 frames (6 to 24
+  seen from `s7` and `s6`) and the game reads not settled while the bottom slot switches
+  (`P+0xE42` != 3) or a popup slides (`P+0x8` 1 or 3); a panel tab of -1 (between screens, `Panel/?`) is Unknown. In the black loads (CAS →
+  town, the title → CAS, quitting the cards; `game Unknown(ov=-1,vt=0x00000000)`) the manager
+  reads but its bottom object pointer `P+0xDAC` is 0, so the chain is not valid
+  (`GameState::between`); both screens are exactly black there (a fade of 60, 28, 0 over 4
+  frames before; `ScreensBlack`, at most 8 a channel). Between screens or Unknown, without the
+  HUD and black: Loading (the bare backdrop, the DS's buttons); an Unknown without the HUD that
+  is not black: None (`ConsoleScreenOf`: the front end's view). Measured: cards quit Loading on
+  frames 102-119, title → CAS 29-30, CAS → town 90-125 (124-125 are `Panel/?`). Options > Quit is a popup over the Options
+  tab in RAM: CONSOLE takes it as Unknown (its yes / no are not `kPopupClose`). The gate: on a focus
+  screen or a popup, a press that would tap (A; B / MENU where they tap a close; LB / RB on the
+  panel) while not settled is held, the latest one winning, and replayed on the first settled
+  frame, or dropped after 90 frames or when the screen changes; focus moves and the DS's own
+  buttons never wait; activities are not gated. The 90-frame wait after a closing tap still
+  applies to a replayed press. FrontEnd, CreateASim, None (touch-only, no table yet), SaveSlots,
+  ItemHand: as Unknown (A presses the stick cursor). Panel with the menu closed, Dialogue, Loading: the buttons are the
   DS's (LB / RB the camera's L / R; A advances a conversation itself). MENU (the PANEL action:
   E, the pad's Back) opens the panel's menu only; Esc / Guide / Start + Back stay the pause
   menu; the pad's TOUCH MENU acts on Back's release, and not at all if Start was held meanwhile
@@ -244,7 +299,8 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   DS's (Game Paused). Unknown: the DS's buttons but A, which presses the stick cursor when one
   exists (a controller and the setting on: `PadState::cursor`; otherwise A stays the DS's, so
   the keyboard alone still answers Save and Quit); the stick
-  cursor works in CONSOLE only on screens without a table (None, Vacuum, Unknown). The menu
+  cursor works in CONSOLE only on screens without a table (None, Vacuum, Unknown, and the RAM's
+  FrontEnd, CreateASim, SaveSlots, ItemHand). The menu
   stays open only while the panel changes tab; any other screen change closes it and puts the
   focus back on the screen's first target. A tap is queued only when the touch script does not
   own the stylus (presses meanwhile are dropped); after a closing tap (popup, phone, X) A and B

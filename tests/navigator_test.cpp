@@ -4,7 +4,9 @@
 // the DS's without one), the pad's touch menu acts on release unless Start joins it, and leaving
 // CONSOLE releases everything; the activities (activities.h): the social answers on LEFT / UP /
 // RIGHT, the cards' draw, lift, play, discard and quit question, the vacuum's blow, hand and
-// steering.
+// steering; presses that would tap wait for a settled screen (90 frames at most), DS buttons do
+// not (a popup opening waits); the front end's screens, save slots and the quit question the
+// cursor, a black load the DS's buttons.
 //   ninja -C build navigator_test && ./build/navigator_test
 #include <cstdio>
 #include <cstdlib>
@@ -27,6 +29,9 @@ static const ScreenState kUnknown {Screen::Unknown, Tab::None};
 static const ScreenState kSocial {Screen::Social, Tab::None};
 static const ScreenState kCards {Screen::Cards, Tab::None};
 static const ScreenState kVacuum {Screen::Vacuum, Tab::None};
+static const ScreenState kFrontEnd {Screen::FrontEnd, Tab::None};
+static const ScreenState kCreateASim {Screen::CreateASim, Tab::None};
+static const ScreenState kSaveSlots {Screen::SaveSlots, Tab::None};
 
 // The index of the target named `name` on screen s.
 static int Index(ScreenState s, const char* name)
@@ -43,10 +48,10 @@ struct Rig
     TouchScript touch;
     u32 keys = 0;
     // One frame with these buttons held (the touch script is not advanced: see Touched).
-    u32 Frame(ScreenState s, PadState p = {})
+    u32 Frame(ScreenState s, PadState p = {}, bool settled = true)
     {
         keys = 0;
-        nav.Update(s, p, touch, keys);
+        nav.Update(s, p, touch, keys, settled);
         return keys;
     }
     // A press: a frame held, then a frame released.
@@ -495,6 +500,200 @@ static void vacuum_blows_drives_and_grabs()
     CHECK(!r.nav.CursorPress() && !r.nav.Hand());
 }
 
+static void unsettled_press_waits()
+{
+    // The game's bottom slot switching (GameState::settled false): A on the popup is held, then
+    // tapped once on the first settled frame.
+    Rig r;
+    r.Frame(kPopup, {}, false);
+    PadState a;
+    a.a = true;
+    r.Frame(kPopup, a, false);
+    r.Frame(kPopup, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(kPopup, {}, true);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == kPopupClose.x && y == kPopupClose.y);
+    r.Drain();
+    r.Frame(kPopup, {}, true);
+    CHECK(!r.touch.Owns());
+    // The latest press wins: R (the next tab's icon) then A on the open menu, while the tab
+    // switches, taps A's target.
+    Rig m;
+    m.Frame(kInteract);
+    m.Press(kInteract, &PadState::menu);
+    m.Frame(kGoals, {}, false);
+    PadState rb;
+    rb.rb = true;
+    m.Frame(kGoals, rb, false);
+    m.Frame(kGoals, {}, false);
+    m.Frame(kGoals, a, false);
+    m.Frame(kGoals, {}, true);
+    CHECK(m.Touched(x, y));
+    const Hotspot& f = HotspotsFor(kGoals)[m.nav.Focus()];
+    CHECK(x == f.x && y == f.y);
+    CHECK(m.nav.MenuOpen());
+}
+
+static void unsettled_press_dropped_after_90()
+{
+    Rig r;
+    r.Frame(kPopup, {}, false);
+    PadState a;
+    a.a = true;
+    r.Frame(kPopup, a, false);
+    for (int i = 0; i < 90; i++) r.Frame(kPopup, {}, false); // 91 unsettled frames with the press
+    r.Frame(kPopup, {}, true);
+    CHECK(!r.touch.Owns());
+    // At 90 it still comes.
+    Rig s;
+    s.Frame(kPopup, {}, false);
+    s.Frame(kPopup, a, false);
+    for (int i = 0; i < 89; i++) s.Frame(kPopup, {}, false);
+    s.Frame(kPopup, {}, true);
+    CHECK(s.touch.Owns());
+}
+
+static void unsettled_ds_buttons_pass()
+{
+    Rig r;
+    r.Frame(kPopup, {}, false);
+    PadState st;
+    st.start = true;
+    CHECK(r.Frame(kPopup, st, false) & (1u << kStart));
+    r.Frame(kInteract, {}, false);
+    PadState p;
+    p.a = p.b = p.right = true;
+    const u32 k = r.Frame(kInteract, p, false);
+    for (int key : {kA, kB, kRight}) CHECK(k & (1u << key));
+}
+
+static void unsettled_press_dropped_on_screen_change()
+{
+    // Held for the popup, the screen changes before it settles: nothing is tapped.
+    Rig r;
+    r.Frame(kPopup, {}, false);
+    PadState a;
+    a.a = true;
+    r.Frame(kPopup, a, false);
+    r.Frame(kPhone, {}, false);
+    r.Frame(kPhone, {}, true);
+    CHECK(!r.touch.Owns());
+    // Nor when it goes through a screen that does not tap and comes back.
+    Rig s;
+    s.Frame(kPopup, {}, false);
+    s.Frame(kPopup, a, false);
+    s.Frame(kDialogue, {}, false);
+    s.Frame(kPopup, {}, true);
+    CHECK(!s.touch.Owns());
+    // Nor when the menu closes (B: no tap) and opens again on the same tab before it settles.
+    Rig m;
+    m.Frame(kGoals);
+    m.Press(kGoals, &PadState::menu);
+    CHECK(m.nav.MenuOpen());
+    m.Frame(kGoals, a, false);
+    PadState b;
+    b.b = true;
+    m.Frame(kGoals, b, false);
+    CHECK(!m.nav.MenuOpen());
+    m.Frame(kGoals, {}, false);
+    PadState menu;
+    menu.menu = true;
+    m.Frame(kGoals, menu, false);
+    CHECK(m.nav.MenuOpen());
+    m.Frame(kGoals, {}, true);
+    CHECK(!m.touch.Owns());
+}
+
+static void save_slots_and_quit_keep_the_cursor()
+{
+    // Options > Save slots, and Options > Quit (the RAM's popup over the Options tab, which
+    // CONSOLE takes as Unknown): A presses the stick cursor with a controller, stays the DS's
+    // without one; the D-pad stays the DS's.
+    for (ScreenState s : {kSaveSlots, kUnknown})
+    {
+        Rig r;
+        r.Frame(s);
+        CHECK(r.nav.CursorScreen());
+        PadState a;
+        a.a = a.cursor = a.down = true;
+        const u32 k = r.Frame(s, a);
+        CHECK(!(k & (1u << kA)) && (k & (1u << kDown)));
+        CHECK(r.nav.CursorPress());
+        CHECK(!r.touch.Owns());
+        Rig n;
+        n.Frame(s);
+        PadState b;
+        b.a = true;
+        CHECK(n.Frame(s, b) & (1u << kA));
+        CHECK(!n.nav.CursorPress());
+    }
+}
+
+static void front_end_screens_touch_with_a()
+{
+    // Title / main menu, Create-a-Sim, None (an unmapped front-end screen): touch-only screens
+    // with no table of targets, so as Unknown: A presses the stick cursor with a controller and
+    // stays the DS's without one; B and the D-pad stay the DS's.
+    for (ScreenState s : {kFrontEnd, kCreateASim, ScreenState {Screen::None, Tab::None}})
+    {
+        Rig r;
+        r.Frame(s);
+        CHECK(r.nav.CursorScreen());
+        PadState p;
+        p.a = p.b = p.up = p.left = p.cursor = true;
+        const u32 k = r.Frame(s, p);
+        CHECK(!(k & (1u << kA)));
+        for (int key : {kB, kUp, kLeft}) CHECK(k & (1u << key));
+        CHECK(r.nav.CursorPress());
+        CHECK(!r.touch.Owns());
+        CHECK(r.nav.Focus() == -1);
+        CHECK(HotspotsFor(s).empty());
+        Rig n;
+        n.Frame(s);
+        PadState a;
+        a.a = true;
+        CHECK(n.Frame(s, a) & (1u << kA));
+        CHECK(!n.nav.CursorPress());
+    }
+    // A black load: nothing to touch, every button the DS's.
+    {
+        const ScreenState s {Screen::Loading, Tab::None};
+        Rig r;
+        r.Frame(s);
+        PadState p;
+        p.a = p.b = p.up = p.left = p.cursor = true;
+        const u32 k = r.Frame(s, p);
+        for (int key : {kA, kB, kUp, kLeft}) CHECK(k & (1u << key));
+        CHECK(!r.nav.CursorPress());
+        CHECK(!r.touch.Owns());
+    }
+    CHECK(std::string(ScreenName(Screen::SaveSlots)) == "SaveSlots");
+    CHECK(std::string(ScreenName(Screen::Loading)) == "Loading");
+}
+
+static void popup_opening_holds_a()
+{
+    // A popup opening (the game reads Popup about 13 frames before the box is drawn: not settled,
+    // GameState::settled): A is held, then taps the popup's X once the box is shown.
+    Rig r;
+    r.Frame(kInteract);
+    r.Frame(kPopup, {}, false);
+    PadState a;
+    a.a = true;
+    r.Frame(kPopup, a, false);
+    for (int i = 0; i < 10; i++) r.Frame(kPopup, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(kPopup, {}, true);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == kPopupClose.x && y == kPopupClose.y);
+    r.Drain();
+    r.Frame(kPopup, {}, true);
+    CHECK(!r.touch.Owns());
+}
+
 int main()
 {
     menu_opens_and_closes();
@@ -512,6 +711,13 @@ int main()
     cards_draw_lift_play_discard();
     cards_quit_question();
     vacuum_blows_drives_and_grabs();
+    unsettled_press_waits();
+    unsettled_press_dropped_after_90();
+    unsettled_ds_buttons_pass();
+    unsettled_press_dropped_on_screen_change();
+    save_slots_and_quit_keep_the_cursor();
+    front_end_screens_touch_with_a();
+    popup_opening_holds_a();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

@@ -163,10 +163,22 @@ ScreenState ScreenTracker::Update(const u32* top, const u32* bottom)
     return current;
 }
 
+bool ScreensBlack(const u32* top, const u32* bottom)
+{
+    for (const u32* p : {top, bottom})
+        for (int i = 0; i < SW * 192; i++)
+        {
+            const u32 c = p[i];
+            if ((int)((c >> 16) & 0xFF) > kBlackMax || (int)((c >> 8) & 0xFF) > kBlackMax || (int)(c & 0xFF) > kBlackMax) return false;
+        }
+    return true;
+}
+
 const char* ScreenName(Screen s)
 {
     static const char* const kNames[] = {"None", "Panel", "Phone", "Dialogue", "Popup", "Gift", "Social",
-                                         "Vacuum", "Cards", "Catalogue", "Build", "Unknown"};
+                                         "Vacuum", "Cards", "Catalogue", "Build", "FrontEnd", "CreateASim",
+                                         "SaveSlots", "ItemHand", "Unknown", "Loading"};
     return kNames[(int)s];
 }
 

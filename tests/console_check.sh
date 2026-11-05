@@ -8,17 +8,25 @@
 #   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item): 3x over the
 #   dimmed world; s5 (a conversation): the dialogue rebuilt wide;
 #   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
-#   top right, the hints' box; s3 (Create-a-Sim, no HUD): SIDE. (The pictures pin the menu and the focus with
+#   top right, the hints' box; s2, s3, s4 (the main menu, Create-a-Sim, Keep this Sim?: no HUD):
+#   the front end's view, the top screen framed at the left at its shape and the touch screen
+#   2.5x framed at the right, the buttons' hint below, never SIDE; slots (sit-store, Options >
+#   Save: the save slots, from RAM): the touch screen 3x, framed, over the dimmed world; load
+#   (act-cards quitting, frame 119: RAM between screens, both screens black): the bare backdrop. (The pictures pin the menu and the focus with
 #   --console-focus / --console-menu: the navigator does not move them.)
 # Then the navigator, driven by the scripts' "pad" events (scripts/console/), from what
-# --print-screen prints: from s7, B closes the phone, MENU opens the menu, R twice goes to
-# Goals, B closes the menu; from s6, A closes the popup; from s7, CONSOLE -> FOCUS -> CONSOLE
-# with the menu open and A held: the menu closes on leaving, nothing is tapped on coming back,
-# MENU opens it again.
+# --print-game (the game's screen, which CONSOLE acts on) and --print-screen (the pixels') print:
+# from s7, B closes the phone, MENU opens the menu, R twice goes to Goals, B closes the menu;
+# from s6, A closes the popup; from s6, a touch closes the popup and A, pressed while the next
+# one opens (the game reads Popup before the box is drawn), waits and closes it; from s7,
+# CONSOLE -> FOCUS -> CONSOLE with the menu open and A held: the menu closes on leaving, nothing
+# is tapped on coming back, MENU opens it again. In none of them do the pixels disagree with the
+# game for long ("pixels disagree").
 # Then the activities on buttons (src/activities.*, scripts/console/): from act-social, RIGHT
 # answers with the right icon (it lights green; the game itself plays on for about 1600
 # frames whatever the answers); from act-cards, X draws (Jun's count on the score bar changes),
 # X then Y draws and discards (the count back to its start), B then A quits (Cards, None,
+# Panel/Interact; the game: Cards, Unknown in the black load, which CONSOLE shows as Loading, then
 # Panel/Interact), B then B answers no and X still draws; from act-vacuum-clog, Y held 10
 # frames clears the clog (the bowl's row 1 back to #30A2D3) within 30 frames.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
@@ -72,9 +80,14 @@ run vacuum act-vacuum "${hotel[@]}" &
 run cards act-cards "${late[@]}" &
 run s3 s3 "${town[@]}" &
 wait
+run s2 s2 "${town[@]}" &
+run s4 s4 "${town[@]}" &
+run slots sit-store "${town[@]}" --input "$repo/scripts/hotspots/options-save.txt" &
+run load act-cards "${late[@]}" --input "$repo/scripts/console/cards-quit.txt" &
+wait
 
 fails=0
-for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s3; do
+for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots load; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -122,6 +135,26 @@ def rail():
     w = world_full()
     for cx, cy in ((400, 100), (700, 650), (1000, 300)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
+
+def front():
+    """No HUD: the top screen fitted in 24,72 568 x 480 (4:3: 568 x 426 at 24,99), the touch
+    screen 2.5x at 616,72, both framed; the hint's box below; the canvas dark elsewhere."""
+    expect("canvas", comp.size, (1280, 720))
+    for x in range(0, 256, 7):
+        for y in range(0, 192, 7):
+            expect(f"touch screen 2.5x DS {x},{y}", C(616 + x * 5 // 2 + 1, 72 + y * 5 // 2 + 1), bottom(x, y))
+            if len(errors) > 4:
+                return
+    for cx, cy in ((24, 99), (300, 300), (591, 524), (100, 500)):
+        expect(f"top at {cx},{cy}", C(cx, cy), top((cx - 24) * 256 // 568, (cy - 99) * 192 // 426))
+    expect("touch screen frame", C(612, 300), OUTLINE)
+    expect("top frame", C(20, 300), OUTLINE)
+    expect("backdrop", C(5, 5), (16, 18, 24))
+    expect("backdrop between", C(604, 300), (16, 18, 24))
+    expect("hint box", C(640, 604), FRAME)
+    row = [C(x, y) for y in range(614, 646) for x in range(240, 1040)]
+    if (255, 255, 255) not in row or OUTLINE not in row:
+        errors.append("no hint text")
 
 def big_over_dim():
     piece("touch screen 3x", 0, 0, 256, 192, 256, 72, 3, step=9)
@@ -176,8 +209,29 @@ elif case == "s5":
 elif case in ("social", "vacuum", "cards"):
     expect("canvas", comp.size, (1280, 720))
     activity()
-elif case == "s3":
-    expect("canvas (SIDE)", comp.size, (512, 192))
+elif case in ("s2", "s3", "s4"):
+    front()
+elif case == "load":
+    # Frame 119 of the cards' quit: the game between Cards and the casino's panel, both screens
+    # black: only the backdrop, no frame, no hint.
+    for x in range(0, 256, 4):
+        for y in range(0, 192, 4):
+            if max(top(x, y)) > 8 or max(bottom(x, y)) > 8:
+                errors.append(f"the screens are not black at {x},{y}")
+                break
+        if errors:
+            break
+    for cy in range(0, 720, 8):
+        for cx in range(0, 1280, 8):
+            if C(cx, cy) != (16, 18, 24):
+                errors.append(f"not the bare backdrop at {cx},{cy}: {C(cx, cy)}")
+                break
+        if errors:
+            break
+elif case == "slots":
+    big_over_dim()
+    expect("touch screen frame", C(252, 300), OUTLINE)
+    expect("touch screen frame top", C(640, 68), OUTLINE)
 for e in errors[:5]:
     print(f"  {case}: {e}")
 sys.exit(1 if errors else 0)
@@ -188,7 +242,7 @@ done
 pad() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4
     "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
-        --layout console --print-screen "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        --layout console --print-screen --print-game "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
 # in_order NAME LINE...: each line (a grep -E pattern) is printed, after the one before.
@@ -202,6 +256,7 @@ in_order() {
 }
 pad pad-tabs s7 tabs 320 &
 pad pad-popup s6 popup 120 &
+pad pad-opening s6 popup-opening 200 &
 pad pad-leave s7 leave 300 &
 wait
 check_pad() {
@@ -209,24 +264,35 @@ check_pad() {
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
+    elif grep -q 'pixels disagree' "$tmp/$name.log"; then
+        echo "FAIL $name: $(grep -m 1 'pixels disagree' "$tmp/$name.log")"
+        fails=$((fails + 1))
     elif "$@"; then echo "ok   $name"
     else echo "FAIL $name"; fails=$((fails + 1)); fi
 }
 tabs() {
     in_order pad-tabs 'screen Phone' 'screen Panel/Interact' 'console menu open' 'screen Panel/Pockets' \
-        'screen Panel/Goals' 'console menu closed'
+        'screen Panel/Goals' 'console menu closed' || return 1
+    in_order pad-tabs 'game Phone' 'game Panel/Interact' 'console menu open' 'game Panel/Pockets' \
+        'game Panel/Goals' 'console menu closed'
 }
-popup() { in_order pad-popup 'screen Popup' 'screen Panel/'; }
+popup() { in_order pad-popup 'screen Popup' 'screen Panel/' && in_order pad-popup 'game Popup' 'game Panel/'; }
+# The second popup closed too: A pressed while it opened waited for its box.
+opening() {
+    in_order pad-opening 'screen Popup' 'screen Panel/' 'screen Popup' 'screen Panel/' &&
+        in_order pad-opening 'game Popup' 'game Panel/' 'game Popup' 'game Panel/'
+}
 leave() {
     in_order pad-leave 'console menu open' 'layout focus' 'console menu closed, focus -1' 'layout console' \
         'console menu open' || return 1
     # Nothing tapped from leaving on: the screen stays the panel's Interact tab.
-    if sed -n '/layout focus/,$p' "$tmp/pad-leave.log" | grep -q 'screen '; then
+    if sed -n '/layout focus/,$p' "$tmp/pad-leave.log" | grep -q -E 'screen |game '; then
         echo "  pad-leave: the screen changed after leaving CONSOLE"; return 1
     fi
 }
 check_pad pad-tabs tabs
 check_pad pad-popup popup
+check_pad pad-opening opening
 check_pad pad-leave leave
 
 # The activities on buttons (src/activities.*): act NAME STATE SCRIPT FRAMES SHOTS CLOCK, a
@@ -237,7 +303,7 @@ act() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
     "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$save" --layout console \
-        --print-screen --clock "$clock" --input "$input" --shot-at "$at" --shot-dir "$tmp/$name" \
+        --print-screen --print-game --clock "$clock" --input "$input" --shot-at "$at" --shot-dir "$tmp/$name" \
         > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
 act act-social act-social social 50 34,36,38,40,42,44 "2026-01-01 12:00" &
@@ -300,7 +366,11 @@ EOF
 check_pad act-social pixels act-social social
 check_pad act-draw pixels act-draw draw
 check_pad act-discard pixels act-discard discard
-check_pad act-quit in_order act-quit 'screen Cards' 'screen None' 'screen Panel/Interact'
+quit() {
+    in_order act-quit 'screen Cards' 'screen None' 'screen Panel/Interact' &&
+        in_order act-quit 'game Cards' 'game Unknown' 'game Panel/Interact'
+}
+check_pad act-quit quit
 cancelled() {
     pixels act-cancel cancel || return 1
     if grep -q 'screen None' "$tmp/act-cancel.log"; then echo "  act-cancel: the game quit"; return 1; fi
