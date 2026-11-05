@@ -28,9 +28,9 @@ void TouchScript::Drag(std::vector<Point> path, int framesPerStep, int holdEnd)
 
 void TouchScript::Cancel()
 {
+    release_ = release_ || !cur_.empty(); // the lift still owed to the DS
     queue_.clear();
     cur_.clear();
-    release_ = false;
 }
 
 bool TouchScript::Busy() const { return !cur_.empty() || !queue_.empty(); }

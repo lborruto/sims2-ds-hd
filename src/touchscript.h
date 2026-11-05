@@ -24,6 +24,8 @@ public:
     void Cancel();
     // A script is running or waiting.
     bool Busy() const;
+    // The script holds the stylus: running, waiting, or on the released frame after a touch.
+    bool Owns() const { return Busy() || release_; }
     // Once per game frame: true and the position while touching, false when idle. A frame is
     // released between two scripts, so the DS sees two separate touches.
     bool Next(int& x, int& y);

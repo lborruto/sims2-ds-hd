@@ -74,6 +74,30 @@ static void queue_capped_at_8()
     CHECK(!t.Busy());
 }
 
+static void tap_queued_on_the_release_frame()
+{
+    TouchScript t;
+    t.Tap(1, 2);
+    CHECK(Is(t, 1, 2)); CHECK(Is(t, 1, 2)); CHECK(Is(t, 1, 2));
+    t.Tap(3, 4); // queued after the last touch frame, before the release frame
+    CHECK(t.Owns());
+    CHECK(Idle(t));
+    CHECK(Is(t, 3, 4)); CHECK(Is(t, 3, 4)); CHECK(Is(t, 3, 4));
+    CHECK(Idle(t));
+    CHECK(!t.Owns());
+}
+
+static void cancel_then_tap_still_lifts()
+{
+    TouchScript t;
+    t.Tap(1, 1);
+    CHECK(Is(t, 1, 1));
+    t.Cancel();
+    t.Tap(5, 6);
+    CHECK(Idle(t)); // the lift
+    CHECK(Is(t, 5, 6));
+}
+
 static void cancel_clears()
 {
     TouchScript t;
@@ -93,6 +117,8 @@ int main()
     hold_and_clamp();
     queued_waits();
     queue_capped_at_8();
+    tap_queued_on_the_release_frame();
+    cancel_then_tap_still_lifts();
     cancel_clears();
     if (failures) { fprintf(stderr, "touchscript_test: %d failures\n", failures); return 1; }
     puts("touchscript_test: ok");
