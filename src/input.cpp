@@ -152,6 +152,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
         else if (k == SDLK_1) wantLayout = (int)Layout::Focus;
         else if (k == SDLK_2) wantLayout = (int)Layout::Side;
         else if (k == SDLK_3) wantLayout = (int)Layout::Stacked;
+        else if (k == SDLK_4) wantLayout = (int)Layout::Console;
         else if (k == SDLK_F11) wantFullscreen = true;
         else if (k == SDLK_F12) wantShot = true;
     }

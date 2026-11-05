@@ -15,7 +15,7 @@ report (see SECURITY.md), not to this issue.
 **What you expected**
 
 **Where in the game** (title, Create-a-Sim, in town, a conversation, a minigame…) **and the
-layout** (AUTO, FOCUS, SIDE, STACKED)
+layout** (CONSOLE, AUTO, FOCUS, SIDE, STACKED)
 
 **What the program printed** in the terminal (copy the text)
 

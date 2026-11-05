@@ -123,6 +123,6 @@ add_executable(navigator_test EXCLUDE_FROM_ALL tests/navigator_test.cpp src/acti
 target_include_directories(navigator_test PRIVATE melonDS/src src)
 
 # Checks of the bindings and the settings file's loading (not built by default): ninja -C build controls_test && ./build/controls_test
-add_executable(controls_test EXCLUDE_FROM_ALL tests/controls_test.cpp src/controls.cpp)
+add_executable(controls_test EXCLUDE_FROM_ALL tests/controls_test.cpp src/controls.cpp src/settings.cpp src/layout.cpp)
 target_include_directories(controls_test PRIVATE melonDS/src src)
 target_link_libraries(controls_test PRIVATE SDL2::SDL2-static)

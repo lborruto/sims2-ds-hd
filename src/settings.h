@@ -6,6 +6,7 @@
 #include <string>
 
 #include "controls.h"
+#include "layout.h"
 
 namespace sims2wide
 {
@@ -16,10 +17,12 @@ struct Settings
     // Playable
     MicMode mic = MicMode::BlowKey;
 
-    // Looks
-    int resolution3D = 1;      // 1 = DS (192 lines), 2, 3… times sharper
-    bool widescreen = false;   // 16:9 world when the game's 3D allows it
-    bool interpolate60 = false; // 60 fps in-between frames
+    // Looks: on by default, for CONSOLE; headless runs never load settings and start with them
+    // off (main.cpp), so the checks' output stays the same.
+    Layout layout = Layout::Console; // the window's layout (--layout overrides it for one run)
+    int resolution3D = 2;      // 1 = DS (192 lines), 2, 3… times sharper
+    bool widescreen = true;    // 16:9 world when the game's 3D allows it
+    bool interpolate60 = true; // 60 fps in-between frames
 
     // Comfort
     bool fullscreen = false;    // borderless, the desktop's size (F11)

@@ -3,7 +3,7 @@
 The Sims 2 (Nintendo DS, 2005) in one window, in the spirit of
 [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex). The melonDS 1.1 core (submodule,
 plus the small looks hooks in `patches/melonDS/`) runs the game; a small SDL2 frontend (`src/`) lays out the two screens and
-picks the layout from what the screens show. No decompilation or recompiler: none exists for
+picks the layout from what the screens show (CONSOLE by default: the game played like a console game). No decompilation or recompiler: none exists for
 this game and plain melonDS is fast enough. `origin` = `lborruto/sims2-ds-wide` (private until
 the owner makes it public; write everything as if it were public already).
 
@@ -18,7 +18,7 @@ the owner makes it public; write everything as if it were public already).
 - Never push `main` without the owner's go-ahead.
 - Keep the README short and for players; technical detail goes here and in CONTRIBUTING.md. A PR
   that changes what README.md or this file says updates them.
-- AUTO stays the default layout. melonDS stays the upstream 1.1 tag: changes go in
+- CONSOLE stays the default layout (the owner plays it all the time; AUTO, FOCUS, SIDE and STACKED are chosen by hand). melonDS stays the upstream 1.1 tag: changes go in
   `patches/melonDS/` (applied by CMake) and only with the owner's agreement; never a fork.
 - One task = one clear commit; `ninja -C build sims2wide` and a headless run before each commit.
 
@@ -26,9 +26,9 @@ the owner makes it public; write everything as if it were public already).
 
 | Path | Role |
 | --- | --- |
-| `src/main.cpp` | Command line, starting the DS, the frame loop (input → `RunFrame` → AUTO → shots → sound → picture; paused: menu only) |
+| `src/main.cpp` | Command line, starting the DS, the frame loop (input → `RunFrame` → layout → shots → sound → picture; paused: menu only) |
 | `src/app.h` | Shared state: the `NDS`, layout chosen/shown, `mainIsTop`, fast forward, quit, `micBlow`, `topAspect`, F5/F12 paths |
-| `src/settings.*` | `Settings`: every option with its default; `settings.ini` load/save (SDL pref path), not headless |
+| `src/settings.*` | `Settings`: every option with its default (CONSOLE's: `layout=console`, widescreen on, 3D resolution 2, 60 fps on); `settings.ini` load/save (SDL pref path), not headless; `layout=` round-trips (`tests/controls_test.cpp`) |
 | `src/controls.*` | Actions, key and controller bindings, defaults, names (from FullDex) |
 | `src/input.*` | Keyboard, mouse (stylus; wheel and right drag as the camera), SDL_GameController, stick cursor, script window events |
 | `src/video.*` | The SDL window: draws the shown layout and the overlay, fullscreen, scaling, maps window points to touch positions |
@@ -90,7 +90,10 @@ room), `act-vacuum` (the vacuum just switched on in the lobby), `act-vacuum-clog
 filter clogged). Pass `--clock "2026-01-01
 12:00"` to runs from the town states whose output is compared.
 
-The layout check: from each state, `--headless --frames 200` must log `focus (top big)` for
+Headless runs default to CONSOLE (the first frame logs `frame 0: layout console`; looks off: settings
+are never loaded there, so the looks-on defaults are the window's only). Every check that relied
+on AUTO names its layout: `--layout auto` for the layout check, `--layout auto` (or `focus`) for
+the 24-shot check. The layout check: from each state, `--headless --frames 200 --layout auto` must log `focus (top big)` for
 s5, s6, s7, sit-dialogue, sit-gift, sit-cityhall, sit-store, sit-pause, and (clock 2026-01-01
 14:00) sit-hotel, sit-concierge, sit-basement; `focus (bottom big)` for act-social, sit-build,
 sit-storebuy, and (14:00) act-vacuum, act-vacuum-clog; nothing (SIDE) for s2, s3, s4; on the complete save (clock 2026-11-05 12:05) `focus (top big)` for sit-casino, sit-hotel-late. From act-social, 2400
@@ -158,7 +161,9 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   lies over the world: it is drawn second (`Placement::topFirst`, `alpha`; a later `Piece`) and wins the mouse.
 - The game zooms in with X and out with Y; L and R turn the camera continuously while held
   (checked with `scripts`-style runs from `s7`). The wheel and the right-button drag press them.
-- Settings are never loaded or saved headless (runs must be the same everywhere); the menu
+- Settings are never loaded or saved headless (runs must be the same everywhere), and headless
+  starts with the looks off (`main.cpp` resets resolution 1, widescreen and 60 fps off, though
+  `Settings`' defaults are on for CONSOLE); only `--res3d`, `--wide`, `--interp` turn them on; the menu
   never opens there. Window events in a script (`press`, `click`, `winshot`) count loop turns
   (`iter`), not game frames: the game stands still while the menu is open.
 - The menu's font has capitals, digits and `:-+./<>!(),` only: write its text in capitals.
@@ -290,7 +295,7 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 - `act-cards` runs whose pictures are compared need `--clock` after the state's time
   (`2026-11-05 12:00`): without it the HUD clock is the host's and two runs differ by it.
 - Looks: with all looks off the headless output must stay byte for byte the same (24-shot
-  shasum check in CONTRIBUTING). Frame 0 after `--state-load` shows melonDS's uninitialised 3D
+  shasum check in CONTRIBUTING, run with `--layout auto`: the default is CONSOLE now). Frame 0 after `--state-load` shows melonDS's uninitialised 3D
   buffer, so even the memory layout of melonDS's objects matters: patch state goes in globals
   (`Looks3D`, `Looks2D`), never in new members.
 - Looks: a patch that no longer applies fails the configure with a message. To edit one, change
@@ -333,7 +338,7 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 
 | # | Task | Status |
 | --- | --- | --- |
-| 1 | POC: melonDS + SDL frontend, headless study of the screens, AUTO layout | ✅ |
+| 1 | POC: melonDS + SDL frontend, headless study of the screens, AUTO layout (CONSOLE is the default now) | ✅ |
 | 2 | Repository template (docs, CI, release, issue templates); portfolio page in `lborruto/docs` waits on a local branch until the repo is public | ✅ / 🔄 |
 | 3 | Bigger side panel: the touch screen at 2x over the world's right edge | ✅ |
 | 4 | Looks: widescreen 3D from FullDex's `GPU3D_Wide.cpp`, sharper 3D, 60 fps (opt-in) | ✅ |

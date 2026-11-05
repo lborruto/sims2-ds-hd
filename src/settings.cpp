@@ -35,6 +35,11 @@ bool Settings::Load(const std::string& path)
         const bool on = v == "1" || v == "on" || v == "true";
         if (controls.Apply(k, v)) continue;
         if (k == "mic") mic = v == "off" ? MicMode::Off : v == "real" ? MicMode::Real : MicMode::BlowKey;
+        else if (k == "layout")
+        {
+            for (Layout l : {Layout::Console, Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked})
+                if (v == LayoutName(l)) layout = l;
+        }
         else if (k == "resolution_3d") resolution3D = std::clamp(atoi(v.c_str()), 1, 8);
         else if (k == "widescreen") widescreen = on;
         else if (k == "interpolate_60") interpolate60 = on;
@@ -64,6 +69,7 @@ bool Settings::Save(const std::string& path) const
     if (!out) return false;
     out << "# The Sims 2 DS, one screen: settings. Changed from the pause menu (Esc).\n"
         << "mic=" << MicKey(mic) << "\n"
+        << "layout=" << LayoutName(layout) << "\n"
         << "resolution_3d=" << resolution3D << "\n"
         << "widescreen=" << (widescreen ? 1 : 0) << "\n"
         << "interpolate_60=" << (interpolate60 ? 1 : 0) << "\n"

@@ -49,7 +49,7 @@ static void Usage()
     fprintf(stderr,
         "sims2wide " SIMS2WIDE_VERSION "\n"
         "usage: sims2wide [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
-        "  --layout auto|focus|side|stacked|console  window layout (default auto)\n"
+        "  --layout console|auto|focus|side|stacked  window layout (default console)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
         "  --res3d N                     3D drawn N times sharper (1 = the DS's own, default)\n"
         "  --wide                        widescreen 16:9 world\n"
@@ -72,7 +72,7 @@ static void Usage()
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
         "      Esc menu (settings, save states, quit), Space fast forward, Tab swaps the big screen\n"
         "      CONSOLE: E opens the touch screen's menu (arrows move, A taps, L/R tabs, B closes)\n"
-        "      0 auto, 1/2/3 layouts, F5/F7 save/load state, F11 fullscreen, F12 screenshot\n"
+        "      0 auto, 1/2/3/4 focus/side/stacked/console, F5/F7 save/load state, F11 fullscreen, F12 screenshot\n"
         "      mouse: the touch screen; over the world, wheel zooms and a right-button drag turns\n");
 }
 
@@ -100,7 +100,8 @@ int main(int argc, char** argv)
     long frames = -1;
     int shotEvery = 0;
     std::set<long> shotAt;
-    Layout layout = Layout::Auto;
+    Layout layout = Layout::Console;
+    bool layoutGiven = false;
     bool compose = false, printScreen = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int res3d = 0;
@@ -133,6 +134,7 @@ int main(int argc, char** argv)
         else if (a == "--layout")
         {
             std::string l = next();
+            layoutGiven = true;
             layout = l == "side" ? Layout::Side : l == "stacked" ? Layout::Stacked : l == "focus" ? Layout::Focus : l == "console" ? Layout::Console : Layout::Auto;
         }
         else if (a.rfind("-psn_", 0) == 0) {} // older macOS adds this to an app started from the Finder
@@ -176,8 +178,6 @@ int main(int argc, char** argv)
     if (!cart) { Tell(dialogs, "Not a Nintendo DS ROM: " + romPath); return 1; }
 
     App app;
-    app.layout = layout;
-    app.shown = layout == Layout::Auto ? Layout::Side : layout;
     // (For the checks' pictures: pinned, the navigator no longer moves them; it still steers.)
     app.consoleMenu = consoleMenu;
     app.consoleFocus = consoleFocus;
@@ -187,6 +187,16 @@ int main(int argc, char** argv)
     // The settings file (not headless: those runs stay the same on every machine).
     const std::string settingsPath = headless ? "" : Settings::DefaultPath();
     if (!settingsPath.empty() && app.settings.Load(settingsPath)) fprintf(stderr, "settings: %s\n", settingsPath.c_str());
+    if (headless)
+    {
+        // Settings default to CONSOLE's looks; headless never loads them, so it starts with the
+        // looks off (the checks' output stays the same) unless the flags ask.
+        app.settings.resolution3D = 1;
+        app.settings.widescreen = false;
+        app.settings.interpolate60 = false;
+    }
+    app.layout = layoutGiven || headless ? layout : app.settings.layout;
+    app.shown = Layout::Side; // (the first frame logs the layout when it is not SIDE)
     if (res3d) app.settings.resolution3D = res3d;
     if (wide) app.settings.widescreen = true;
     if (interp) app.settings.interpolate60 = true;
@@ -293,7 +303,7 @@ int main(int argc, char** argv)
             if (input.wantSave) menu.Say(SaveState(nds, quickState) ? "STATE SAVED" : "STATE NOT SAVED", frame);
             if (input.wantLoad) menu.Say(LoadState(nds, quickState) ? "STATE LOADED" : "NO STATE TO LOAD", frame);
             if (input.wantShot) { WriteShot(shotFile, app.Top(), app.Bottom()); menu.Say("SCREENSHOT SAVED", frame); }
-            if (input.wantLayout >= 0) app.layout = (Layout)input.wantLayout;
+            if (input.wantLayout >= 0) app.settings.layout = app.layout = (Layout)input.wantLayout;
             if (input.wantFullscreen)
             {
                 app.settings.fullscreen = !app.settings.fullscreen;

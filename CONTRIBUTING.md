@@ -63,8 +63,9 @@ checked in the window with a script of window events (`press`, `click`, `winshot
 table below) and `--frames`, which closes the window by itself.
 
 A change to the core's patches or to the looks keeps the looks-off output byte for byte the
-same: from save states of Create-a-Sim, a conversation and free roam, `--frames 200
---shot-every 50` with and without `--compose`, shasums compared before and after the change.
+same: from save states of Create-a-Sim, a conversation and free roam, `--layout auto --frames 200
+--shot-every 50` with and without `--compose` (24 shots; headless runs start with the looks off
+and default to CONSOLE, so name the layout), shasums compared before and after the change.
 
 CI runs on every pull request and push to `main`: actionlint and shellcheck on the workflows,
 gitleaks over the whole history, CodeQL on `src/` (once the repository is public: code
@@ -85,7 +86,7 @@ issue.
   messages. `.gitignore` covers `roms/`, `shots/`, `*.sav` and `*.st`; never force-add what it
   ignores. Screenshots in `docs/screenshots` are fine. Nothing that tells people where to get
   a ROM.
-- **The single window is the default.** AUTO stays the default layout; the others are there by
+- **The single window is the default.** CONSOLE is the default layout; the others are there by
   choice.
 - **Learn from the picture, not from the game's code.** Situations are recognised from the
   screens' pixels (like the status bar). A rule comes with the shots that show it holds, in
@@ -111,7 +112,8 @@ The headless mode runs the game without a window, about four times faster than r
 | (in a script, CONSOLE) | `pad ACTION` (`a`, `b`, `x`, `y`, `l`/`lb`, `r`/`rb`, `start`, `select`, `menu`, `up`, `down`, `left`, `right`): the action held as on a controller, through the navigator; `layout NAME` (`auto`, `focus`, `side`, `stacked`, `console`) switches the layout at that frame. Headless and window alike; `--print-screen` also prints the navigator's menu and focus |
 | (in a script, window only) | `press KEY` (SDL's key names: `Escape`, `Return`, `F11`, `X`), `move x y` and `click x y` (window points), `wheel n`, `winshot` (the window's picture, `w<frame>.png`): real SDL events for the frontend; their frame counts the loop's turns, paused ones too |
 | `--shot-every N`, `--shot-at a,b,c`, `--shot-dir DIR` | both screens as PNG (256 × 384) |
-| `--compose` | the window's picture instead (the layout AUTO would show) |
+| `--layout console\|auto\|focus\|side\|stacked` | the layout (default CONSOLE; the checks that need another name it) |
+| `--compose` | the window's picture instead (the layout's) |
 | `--res3d N`, `--wide`, `--interp` | the looks; shots then also write the top picture at its size (`fNNNNNN-top.png`) |
 | `--state-load FILE`, `--state-save FILE` | start from a save state, save one at the end |
 | `--save FILE` | the game's save (use a scratch one for tests) |
@@ -195,7 +197,9 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
 - **Settings** (`settings.*`): one `Settings` struct for every option, whoever uses it; loaded
   from `settings.ini` (plain `key=value`) in SDL's per-user folder when the window opens, never
   headless, saved on every change from the menu and when the program closes (with the window's
-  size). Add a field with its default, its two lines in `Load` and `Save`, its row in `menu.cpp`.
+  size). Add a field with its default, its two lines in `Load` and `Save`, its row in `menu.cpp`. The defaults are CONSOLE's: `layout=console`, widescreen on,
+  3D resolution 2, 60 fps on; `--layout` overrides the layout for one run. Headless never loads
+  settings and starts with the looks off (main.cpp), so its output does not depend on them.
 - **Controls** (`controls.*`, `input.*`): each action (the 12 DS buttons, MENU, FAST FORWARD,
   SWAP SCREENS, SAVE STATE, LOAD STATE, BLOW, CURSOR PRESS, TOUCH MENU) has a key (an SDL keycode, so the
   key's label on any layout) and a controller input; giving an action a key another one had

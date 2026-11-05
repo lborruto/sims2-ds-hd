@@ -9,6 +9,7 @@
 #include <string>
 
 #include "controls.h"
+#include "settings.h"
 
 using namespace sims2wide;
 using namespace Controls;
@@ -113,8 +114,30 @@ static void old_file_with_e_once_keys_known()
     SDL_Quit();
 }
 
+// The layout and the looks round-trip through settings.ini; the defaults are CONSOLE's.
+static void layout_round_trip()
+{
+    Settings d;
+    CHECK(d.layout == Layout::Console && d.widescreen && d.resolution3D == 2 && d.interpolate60);
+    const std::string path = "controls_test_settings.ini";
+    for (Layout l : {Layout::Console, Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked})
+    {
+        Settings a;
+        a.layout = l;
+        a.widescreen = false;
+        CHECK(a.Save(path));
+        Settings b;
+        b.layout = Layout::Stacked;
+        CHECK(b.Load(path));
+        CHECK(b.layout == l);
+        CHECK(!b.widescreen);
+    }
+    remove(path.c_str());
+}
+
 int main(int, char**)
 {
+    layout_round_trip();
     defaults_one_each();
     old_file_with_back();
     saved_file_loads_back();

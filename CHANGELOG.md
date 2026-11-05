@@ -9,6 +9,13 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
+- CONSOLE, now the default layout: the game played like a console game. The town fills the
+  window, widescreen, sharper and at 60 fps (these are now on by default), with a small rail of
+  the touch screen's tabs and phone. One button (Back, or E) opens the touch screen's menu big
+  over the town; conversations, popups and the shop get a big picture of their own; the social
+  game, Keelhaulin' Cards and the vacuum are played on the buttons, with a box of hints. The
+  D-pad moves a highlight, A taps, LB and RB switch tabs, B closes. The other layouts stay in
+  SETTINGS > DISPLAY > LAYOUT (key 4 is CONSOLE) and the choice is kept between runs.
 - The casino's card game (Keelhaulin' Cards) shows the cards big, the table beside them.
 - The DS buttons' keys follow their position on any keyboard layout: on AZERTY, B is on W,
   Y on Q, L on A and R on Z, the same places as on QWERTY.
