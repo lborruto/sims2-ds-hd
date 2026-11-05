@@ -5,7 +5,7 @@
 // CONSOLE releases everything; the activities (activities.h): the social answers on LEFT / UP /
 // RIGHT, the cards' draw, lift, play, discard and quit question, the vacuum's blow, hand and
 // steering; presses that would tap wait for a settled screen (90 frames at most), DS buttons do
-// not; the front end's screens keep the DS's buttons.
+// not; the front end's screens keep the DS's buttons, save slots and the quit question the cursor.
 //   ninja -C build navigator_test && ./build/navigator_test
 #include <cstdio>
 #include <cstdlib>
@@ -568,11 +568,73 @@ static void unsettled_ds_buttons_pass()
     for (int key : {kA, kB, kRight}) CHECK(k & (1u << key));
 }
 
+static void unsettled_press_dropped_on_screen_change()
+{
+    // Held for the popup, the screen changes before it settles: nothing is tapped.
+    Rig r;
+    r.Frame(kPopup, {}, false);
+    PadState a;
+    a.a = true;
+    r.Frame(kPopup, a, false);
+    r.Frame(kPhone, {}, false);
+    r.Frame(kPhone, {}, true);
+    CHECK(!r.touch.Owns());
+    // Nor when it goes through a screen that does not tap and comes back.
+    Rig s;
+    s.Frame(kPopup, {}, false);
+    s.Frame(kPopup, a, false);
+    s.Frame(kDialogue, {}, false);
+    s.Frame(kPopup, {}, true);
+    CHECK(!s.touch.Owns());
+    // Nor when the menu closes (B: no tap) and opens again on the same tab before it settles.
+    Rig m;
+    m.Frame(kGoals);
+    m.Press(kGoals, &PadState::menu);
+    CHECK(m.nav.MenuOpen());
+    m.Frame(kGoals, a, false);
+    PadState b;
+    b.b = true;
+    m.Frame(kGoals, b, false);
+    CHECK(!m.nav.MenuOpen());
+    m.Frame(kGoals, {}, false);
+    PadState menu;
+    menu.menu = true;
+    m.Frame(kGoals, menu, false);
+    CHECK(m.nav.MenuOpen());
+    m.Frame(kGoals, {}, true);
+    CHECK(!m.touch.Owns());
+}
+
+static void save_slots_and_quit_keep_the_cursor()
+{
+    // Options > Save slots, and Options > Quit (the RAM's popup over the Options tab, which
+    // CONSOLE takes as Unknown): A presses the stick cursor with a controller, stays the DS's
+    // without one; the D-pad stays the DS's.
+    for (ScreenState s : {kSaveSlots, kUnknown})
+    {
+        Rig r;
+        r.Frame(s);
+        CHECK(r.nav.CursorScreen());
+        PadState a;
+        a.a = a.cursor = a.down = true;
+        const u32 k = r.Frame(s, a);
+        CHECK(!(k & (1u << kA)) && (k & (1u << kDown)));
+        CHECK(r.nav.CursorPress());
+        CHECK(!r.touch.Owns());
+        Rig n;
+        n.Frame(s);
+        PadState b;
+        b.a = true;
+        CHECK(n.Frame(s, b) & (1u << kA));
+        CHECK(!n.nav.CursorPress());
+    }
+}
+
 static void front_end_screens_pass_the_buttons()
 {
-    // Title / main menu, Create-a-Sim, Options > Save slots: no table of targets yet, the DS's
-    // own buttons (A, B, the D-pad), even with a stick cursor.
-    for (ScreenState s : {kFrontEnd, kCreateASim, kSaveSlots})
+    // Title / main menu, Create-a-Sim: no table of targets yet, the DS's own buttons (A, B, the
+    // D-pad), even with a stick cursor.
+    for (ScreenState s : {kFrontEnd, kCreateASim})
     {
         Rig r;
         r.Frame(s);
@@ -608,6 +670,8 @@ int main()
     unsettled_press_waits();
     unsettled_press_dropped_after_90();
     unsettled_ds_buttons_pass();
+    unsettled_press_dropped_on_screen_change();
+    save_slots_and_quit_keep_the_cursor();
     front_end_screens_pass_the_buttons();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");

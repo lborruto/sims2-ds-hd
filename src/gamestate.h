@@ -32,7 +32,12 @@ const char* GScreenName(GScreen);
 std::string GameStateName(const GameState&);   // "Panel/Goals", "Popup", "Unknown(ov=8,vt=0x0214B1C4)"
 // CONSOLE's screen from the game's: Panel with its tab, the rest by name; not valid, a Panel
 // whose tab is not 0..4, or an unmapped screen: Unknown (the DS's buttons, the stick cursor).
+// Options > Quit is a popup over the Options tab (tab 4): Unknown too, since its yes / no
+// buttons are not kPopupClose (the stick cursor answers it, or the DS's A).
 ScreenState ToScreenState(const GameState&);
+// What CONSOLE shows and steers: ToScreenState when RAM reads (an Unknown without the HUD, the
+// black loads between screens, is None: SIDE, not the activity layout), else the pixels' answer.
+ScreenState ConsoleScreenOf(const GameState&, ScreenState pixels, bool hud);
 // Whether the pixel tracker's answer (screens.h) is what the game's screen looks like:
 // the same, or None for FrontEnd / CreateASim (no HUD), Unknown for SaveSlots / ItemHand.
 bool PixelsAgree(const GameState&, ScreenState pixels);

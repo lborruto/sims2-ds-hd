@@ -31,8 +31,8 @@ struct App
     // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
     // pinned them for a check's picture.
     bool consolePinned = false;
-    // CONSOLE's screen: the game's own (RAM) when it reads, else the pixel tracker's.
-    ScreenState ConsoleScreen() const { return game.valid ? ToScreenState(game) : screens.Current(); }
+    // CONSOLE's screen: the game's own (RAM) when it reads, else the pixel tracker's (gamestate.h).
+    ScreenState ConsoleScreen() const { return ConsoleScreenOf(game, screens.Current(), HudVisible(Top())); }
     // The game's bottom slot is not switching (true without a RAM reading): the navigator's gate.
     bool Settled() const { return !game.valid || game.settled; }
 

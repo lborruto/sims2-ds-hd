@@ -20,6 +20,7 @@
 # answers with the right icon (it lights green; the game itself plays on for about 1600
 # frames whatever the answers); from act-cards, X draws (Jun's count on the score bar changes),
 # X then Y draws and discards (the count back to its start), B then A quits (Cards, None,
+# Panel/Interact; the game: Cards, Unknown in the black load, which CONSOLE shows as None, then
 # Panel/Interact), B then B answers no and X still draws; from act-vacuum-clog, Y held 10
 # frames clears the clog (the bowl's row 1 back to #30A2D3) within 30 frames.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
@@ -227,7 +228,7 @@ leave() {
     in_order pad-leave 'console menu open' 'layout focus' 'console menu closed, focus -1' 'layout console' \
         'console menu open' || return 1
     # Nothing tapped from leaving on: the screen stays the panel's Interact tab.
-    if sed -n '/layout focus/,$p' "$tmp/pad-leave.log" | grep -q 'screen '; then
+    if sed -n '/layout focus/,$p' "$tmp/pad-leave.log" | grep -q -E 'screen |game '; then
         echo "  pad-leave: the screen changed after leaving CONSOLE"; return 1
     fi
 }
@@ -308,7 +309,7 @@ check_pad act-draw pixels act-draw draw
 check_pad act-discard pixels act-discard discard
 quit() {
     in_order act-quit 'screen Cards' 'screen None' 'screen Panel/Interact' &&
-        in_order act-quit 'game Cards' 'game Panel/Interact'
+        in_order act-quit 'game Cards' 'game Unknown' 'game Panel/Interact'
 }
 check_pad act-quit quit
 cancelled() {

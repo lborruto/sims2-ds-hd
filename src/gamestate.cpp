@@ -146,7 +146,7 @@ ScreenState ToScreenState(const GameState& g)
     case GScreen::Panel:
         if (g.tab < 0 || g.tab > 4) return {Screen::Unknown};
         return {Screen::Panel, (Tab)((int)Tab::Interact + g.tab)};
-    case GScreen::Popup: return {Screen::Popup};
+    case GScreen::Popup: return {g.tab == 4 ? Screen::Unknown : Screen::Popup}; // 4: Options > Quit
     case GScreen::Phone: return {Screen::Phone};
     case GScreen::Dialogue: return {Screen::Dialogue};
     case GScreen::Gift: return {Screen::Gift};
@@ -168,11 +168,20 @@ bool PixelsAgree(const GameState& g, ScreenState pixels)
 {
     const ScreenState r = ToScreenState(g);
     if (r == pixels) return true;
+    if (g.screen == GScreen::Popup && pixels.screen == Screen::Popup) return true; // Options > Quit
     switch (r.screen)
     {
     case Screen::FrontEnd: case Screen::CreateASim: return pixels.screen == Screen::None;
     case Screen::SaveSlots: case Screen::ItemHand: return pixels.screen == Screen::Unknown;
     default: return false;
     }
+}
+
+ScreenState ConsoleScreenOf(const GameState& g, ScreenState pixels, bool hud)
+{
+    if (!g.valid) return pixels;
+    ScreenState s = ToScreenState(g);
+    if (s.screen == Screen::Unknown && !hud) s = {Screen::None};
+    return s;
 }
 }

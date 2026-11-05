@@ -12,8 +12,8 @@
 //   Popup (a goal, tips, Game Paused): A or B tap its X; Start stays the DS's (it resumes a pause).
 //   Dialogue: every button is the DS's (A is the game's own "next").
 //   None: every button is the DS's.
-//   FrontEnd, CreateASim, SaveSlots (from RAM; no table yet): every button is the DS's.
-//   ItemHand (from RAM; no table yet): as Unknown.
+//   FrontEnd, CreateASim (from RAM; no table yet): every button is the DS's.
+//   SaveSlots, ItemHand (from RAM; no table yet): as Unknown.
 //   Unknown: the DS's buttons, but A presses the stick cursor when there is one (the fallback for
 //     unmeasured screens); without a controller A stays the DS's.
 // Presses are edges of the PadState (pressed now, not on the previous Update). While the touch

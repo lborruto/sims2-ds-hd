@@ -39,9 +39,8 @@ Mode ModeOf(Screen s, bool menuOpen)
     case Screen::Social: case Screen::Cards: case Screen::Vacuum: return Mode::Activity;
     case Screen::Popup: return Mode::Popup;
     case Screen::Unknown: return Mode::Cursor;
-    case Screen::ItemHand: return Mode::Cursor; // no table yet: as Unknown
-    case Screen::None: case Screen::Dialogue:
-    case Screen::FrontEnd: case Screen::CreateASim: case Screen::SaveSlots: return Mode::Pass;
+    case Screen::ItemHand: case Screen::SaveSlots: return Mode::Cursor; // no table yet: as Unknown
+    case Screen::None: case Screen::Dialogue: case Screen::FrontEnd: case Screen::CreateASim: return Mode::Pass;
     }
     return Mode::Pass;
 }
@@ -94,6 +93,7 @@ int CloseOf(const std::vector<Hotspot>& h)
 }
 }
 
+// Mirrors the taps of Update's Mode::Focus and Mode::Popup cases: change one, change the other.
 bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
 {
     const Mode mode = ModeOf(s.screen, menuOpen_);
@@ -164,7 +164,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         }
         else if (held_) { replay = held_; held_ = nullptr; }
     }
-    else if (settled) held_ = nullptr;
+    else held_ = nullptr; // a screen that does not tap (or no longer): nothing to replay
     auto pressed = [&](bool PadState::*b)
     {
         if (b == replay) return true;
@@ -192,7 +192,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         dsKeys |= DsKeys(pad, true);
         if (s.screen == Screen::Panel && pressed(&PadState::menu)) menuOpen_ = true;
         break;
-    case Mode::Focus:
+    case Mode::Focus: // (the taps here are listed again in WouldTap, for the gate)
     {
         if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);
         if (move && focus_ >= 0)

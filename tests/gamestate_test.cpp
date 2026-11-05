@@ -205,6 +205,34 @@ static void to_screen_state()
     CHECK(PixelsAgree(g, {Screen::Unknown}) && !PixelsAgree(g, {Screen::Panel, Tab::Options}));
     g.screen = GScreen::Phone;
     CHECK(PixelsAgree(g, {Screen::Phone}) && !PixelsAgree(g, {Screen::Unknown}));
+    // Options > Quit: a popup over the Options tab, Unknown for CONSOLE (its buttons are not the
+    // popup's X); a popup over any other tab stays Popup.
+    g.screen = GScreen::Popup;
+    g.tab = 4;
+    CHECK(ToScreenState(g) == (ScreenState{Screen::Unknown}));
+    CHECK(PixelsAgree(g, {Screen::Unknown}) && PixelsAgree(g, {Screen::Popup}));
+    for (int t : {-1, 0, 1, 2, 3})
+    {
+        g.tab = t;
+        CHECK(ToScreenState(g) == (ScreenState{Screen::Popup}));
+    }
+}
+
+static void console_screen()
+{
+    // RAM when it reads; a black load (Unknown, no HUD) is None; without RAM the pixels.
+    GameState g;
+    CHECK(ConsoleScreenOf(g, {Screen::Phone}, true) == (ScreenState{Screen::Phone}));
+    g.valid = true;
+    CHECK(ConsoleScreenOf(g, {Screen::Cards}, false) == (ScreenState{Screen::None}));
+    CHECK(ConsoleScreenOf(g, {Screen::None}, true) == (ScreenState{Screen::Unknown}));
+    g.screen = GScreen::Panel;
+    g.tab = -1;
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false) == (ScreenState{Screen::None}));
+    g.tab = 1;
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false) == (ScreenState{Screen::Panel, Tab::Pockets}));
+    g.screen = GScreen::Cards;
+    CHECK(ConsoleScreenOf(g, {Screen::None}, false) == (ScreenState{Screen::Cards}));
 }
 
 int main()
@@ -216,6 +244,7 @@ int main()
     invalid_chains();
     random_ram();
     to_screen_state();
+    console_screen();
     if (failures) { fprintf(stderr, "%d failed\n", failures); return 1; }
     printf("all passed\n");
     return 0;

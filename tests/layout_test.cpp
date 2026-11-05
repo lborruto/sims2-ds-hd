@@ -110,7 +110,8 @@ static std::vector<ScreenState> AllStates()
 {
     std::vector<ScreenState> v;
     for (Screen sc : {Screen::None, Screen::Panel, Screen::Phone, Screen::Dialogue, Screen::Popup, Screen::Gift, Screen::Social,
-                      Screen::Vacuum, Screen::Cards, Screen::Catalogue, Screen::Build, Screen::Unknown})
+                      Screen::Vacuum, Screen::Cards, Screen::Catalogue, Screen::Build, Screen::FrontEnd,
+                      Screen::CreateASim, Screen::SaveSlots, Screen::ItemHand, Screen::Unknown})
         if (sc == Screen::Panel)
             for (Tab t : {Tab::None, Tab::Interact, Tab::Pockets, Tab::Goals, Tab::Relationships, Tab::Options}) v.push_back({sc, t});
         else v.push_back({sc, Tab::None});
