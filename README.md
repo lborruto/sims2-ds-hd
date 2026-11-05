@@ -22,7 +22,7 @@
   games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
 - **It follows the game.** It sees what the game shows (its status bar, a social game, a shop,
   the vacuum, the cards) from the screens themselves, so the picture changes with nothing to set.
-  Title, menus and Create-a-Sim show both screens side by side.
+  Title, menus and Create-a-Sim show the top screen and the touch screen big, each in its frame.
 - **The old layouts are still there.** AUTO, FOCUS, SIDE and STACKED: SETTINGS > DISPLAY > LAYOUT.
 - **The DS clock is your clock.** The game lives by the time of day (rooms take real hours,
   skill points come at set hours), so it reads your computer's time, also after a save state,
@@ -157,7 +157,7 @@ They are kept in `settings.ini` in your user folder (the window's size too): on 
 
 | Layout | What you see |
 |---|---|
-| **CONSOLE** (default) | the window as a console game: the world big (widescreen, sharper, 60 fps), the touch screen's menu, conversations, popups and games laid out big, with hints; title and Create-a-Sim side by side |
+| **CONSOLE** (default) | the window as a console game: the world big (widescreen, sharper, 60 fps), the touch screen's menu, conversations, popups and games laid out big, with hints; title and Create-a-Sim framed, the touch screen big |
 | **AUTO** | FOCUS in town (the touch screen big during a social game, in the shop's catalogue or Build Rooms), SIDE everywhere else |
 | **FOCUS** | the world big, the touch screen at twice its size over the world's right edge, a little see-through (Tab makes the touch screen the big one instead) |
 | **SIDE** | both screens side by side |

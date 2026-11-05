@@ -8,7 +8,10 @@
 #   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item): 3x over the
 #   dimmed world; s5 (a conversation): the dialogue rebuilt wide;
 #   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
-#   top right, the hints' box; s3 (Create-a-Sim, no HUD): SIDE. (The pictures pin the menu and the focus with
+#   top right, the hints' box; s2, s3, s4 (the main menu, Create-a-Sim, Keep this Sim?: no HUD):
+#   the front end's view, the top screen framed at the left at its shape and the touch screen
+#   2.5x framed at the right, the buttons' hint below, never SIDE; slots (sit-store, Options >
+#   Save: the save slots, from RAM): the touch screen 3x, framed, over the dimmed world. (The pictures pin the menu and the focus with
 #   --console-focus / --console-menu: the navigator does not move them.)
 # Then the navigator, driven by the scripts' "pad" events (scripts/console/), from what
 # --print-game (the game's screen, which CONSOLE acts on) and --print-screen (the pixels') print:
@@ -48,14 +51,15 @@ run() {
     file=$shots/$state.st
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
-    local save=$tmp/$name.sav
+    local save=$tmp/$name.sav input=()
     if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
+    if [ "$name" = slots ]; then input=(--input "$repo/scripts/hotspots/options-save.txt"); fi
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
-        --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
+        --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 ${input[@]+"${input[@]}"} "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
     [ "$state" = act-cards ] && cp "$complete_save" "$save"
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
-        --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
+        --shot-at 119 --shot-dir "$tmp/$name/r" ${input[@]+"${input[@]}"} "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
 }
 
@@ -74,9 +78,13 @@ run vacuum act-vacuum "${hotel[@]}" &
 run cards act-cards "${late[@]}" &
 run s3 s3 "${town[@]}" &
 wait
+run s2 s2 "${town[@]}" &
+run s4 s4 "${town[@]}" &
+run slots sit-store "${town[@]}" &
+wait
 
 fails=0
-for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s3; do
+for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -124,6 +132,26 @@ def rail():
     w = world_full()
     for cx, cy in ((400, 100), (700, 650), (1000, 300)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
+
+def front():
+    """No HUD: the top screen fitted in 24,72 568 x 480 (4:3: 568 x 426 at 24,99), the touch
+    screen 2.5x at 616,72, both framed; the hint's box below; the canvas dark elsewhere."""
+    expect("canvas", comp.size, (1280, 720))
+    for x in range(0, 256, 7):
+        for y in range(0, 192, 7):
+            expect(f"touch screen 2.5x DS {x},{y}", C(616 + x * 5 // 2 + 1, 72 + y * 5 // 2 + 1), bottom(x, y))
+            if len(errors) > 4:
+                return
+    for cx, cy in ((24, 99), (300, 300), (591, 524), (100, 500)):
+        expect(f"top at {cx},{cy}", C(cx, cy), top((cx - 24) * 256 // 568, (cy - 99) * 192 // 426))
+    expect("touch screen frame", C(612, 300), OUTLINE)
+    expect("top frame", C(20, 300), OUTLINE)
+    expect("backdrop", C(5, 5), (16, 18, 24))
+    expect("backdrop between", C(604, 300), (16, 18, 24))
+    expect("hint box", C(640, 604), FRAME)
+    row = [C(x, y) for y in range(614, 636) for x in range(250, 1030)]
+    if (255, 255, 255) not in row or OUTLINE not in row:
+        errors.append("no hint text")
 
 def big_over_dim():
     piece("touch screen 3x", 0, 0, 256, 192, 256, 72, 3, step=9)
@@ -178,8 +206,12 @@ elif case == "s5":
 elif case in ("social", "vacuum", "cards"):
     expect("canvas", comp.size, (1280, 720))
     activity()
-elif case == "s3":
-    expect("canvas (SIDE)", comp.size, (512, 192))
+elif case in ("s2", "s3", "s4"):
+    front()
+elif case == "slots":
+    big_over_dim()
+    expect("touch screen frame", C(252, 300), OUTLINE)
+    expect("touch screen frame top", C(640, 68), OUTLINE)
 for e in errors[:5]:
     print(f"  {case}: {e}")
 sys.exit(1 if errors else 0)

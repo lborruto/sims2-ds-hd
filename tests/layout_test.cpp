@@ -186,8 +186,44 @@ int main()
         const Composition act = BuildConsole({Screen::Vacuum, Tab::None}, false, -1, SW, SH);
         CHECK(act.pieces[0].src == Src::Bottom && act.pieces[0].to.x == 36 && act.pieces[0].to.y == 68 && act.pieces[0].to.w == SW * 3);
         CHECK(act.pieces[1].src == Src::Top && act.pieces[1].to.x == 858 && act.pieces[1].to.w == 384 && act.pieces[1].to.h == 288);
-        const Composition side = BuildConsole({Screen::None, Tab::None}, false, -1, SW, SH);
-        CHECK(side.cw == SW * 2 && side.ch == SH);
+    }
+    // No HUD (title, main menu, Create-a-Sim, black loads): never the two screens side by side.
+    // The top screen framed at the left at its shape, the touch screen 2.5x framed at the right,
+    // the only touchable piece; a hint row at the bottom.
+    for (Screen sc : {Screen::FrontEnd, Screen::CreateASim, Screen::None})
+        for (const auto& top : {std::pair<int, int> {SW, SH}, {341, 192}, {682, 384}})
+        {
+            const Composition c = BuildConsole({sc, Tab::None}, false, -1, top.first, top.second);
+            CHECK(c.cw == kConsoleW && c.ch == kConsoleH);
+            const Composition side = FromPlacement(Place(Layout::Side, true, (float)top.first / top.second), top.first, top.second);
+            int touchBottoms = 0;
+            for (const Piece& q : c.pieces)
+            {
+                for (const Piece& sq : side.pieces)
+                    CHECK(!(q.to.x == sq.to.x && q.to.y == sq.to.y && q.to.w == sq.to.w && q.to.h == sq.to.h));
+                if (q.src != Src::Bottom || !q.touch) continue;
+                touchBottoms++;
+                CHECK(q.from.x == 0 && q.from.y == 0 && q.from.w == SW && q.from.h == SH);
+                CHECK(q.to.w * 2 >= SW * 5 && q.to.h * 2 >= SH * 5 && q.to.w * SH == q.to.h * SW);
+                CHECK(q.to.x >= c.pieces[0].to.x + c.pieces[0].to.w);
+            }
+            CHECK(touchBottoms == 1);
+            CHECK(c.pieces.size() == 2 && c.pieces[0].src == Src::Top && c.pieces[0].to.x + c.pieces[0].to.w <= kConsoleW / 2);
+            // The top screen at its own shape (within a pixel), never stretched.
+            const Rect t = c.pieces[0].to;
+            CHECK(std::abs(t.w * top.second - t.h * top.first) <= top.first);
+            bool hint = false;
+            for (const Overlay& o : c.overlays) hint |= o.text != nullptr && o.to.y > 600;
+            CHECK(hint);
+            float cx, cy, sc2;
+            CHECK(CanvasFromTouch(c, 10, 20, cx, cy, sc2) && sc2 == 2.5f && cx == c.pieces[1].to.x + 25 && cy == c.pieces[1].to.y + 50);
+        }
+    // SaveSlots, ItemHand, Unknown (HUD up): the menu composition, framed, with the stick cursor.
+    for (Screen sc : {Screen::SaveSlots, Screen::ItemHand, Screen::Unknown})
+    {
+        const Composition m = BuildConsole({sc, Tab::None}, false, -1, SW, SH);
+        CHECK(m.pieces.size() == 2 && !m.pieces[0].touch && m.pieces[1].src == Src::Bottom && m.pieces[1].to.x == kMenuTo.x && m.pieces[1].to.y == kMenuTo.y && m.pieces[1].to.w == SW * 3);
+        CHECK(m.overlays.size() == 2 && m.overlays[0].argb == kDimArgb && m.overlays[1].argb == kFrameArgb && m.overlays[1].to.x == kMenuTo.x - 6);
     }
     // The menu: the dimmed world swallows clicks and the camera; the touch screen 3x is the stylus.
     for (ScreenState s : {ScreenState {Screen::Panel, Tab::Goals}, ScreenState {Screen::Popup, Tab::None}, ScreenState {Screen::Gift, Tab::None}})
@@ -265,8 +301,8 @@ int main()
         CHECK(CanvasFromTouch(town, 16, 22, cx, cy, sc) && sc == 2 && cx == kRailTabsTo.x + 32 && cy == kRailTabsTo.y + 32);
         CHECK(CanvasFromTouch(town, 230, 20, cx, cy, sc) && cx == kRailPhoneTo.x + 16);
         CHECK(!CanvasFromTouch(town, 128, 96, cx, cy, sc));
-        const Composition act = BuildConsole({Screen::Unknown, Tab::None}, false, -1, SW, SH);
-        CHECK(CanvasFromTouch(act, 10, 20, cx, cy, sc) && sc == 3 && cx == 36 + 30 && cy == 68 + 60);
+        const Composition unk = BuildConsole({Screen::Unknown, Tab::None}, false, -1, SW, SH);
+        CHECK(CanvasFromTouch(unk, 10, 20, cx, cy, sc) && sc == 3 && cx == kMenuTo.x + 30 && cy == kMenuTo.y + 60);
         const Composition side = FromPlacement(Place(Layout::Side, true, kDSAspect), SW, SH);
         CHECK(CanvasFromTouch(side, 0, 0, cx, cy, sc) && cx == SW && cy == 0 && sc == 1);
         CHECK(!CanvasFromTouch(side, SW, 0, cx, cy, sc));
