@@ -55,7 +55,7 @@ Before opening a pull request:
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
     ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens
     ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
-    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong, the navigator's pad scripts (ROM, shots/, the complete save, Pillow)
+    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts (ROM, shots/, the complete save, Pillow)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below). A change to the menu, the mouse or the keys is
@@ -183,6 +183,15 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   previous frame; taps are dropped while the touch script owns the stylus. Leaving CONSOLE
   cancels the touch script and closes the menu. `tests/navigator_test.cpp` drives it on
   synthetic screen states; `tests/console_check.sh` from save states with `pad` scripts.
+- **Activities** (`activities.*`): the navigator hands the social reaction, Keelhaulin' Cards
+  and the vacuum to `ActivityInput`, which keeps its own `ActivityState` (the previous
+  `PadState`, the focus, the cards' lifted places and quit question) and turns buttons into the
+  game's touches: taps, and drags through `TouchScript::Drag` (a card onto the play arrow or the
+  discard pile); the vacuum's hand is the stick cursor (`Navigator::Hand`, moved by the right
+  stick or by the D-pad with X or A held, so the keyboard needs no stick; A held presses it), its
+  Y blows (`Navigator::Blow` into `App::micBlow`). `ActivityHints` gives the hints' box its rows
+  (`AddHints`, `console.*`: text overlays in the 5 × 7 font, `Overlay::text`, lines split by hand).
+  `PadState` is in `padstate.h` (both use it).
 - **Settings** (`settings.*`): one `Settings` struct for every option, whoever uses it; loaded
   from `settings.ini` (plain `key=value`) in SDL's per-user folder when the window opens, never
   headless, saved on every change from the menu and when the program closes (with the window's

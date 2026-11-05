@@ -1,0 +1,2 @@
+# From act-cards, CONSOLE: X draws from the deck (Jun's hand 8 -> 9).
+20 2 pad x

@@ -103,7 +103,7 @@ static void tables_have_their_targets()
 {
     CHECK(HotspotsFor({Screen::None, Tab::None}).empty());
     CHECK(HotspotsFor({Screen::Unknown, Tab::None}).empty());
-    CHECK(HotspotsFor({Screen::Vacuum, Tab::None}).empty()); // the stick's hand (Task 7)
+    CHECK(HotspotsFor({Screen::Vacuum, Tab::None}).empty()); // the stick's hand (activities.h)
     // Every tab: its own targets, then the five tab icons and the phone.
     for (Tab t : {Tab::None, Tab::Interact, Tab::Pockets, Tab::Goals, Tab::Relationships, Tab::Options})
     {

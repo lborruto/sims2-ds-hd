@@ -8,13 +8,19 @@
 #   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item): 3x over the
 #   dimmed world; s5 (a conversation): the dialogue rebuilt wide;
 #   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
-#   top right; s3 (Create-a-Sim, no HUD): SIDE. (The pictures pin the menu and the focus with
+#   top right, the hints' box; s3 (Create-a-Sim, no HUD): SIDE. (The pictures pin the menu and the focus with
 #   --console-focus / --console-menu: the navigator does not move them.)
 # Then the navigator, driven by the scripts' "pad" events (scripts/console/), from what
 # --print-screen prints: from s7, B closes the phone, MENU opens the menu, R twice goes to
 # Goals, B closes the menu; from s6, A closes the popup; from s7, CONSOLE -> FOCUS -> CONSOLE
 # with the menu open and A held: the menu closes on leaving, nothing is tapped on coming back,
 # MENU opens it again.
+# Then the activities on buttons (src/activities.*, scripts/console/): from act-social, RIGHT
+# answers with the right icon (it lights green; the game itself plays on for about 1600
+# frames whatever the answers); from act-cards, X draws (Jun's count on the score bar changes),
+# X then Y draws and discards (the count back to its start), B then A quits (Cards, None,
+# Panel/Interact), B then B answers no and X still draws; from act-vacuum-clog, Y held 10
+# frames clears the clog (the bowl's row 1 back to #30A2D3) within 30 frames.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
 #   bash tests/console_check.sh
 # Override with SIMS2WIDE, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh) and
@@ -133,6 +139,14 @@ def activity():
     expect("world frame", C(855, 200), OUTLINE)
     for x, y in ((0, 0), (100, 50), (383, 287), (200, 280)):
         expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, y * 192 // 288))
+    # The hints' box (kHintBox, 850,400): its outline, its fill, the first button's chip and,
+    # in the first row's text (x 972 on), white letters with the outline's shadow.
+    expect("hints outline", C(851, 500), OUTLINE)
+    expect("hints fill", C(1000, 406), FRAME)
+    expect("hint chip", C(870, 430), PANEL)
+    row = [C(x, y) for y in range(420, 444) for x in range(972, 1100)]
+    if (255, 255, 255) not in row or OUTLINE not in row:
+        errors.append("no hint text in the first row")
 
 if case == "cityhall":
     expect("canvas", comp.size, (1280, 720))
@@ -214,5 +228,84 @@ leave() {
 check_pad pad-tabs tabs
 check_pad pad-popup popup
 check_pad pad-leave leave
+
+# The activities on buttons (src/activities.*): act NAME STATE SCRIPT FRAMES SHOTS CLOCK, a
+# CONSOLE run with --print-screen and shots of the two screens at SHOTS (NAME/f*.png).
+act() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 at=$5 clock=$6 file save=$tmp/$1.sav
+    file=$shots/$state.st
+    [ -f "$file" ] || file=$more_shots/$state.st
+    if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$save" --layout console \
+        --print-screen --clock "$clock" --input "$input" --shot-at "$at" --shot-dir "$tmp/$name" \
+        > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+act act-social act-social social 50 34,36,38,40,42,44 "2026-01-01 12:00" &
+act act-draw act-cards cards-draw 200 10,199 "2026-11-05 12:05" &
+act act-discard act-cards cards-discard 300 10,90,299 "2026-11-05 12:05" &
+act act-quit act-cards cards-quit 300 10 "2026-11-05 12:05" &
+wait
+act act-cancel act-cards cards-cancel 300 10,299 "2026-11-05 12:05" &
+act act-blow act-vacuum-clog vacuum-blow 60 9,40 "2026-01-01 14:00" &
+wait
+# pixels NAME CASE: the Python checks below on NAME's shots.
+pixels() {
+    "$python" -I - "$tmp/$1" "$2" <<'EOF'
+import sys
+from PIL import Image
+
+d, case = sys.argv[1:3]
+shot = lambda f: Image.open(f"{d}/f{f:06d}.png").convert("RGB")
+errors = []
+
+def green(im, x, y, w, h):
+    """Pixels of the lit answer's green in a bottom-screen area."""
+    return sum(1 for yy in range(y, y + h) for xx in range(x, x + w)
+               if (lambda p: p[1] > p[0] + 40 and p[1] > p[2] + 40)(im.getpixel((xx, 192 + yy))))
+
+def count(im):
+    """Jun's card count on the score bar (top screen, x 82-87, rows 2-13), as pixels."""
+    return [im.getpixel((x, y)) for y in range(2, 14) for x in range(82, 88)]
+
+if case == "social":
+    # The tapped icon lights green for a few frames (about 4 to 12 after the touch); the
+    # others stay unlit.
+    shots = [shot(f) for f in (34, 36, 38, 40, 42, 44)]
+    if max(green(im, 186, 101, 45, 45) for im in shots) < 200:
+        errors.append("the right icon never lit")
+    if any(green(im, 26, 101, 45, 45) or green(im, 106, 55, 45, 45) for im in shots):
+        errors.append("another icon lit")
+elif case == "draw":
+    if count(shot(10)) == count(shot(199)):
+        errors.append("the card count did not change (no draw)")
+elif case == "discard":
+    if count(shot(10)) == count(shot(90)):
+        errors.append("the card count did not change (no draw)")
+    if count(shot(10)) != count(shot(299)):
+        errors.append("the card count is not back to its start (no discard)")
+elif case == "cancel":
+    if count(shot(10)) == count(shot(299)):
+        errors.append("no draw after answering no")
+elif case == "blow":
+    clean = lambda im: all(im.getpixel((x, 193)) == (0x30, 0xA2, 0xD3) for x in range(4, 45))
+    if clean(shot(9)):
+        errors.append("not clogged before the blow")
+    if not clean(shot(40)):
+        errors.append("still clogged 30 frames after the blow began")
+for e in errors:
+    print(f"  {case}: {e}")
+sys.exit(1 if errors else 0)
+EOF
+}
+check_pad act-social pixels act-social social
+check_pad act-draw pixels act-draw draw
+check_pad act-discard pixels act-discard discard
+check_pad act-quit in_order act-quit 'screen Cards' 'screen None' 'screen Panel/Interact'
+cancelled() {
+    pixels act-cancel cancel || return 1
+    if grep -q 'screen None' "$tmp/act-cancel.log"; then echo "  act-cancel: the game quit"; return 1; fi
+}
+check_pad act-cancel cancelled
+check_pad act-blow pixels act-blow blow
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

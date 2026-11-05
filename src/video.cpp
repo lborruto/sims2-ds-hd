@@ -141,12 +141,12 @@ SDL_Texture* Video::OverlayTexture(const Overlay& o, int w, int h)
     if (w <= 0 || h <= 0) return nullptr;
     auto same = [&](const OverlayTex& e) {
         return e.w == w && e.h == h && e.o.to.w == o.to.w && e.o.to.h == o.to.h && e.o.argb == o.argb && e.o.radius == o.radius &&
-               e.o.border == o.border && e.o.borderArgb == o.borderArgb;
+               e.o.border == o.border && e.o.borderArgb == o.borderArgb && e.o.text == o.text && e.o.textScale == o.textScale;
     };
     for (const OverlayTex& e : overlayTex)
         if (same(e)) return e.tex;
-    // A new one (a resize or a new ring makes a few): keep the cache small.
-    if (overlayTex.size() >= 24)
+    // A new one (a resize or a new ring makes a few; an activity's hints are some twenty): keep the cache small.
+    if (overlayTex.size() >= 64)
     {
         for (OverlayTex& e : overlayTex) SDL_DestroyTexture(e.tex);
         overlayTex.clear();

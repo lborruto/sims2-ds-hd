@@ -39,10 +39,11 @@ the owner makes it public; write everything as if it were public already).
 | `src/compose.*` | `Composition`: pieces (a rectangle of one DS screen at a canvas rectangle, opacity, touchable or not) in drawing order, and overlays (rounded frames, boxes, the dimmed backdrop, the focus ring; `RasteriseOverlay`, each drawn before the piece it names); `FromPlacement`/`Compose`, `TouchFromComposition`, `TouchClampedComposition`, `OverTopComposition`; what `Video`, `--compose` and the mouse use |
 | `src/console.*` | CONSOLE (`--layout console`): `BuildConsole(ScreenState, menuOpen, focus, topW, topH)`, the 1280 × 720 composition per recognised screen (town and its rail, the menu over the dimmed world, the dialogue rebuilt wide, activities, SIDE for None), its geometry and the game's colours; `App::consoleMenu` / `consoleFocus` (the navigator drives them; `--console-menu` / `--console-focus N` pin them for checks' pictures, `App::consolePinned`) |
 | `src/navigator.*` | CONSOLE's navigator: `PadState` (the actions held: DS buttons, MENU = the PANEL action, sticks), `Navigator::Update(ScreenState, pad, TouchScript&, dsKeys)`: per screen the DS's buttons passed on, or a focus over `HotspotsFor` moved by the D-pad and tapped with A; `Leave` when CONSOLE goes; `Input::Steer` runs it (window and headless) |
-| `tests/navigator_test.cpp` | The navigator on synthetic screen states: menu, focus moves, taps, tabs, popup, phone, town keys, Unknown's cursor, leaving CONSOLE (`ninja -C build navigator_test`) |
+| `src/activities.*`, `src/padstate.h` | CONSOLE's activities on buttons: `ActivityInput(Screen, PadState, TouchScript&, dsKeys, ActivityState&)` (social answers, the cards' draw / lift / play / discard / quit question, the vacuum's drive, hand, grab and blow), `ActivityHints` (the hints' box rows); `PadState` (shared with the navigator) |
+| `tests/navigator_test.cpp` | The navigator on synthetic screen states: menu, focus moves, taps, tabs, popup, phone, town keys, Unknown's cursor, leaving CONSOLE, the activities (`ninja -C build navigator_test`) |
 | `tests/controls_test.cpp` | The bindings: one action per input, by default and after loading an older settings file (`ninja -C build controls_test`) |
 | `scripts/console/*.txt` | `pad` scripts for `tests/console_check.sh`'s navigator cases |
-| `tests/console_check.sh` | CONSOLE's pictures from save states: the DS pixels where each piece puts them, the frames, the dimmed world, the focus ring, SIDE without a HUD; then the navigator from `pad` scripts (`--print-screen`: tabs from `s7`, the popup from `s6`, CONSOLE → FOCUS → CONSOLE) (ROM, `shots/`, the complete save and Pillow: `PYTHON=…`) |
+| `tests/console_check.sh` | CONSOLE's pictures from save states: the DS pixels where each piece puts them, the frames, the dimmed world, the focus ring, SIDE without a HUD; then the navigator from `pad` scripts (`--print-screen`: tabs from `s7`, the popup from `s6`, CONSOLE → FOCUS → CONSOLE) and the activities' (a social answer, the cards' draw, discard, quit and its cancel, the vacuum's blow), the hints' box (ROM, `shots/`, the complete save and Pillow: `PYTHON=…`) |
 | `src/touchscript.*` | `TouchScript` (`Input::touchScript`): taps, holds and drags over game frames, queued (8 at most), one released frame between; wins over the mouse and the stick in `Input::Frame` |
 | `tests/layout_test.cpp` | Touch mapping of every pixel in every layout and size, and of every piece of every CONSOLE composition (`ninja -C build layout_test`) |
 | `tests/touchscript_test.cpp` | The synthesised touches (`ninja -C build touchscript_test`) |
@@ -216,17 +217,21 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   text box, so its bottom border stops at x 153); the text x 8-159 rows 26-123; the arrow x
   219-249 rows 155-186 (its dark outline ends at x 249; column 250 holds only a one-pixel fringe
   of `#6171B2` on rows 168-175, and row 187 seven such pixels, both left out because the screen
-  frame's rounded corner starts at 250,186 and 248,187). The hints' box (`kHintBox`) is left empty until
-  hints are drawn. `menuOpen` shows the menu composition on any screen with a HUD; Phone, Popup
+  frame's rounded corner starts at 250,186 and 248,187). The hints' box (`kHintBox`, 850,400, 400 wide, as high
+  as its rows, 252 at most): `AddHints`, one row per `Hint` (a chip in `#5961A2` with the
+  button, round for one letter at 3x, a word at 2x; the text at 3x from x 972, white with a
+  `#383869` shadow one font pixel off), drawn as text overlays (`Overlay::text`: the 5 × 7
+  font, literal strings, lines split by hand with `\n`: 14 characters beside a chip, 20 in a
+  note). The window's overlay texture cache holds 64 (an activity's hints are some twenty). `menuOpen` shows the menu composition on any screen with a HUD; Phone, Popup
   and Gift always do. The stick cursor is drawn where the piece showing its point draws it
   (`CanvasFromTouch`), hidden where no piece shows it.
 - The navigator (`navigator.cpp`, CONSOLE only; `Input::Steer`, before the mouse, and the touch
-  script last as ever). Panel with the menu closed, Dialogue, None, Vacuum: the buttons are the
+  script last as ever). Panel with the menu closed, Dialogue, None: the buttons are the
   DS's (LB / RB the camera's L / R; A advances a conversation itself). MENU (the PANEL action:
   E, the pad's Back) opens the panel's menu only; Esc / Guide / Start + Back stay the pause
   menu; the pad's TOUCH MENU acts on Back's release, and not at all if Start was held meanwhile
   (`ReleasePulse`: Start + Back in either order is the pause menu); the key E acts on its press.
-  Focus screens (the panel's menu, Phone, Gift, Catalogue, Build, Social, Cards): the
+  Focus screens (the panel's menu, Phone, Gift, Catalogue, Build): the
   D-pad or left stick moves the focus (`Neighbour`; held: again after 18 frames, then every 6),
   A taps, on the panel LB / RB tap the previous / next tab icon (in a ring) and B / MENU close
   the menu (no tap); on the Phone B / MENU tap `kPhoneClose` and close the menu; elsewhere B taps
@@ -240,8 +245,8 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   own the stylus (presses meanwhile are dropped); after a closing tap (popup, phone, X) A and B
   wait for the screen to change (90 frames at most): the popup box slides away still reading
   Popup and a second tap would land on the panel. Volume sliders and the cards' play arrow take
-  a drag only (`Hotspot::dragOnly`): the focus skips them (the mouse or, later, Task 7 does
-  them). Presses are edges against the previous `PadState`; after `Leave` (another layout) or
+  a drag only (`Hotspot::dragOnly`): the focus skips them (the mouse does the sliders, the
+  cards' A the arrow). Presses are edges against the previous `PadState`; after `Leave` (another layout) or
   the pause menu, buttons still held are not presses. The DS's Select moved to the left stick's
   click (Back is the touch menu's). `Bindings::Apply` loads settings through `SetKey`/`SetPad`
   (the swap), so an older file giving an action Back or E (now TOUCH MENU's defaults) still binds
@@ -251,6 +256,29 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   (`Bindings::ResolveKeys`; a 0 left by the load counts as a default). The test gets the keymap
   from SDL's dummy video driver. From `s7`, `pad b` closes the phone (Panel/Interact about 50
   frames later, the phone slides).
+- The activities (`activities.cpp`, CONSOLE: Social, Cards, Vacuum go to `ActivityInput`; Start
+  and Select stay the DS's). Social: Left / Up / Right (or the stick) tap the left / middle /
+  right answer, A the focused one. The tapped answer lights green about 4 to 12 frames after the
+  touch (`act-social`, a tap at frame 30: green on frames 34-42), then the game plays on: it
+  leaves the social screen around frame 1600 whatever the answers (no answer at all: 1606), so
+  a check cannot wait for it to leave. Cards: the focus as on a focus screen, starting on card 1;
+  A on a card taps it (lifted) and A again on a card it lifted drags it onto the play arrow
+  (`Drag`: 4 frames on the card, 8 steps of 2 frames, 4 on the arrow; a lone card snaps back,
+  seen headless; a real play of three alike was not reached); X taps the deck; Y drags the
+  focused card onto the discard pile (9 → 8, the end of the turn); B taps X. The question "Are
+  you sure you want to quit?" still reads Cards: `ActivityState::confirm`, set by the quit tap,
+  makes A tap its tick (93,92: Cards → None → Panel/Interact) and B its cross (163,92: the game
+  goes on); the other buttons wait. Answered with the mouse, the flag stays until the next A or
+  B (which then lands on card 2's or card 4's place) or a screen change. Jun's card count is on
+  the top screen at x 83-86, rows 3-12 (the checks compare x 82-87, rows 2-13). Vacuum: the
+  left stick drives (the DS's D-pad), the D-pad too unless X or A is held; the hand is the stick
+  cursor, moved by the right stick (a controller, the setting on or off) or by the D-pad 2 pixels
+  a frame while X or A is held (the keyboard's way), shown without a controller; A held keeps the
+  stylus down there (dust touched clogs, as with the stylus); Y is the microphone
+  (`Navigator::Blow`, ORed into `App::micBlow`; held 10 frames from `act-vacuum-clog`, the clog is
+  gone at frame 30: row 1 back to `#30A2D3`); B, L, R stay the DS's. The mockup's RT for the grab
+  is the pad's FAST FORWARD (RT), so the grab is A (and the TOUCH binding, LT, presses the hand
+  too).
 - The complete save's states (in git-ignored `shots/`; run them with
   `--save` a copy of `saves/complete-play.sav` and `--clock "2026-11-05 12:05"`): `sit-casino`
   (`act-cards` quit to the casino's panel, `scripts/hotspots/casino-base.txt`) and

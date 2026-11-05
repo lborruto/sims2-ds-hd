@@ -99,6 +99,23 @@ sit in the same places as on QWERTY. Every row but the last four can be changed 
 BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation and Switch
 controllers are known by their own button names.
 
+In `--layout console` the activities are played on the buttons too, with a box of hints
+beside them:
+
+| Activity | Key | Controller | Does |
+|---|---|---|---|
+| Social reaction | Left / Up / Right | D-pad or left stick | the left / top / right answer |
+| | X | A | the chosen answer again |
+| Keelhaulin' Cards | Arrows | D-pad or left stick | choose a card (or the deck, the discard pile, ? and X) |
+| | X | A | pick the card up; again: play it on the stairs |
+| | S | X | draw from the deck |
+| | A | Y | discard the chosen card |
+| | Z | B | quit (then X / A: yes, Z / B: no) |
+| Vacuum | Arrows | left stick (or D-pad) | drive |
+| | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
+| | X (hold) | A (hold) | grab a find with the hand and drag it to the box |
+| | A (hold) | Y (hold) | blow: clears a clogged filter |
+
 The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another
 emulator or a flash cart works if you put it there. A copy is made in `backups/` beside it when
 the program starts and every half hour (the last eight are kept).

@@ -58,7 +58,7 @@ FetchContent_MakeAvailable(sdl2)
 
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
-    src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/controls.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
+    src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/controls.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
     src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
@@ -101,7 +101,8 @@ if(WIN32)
 endif()
 
 # Checks of the layouts' touch mapping (not built by default): ninja -C build layout_test && ./build/layout_test
-add_executable(layout_test EXCLUDE_FROM_ALL tests/layout_test.cpp src/layout.cpp src/compose.cpp src/console.cpp src/hotspots.cpp src/screens.cpp)
+add_executable(layout_test EXCLUDE_FROM_ALL tests/layout_test.cpp src/layout.cpp src/activities.cpp src/compose.cpp src/console.cpp src/hotspots.cpp src/screens.cpp
+    src/touchscript.cpp src/ui.cpp)
 target_include_directories(layout_test PRIVATE melonDS/src src)
 
 # Checks of the synthesised touches (not built by default): ninja -C build touchscript_test && ./build/touchscript_test
@@ -117,7 +118,8 @@ add_executable(screens_test EXCLUDE_FROM_ALL tests/screens_test.cpp src/screens.
 target_include_directories(screens_test PRIVATE melonDS/src src)
 
 # Checks of CONSOLE's navigator (not built by default): ninja -C build navigator_test && ./build/navigator_test
-add_executable(navigator_test EXCLUDE_FROM_ALL tests/navigator_test.cpp src/navigator.cpp src/hotspots.cpp src/screens.cpp src/touchscript.cpp)
+add_executable(navigator_test EXCLUDE_FROM_ALL tests/navigator_test.cpp src/activities.cpp src/navigator.cpp src/hotspots.cpp src/screens.cpp
+    src/touchscript.cpp)
 target_include_directories(navigator_test PRIVATE melonDS/src src)
 
 # Checks of the bindings and the settings file's loading (not built by default): ninja -C build controls_test && ./build/controls_test

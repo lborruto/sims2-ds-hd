@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
+#include "activities.h"
 #include "hotspots.h"
 
 namespace sims2wide
@@ -29,6 +30,15 @@ Piece World(int topW, int rows)
 
 Piece Bottom(Rect from, Rect to) { return {Src::Bottom, from, to}; }
 
+// Text in white with the outline's shadow (each font pixel `scale` canvas pixels).
+Overlay Text(int x, int y, const char* text, int scale)
+{
+    Overlay o {TextRect(x, y, text, scale), 0xFFFFFFFF, 0, 0, kOutlineArgb};
+    o.text = text;
+    o.textScale = scale;
+    return o;
+}
+
 // The focus ring around hotspot `focus`'s area, as the topmost touchable bottom piece showing the
 // area's centre draws it (the area clipped to that piece), 4 pixels outside it.
 void AddRing(Composition& c, ScreenState s, int focus)
@@ -51,7 +61,31 @@ void AddRing(Composition& c, ScreenState s, int focus)
         c.overlays.push_back({{rx0 - t, ry0 - t, rx1 - rx0 + 2 * t, ry1 - ry0 + 2 * t}, 0, 8, t, kRingArgb, -1});
         return;
     }
-}
+}}
+
+void AddHints(Composition& c, const std::vector<Hint>& hints)
+{
+    if (hints.empty()) return;
+    const size_t box = c.overlays.size();
+    c.overlays.push_back({{kHintBox.x, kHintBox.y, kHintBox.w, 0}, kFrameArgb, 16, 4, kOutlineArgb});
+    int y = kHintBox.y + kHintPad;
+    for (const Hint& h : hints)
+    {
+        int x = kHintBox.x + kHintPad, rowH = TextRect(0, 0, h.text, 3).h - 3;
+        if (h.button)
+        {
+            const bool round = !h.button[1];
+            const int cw = round ? kHintChipH : TextRect(0, 0, h.button, 2).w + 14;
+            c.overlays.push_back({{x, y, cw, kHintChipH}, kPanelArgb, round ? kHintChipH / 2 : 9, 3, kOutlineArgb});
+            if (round) c.overlays.push_back(Text(x + (kHintChipH - 15) / 2, y + (kHintChipH - 21) / 2, h.button, 3));
+            else c.overlays.push_back(Text(x + 8, y + (kHintChipH - 14) / 2, h.button, 2));
+            x = kHintTextX;
+            rowH += kHintChipH - 21;
+        }
+        c.overlays.push_back(Text(x, y + (h.button ? (kHintChipH - 21) / 2 : 0), h.text, 3));
+        y += std::max(rowH, h.button ? kHintChipH : 0) + kHintGap;
+    }
+    c.overlays[box].to.h = std::min(y - kHintGap + kHintPad - kHintBox.y, kHintBox.h);
 }
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH)
@@ -87,7 +121,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     }
     else
     {
-        // Social, Vacuum, Cards, Catalogue, Build, Unknown. (The hints' box: Task 7.)
+        // Social, Vacuum, Cards, Catalogue, Build, Unknown; the hints' box for the activities.
         const int h = (int)std::lround((double)kActivityTopW * topH / topW);
         const Rect topTo {kActivityTopX, kActivityTopY, kActivityTopW, h};
         c.overlays.push_back({kCanvas, kPanelArgb, 0, 0, 0, 0});
@@ -95,6 +129,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.overlays.push_back(FrameAround(topTo, 0));
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kActivityBottomTo));
         c.pieces.push_back({Src::Top, {0, 0, topW, topH}, topTo});
+        AddHints(c, ActivityHints(s.screen));
     }
     AddRing(c, s, focus);
     return c;

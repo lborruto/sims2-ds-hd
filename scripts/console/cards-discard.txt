@@ -1,0 +1,4 @@
+# From act-cards, CONSOLE: X draws (8 -> 9), Y drags the focused card (the first) onto the
+# discard pile (9 -> 8, the end of the turn).
+20 2 pad x
+100 2 pad y

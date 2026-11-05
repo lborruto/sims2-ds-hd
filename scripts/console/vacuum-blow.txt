@@ -1,0 +1,2 @@
+# From act-vacuum-clog, CONSOLE: Y held 10 frames blows into the microphone: the clog clears.
+10 10 pad y

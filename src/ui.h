@@ -11,6 +11,10 @@
 
 namespace sims2wide
 {
+// The font's 5 x 7 glyph for c (lower case drawn as capitals), one row per byte, bit 4 the
+// leftmost pixel; nullptr for a sign it does not have. (Also CONSOLE's hints, compose.cpp.)
+const u8* Glyph(char c);
+
 struct Canvas
 {
     int w = 0, h = 0;

@@ -3,6 +3,7 @@
 #include <cstring>
 #include <vector>
 
+#include "activities.h"
 #include "hotspots.h"
 
 namespace sims2wide
@@ -23,6 +24,7 @@ enum class Mode
     Focus,  // a focus over the screen's targets, A taps
     Popup,  // A or B close the popup
     Cursor, // the DS's buttons, A presses the stick cursor
+    Activity, // activities.h plays it (the cards' focus moves as on a focus screen)
 };
 
 Mode ModeOf(Screen s, bool menuOpen)
@@ -30,11 +32,11 @@ Mode ModeOf(Screen s, bool menuOpen)
     switch (s)
     {
     case Screen::Panel: return menuOpen ? Mode::Focus : Mode::Pass;
-    case Screen::Phone: case Screen::Gift: case Screen::Catalogue: case Screen::Build:
-    case Screen::Social: case Screen::Cards: return Mode::Focus;
+    case Screen::Phone: case Screen::Gift: case Screen::Catalogue: case Screen::Build: return Mode::Focus;
+    case Screen::Social: case Screen::Cards: case Screen::Vacuum: return Mode::Activity;
     case Screen::Popup: return Mode::Popup;
     case Screen::Unknown: return Mode::Cursor;
-    case Screen::None: case Screen::Dialogue: case Screen::Vacuum: return Mode::Pass;
+    case Screen::None: case Screen::Dialogue: return Mode::Pass;
     }
     return Mode::Pass;
 }
@@ -123,12 +125,14 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         focus_ = -1;
         closing_ = 0;
         screen_ = s;
+        activity_ = ActivityState();
     }
     else if (closing_ > 0) closing_--;
 
     const std::vector<Hotspot>& h = HotspotsFor(s);
     cursorScreen_ = h.empty();
-    cursorPress_ = false;
+    cursorPress_ = blow_ = false;
+    handDx_ = handDy_ = 0;
     // A tap only when nothing else touches: a press while a tap or a drag runs is dropped.
     const bool canTap = !touch.Owns() && closing_ == 0;
     auto tap = [&](const Hotspot& t) { if (canTap) touch.Tap(t.x, t.y); return canTap; };
@@ -182,6 +186,22 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         dsKeys |= DsKeys(pad, !pad.cursor);
         cursorPress_ = pad.cursor && pad.a;
         break;
+    case Mode::Activity:
+        if (s.screen == Screen::Cards && focus_ >= 0 && focus_ < (int)h.size() && move)
+        {
+            static const int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
+            Move(s, dx[dir], dy[dir]);
+        }
+        activity_.prev = prev_;
+        activity_.focus = focus_;
+        ActivityInput(s.screen, pad, touch, dsKeys, activity_);
+        focus_ = activity_.focus;
+        // The vacuum's hand is the stick cursor: A held presses it.
+        cursorPress_ = activity_.grab;
+        blow_ = activity_.blow;
+        handDx_ = activity_.handDx;
+        handDy_ = activity_.handDy;
+        break;
     }
 
     // Where the focus shows: on the targets of a focus screen and on a popup's X.
@@ -190,6 +210,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     case Mode::Focus: case Mode::Popup:
         if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);
         break;
+    case Mode::Activity: break; // (ActivityInput sets it: -1 in the vacuum)
     default: focus_ = -1; break;
     }
     prev_ = pad;
@@ -198,7 +219,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
 void Navigator::Leave(TouchScript& touch)
 {
     touch.Cancel();
-    menuOpen_ = cursorPress_ = cursorScreen_ = false;
+    menuOpen_ = cursorPress_ = cursorScreen_ = blow_ = false;
+    handDx_ = handDy_ = 0;
+    activity_ = ActivityState();
     focus_ = -1;
     closing_ = 0;
     screen_ = ScreenState();

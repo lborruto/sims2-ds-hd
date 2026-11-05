@@ -2,10 +2,13 @@
 // moves the focus, A taps the focused target, L / R tap the tab icons, a popup closes with A, the
 // town keeps the DS's buttons, the phone closes with B, Unknown presses the stick cursor (A stays
 // the DS's without one), the pad's touch menu acts on release unless Start joins it, and leaving
-// CONSOLE releases everything.
+// CONSOLE releases everything; the activities (activities.h): the social answers on LEFT / UP /
+// RIGHT, the cards' draw, lift, play, discard and quit question, the vacuum's blow, hand and
+// steering.
 //   ninja -C build navigator_test && ./build/navigator_test
 #include <cstdio>
 #include <cstdlib>
+#include <string>
 
 #include "hotspots.h"
 #include "navigator.h"
@@ -21,6 +24,18 @@ static const ScreenState kPhone {Screen::Phone, Tab::None};
 static const ScreenState kPopup {Screen::Popup, Tab::None};
 static const ScreenState kDialogue {Screen::Dialogue, Tab::None};
 static const ScreenState kUnknown {Screen::Unknown, Tab::None};
+static const ScreenState kSocial {Screen::Social, Tab::None};
+static const ScreenState kCards {Screen::Cards, Tab::None};
+static const ScreenState kVacuum {Screen::Vacuum, Tab::None};
+
+// The index of the target named `name` on screen s.
+static int Index(ScreenState s, const char* name)
+{
+    const auto& h = HotspotsFor(s);
+    for (int i = 0; i < (int)h.size(); i++)
+        if (std::string(h[i].name) == name) return i;
+    return -1;
+}
 
 struct Rig
 {
@@ -44,6 +59,15 @@ struct Rig
     }
     // The first frame of the touch script's current tap, if any.
     bool Touched(int& x, int& y) { return touch.Owns() && touch.Next(x, y); }
+    // Where the touch script's current touch ends (its first and last points).
+    bool Path(int& x0, int& y0, int& x1, int& y1)
+    {
+        if (!touch.Owns() || !touch.Next(x0, y0)) return false;
+        x1 = x0, y1 = y0;
+        int x, y;
+        while (touch.Next(x, y)) { x1 = x; y1 = y; }
+        return true;
+    }
     void Drain()
     {
         int x, y;
@@ -304,6 +328,163 @@ static void leaving_console_releases_all()
     CHECK(r.Frame(kInteract) == 0);
 }
 
+static void social_answers_on_the_d_pad()
+{
+    Rig r;
+    r.Frame(kSocial);
+    const auto& h = HotspotsFor(kSocial);
+    CHECK(r.nav.Focus() == 0);
+    bool PadState::*dirs[3] = {&PadState::left, &PadState::up, &PadState::right};
+    for (int i = 0; i < 3; i++)
+    {
+        PadState p;
+        p.*dirs[i] = true;
+        CHECK(r.Frame(kSocial, p) == 0); // not the DS's D-pad
+        int x = -1, y = -1;
+        CHECK(r.Touched(x, y));
+        CHECK(x == h[i].x && y == h[i].y);
+        CHECK(r.nav.Focus() == i);
+        r.Drain();
+        r.Frame(kSocial);
+    }
+    // A taps the focused answer (the last one chosen); the stick's left too.
+    r.Press(kSocial, &PadState::a);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == h[2].x && y == h[2].y);
+    r.Drain();
+    PadState stick;
+    stick.lx = -1;
+    r.Frame(kSocial, stick);
+    CHECK(r.Touched(x, y));
+    CHECK(x == h[0].x && y == h[0].y);
+}
+
+static void cards_draw_lift_play_discard()
+{
+    Rig r;
+    r.Frame(kCards);
+    const auto& h = HotspotsFor(kCards);
+    const int card1 = Index(kCards, "card 1");
+    CHECK(r.nav.Focus() == card1);
+    int x = -1, y = -1, x1 = -1, y1 = -1;
+    // X: the deck.
+    r.Press(kCards, &PadState::x);
+    CHECK(r.Touched(x, y));
+    CHECK(x == h[Index(kCards, "deck")].x && y == h[Index(kCards, "deck")].y);
+    r.Drain();
+    // RIGHT: the next card; A lifts it (a tap), A again drags it onto the play arrow.
+    r.Press(kCards, &PadState::right);
+    const int card2 = Index(kCards, "card 2");
+    CHECK(r.nav.Focus() == card2);
+    CHECK(!r.touch.Owns());
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Path(x, y, x1, y1));
+    CHECK(x == h[card2].x && y == h[card2].y && x1 == x && y1 == y);
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Path(x, y, x1, y1));
+    CHECK(x == h[card2].x && y == h[card2].y);
+    CHECK(x1 == h[Index(kCards, "play")].x && y1 == h[Index(kCards, "play")].y);
+    // Played: A lifts again. Y drags the focused card onto the discard pile.
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Path(x, y, x1, y1));
+    CHECK(x1 == x && y1 == y);
+    r.Press(kCards, &PadState::y);
+    CHECK(r.Path(x, y, x1, y1));
+    CHECK(x == h[card2].x && y == h[card2].y);
+    CHECK(x1 == h[Index(kCards, "discard")].x && y1 == h[Index(kCards, "discard")].y);
+    // A press while a drag runs is dropped.
+    r.Press(kCards, &PadState::y);
+    CHECK(r.touch.Owns());
+    r.Press(kCards, &PadState::x);
+    r.Drain();
+    CHECK(!r.touch.Owns());
+    // The focus never rests on the play arrow (a drag's target only).
+    for (int i = 0; i < 6; i++) r.Press(kCards, &PadState::up);
+    CHECK(r.nav.Focus() != Index(kCards, "play"));
+}
+
+static void cards_quit_question()
+{
+    Rig r;
+    r.Frame(kCards);
+    int x = -1, y = -1;
+    const Hotspot& quit = HotspotsFor(kCards)[Index(kCards, "quit")];
+    // B: the quit button; B again answers no (the cross), and the game goes on.
+    r.Press(kCards, &PadState::b);
+    CHECK(r.Touched(x, y));
+    CHECK(x == quit.x && y == quit.y);
+    r.Drain();
+    r.Press(kCards, &PadState::x); // waits for the answer
+    CHECK(!r.touch.Owns());
+    r.Press(kCards, &PadState::b);
+    CHECK(r.Touched(x, y));
+    CHECK(x == kCardsQuitNo.x && y == kCardsQuitNo.y);
+    r.Drain();
+    r.Press(kCards, &PadState::x);
+    CHECK(r.Touched(x, y));
+    CHECK(x == HotspotsFor(kCards)[Index(kCards, "deck")].x);
+    r.Drain();
+    // B, then A: yes (the tick).
+    r.Press(kCards, &PadState::b);
+    r.Drain();
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y));
+    CHECK(x == kCardsQuitYes.x && y == kCardsQuitYes.y);
+    r.Drain();
+    // A fresh game (the screen changed) asks nothing.
+    r.Frame(kInteract);
+    r.Frame(kCards);
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y));
+    CHECK(x == HotspotsFor(kCards)[Index(kCards, "card 1")].x);
+}
+
+static void vacuum_blows_drives_and_grabs()
+{
+    Rig r;
+    r.Frame(kVacuum);
+    CHECK(r.nav.CursorScreen() && r.nav.Hand());
+    CHECK(r.nav.Focus() == -1);
+    // Y: the microphone, not the DS's Y.
+    PadState p;
+    p.y = true;
+    CHECK(!(r.Frame(kVacuum, p) & (1u << kY)));
+    CHECK(r.nav.Blow());
+    r.Frame(kVacuum);
+    CHECK(!r.nav.Blow());
+    // The D-pad and the stick drive; B, L and R stay the DS's.
+    PadState d;
+    d.up = d.b = d.lb = true;
+    d.lx = 1;
+    u32 k = r.Frame(kVacuum, d);
+    for (int key : {kUp, kRight, kB, kL}) CHECK(k & (1u << key));
+    CHECK(r.nav.HandDx() == 0 && r.nav.HandDy() == 0);
+    // X held: the D-pad moves the hand (no driving); the stick still drives.
+    PadState hx;
+    hx.x = hx.up = hx.right = true;
+    hx.ly = 1;
+    k = r.Frame(kVacuum, hx);
+    CHECK(!(k & (1u << kUp)) && !(k & (1u << kRight)) && !(k & (1u << kX)));
+    CHECK(k & (1u << kDown));
+    CHECK(r.nav.HandDx() > 0 && r.nav.HandDy() < 0);
+    CHECK(!r.nav.CursorPress());
+    // A held: the stylus down at the hand (and the D-pad drags it), not the DS's A.
+    PadState a;
+    a.a = a.left = true;
+    k = r.Frame(kVacuum, a);
+    CHECK(!(k & (1u << kA)) && !(k & (1u << kLeft)));
+    CHECK(r.nav.CursorPress());
+    CHECK(r.nav.HandDx() < 0);
+    CHECK(!r.touch.Owns()); // (the hand is the stick cursor, not a touch script)
+    r.Frame(kVacuum);
+    CHECK(!r.nav.CursorPress());
+    // Leaving the vacuum lets go.
+    r.Frame(kVacuum, a);
+    r.Frame(kInteract);
+    CHECK(!r.nav.CursorPress() && !r.nav.Hand());
+}
+
 int main()
 {
     menu_opens_and_closes();
@@ -317,6 +498,10 @@ int main()
     unknown_without_a_cursor_keeps_a();
     touch_menu_on_release_unless_start();
     leaving_console_releases_all();
+    social_answers_on_the_d_pad();
+    cards_draw_lift_play_discard();
+    cards_quit_question();
+    vacuum_blows_drives_and_grabs();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

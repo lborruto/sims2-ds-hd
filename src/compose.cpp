@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include "ui.h"
+
 namespace sims2wide
 {
 Composition FromPlacement(const Placement& p, int topW, int topH)
@@ -88,11 +90,42 @@ bool OverTopComposition(const Composition& c, const CanvasFit& fit, float px, fl
     return false;
 }
 
+Rect TextRect(int x, int y, const char* text, int scale)
+{
+    int lines = 1, chars = 0, longest = 0;
+    for (const char* c = text; *c; c++)
+        if (*c == '\n') { lines++; chars = 0; }
+        else longest = std::max(longest, ++chars);
+    return {x, y, longest * 6 * scale, (lines * 9 - 1) * scale};
+}
+
 void RasteriseOverlay(const Overlay& o, int w, int h, std::vector<u32>& px)
 {
     px.assign((size_t)std::max(w, 0) * std::max(h, 0), 0);
     if (w <= 0 || h <= 0 || o.to.w <= 0 || o.to.h <= 0) return;
     const float sx = (float)w / o.to.w, sy = (float)h / o.to.h, s = std::min(sx, sy);
+    if (o.text)
+    {
+        // Each font pixel a block of the output's pixels: the shadow first, then the text.
+        const int sc = std::max(o.textScale, 1);
+        auto block = [&](int fx, int fy, u32 argb) {
+            const int x0 = (int)(fx * sc * sx), x1 = (int)((fx + 1) * sc * sx);
+            const int y0 = (int)(fy * sc * sy), y1 = (int)((fy + 1) * sc * sy);
+            for (int y = std::max(y0, 0); y < std::min(y1, h); y++)
+                for (int x = std::max(x0, 0); x < std::min(x1, w); x++) px[(size_t)y * w + x] = argb;
+        };
+        for (int pass = o.borderArgb ? 0 : 1; pass < 2; pass++)
+        {
+            int cx = 0, cy = 0;
+            for (const char* c = o.text; *c; c++, cx += 6)
+                if (*c == '\n') { cx = -6; cy += 9; }
+                else if (const u8* g = Glyph(*c))
+                    for (int row = 0; row < 7; row++)
+                        for (int col = 0; col < 5; col++)
+                            if (g[row] & (0x10 >> col)) block(cx + col + (pass ? 0 : 1), cy + row + (pass ? 0 : 1), pass ? o.argb : o.borderArgb);
+        }
+        return;
+    }
     const float r = std::min(o.radius * s, std::min(w, h) / 2.0f), b = o.border * s;
     for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++)

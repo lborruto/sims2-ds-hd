@@ -35,7 +35,18 @@ struct Overlay
     int border;       // the border's width inside `to`, canvas pixels (0: none)
     u32 borderArgb;
     int before = -1;  // drawn just before pieces[before]; -1: after every piece
+    // Text instead of a box (CONSOLE's hints): the 5 x 7 font (ui.h, capitals) in `argb`, each
+    // font pixel textScale canvas pixels, from to's top left, lines split at '\n' 9 font pixels
+    // apart, with a shadow in borderArgb one font pixel down and right (0: none). `to` holds the
+    // text and its shadow (TextRect). The text is not copied: a string that outlives the
+    // composition (the hints are literals).
+    const char* text = nullptr;
+    int textScale = 0;
 };
+
+// A text overlay's rectangle at (x, y): its longest line's characters of 5 font pixels and a gap
+// of 1 (the last gap holds the shadow), by 9 font pixels a line (the last one's 7 and the shadow's).
+Rect TextRect(int x, int y, const char* text, int scale);
 
 // An overlay as w x h pixels of 0xAARRGGBB (straight alpha; 0 outside its rounded corners), for
 // `to` drawn at w x h output pixels: radius and border scaled with it. What --compose and the

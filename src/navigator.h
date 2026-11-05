@@ -6,34 +6,25 @@
 //   Panel, menu open: the D-pad (or the left stick) moves the focus, A taps the focused target,
 //     L / R tap the previous / next tab's icon, B or MENU close the menu.
 //   Phone: the focus as in the menu; B or MENU tap the phone's X (back to the panel, menu closed).
-//   Gift, Catalogue, Build, Social, Cards: the focus as in the menu; B taps the screen's X when it
-//     has one. (Task 7 gives the activities their own buttons.)
+//   Gift, Catalogue, Build: the focus as in the menu; B taps the screen's X when it has one.
+//   Social, Cards, Vacuum: the activity's own buttons (activities.h); the cards' focus moves as
+//     in the menu, the vacuum's hand is the stick cursor.
 //   Popup (a goal, tips, Game Paused): A or B tap its X; Start stays the DS's (it resumes a pause).
 //   Dialogue: every button is the DS's (A is the game's own "next").
-//   None, Vacuum: every button is the DS's.
+//   None: every button is the DS's.
 //   Unknown: the DS's buttons, but A presses the stick cursor when there is one (the fallback for
 //     unmeasured screens); without a controller A stays the DS's.
 // Presses are edges of the PadState (pressed now, not on the previous Update). While the touch
 // script owns the stylus, presses that would tap are dropped, never queued behind it.
 #pragma once
+#include "activities.h"
 #include "common.h"
+#include "padstate.h"
 #include "screens.h"
 #include "touchscript.h"
 
 namespace sims2wide
 {
-// What the player holds this frame, after the bindings (controls.h): the DS's buttons by their
-// action, MENU the in-game menu's action (Controls::PANEL), the sticks and triggers as read.
-struct PadState
-{
-    bool a = false, b = false, x = false, y = false, lb = false, rb = false, start = false, select = false,
-         menu = false, up = false, down = false, left = false, right = false;
-    float lx = 0, ly = 0, rx = 0, ry = 0, lt = 0, rt = 0;
-    // A stick cursor exists (a controller and the setting on): Unknown gives A to it. Without one
-    // A stays the DS's there (the keyboard alone must still answer a Save or a Quit question).
-    bool cursor = false;
-};
-
 // A button that acts once, on its release, and only if `spoil` was never true while it was held:
 // the pad's TOUCH MENU on Back, since Start + Back (in either order) is the pause menu.
 class ReleasePulse
@@ -77,6 +68,14 @@ public:
     bool CursorPress() const { return cursorPress_; }
     // The stick cursor is the way to touch here (no table of targets: None, Vacuum, Unknown).
     bool CursorScreen() const { return cursorScreen_; }
+    // The vacuum: the stick cursor is its hand, shown and moved even without a controller (the
+    // D-pad moves it while X or A is held: HandDx / HandDy, DS pixels this frame); CursorPress
+    // is A held.
+    bool Hand() const { return screen_.screen == Screen::Vacuum; }
+    float HandDx() const { return handDx_; }
+    float HandDy() const { return handDy_; }
+    // The vacuum's Y: blow into the microphone this frame.
+    bool Blow() const { return blow_; }
 
 private:
     void Move(ScreenState s, int dx, int dy);
@@ -84,7 +83,9 @@ private:
     PadState prev_;
     bool fresh_ = true;  // take the next pad as the previous one (no presses)
     ScreenState screen_;
-    bool menuOpen_ = false, cursorPress_ = false, cursorScreen_ = false;
+    bool menuOpen_ = false, cursorPress_ = false, cursorScreen_ = false, blow_ = false;
+    float handDx_ = 0, handDy_ = 0;
+    ActivityState activity_;
     int focus_ = -1;
     int closing_ = 0;    // frames left in which A / B do nothing after a tap that closes the screen
     int repeatDir_ = -1, repeatFrames_ = 0; // the held direction (0-3) and how long, for the repeat

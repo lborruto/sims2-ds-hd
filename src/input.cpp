@@ -321,6 +321,8 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         navigator.Update(app.screens.Current(), p, touchScript, keys);
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
+        // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding).
+        app.micBlow = navigator.Blow();
     }
     else if (steering)
     {
@@ -328,6 +330,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         navigator.Leave(touchScript);
         steering = false;
         if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
+        app.micBlow = false;
     }
 }
 
@@ -362,7 +365,7 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     const bool fastNow = held[FAST] || PadOn(s, FAST);
     if (fastNow != fastPrev) app.fast = fastNow;
     fastPrev = fastNow;
-    app.micBlow = held[BLOW] || PadOn(s, BLOW);
+    app.micBlow = held[BLOW] || PadOn(s, BLOW) || (app.shown == Layout::Console && navigator.Blow());
 
     // The mouse's camera: the wheel's zoom and the drag's turn, as the game's own buttons.
     if (zoom > 0) { keys |= 1u << kX; zoom--; }
@@ -376,20 +379,29 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     if (tapFrames > 0) tapFrames--;
 
     // The stick cursor: faster with a fuller deflection, for both precision and reach.
-    // In CONSOLE only where no table of targets is (navigator.h), with A as its press there too.
+    // In CONSOLE only where no table of targets is (navigator.h), with A as its press there too;
+    // in the vacuum it is the hand, there without a controller too (the D-pad moves it while X or
+    // A is held: activities.h).
     const bool console = app.shown == Layout::Console;
+    const bool hand = console && navigator.Hand();
     cursorPress = held[TOUCH] || PadOn(s, TOUCH) || (console && navigator.CursorPress());
     if (console && !navigator.CursorScreen()) cursorShownUntil = 0; // (not left over from a screen before)
-    if (s.stickCursor && !pads.empty() && (!console || navigator.CursorScreen()))
+    if ((s.stickCursor && !pads.empty() && (!console || navigator.CursorScreen())) || hand)
     {
-        const float mag = std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry);
-        if (mag > kStickDead || cursorPress)
+        const float mag = pads.empty() ? 0.0f : std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry);
+        const bool stepped = hand && (navigator.HandDx() != 0 || navigator.HandDy() != 0);
+        if (mag > kStickDead || stepped || cursorPress)
         {
             if (mag > kStickDead)
             {
                 const float step = 1.0f + 3.5f * mag;
                 cursorX = std::clamp(cursorX + pad.rx * step, 0.0f, (float)(SW - 1));
                 cursorY = std::clamp(cursorY + pad.ry * step, 0.0f, (float)(SH - 1));
+            }
+            if (stepped)
+            {
+                cursorX = std::clamp(cursorX + navigator.HandDx(), 0.0f, (float)(SW - 1));
+                cursorY = std::clamp(cursorY + navigator.HandDy(), 0.0f, (float)(SH - 1));
             }
             cursorShownUntil = frame + 180;
         }

@@ -7,6 +7,7 @@
 // with the world small at the top right. DS pieces are drawn as the game draws them, 2x or 3x;
 // frames and the focus ring are overlays in the game's colours.
 #pragma once
+#include "activities.h"
 #include "compose.h"
 #include "screens.h"
 
@@ -44,10 +45,19 @@ constexpr Rect kDialogueArrowFrom {219, 155, 31, 32}, kDialogueArrowTo {916, 634
 constexpr Rect kDialogueTextBox {124, 516, 776, 188};
 
 // An activity: the touch screen 3x at the left, the world 384 wide at the top right (its height
-// from its shape: 288 at the DS's 4:3), both framed; the hints' box (Task 7 writes in it).
+// from its shape: 288 at the DS's 4:3), both framed; the hints' box (AddHints, below).
 constexpr Rect kActivityBottomTo {36, 68, SW * 3, SH * 3};
 constexpr int kActivityTopX = 858, kActivityTopY = 68, kActivityTopW = 384;
 constexpr Rect kHintBox {850, 400, 400, 252};
+// Inside it: the padding, the gap between rows, the buttons' chips' height and the column the
+// texts start at (after the widest chip, a 7-letter word at 2x); a text line at 3x is 18 pixels
+// a character, so 14 fit beside a chip and 20 in a note (activities.cpp wraps them by hand).
+constexpr int kHintPad = 14, kHintGap = 8, kHintChipH = 33, kHintTextX = kHintBox.x + kHintPad + 98 + 10;
+
+// The hints' box for an activity, at kHintBox's top, as high as its rows (at most kHintBox's):
+// a row per hint, its button in a chip of the panel's colour (round for one letter), what it
+// does beside it at 3x; a hint without a button is a note across the box.
+void AddHints(Composition& c, const std::vector<Hint>& hints);
 
 // The composition for screen s. menuOpen: the menu is up (in town: the touch screen 3x over the
 // dimmed world). focus: the index in HotspotsFor(s) the focus ring frames (-1: none; no ring
