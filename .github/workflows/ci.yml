@@ -164,7 +164,7 @@ jobs:
         env:
           SDL_VIDEODRIVER: dummy
         run: |
-          tests="layout_test touchscript_test hotspots_test screens_test navigator_test controls_test"
+          tests="layout_test touchscript_test hotspots_test screens_test navigator_test controls_test gamestate_test"
           # shellcheck disable=SC2086
           ninja -C build $tests
           for t in $tests; do

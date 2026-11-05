@@ -8,6 +8,7 @@
 #include "GPU.h"
 #include "NDS.h"
 #include "common.h"
+#include "gamestate.h"
 #include "layout.h"
 #include "scene.h"
 #include "screens.h"
@@ -23,6 +24,7 @@ struct App
     Layout shown = Layout::Side;   // what the window shows this frame (AUTO resolved)
     bool mainIsTop = true;         // FOCUS: which screen is big
     AutoLayout autoLayout;
+    GameState game;                // what the game itself says is up, read from RAM every frame (gamestate.h)
     ScreenTracker screens;         // which screen the touch screen shows (screens.h), every frame
     bool consoleMenu = false;      // CONSOLE: the menu is up (the touch screen 3x over the dimmed world)
     int consoleFocus = -1;         // CONSOLE: the focused target, an index in HotspotsFor (-1: none)

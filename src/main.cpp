@@ -63,6 +63,7 @@ static void Usage()
         "  --save FILE                   the game's save (default beside the ROM, .sav)\n"
         "  --mic off|blow|real           what the DS hears: silence, the blow key, the computer's microphone\n"
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
+        "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
         "  --print-screen                print the recognised bottom screen when it changes (frame N: screen X)\n"
         "                                and CONSOLE's menu and focus (frame N: console menu open|closed, focus F)\n"
         "  --console-menu, --console-focus N  (checks) CONSOLE's menu shown, the focus ring on target N\n"
@@ -102,7 +103,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int res3d = 0;
     bool wide = false, interp = false;
@@ -128,6 +129,7 @@ int main(int argc, char** argv)
         else if (a == "--mic") micArg = next();
         else if (a == "--fast") fast = true;
         else if (a == "--print-screen") printScreen = true;
+        else if (a == "--print-game") printGame = true;
         else if (a == "--console-menu") consoleMenu = consolePinned = true;
         else if (a == "--console-focus") { consoleFocus = atoi(next().c_str()); consolePinned = true; }
         else if (a == "--clock") { if (!clock::SetFixed(next())) { fprintf(stderr, "--clock wants \"YYYY-MM-DD HH:MM\"\n"); return 1; } }
@@ -329,6 +331,11 @@ int main(int argc, char** argv)
         nds.RunFrame();
         looks.Frame(app);
 
+        {
+            GameState before = app.game;
+            app.game = ReadGameState({nds.MainRAM, nds.MainRAMMask});
+            if (printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
+        }
         const u32* top = app.Top();
         const u32* bottom = app.Bottom();
         {
