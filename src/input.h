@@ -10,6 +10,7 @@
 
 #include "app.h"
 #include "script.h"
+#include "touchscript.h"
 #include "ui.h"
 #include "video.h"
 
@@ -41,6 +42,8 @@ struct Input
     // where it was pressed: a quick click or a trackpad tap sends the button down and up within
     // milliseconds, before the next frame, and the DS would never see the touch.
     int tapFrames = 0, tapX = 0, tapY = 0;
+    // Touches made from code (taps, holds, drags over game frames); they win over the mouse and the stick.
+    TouchScript touchScript;
     int mouseX = 0, mouseY = 0, dragX = 0;
     int zoom = 0;   // frames of X (> 0, zoom in) or Y (< 0, zoom out) still to hold, from the wheel
     float zoomAcc = 0;

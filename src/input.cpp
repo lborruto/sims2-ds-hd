@@ -300,6 +300,8 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     if (mouseDown && stylusDrag) { video.TouchClampedAt(app, dragPiece, mouseX, mouseY, mx, my); touching = true; tx = mx; ty = my; }
     else if (tapFrames > 0) { touching = true; tx = tapX; ty = tapY; }
     if (tapFrames > 0) tapFrames--;
+    // A running touch script (the console layout's navigator and activities) wins over all of them.
+    { int sx, sy; if (touchScript.Next(sx, sy)) { touching = true; tx = sx; ty = sy; } }
 
     // The stick cursor: faster with a fuller deflection, for both precision and reach.
     cursorPress = held[TOUCH] || PadOn(s, TOUCH);
