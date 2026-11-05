@@ -216,6 +216,8 @@ int main(int argc, char** argv)
     else if (micArg == "blow") app.settings.mic = MicMode::BlowKey;
     else if (micArg == "real") app.settings.mic = MicMode::Real;
     else if (!micArg.empty()) { Usage(); return 1; }
+    if (rom.size() >= 0x10) app.romCode.assign((const char*)rom.data() + 0x0C, 4);
+    app.portSupported = app.romCode == "ASJP";
     melonDS::NDSArgs args;
     args.JIT = std::nullopt;
     app.nds = std::make_unique<NDS>(std::move(args), nullptr);
@@ -238,6 +240,12 @@ int main(int argc, char** argv)
     Audio audio;
     Input input;
     PauseMenu menu;
+    if (!app.portSupported)
+    {   // the pause menu's font: capitals, digits and a few signs only
+        const char* msg = "THIS ROM IS NOT THE EUROPEAN ONE: CONSOLE USES ITS OLD SCREEN RULES";
+        fprintf(stderr, "rom %s: %s\n", app.romCode.c_str(), msg);
+        menu.Say(msg, 0);
+    }
     Backups backups;
     if (!headless)
     {
@@ -344,13 +352,13 @@ int main(int argc, char** argv)
         const ScreenState consoleBefore = app.ConsoleScreen();
         {
             GameState before = app.game;
-            app.game = ReadGameState({nds.MainRAM, nds.MainRAMMask});
-            if (unknownAfter >= 0 && frame >= unknownAfter)
+            app.game = app.portSupported ? ReadGameState({nds.MainRAM, nds.MainRAMMask}) : GameState{};
+            if (app.portSupported && unknownAfter >= 0 && frame >= unknownAfter)
             {   // the check's fake: a new unmapped pair every 200 frames
                 app.game.valid = true; app.game.between = false; app.game.settled = true;
                 app.game.screen = GScreen::Unknown; app.game.overlay = 90; app.game.vtable = 0x02000000 + (u32)((frame - unknownAfter) / 200);
             }
-            if (printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
+            if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
         }
         if (recorder) recorder->Frame(app, frame, nds);
         const u32* top = app.Top();

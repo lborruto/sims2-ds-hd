@@ -28,7 +28,7 @@ the owner makes it public; write everything as if it were public already).
 | --- | --- |
 | `src/main.cpp` | Command line, starting the DS, the frame loop (input → `RunFrame` → layout → shots → sound → picture; paused: menu only) |
 | `src/app.h` | Shared state: the `NDS`, layout chosen/shown, `mainIsTop`, fast forward, quit, `micBlow`, `topAspect`, F5/F12 paths |
-| `src/settings.*` | `Settings`: every option with its default (CONSOLE's: `layout=console`, widescreen on, 3D resolution 2, 60 fps on); `settings.ini` load/save (SDL pref path), not headless; `layout=` round-trips (`tests/controls_test.cpp`) |
+| `src/settings.*` | `Settings`: every option with its default (CONSOLE's: `layout=console`, widescreen on, 3D resolution 2, 60 fps on); `settings.ini` load/save (SDL pref path), not headless; `layout=` round-trips (`tests/controls_test.cpp`); `settings_version=2` is written on save, and a file without it that says `layout=auto` (v0.1.1 wrote it on any change) loads as CONSOLE, once |
 | `src/controls.*` | Actions, key and controller bindings, defaults, names (from FullDex) |
 | `src/input.*` | Keyboard, mouse (stylus; wheel and right drag as the camera), SDL_GameController, stick cursor, script window events |
 | `src/video.*` | The SDL window: draws the shown layout and the overlay, fullscreen, scaling, maps window points to touch positions |
@@ -104,6 +104,11 @@ frames go back to `top big` around frame 1570, when the game returns to town.
 
 ## Known traps
 
+- The RAM map is the European ROM's (game code `ASJP`, header 0x0C): `App::portSupported`. On any
+  other ROM `App::game` stays default (not valid, not between), CONSOLE uses the pixel tracker,
+  the recorder records nothing, `--print-game` prints nothing, and one toast / stderr line says
+  so. `tests/gamestate_check.sh` runs a copy with `XXXX` as game code (melonDS does not check
+  the header CRC for direct boot).
 - melonDS framebuffers are `0xAARRGGBB`, 256 × 192 each, `GPU.Framebuffer[FrontBuffer][0]` =
   top, `[1]` = bottom.
 - HUD detection uses the status bar's frame, never what lies under the Sanity bar: row 176

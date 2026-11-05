@@ -116,4 +116,20 @@ if [ -f "$shots/s6.st" ]; then
     "$bin" "$rom" --headless --frames 200 --state-load "$shots/s6.st" --save "$tmp/rec.sav" --record-dir "$tmp/rec0" > "$tmp/rec0.log" 2>&1
     [ "$(count "$tmp/rec0" st)" = 0 ] && echo "ok   recorder: nothing recorded on a mapped screen" || { echo "FAIL recorder: recorded on a mapped screen"; fail=1; }
 else echo "FAIL recorder: no $shots/s6.st"; fail=1; fi
+
+# The ROM gate: the RAM map is the European ROM's (ASJP). A copy with another game code (bytes
+# 0x0C-0x0F) must read no game state, say so once, and still run to its end.
+python3 - "$rom" "$tmp/other.nds" <<'PY'
+import sys
+d = bytearray(open(sys.argv[1], 'rb').read()); d[0x0C:0x10] = b'XXXX'
+open(sys.argv[2], 'wb').write(d)
+PY
+if [ -f "$shots/s6.st" ] && [ -f "$tmp/other.nds" ]; then
+    "$bin" "$tmp/other.nds" --headless --frames 120 --state-load "$shots/s6.st" --save "$tmp/other.sav" --print-game > "$tmp/other.log" 2>&1
+    st=$?
+    games=$(grep -c -E '^frame [0-9]+: game ' "$tmp/other.log")
+    said=$(grep -c 'NOT THE EUROPEAN ONE' "$tmp/other.log")
+    if [ "$st" = 0 ] && [ "$games" = 0 ] && [ "$said" = 1 ] && grep -q '^clock: ' "$tmp/other.log"; then echo "ok   rom gate: another game code reads no game state, said once"
+    else echo "FAIL rom gate: exit $st, game lines $games, messages $said"; fail=1; fi
+else echo "FAIL rom gate: no $shots/s6.st or no copy"; fail=1; fi
 exit $fail

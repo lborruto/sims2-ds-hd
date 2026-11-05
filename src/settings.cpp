@@ -26,6 +26,7 @@ bool Settings::Load(const std::string& path)
     if (!in) return false;
     std::string line;
     bool hasLayout = false;
+    int version = 0; // no settings_version line: a file from before 2
     while (std::getline(in, line))
     {
         while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
@@ -36,6 +37,7 @@ bool Settings::Load(const std::string& path)
         const bool on = v == "1" || v == "on" || v == "true";
         if (controls.Apply(k, v)) continue;
         if (k == "mic") mic = v == "off" ? MicMode::Off : v == "real" ? MicMode::Real : MicMode::BlowKey;
+        else if (k == "settings_version") version = atoi(v.c_str());
         else if (k == "layout")
         {
             hasLayout = true;
@@ -70,6 +72,10 @@ bool Settings::Load(const std::string& path)
         widescreen = d.widescreen;
         interpolate60 = d.interpolate60;
     }
+    // v0.1.1 wrote layout=auto on any change (AUTO was the default then), so a file without a
+    // settings_version that says auto is an upgrader's, not a choice: CONSOLE, once (the next
+    // save writes version 2 and the file then says what the player chose).
+    if (version < 2 && layout == Layout::Auto) layout = Layout::Console;
     return true;
 }
 
@@ -79,6 +85,7 @@ bool Settings::Save(const std::string& path) const
     std::ofstream out(path);
     if (!out) return false;
     out << "# The Sims 2 DS, one screen: settings. Changed from the pause menu (Esc).\n"
+        << "settings_version=2\n"
         << "mic=" << MicKey(mic) << "\n"
         << "layout=" << LayoutName(layout) << "\n"
         << "resolution_3d=" << resolution3D << "\n"

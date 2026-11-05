@@ -38,6 +38,11 @@ struct App
 
     Settings settings;
 
+    // The ROM's game code (header 0x0C) and whether the RAM map fits it: only the European ROM
+    // (ASJP) has its addresses; any other: GameState is never read (not valid, not between).
+    std::string romCode;
+    bool portSupported = false;
+
     bool fast = false;             // fast forward held
     bool quit = false;
     bool micBlow = false;          // the "blow into the microphone" key is held
