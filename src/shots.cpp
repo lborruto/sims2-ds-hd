@@ -2,6 +2,8 @@
 
 #include <vector>
 
+#include "compose.h"
+
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
@@ -40,27 +42,26 @@ void WriteImage(const std::string& path, const u32* px, int w, int h)
 
 void WriteCompose(const std::string& path, Layout l, bool mainIsTop, const u32* top, int topW, int topH, const u32* bottom)
 {
-    Placement p = Place(l, mainIsTop, (float)topW / topH);
-    std::vector<u8> rgb(p.cw * p.ch * 3, 0);
-    for (int i = 0; i < p.cw * p.ch; i++) { rgb[i * 3] = 16; rgb[i * 3 + 1] = 18; rgb[i * 3 + 2] = 24; }
-    // The screen drawn second may overlap the first one, with the placement's opacity.
-    for (int i = 0; i < 2; i++)
+    const Composition c = Compose(l, mainIsTop, (float)topW / topH, topW, topH);
+    std::vector<u8> rgb(c.cw * c.ch * 3, 0);
+    for (int i = 0; i < c.cw * c.ch; i++) { rgb[i * 3] = 16; rgb[i * 3 + 1] = 18; rgb[i * 3 + 2] = 24; }
+    // The pieces in order: a later one may overlap an earlier one, with its opacity.
+    for (const Piece& q : c.pieces)
     {
-        const bool isTop = (i == 0) == p.topFirst;
-        const Rect& r = isTop ? p.top : p.bottom;
-        const u32* src = isTop ? top : bottom;
-        const int a = i ? p.alpha : 255;
-        const int iw = isTop ? topW : SW, ih = isTop ? topH : SH;
+        const Rect& r = q.to;
+        const u32* src = q.src == Src::Top ? top : bottom;
+        const int iw = q.src == Src::Top ? topW : SW;
+        const int a = q.alpha;
         for (int y = 0; y < r.h; y++)
             for (int x = 0; x < r.w; x++)
             {
-                u32 px = src[(y * ih / r.h) * iw + x * iw / r.w];
-                u8* d = &rgb[((r.y + y) * p.cw + r.x + x) * 3];
+                u32 px = src[(q.from.y + y * q.from.h / r.h) * iw + q.from.x + x * q.from.w / r.w];
+                u8* d = &rgb[((r.y + y) * c.cw + r.x + x) * 3];
                 d[0] = (u8)((((px >> 16) & 0xFF) * a + d[0] * (255 - a)) / 255);
                 d[1] = (u8)((((px >> 8) & 0xFF) * a + d[1] * (255 - a)) / 255);
                 d[2] = (u8)(((px & 0xFF) * a + d[2] * (255 - a)) / 255);
             }
     }
-    stbi_write_png(path.c_str(), p.cw, p.ch, 3, rgb.data(), p.cw * 3);
+    stbi_write_png(path.c_str(), c.cw, c.ch, 3, rgb.data(), c.cw * 3);
 }
 }

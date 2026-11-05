@@ -36,6 +36,7 @@ the owner makes it public; write everything as if it were public already).
 | `src/audio.*`, `src/audiostretch.h` | SDL sound queue, WSOLA stretching when slow (from FullDex), volume, fast forward |
 | `src/backup.*` | Copies of the `.sav` in `backups/`, at start and every half hour, eight kept |
 | `src/layout.*` | `Place()` (canvas per layout, `topAspect`, FOCUS's overlaid panel), `CanvasFit`, `TouchFromOutput`, `OverTop` |
+| `src/compose.*` | `Composition`: pieces (a rectangle of one DS screen at a canvas rectangle, opacity, touchable or not) in drawing order; `FromPlacement`/`Compose`, `TouchFromComposition`, `TouchClampedComposition`, `OverTopComposition`; what `Video`, `--compose` and the mouse use |
 | `tests/layout_test.cpp` | Touch mapping of every pixel in every layout and size (`ninja -C build layout_test`) |
 | `src/looks.*` | Sharper / widescreen 3D and 60 fps: applies the Looks settings, builds `App::TopImage` |
 | `src/melonds_ext/GPU3D_Wide.*` | FullDex's wide 3D rasteriser (CPU), built into melonDS's `core` |
@@ -128,11 +129,11 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   plist (there) and the terminal's permission on a Mac for the CLI program.
 - `SIMS2WIDE_PROBE=N` prints AUTO's signals every N frames (HUD, social, warm menu, motion and
   brightness of each screen).
-- Touch mapping goes through the same `Place()` as drawing: change one, the other follows.
+- Touch mapping goes through the same composition (`compose.h`, from `Place()`) as drawing: change one, the other follows. The topmost piece under the pointer decides (a top piece or an untouchable one takes the click); a drag keeps the piece it began on.
   The stylus goes down only when the left button is pressed on the touch screen; until release
   it follows the pointer clamped to that screen (`TouchClamped`), wherever the pointer goes.
   Window points and renderer pixels differ on HiDPI; `Video::ToOutput` converts. FOCUS's panel
-  lies over the world: it is drawn second (`Placement::topFirst`, `alpha`) and wins the mouse.
+  lies over the world: it is drawn second (`Placement::topFirst`, `alpha`; a later `Piece`) and wins the mouse.
 - The game zooms in with X and out with Y; L and R turn the camera continuously while held
   (checked with `scripts`-style runs from `s7`). The wheel and the right-button drag press them.
 - Settings are never loaded or saved headless (runs must be the same everywhere); the menu

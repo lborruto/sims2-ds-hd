@@ -5,7 +5,9 @@
 //   ninja -C build layout_test && ./build/layout_test
 #include <cstdio>
 #include <cstdlib>
+#include <utility>
 
+#include "compose.h"
 #include "layout.h"
 
 using namespace sims2wide;
@@ -63,8 +65,99 @@ static void TestLayout(Layout l, bool mainIsTop, float aspect, int ow, int oh)
     CHECK(!OverTop(p, fit, fit.ox - 1, fit.oy - 1));
 }
 
+// --- Compositions: pieces of the DS screens drawn at rectangles, and the mouse through them.
+
+// Every DS bottom pixel's centre, drawn through the composition and mapped back, is itself.
+static void TestComposeRoundtrip(Layout l, bool mainIsTop, float aspect, int ow, int oh)
+{
+    const int topW = (int)(SH * aspect + 0.5f);
+    const Composition c = FromPlacement(Place(l, mainIsTop, aspect), topW, SH);
+    const CanvasFit fit = CanvasFit::For(c.cw, c.ch, ow, oh);
+    const Piece* b = nullptr;
+    for (const Piece& q : c.pieces) if (q.src == Src::Bottom) b = &q;
+    CHECK(b);
+    if (!b) return;
+    for (int y = 0; y < SH; y++)
+        for (int x = 0; x < SW; x++)
+        {
+            const float cx = b->to.x + (x + 0.5f) * b->to.w / b->from.w, cy = b->to.y + (y + 0.5f) * b->to.h / b->from.h;
+            const float px = fit.ox + cx * fit.scale, py = fit.oy + cy * fit.scale;
+            int tx = -1, ty = -1;
+            if (!TouchFromComposition(c, fit, px, py, tx, ty) || tx != x || ty != y)
+            {
+                fprintf(stderr, "compose %s main %d aspect %.2f out %dx%d: pixel %d,%d -> %d,%d\n", LayoutName(l), mainIsTop, aspect, ow, oh, x, y, tx, ty);
+                failures++;
+                return;
+            }
+        }
+}
+
+static Composition TwoBottomPieces()
+{
+    Composition c {1400, 600, {}, {}};
+    c.pieces.push_back({Src::Bottom, {0, 0, SW, 96}, {0, 0, SW * 3, 96 * 3}});
+    c.pieces.push_back({Src::Bottom, {0, 96, SW, 96}, {900, 0, SW * 2, 96 * 2}});
+    return c;
+}
+
 int main()
 {
+    for (Layout l : {Layout::Stacked, Layout::Side, Layout::Focus})
+        for (bool mainIsTop : {true, false})
+            for (float aspect : {kDSAspect, 16.0f / 9.0f})
+                for (const auto& s : {std::pair<int, int> {1280, 720}, {2560, 1440}}) TestComposeRoundtrip(l, mainIsTop, aspect, s.first, s.second);
+
+    // Two pieces of the touch screen at different scales: each maps back through its own.
+    {
+        const Composition c = TwoBottomPieces();
+        const CanvasFit fit = CanvasFit::For(c.cw, c.ch, 1400, 600);
+        int tx = -1, ty = -1, idx = -1;
+        CHECK(TouchFromComposition(c, fit, 3 * 10 + 1, 3 * 20 + 1, tx, ty, &idx) && tx == 10 && ty == 20 && idx == 0);
+        CHECK(TouchFromComposition(c, fit, 900 + 2 * 30, 2 * 5, tx, ty, &idx) && tx == 30 && ty == 101 && idx == 1);
+        CHECK(!TouchFromComposition(c, fit, 850, 100, tx, ty)); // the gap between them
+        // A drag that started on the first piece stays on it: past its right edge it is held.
+        TouchClampedComposition(c, 0, fit, 1300, 500, tx, ty);
+        CHECK(tx == SW - 1 && ty == 95);
+        TouchClampedComposition(c, 1, fit, 0, -50, tx, ty);
+        CHECK(tx == 0 && ty == 96);
+    }
+    // Overlapping pieces: the later one is hit.
+    {
+        Composition c {600, 400, {}, {}};
+        c.pieces.push_back({Src::Bottom, {0, 0, SW, SH}, {0, 0, SW, SH}});
+        c.pieces.push_back({Src::Bottom, {0, 0, 64, 48}, {100, 100, 256, 192}});
+        const CanvasFit fit = CanvasFit::For(c.cw, c.ch, 600, 400);
+        int tx, ty, idx;
+        CHECK(TouchFromComposition(c, fit, 100 + 4 * 10, 100 + 4 * 20, tx, ty, &idx) && idx == 1 && tx == 10 && ty == 20);
+        CHECK(TouchFromComposition(c, fit, 50, 50, tx, ty, &idx) && idx == 0 && tx == 50 && ty == 50);
+    }
+    // A piece with touch off is never hit, and does not let a click through to what is under it.
+    {
+        Composition c {600, 400, {}, {}};
+        c.pieces.push_back({Src::Bottom, {0, 0, SW, SH}, {0, 0, SW, SH}, 255, false});
+        const CanvasFit fit = CanvasFit::For(c.cw, c.ch, 600, 400);
+        int tx, ty;
+        CHECK(!TouchFromComposition(c, fit, 50, 50, tx, ty));
+        c.pieces.insert(c.pieces.begin(), {Src::Bottom, {0, 0, SW, SH}, {0, 0, SW, SH}});
+        CHECK(!TouchFromComposition(c, fit, 50, 50, tx, ty));
+    }
+    // The camera: over a top piece unless a later touchable bottom piece covers the point.
+    {
+        const Composition c = FromPlacement(Place(Layout::Focus, true, kDSAspect), SW, SH);
+        const CanvasFit fit = CanvasFit::For(c.cw, c.ch, c.cw, c.ch);
+        CHECK(OverTopComposition(c, fit, 100, 100));
+        CHECK(!OverTopComposition(c, fit, c.cw - 10, c.ch / 2));
+        CHECK(!OverTopComposition(c, fit, -5, 100));
+    }
+    // A placement drawn second keeps its opacity on its piece; the first is opaque.
+    {
+        const Composition c = FromPlacement(Place(Layout::Focus, true, kDSAspect), SW, SH);
+        CHECK(c.pieces.size() == 2 && c.pieces[0].src == Src::Top && c.pieces[0].alpha == 255);
+        CHECK(c.pieces[1].src == Src::Bottom && c.pieces[1].alpha == 232);
+        CHECK(c.pieces[0].from.w == SW && c.pieces[0].from.h == SH);
+        const Composition w = FromPlacement(Place(Layout::Side, true, 16.0f / 9.0f), 427, 240);
+        CHECK(w.pieces[0].from.w == 427 && w.pieces[0].from.h == 240);
+    }
     const int sizes[][2] = {{1280, 720}, {2560, 1440}, {1000, 600}, {800, 1000}, {1920, 1080}, {640, 480}};
     const float aspects[] = {kDSAspect, 16.0f / 9.0f};
     for (Layout l : {Layout::Stacked, Layout::Side, Layout::Focus})

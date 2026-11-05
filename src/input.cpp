@@ -192,7 +192,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
             }
             mouseDown = down && !menuOpen;
             int tx, ty;
-            stylusDrag = mouseDown && video.TouchAt(app, mouseX, mouseY, tx, ty);
+            stylusDrag = mouseDown && video.TouchAt(app, mouseX, mouseY, tx, ty, &dragPiece);
             if (stylusDrag) { tapFrames = 3; tapX = tx; tapY = ty; }
         }
         else if (ev.button.button == SDL_BUTTON_RIGHT)
@@ -297,7 +297,7 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     else if (rotate < 0) { keys |= 1u << kL; rotate++; }
 
     int mx, my;
-    if (mouseDown && stylusDrag) { video.TouchClampedAt(app, mouseX, mouseY, mx, my); touching = true; tx = mx; ty = my; }
+    if (mouseDown && stylusDrag) { video.TouchClampedAt(app, dragPiece, mouseX, mouseY, mx, my); touching = true; tx = mx; ty = my; }
     else if (tapFrames > 0) { touching = true; tx = tapX; ty = tapY; }
     if (tapFrames > 0) tapFrames--;
 

@@ -1,6 +1,6 @@
 // Where the two DS screens go in the window. Each layout places them on a logical canvas, which
 // the window scales to fit (letterboxed); drawing and mouse-to-touch mapping both go through
-// Place() and CanvasFit, so they always agree.
+// the layout's composition (compose.h, made from Place()) and CanvasFit, so they always agree.
 #pragma once
 #include "common.h"
 
@@ -33,7 +33,8 @@ Placement Place(Layout l, bool mainIsTop, float topAspect = kDSAspect);
 struct CanvasFit
 {
     float scale, ox, oy;
-    static CanvasFit For(const Placement& p, int ow, int oh);
+    static CanvasFit For(const Placement& p, int ow, int oh) { return For(p.cw, p.ch, ow, oh); }
+    static CanvasFit For(int cw, int ch, int ow, int oh);
     // Canvas rectangle -> output pixels.
     void ToOutput(const Rect& r, int& x, int& y, int& w, int& h) const;
     // Output pixels -> canvas position.

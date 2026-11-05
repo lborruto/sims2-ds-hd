@@ -1,5 +1,6 @@
 #include "video.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <vector>
 
@@ -80,21 +81,20 @@ void Video::Present(const App& app, const Canvas* over)
     }
     // --- end looks
     SDL_UpdateTexture(tex[1], nullptr, app.Bottom(), SW * 4);
-    const Placement p = Placed(app);
+    const Composition comp = Composed(app);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
-    const CanvasFit fit = CanvasFit::For(p, ow, oh);
+    const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, ow, oh);
     SDL_SetRenderDrawColor(ren, 16, 18, 24, 255);
     SDL_RenderClear(ren);
-    // The screen drawn second may lie over the first one (FOCUS's panel), with its opacity.
-    for (int i = 0; i < 2; i++)
+    // The pieces in order: a later one lies over an earlier one, with its opacity.
+    for (const Piece& q : comp.pieces)
     {
-        const bool isTop = (i == 0) == p.topFirst;
-        SDL_Rect d;
-        fit.ToOutput(isTop ? p.top : p.bottom, d.x, d.y, d.w, d.h);
-        SDL_Texture* t = tex[isTop ? 0 : 1];
-        SDL_SetTextureAlphaMod(t, i ? p.alpha : 255);
-        SDL_RenderCopy(ren, t, nullptr, &d);
+        SDL_Rect d, f {q.from.x, q.from.y, q.from.w, q.from.h};
+        fit.ToOutput(q.to, d.x, d.y, d.w, d.h);
+        SDL_Texture* t = tex[q.src == Src::Top ? 0 : 1];
+        SDL_SetTextureAlphaMod(t, q.alpha);
+        SDL_RenderCopy(ren, t, &f, &d);
     }
     if (over && over->Dirty())
     {
@@ -123,43 +123,44 @@ void Video::Present(const App& app, const Canvas* over)
     SDL_RenderPresent(ren);
 }
 
-bool Video::TouchAt(const App& app, int wx, int wy, int& tx, int& ty) const
+bool Video::TouchAt(const App& app, int wx, int wy, int& tx, int& ty, int* pieceIndex) const
 {
-    const Placement p = Placed(app);
+    const Composition c = Composed(app);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     float px, py;
     ToOutput(wx, wy, px, py);
-    return TouchFromOutput(p, CanvasFit::For(p, ow, oh), px, py, tx, ty);
+    return TouchFromComposition(c, CanvasFit::For(c.cw, c.ch, ow, oh), px, py, tx, ty, pieceIndex);
 }
 
-void Video::TouchClampedAt(const App& app, int wx, int wy, int& tx, int& ty) const
+void Video::TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& tx, int& ty) const
 {
-    const Placement p = Placed(app);
+    const Composition c = Composed(app);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     float px, py;
     ToOutput(wx, wy, px, py);
-    TouchClamped(p, CanvasFit::For(p, ow, oh), px, py, tx, ty);
+    // (The layout may have changed since the drag began: stay on a piece that exists.)
+    TouchClampedComposition(c, std::min(pieceIndex, (int)c.pieces.size() - 1), CanvasFit::For(c.cw, c.ch, ow, oh), px, py, tx, ty);
 }
 
 bool Video::OverTop(const App& app, int wx, int wy) const
 {
-    const Placement p = Placed(app);
+    const Composition c = Composed(app);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     float px, py;
     ToOutput(wx, wy, px, py);
-    return sims2wide::OverTop(p, CanvasFit::For(p, ow, oh), px, py);
+    return OverTopComposition(c, CanvasFit::For(c.cw, c.ch, ow, oh), px, py);
 }
 
 SDL_Rect Video::BottomRect(const App& app) const
 {
-    const Placement p = Placed(app);
+    const Composition c = Composed(app);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     SDL_Rect r;
-    CanvasFit::For(p, ow, oh).ToOutput(p.bottom, r.x, r.y, r.w, r.h);
+    CanvasFit::For(c.cw, c.ch, ow, oh).ToOutput(BottomPieceRect(c), r.x, r.y, r.w, r.h);
     return r;
 }
 }

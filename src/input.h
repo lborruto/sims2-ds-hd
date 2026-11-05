@@ -36,6 +36,7 @@ struct Input
     // The left button went down on the touch screen: until it is released the stylus stays on
     // it, held to its edges (a drag that overshoots does not lift the stylus).
     bool stylusDrag = false;
+    int dragPiece = 0;             // the composition piece the stylus drag began on
     // A press on the touch screen keeps the stylus down for at least this many game frames,
     // where it was pressed: a quick click or a trackpad tap sends the button down and up within
     // milliseconds, before the next frame, and the DS would never see the touch.
