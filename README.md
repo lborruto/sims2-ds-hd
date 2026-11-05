@@ -233,8 +233,10 @@ state.
 ## Licence and credits
 
 GPLv3, see [LICENSE](LICENSE), as melonDS. Built on [melonDS](https://github.com/melonDS-emu/melonDS)
-1.1, [SDL2](https://www.libsdl.org/), [stb_image_write](https://github.com/nothings/stb) and
-[tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/).
+1.1, [SDL2](https://www.libsdl.org/), [stb_image_write and stb_truetype](https://github.com/nothings/stb) and
+[tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/). The interface's font is
+[Nunito](https://github.com/googlefonts/nunito) (SIL Open Font License 1.1,
+[assets/fonts/OFL.txt](assets/fonts/OFL.txt)).
 The idea comes from [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex), which does
 this for the DS Pokémon games; `src/platform.cpp`, the remappable controls (`src/controls.*`),
 the menu's drawing and font (`src/ui.*`) and the sound stretching (`src/audiostretch.h`) are

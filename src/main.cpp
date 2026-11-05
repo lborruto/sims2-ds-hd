@@ -53,6 +53,8 @@ static void Usage()
         "usage: sims2wide [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
         "  --layout console|auto|focus|side|stacked  window layout (default console)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
+        "  --compose-scale N             --compose pictures N times the canvas (1 to 4; the UI drawn at that size)\n"
+        "  --ui-demo                     (checks) the HD interface kit's demonstration over the picture\n"
         "  --res3d N                     3D drawn N times sharper (1 = the DS's own; default 2 in the window, 1 headless)\n"
         "  --wide                        widescreen 16:9 world\n"
         "  --interp                      60 fps in-between frames for the 3D\n"
@@ -117,6 +119,8 @@ int main(int argc, char** argv)
     bool layoutGiven = false;
     bool compose = false, printScreen = false, printGame = false, printHud = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
+    int composeScale = 1;
+    bool uiDemo = false;
     int res3d = 0;
     bool wide = false, interp = false;
     int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
@@ -129,6 +133,8 @@ int main(int argc, char** argv)
         else if (a == "--version") { printf("sims2wide %s\n", SIMS2WIDE_VERSION); return 0; }
         else if (a == "--headless") headless = true;
         else if (a == "--compose") compose = true;
+        else if (a == "--compose-scale") composeScale = std::clamp(atoi(next().c_str()), 1, 4);
+        else if (a == "--ui-demo") uiDemo = true;
         else if (a == "--res3d") res3d = std::clamp(atoi(next().c_str()), 1, 8);
         else if (a == "--wide") wide = true;
         else if (a == "--interp") interp = true;
@@ -213,6 +219,7 @@ int main(int argc, char** argv)
     app.consoleMenu = consoleMenu;
     app.consoleFocus = consoleFocus;
     app.consolePinned = consolePinned;
+    app.uiDemo = uiDemo;
     app.quickState = quickState;
     app.shotFile = shotFile;
     // The settings file (not headless: those runs stay the same on every machine).
@@ -461,7 +468,12 @@ int main(int argc, char** argv)
             int tw, th;
             const u32* big = app.TopImage(tw, th);
             // (The other layouts sized from the picture itself, as they always were here.)
-            if (compose) WriteCompose(shotDir + name, app.shown == Layout::Console ? video.Composed(app) : Compose(app.shown, app.mainIsTop, (float)tw / th, tw, th), big, tw, th, bottom);
+            if (compose)
+            {
+                Composition c = app.shown == Layout::Console ? video.Composed(app) : Compose(app.shown, app.mainIsTop, (float)tw / th, tw, th);
+                if (app.uiDemo) c.ui = ui::DemoItems(bottom);
+                WriteCompose(shotDir + name, c, big, tw, th, bottom, composeScale);
+            }
             else WriteShot(shotDir + name, top, bottom);
             // The looks' top picture at its size, beside the DS's screens.
             if (!compose && !app.topBig.empty())

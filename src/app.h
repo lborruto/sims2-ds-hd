@@ -31,6 +31,8 @@ struct App
     // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
     // pinned them for a check's picture.
     bool consolePinned = false;
+    // (A check) the UI kit's demonstration drawn over every composition (--ui-demo).
+    bool uiDemo = false;
     // CONSOLE's screen: the game's own (RAM) when it reads, else the pixel tracker's (gamestate.h).
     ScreenState ConsoleScreen() const { return ConsoleScreenOf(game, screens.Current(), HudVisible(Top()), (game.valid || game.between) && ScreensBlack(Top(), Bottom())); }
     // The game's bottom slot is not switching (true without a RAM reading): the navigator's gate.

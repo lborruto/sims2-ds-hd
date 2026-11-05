@@ -1,0 +1,84 @@
+// The UI kit: the game's look (purple rounded panels, white HD text with a soft dark shadow,
+// controller button chips, live pictures) as a list of items in canvas pixels, rasterised in
+// software at any scale. The window and --compose both draw that raster, so they show the same
+// pixels, and the same items always give the same pixels (no clock, no animation here).
+// UI items are drawn after a composition's pieces and overlays and never take the mouse.
+#pragma once
+#include <string>
+#include <vector>
+
+#include "common.h"
+#include "layout.h"
+#include "ui/font.h"
+
+namespace sims2wide::ui
+{
+// The game's palette (0xAARRGGBB) and the panels' shape, canvas pixels.
+struct Theme
+{
+    u32 frame, frameDark, fill, fillDark, text, shadow, backdrop;
+    float radius, border;
+};
+const Theme& GameTheme();
+
+enum class Align { Left, Centre, Right };
+// The controller's buttons a chip can show: A, B, X, Y as round chips, the others as pills
+// (the D-pad as a cross).
+enum class Button { A, B, X, Y, LB, RB, Start, DPad };
+
+struct UiItem
+{
+    enum Kind { Panel, Text, Chip, Image } kind = Panel;
+    Rect to {};         // canvas pixels (Text: the box it is laid out and clipped in)
+
+    // Panel: a rounded box, `border` wide band of `borderArgb` inside `to`, a dark one-pixel
+    // outline and, raised, a soft drop shadow under it.
+    u32 fill = 0, borderArgb = 0;
+    float radius = 0, border = 0;
+    bool raised = true;
+
+    // Text (and a chip's label): UTF-8, size in canvas pixels per em, wrapped to to.w when
+    // `wrap`, aligned in `to`; a shadow one canvas pixel down and right, softened when scaled.
+    std::string text;
+    float size = 24;
+    Weight weight = Weight::Bold;
+    Align align = Align::Left;
+    bool wrap = true;
+    bool middle = false; // the lines centred in to's height (else from its top)
+    u32 colour = 0xFFFFFFFF, shadowArgb = 0;
+
+    // Chip: the button's chip, `size` its text size (the chip is as tall as a line), then the
+    // label in `text` (none: the chip alone). `to` from ChipItem (grows with the label).
+    Button button = Button::A;
+    float labelAt = 0;   // where the label starts, from to.x (0: right after the chip): a column of hints
+
+    // Image: a rectangle of an ARGB picture (not copied: it must outlive the raster; a live crop
+    // of a DS screen), scaled to `to` (nearest by the whole factor, then bilinear to the size),
+    // `fill` as its opacity's alpha (0: opaque).
+    const u32* src = nullptr;
+    int srcW = 0, srcH = 0; // the picture's size (srcW is its stride)
+    Rect from {};
+};
+
+UiItem PanelItem(Rect to, const Theme& t = GameTheme());          // the light panel (fill, frame)
+UiItem WellItem(Rect to, const Theme& t = GameTheme());           // a darker inset box inside a panel
+UiItem TextItem(Rect to, const std::string& utf8, float size, Align align = Align::Left, Weight w = Weight::Bold);
+// A chip at (x, y) with its label; its rectangle is the chip and the label together.
+// labelAt: the label's start from x (a column of hints lines its labels up), 0: after the chip.
+UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, float labelAt = 0);
+Rect ChipRect(int x, int y, Button b, const std::string& label, float size, float labelAt = 0);
+UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from);
+
+// The items' bounds on the canvas (shadows included), empty when none draws anything.
+Rect Bounds(const std::vector<UiItem>& items);
+// A hash of everything that changes the raster (an image's pixels included).
+u64 Hash(const std::vector<UiItem>& items);
+
+// The items drawn into argb (w x h, straight alpha, cleared first): canvas point (cx, cy) lands
+// on argb pixel ((cx - ox) * scale, (cy - oy) * scale). scale: output pixels per canvas pixel.
+void Rasterise(const std::vector<UiItem>& items, float scale, u32* argb, int w, int h, float ox = 0, float oy = 0);
+
+// A demonstration of the kit (--ui-demo): a panel, text, every chip and a live crop of `bottom`
+// (the DS's touch screen, 256 x 192; null: none).
+std::vector<UiItem> DemoItems(const u32* bottom);
+}

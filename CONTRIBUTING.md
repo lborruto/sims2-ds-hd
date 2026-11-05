@@ -102,7 +102,7 @@ issue.
   change nothing (the check below). Another change to it needs an issue first; most belong
   upstream.
 - **No new dependency without discussion.** Today: melonDS, SDL2, stb_image_write,
-  tinyfiledialogs (and Pillow
+  stb_truetype, tinyfiledialogs, the Nunito font (and Pillow
   for `tools/sheet.py` only).
 - **Measure performance claims**, more than once, on the same save state, with `--headless`.
 - **Playable from the keyboard and mouse alone.**

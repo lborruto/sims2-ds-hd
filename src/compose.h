@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "layout.h"
+#include "ui/kit.h"
 
 namespace sims2wide
 {
@@ -58,6 +59,8 @@ struct Composition
     int cw, ch;
     std::vector<Piece> pieces;
     std::vector<Overlay> overlays;
+    // The HD interface (ui/kit.h), drawn after the pieces and the overlays; never touchable.
+    std::vector<ui::UiItem> ui;
 };
 
 // A two-screen placement as pieces, in drawing order (FOCUS's panel keeps its opacity).
