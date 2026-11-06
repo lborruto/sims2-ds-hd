@@ -2562,8 +2562,15 @@ check_pad shell-continue shell_continue
 # fails, the state before it is put back (the phone still there) and the menu says so; a slot that
 # cannot be written says so; a place the game saved after is refused by Continue (the .sav
 # changed) and dropped; a new start of the same ROM drops its place.
-mkdir -p "$tmp/shell-change-data" "$tmp/shell-bad-data/states/ASJP/slot1.st" "$tmp/shell-stale-data"
+mkdir -p "$tmp/shell-change-data" "$tmp/shell-bad-data/states/ASJP/slot1.st" "$tmp/shell-stale-data" "$tmp/shell-undo-data/states/ASJP" \
+    "$tmp/shell-cont-data"
 head -c 5000 /dev/urandom > "$tmp/shell-bad-data/states/ASJP/slot2.st"
+# (an older before-load.st, another place (s6): the failed load must never put it back, nor write
+# over it; slot 1's maker, from before, must outlive the failed save)
+cp "$shots/s6.st" "$tmp/shell-bad-data/states/ASJP/before-load.st"
+printf 'rom=older.nds\nheader=1\nsave=0\n' > "$tmp/shell-bad-data/states/ASJP/slot1.meta"
+cp "$tmp/shell-bad-data/states/ASJP/slot1.meta" "$tmp/shell-bad-slot1.meta"
+head -c 5000 /dev/urandom > "$tmp/shell-undo-data/states/ASJP/before-load.st"
 shell_run() {
     local name=$1 frames=$2 data=$3 script=$4; shift 4
     "$bin" "$rom" --headless --frames "$frames" --save "$tmp/$name.sav" --data-dir "$tmp/$data" "${town[@]}" --print-shell --print-game \
@@ -2571,6 +2578,12 @@ shell_run() {
 }
 shell_run shell-change 300 shell-change-data change --state-load "$shots/s7.st" &
 shell_run shell-badload 200 shell-bad-data badload --state-load "$shots/s7.st" &
+shell_run shell-badundo 120 shell-undo-data badundo --state-load "$shots/s7.st" &
+wait
+# A Continue whose suspend state is broken: the place written by a quit, then its bytes spoilt.
+( shell_run shell-cont-quit 100 shell-cont-data quit --state-load "$shots/s7.st" &&
+  head -c 5000 /dev/urandom > "$tmp/shell-cont-data/states/ASJP/suspend.st" && cp "$tmp/shell-cont-quit.sav" "$tmp/shell-badcont.sav" &&
+  shell_run shell-badcont 40 shell-cont-data continue --launch ) &
 ( shell_run shell-stale-quit 100 shell-stale-data quit --state-load "$shots/s7.st" && printf 'x' >> "$tmp/shell-stale-quit.sav" &&
   cp "$tmp/shell-stale-quit.sav" "$tmp/shell-stale.sav" && shell_run shell-stale 60 shell-stale-data stale --launch &&
   cp "$tmp/shell-stale.sav" "$tmp/shell-newstart-quit.sav" && shell_run shell-newstart-quit 100 shell-stale-data quit --state-load "$shots/s7.st" &&
@@ -2581,8 +2594,20 @@ shell_change() {
     ! grep -q -E '^frame (5[1-9]|[67][0-9]): shell launch' "$tmp/shell-change.log" || { echo "  shell-change: the menu's A chose on the panel"; return 1; }
 }
 shell_badload() {
-    in_order shell-badload 'ask=load \(yes\)' 'shell restore 0 ok' 'shell load 2 failed' 'shell says That did not work' 'shell save 1 failed' 'shell says That did not work' || return 1
-    ! grep -q -E 'game Panel' "$tmp/shell-badload.log" || { echo "  shell-badload: the game moved"; return 1; }
+    in_order shell-badload 'ask=load \(yes\)' 'shell restore ok' 'shell load 2 failed' 'shell says That did not work' 'shell save 1 failed' 'shell says That did not work' || return 1
+    # (never the older before-load.st, s6's place: the game stays on the phone)
+    [ "$(grep -c -E 'game ' "$tmp/shell-badload.log")" = 1 ] || { echo "  shell-badload: the game moved: $(grep -E 'game ' "$tmp/shell-badload.log" | tail -n 1)"; return 1; }
+    cmp -s "$shots/s6.st" "$tmp/shell-bad-data/states/ASJP/before-load.st" || { echo "  shell-badload: before-load.st written by a failed load"; return 1; }
+    cmp -s "$tmp/shell-bad-slot1.meta" "$tmp/shell-bad-data/states/ASJP/slot1.meta" || { echo "  shell-badload: slot 1's maker lost by a failed save"; return 1; }
+}
+shell_badundo() {
+    in_order shell-badundo 'page=states focus=4' 'shell restore ok' 'shell undo 0 failed' 'shell says That did not work' || return 1
+    [ "$(grep -c -E 'game ' "$tmp/shell-badundo.log")" = 1 ] || { echo "  shell-badundo: the game moved"; return 1; }
+}
+shell_badcont() {
+    in_order shell-cont-quit 'shell suspend written' || return 1
+    in_order shell-badcont 'shell launch .*\(continue\)' 'shell restore ok' 'suspend state: cannot load' 'shell says Your place could not be loaded' || return 1
+    [ ! -f "$tmp/shell-cont-data/states/ASJP/suspend.st" ] || { echo "  shell-badcont: the broken place kept"; return 1; }
 }
 shell_stale() {
     in_order shell-stale-quit 'shell suspend written' || return 1
@@ -2596,6 +2621,8 @@ shell_newstart() {
 }
 check_pad shell-change shell_change
 check_pad shell-badload shell_badload
+check_pad shell-badundo shell_badundo
+check_pad shell-badcont shell_badcont
 check_pad shell-stale shell_stale
 check_pad shell-newstart shell_newstart
 for page in main settings controls keys states quit; do

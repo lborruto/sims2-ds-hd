@@ -81,7 +81,7 @@ enum class OwnWordId : int
     WirelessNote,
     // The review's round: change game, open the saves' folder, a stale place, a state from another
     // file, a place that did not load.
-    ShellChangeGame, ShellOpenFolder, LaunchSaveNewer, StOtherRom, LaunchContinueFailed,
+    ShellChangeGame, ShellOpenFolder, LaunchSaveNewer, StOtherRom, LaunchContinueFailed, QuickOtherRom,
     // Platform (task 5): the settings' new rows and values, their notes, the save moved to the
     // settings folder (the pause menu's banner), a window screenshot's toast.
     SetBattery, SetMute, SetBackground, SetFastSpeed, FastMax, SetFastKey, FastHold, FastPress, SetFastBoot, SetHidePointer,

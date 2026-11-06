@@ -120,22 +120,81 @@ Thumb ShellHost::ThumbNow(const App& app, const Video& video) const
     return MakeThumb(RenderCompose(c, top, tw, th, app.Bottom(), 1), c.cw, c.ch, (long long)time(nullptr));
 }
 
-bool ShellHost::Load(App& app, const std::string& path)
+bool ShellHost::Load(App& app, const std::string& path, std::vector<u8>* snapshot)
 {
+    restoreFailed = false;
     if (beforeLoad) beforeLoad();
-    return LoadState(*app.nds, path);
+    // The machine as it is, in memory: a load that fails half-way (a broken or cut file) puts it
+    // straight back, so a half-read state is never played on (slots, Undo, F7, Continue alike).
+    std::vector<u8> local;
+    std::vector<u8>& before = snapshot ? *snapshot : local;
+    before.clear();
+    const bool kept = SaveStateTo(*app.nds, before);
+    if (!kept) before.clear();
+    if (LoadState(*app.nds, path)) return true;
+    const bool back = kept && LoadStateFrom(*app.nds, before);
+    if (!back)
+    {
+        // Nothing to go back to, or the way back failed too: said always (the caller's toast).
+        restoreFailed = true;
+        fprintf(stderr, "frame %ld: shell restore failed after a failed load of %s (%s)\n", frame, path.c_str(),
+                kept ? "the state of before did not load" : "the state of before could not be taken");
+    }
+    else if (print || headless) fprintf(stderr, "frame %ld: shell restore ok\n", frame);
+    before.clear();
+    return false;
 }
 
-bool ShellHost::WriteSuspend(App& app, const Video& video)
+bool ShellHost::QuickSave(App& app, Video& video)
+{
+    // The state first (beside it, then in its place: a failed write keeps the old one and its
+    // maker), then its maker in the old one's place; a maker that cannot be written goes (never
+    // the old one's over the new state).
+    bool ok = SaveState(*app.nds, data.Quick(code));
+    if (ok && !WriteMeta(data.QuickMeta(code), {romPath, romHeader, 0}))
+    {
+        std::error_code ec;
+        std::filesystem::remove(data.QuickMeta(code), ec);
+        ok = false;
+    }
+    Say(video, OwnWordIn(model.language, ok ? W::ToastStateSaved : W::StFailed));
+    return ok;
+}
+
+bool ShellHost::QuickLoad(App& app, Video& video)
+{
+    // F7 asks nothing: a state another ROM file made is refused, said (F5 saves over it).
+    StateMeta meta;
+    if (ReadMeta(data.QuickMeta(code), meta) && (meta.rom != romPath || meta.header != romHeader))
+    {
+        std::string msg = OwnWordIn(model.language, W::QuickOtherRom);
+        if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, BaseName(meta.rom));
+        if (print || headless) fprintf(stderr, "frame %ld: shell quick refused: another file\n", frame);
+        Say(video, msg);
+        return false;
+    }
+    const bool ok = FileExists(data.Quick(code)) && Load(app, data.Quick(code));
+    Say(video, OwnWordIn(model.language, ok ? W::ToastStateLoaded : FileExists(data.Quick(code)) ? W::StFailed : W::ToastNoState));
+    return ok;
+}
+
+bool ShellHost::WriteSuspend(App& app, Video& video)
 {
     if (!data.Ok() || !app.nds) return false;
-    const bool ok = SaveState(*app.nds, data.Suspend(code)) && WriteThumb(data.SuspendThumb(code), ThumbNow(app, video));
-    // Its maker only after a good write (else nothing is offered as Continue); the save's hash as
-    // it is now: a save written later makes the place stale.
-    std::error_code ec;
-    if (ok) WriteMeta(data.SuspendMeta(code), {romPath, romHeader, HashFile(Host::SavePath)});
-    else std::filesystem::remove(data.SuspendMeta(code), ec);
+    // The state first (a failed write keeps whatever was there, with its maker), then its picture
+    // and its maker (the save's hash as it is now: a save written later makes the place stale).
+    // A picture or a maker that cannot be written fails the suspend: its files go (nothing is
+    // offered as Continue that its maker does not describe).
+    const bool saved = SaveState(*app.nds, data.Suspend(code));
+    const bool ok = saved && WriteThumb(data.SuspendThumb(code), ThumbNow(app, video)) &&
+                    WriteMeta(data.SuspendMeta(code), {romPath, romHeader, HashFile(Host::SavePath)});
+    if (saved && !ok)
+    {
+        std::error_code ec;
+        for (const std::string& f : {data.Suspend(code), data.SuspendThumb(code), data.SuspendMeta(code)}) std::filesystem::remove(f, ec);
+    }
     if (print || headless) fprintf(stderr, "frame %ld: shell suspend %s\n", frame, ok ? "written" : "failed");
+    if (!ok) Say(video, OwnWordIn(model.language, W::StFailed));
     return ok;
 }
 
@@ -201,8 +260,16 @@ void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
     }
     case Act::SaveSlot:
     {
-        const bool ok = data.Ok() && SaveState(*app.nds, data.Slot(code, r.arg)) && WriteThumb(data.SlotThumb(code, r.arg), ThumbNow(app, video)) &&
-                        WriteMeta(data.SlotMeta(code, r.arg), {romPath, romHeader, 0});
+        // The state first (beside it, then in its place: a failed write keeps the old slot, its
+        // picture and its maker), then its picture and its maker in their places; a maker that
+        // cannot be written goes (never the old one's over the new state: no warning, it loads).
+        const bool saved = data.Ok() && SaveState(*app.nds, data.Slot(code, r.arg));
+        const bool thumb = saved && WriteThumb(data.SlotThumb(code, r.arg), ThumbNow(app, video));
+        const bool meta = saved && WriteMeta(data.SlotMeta(code, r.arg), {romPath, romHeader, 0});
+        std::error_code ec;
+        if (saved && !thumb) std::filesystem::remove(data.SlotThumb(code, r.arg), ec); // (never the old place's picture)
+        if (saved && !meta) std::filesystem::remove(data.SlotMeta(code, r.arg), ec);
+        const bool ok = saved && thumb && meta;
         log("save", r.arg + 1, ok);
         LoadSlots();
         Say(video, ok ? Fill(OwnWordIn(lang, W::StSaved), std::to_string(r.arg + 1)) : OwnWordIn(lang, W::StFailed));
@@ -210,12 +277,12 @@ void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
     }
     case Act::LoadSlot:
     {
-        // The state of now first: the load's undo. A load that fails puts it straight back (a
-        // half-read state is never played on) and leaves Undo as it was.
-        const bool kept = SaveState(*app.nds, data.Undo(code));
-        const bool ok = Load(app, data.Slot(code, r.arg));
-        if (ok) canUndo = kept;
-        else if (kept || canUndo) { const bool back = LoadState(*app.nds, data.Undo(code)); log("restore", 0, back); }
+        // The state of now, in memory: the load's undo, written as before-load.st only once the load
+        // went well. A load that fails is undone by Load itself (that same state, never an older
+        // before-load.st) and before-load.st and Undo stay exactly as they were.
+        std::vector<u8> before;
+        const bool ok = Load(app, data.Slot(code, r.arg), &before);
+        if (ok) canUndo = !before.empty() && WriteStateBytes(before.data(), before.size(), data.Undo(code));
         input.lastMoney_ = -1;
         log("load", r.arg + 1, ok);
         Say(video, ok ? Fill(OwnWordIn(lang, W::StLoaded), std::to_string(r.arg + 1)) : OwnWordIn(lang, W::StFailed));

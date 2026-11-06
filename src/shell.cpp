@@ -319,10 +319,30 @@ std::vector<MainItem> MainEntries(const Model& m)
     return e;
 }
 
-bool PadPress(const Controls::Bindings& b, int action, int fallback, const bool* now, const bool* before)
+PadIns ShellPadIns(const Controls::Bindings& b)
 {
-    const int in = b.Pad(action) >= 0 ? b.Pad(action) : fallback;
-    return in >= 0 && in < Controls::IN_COUNT && now[in] && !before[in];
+    using namespace Controls;
+    PadIns r;
+    r.accept = b.Pad(A) >= 0 ? b.Pad(A) : b.Pad(B) == IN_A ? IN_B : IN_A;
+    if (b.Pad(B) >= 0) r.back = b.Pad(B) != r.accept ? b.Pad(B) : -1;
+    else if (r.accept != IN_B) r.back = IN_B;
+    else if (r.accept != IN_A && b.ActionOfPad(IN_A) < 0) r.back = IN_A;
+    return r;
+}
+
+PadNav ShellPadNav(const Controls::Bindings& b, const bool* now, const bool* before)
+{
+    using namespace Controls;
+    const PadIns ins = ShellPadIns(b);
+    auto pressed = [&](int in) { return in >= 0 && in < IN_COUNT && now[in] && !before[in]; };
+    // X / Y only on an input that is neither accept nor back: one press, one shell action.
+    auto own = [&](int a) { const int in = b.Pad(a); return in != ins.accept && in != ins.back && pressed(in); };
+    PadNav n;
+    n.a = pressed(ins.accept);
+    n.b = pressed(ins.back);
+    n.x = own(X);
+    n.y = own(Y);
+    return n;
 }
 
 std::vector<LaunchEntry> LaunchEntries(const Model& m)

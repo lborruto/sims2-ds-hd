@@ -298,7 +298,10 @@ void Input::Poll(const App& app, bool menuOpen)
     }
     // The menu opens with its button, or with START and BACK together.
     const bool combo = pad.btn[IN_START] && pad.btn[IN_BACK];
-    if (PadPressed(s, MENU) || (combo && !prevCombo)) wantMenu = true;
+    // (In the shell, a MENU on the pad's accept or back is that, not a second action too.)
+    const shell::PadIns shellIns = shell::ShellPadIns(s.controls);
+    const bool menuIsNav = menuOpen && (s.controls.Pad(MENU) == shellIns.accept || s.controls.Pad(MENU) == shellIns.back);
+    if ((PadPressed(s, MENU) && !menuIsNav) || (combo && !prevCombo)) wantMenu = true;
     prevCombo = combo;
     auto stickUp = [](const PadRaw& p) { return p.btn[IN_UP] || p.ly < -0.5f; };
     auto stickDown = [](const PadRaw& p) { return p.btn[IN_DOWN] || p.ly > 0.5f; };
@@ -316,11 +319,13 @@ void Input::Poll(const App& app, bool menuOpen)
         nav.down |= rep(stickDown(pad), stickDown(prevPad), navHeld[1]);
         nav.left |= rep(stickLeft(pad), stickLeft(prevPad), navHeld[2]);
         nav.right |= rep(stickRight(pad), stickRight(prevPad), navHeld[3]);
-        // (A cleared or moved A / B never locks the menu: without a pad input, the pad's own south / east.)
-        nav.a |= shell::PadPress(s.controls, A, IN_A, pad.btn, prevPad.btn);
-        nav.b |= shell::PadPress(s.controls, B, IN_B, pad.btn, prevPad.btn);
-        nav.x |= PadPressed(s, X);
-        nav.y |= PadPressed(s, Y);
+        // (A cleared or moved A / B never locks the menu: without a pad input, the pad's own south / east;
+        // one press is one shell action.)
+        const shell::PadNav pn = shell::ShellPadNav(s.controls, pad.btn, prevPad.btn);
+        nav.a |= pn.a;
+        nav.b |= pn.b;
+        nav.x |= pn.x;
+        nav.y |= pn.y;
         return;
     }
     if (PadPressed(s, SAVESTATE)) wantSave = true;

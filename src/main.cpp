@@ -901,7 +901,7 @@ relaunch:
         {
             const bool ok = host.Load(app, host.data.Suspend(app.romCode));
             fprintf(stderr, "suspend state: %s\n", ok ? "loaded" : "cannot load");
-            if (!ok) host.Say(video, OwnWord(app.rom.get(), OwnWordId::LaunchContinueFailed));
+            if (!ok) host.Say(video, OwnWord(app.rom.get(), host.restoreFailed ? OwnWordId::StFailed : OwnWordId::LaunchContinueFailed));
             drop = true;
         }
         if (drop)
@@ -1109,8 +1109,20 @@ relaunch:
             }
             audio.Pause(false);
             const int lang = host.model.language;
-            if (input.wantSave) host.Say(video, OwnWordIn(lang, SaveState(nds, quickState) ? OwnWordId::ToastStateSaved : OwnWordId::StFailed));
-            if (input.wantLoad) host.Say(video, OwnWordIn(lang, host.Load(app, quickState) ? OwnWordId::ToastStateLoaded : OwnWordId::ToastNoState));
+            if (input.wantSave)
+            {
+                if (host.data.Ok()) host.QuickSave(app, video);
+                else host.Say(video, OwnWordIn(lang, SaveState(nds, quickState) ? OwnWordId::ToastStateSaved : OwnWordId::StFailed));
+            }
+            if (input.wantLoad)
+            {
+                if (host.data.Ok()) host.QuickLoad(app, video);
+                else
+                {
+                    const bool ok = host.Load(app, quickState);
+                    host.Say(video, OwnWordIn(lang, ok ? OwnWordId::ToastStateLoaded : host.restoreFailed ? OwnWordId::StFailed : OwnWordId::ToastNoState));
+                }
+            }
             if (input.wantShot && pendingShot.empty())
             {
                 // The window's picture as it is drawn (its own size: HD), in the data folder's
@@ -1650,6 +1662,9 @@ relaunch:
         shellPage = -1;
         if (window) video.RememberSize(app.settings);
         app.nds.reset();
+        // (The 60 fps frames of the game before: never blended into the next one's first frame.)
+        melonDS::Looks3D.RawPrevious.clear();
+        melonDS::Looks3D.RawCurrent.clear();
         app.rom.reset();
         app.icons.reset();
         app.hudStrings = HudStrings();

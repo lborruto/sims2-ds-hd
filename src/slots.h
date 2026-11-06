@@ -63,6 +63,8 @@ struct DataDir
     // window's screenshots (screenshots/), made the first time they are asked for ("" none).
     std::string Saves() const;
     std::string Screenshots() const;
+    std::string Quick(const std::string& code) const;             // F5 / F7's state
+    std::string QuickMeta(const std::string& code) const;         // its StateMeta (F7 refuses another file's)
 
     // The recent ROMs, newest first (only files that still exist), at most kRecents.
     static constexpr int kRecents = 5;
