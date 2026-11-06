@@ -2,7 +2,7 @@
 // of pieces of the two DS screens on a 1280 x 720 canvas, as in the approved mockup: in town (the
 // panel) the world fills the canvas with a rail of the touch screen's tab icons and phone at the
 // right; the menu, the phone, popups and Give Item are the whole touch screen 3x over the dimmed
-// world (framed for SaveSlots, ItemHand and Unknown); a black load is the bare backdrop; without a
+// world (framed for SaveSlots and Unknown); a black load is the bare backdrop; without a
 // HUD (the front end) the top screen at the left and the touch screen 2.5x at the right, each in its frame; a conversation is the world with the
 // game's dialogue redrawn in HD at the bottom (port/dialogue.h; without the game's text, its own box rebuilt wide); an activity is the touch screen 3x at the left
 // with the world small at the top right. DS pieces are drawn as the game draws them, 2x or 3x;
@@ -85,7 +85,7 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // dimmed world). focus: the index in HotspotsFor(s) the focus ring frames (-1: none; no ring
 // when no touchable bottom piece shows it). topW x topH: the top picture's size (App::TopImage).
 // Screen::Loading (a black load): the bare backdrop, no piece.
-// Screen::None, FrontEnd, CreateASim: the front end's view (kFront*); SaveSlots, ItemHand, Unknown:
+// Screen::None, FrontEnd, CreateASim: the front end's view (kFront*); SaveSlots, Unknown:
 // the menu composition with a frame (the stick cursor's screens); never SIDE's bare pair of screens.
 // hud, strings (both given and strings->ok: the game's RAM and text read): the HD status bar
 // (port/statusbar.h) wherever the world shows the game's HUD, the game's own bar (the top

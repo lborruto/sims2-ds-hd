@@ -284,7 +284,12 @@ void MooGoo(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState&
     if (r.mooGooIntro)
     {
         // The rules page: its play arrow is the only way on (B goes on too, then asks to quit).
-        if (st.quitChain == 0 && canTap && (a || b || start))
+        // (A tap that is not taken leaves the page up: the chain is dropped after kMooGooChainWait, so the next B taps again.)
+        if (st.quitChain)
+        {
+            if (++st.chainFrames > kMooGooChainWait) st.quitChain = 0;
+        }
+        else if (canTap && (a || b || start))
         {
             tap(kMooGooArrow);
             if (!a) { st.quitChain = 1; st.chainFrames = 0; }
@@ -567,7 +572,8 @@ void MixerSave(const PadState& pad, TouchScript& touch, ActivityState& st, bool 
     if (!canTap) return;
     if (Pressed(pad, st, &PadState::a))
     {
-        if (slot >= 0 && st.ram.mixerSave && st.ram.mixerSaveUsed[slot] && st.armedSlot != slot) { st.armedSlot = slot; return; }
+        // (the used slots unread: every slot asks, the safe fallback)
+        if (slot >= 0 && (!st.ram.mixerSave || st.ram.mixerSaveUsed[slot]) && st.armedSlot != slot) { st.armedSlot = slot; return; }
         st.armedSlot = -1;
         touch.Tap(h[st.focus].x, h[st.focus].y);
     }
@@ -626,6 +632,7 @@ std::vector<Point> ScratchRub(int tier, int i)
 
 void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
 {
+    const float ox = st.px, oy = st.py;
     // The stick over further: either one, the one further over.
     float sx = pad.lx, sy = pad.ly;
     if (pad.rx * pad.rx + pad.ry * pad.ry > sx * sx + sy * sy) { sx = pad.rx; sy = pad.ry; }
@@ -649,6 +656,11 @@ void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
         st.py += dy * step;
     }
     else st.dpadHeld = 0;
+    // The stick and the D-pad together: at most `cap` a frame in all.
+    {
+        const float mx = st.px - ox, my = st.py - oy, d = std::sqrt(mx * mx + my * my), lim = std::max(cap, 1.0f);
+        if (d > lim) { st.px = ox + mx * lim / d; st.py = oy + my * lim / d; }
+    }
     st.px = std::clamp(st.px, 0.0f, (float)(SW - 1));
     st.py = std::clamp(st.py, 0.0f, (float)(SH - 1));
 }

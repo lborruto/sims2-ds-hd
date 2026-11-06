@@ -63,8 +63,6 @@ Overlay Text(int x, int y, const char* text, int scale)
     return o;
 }
 
-// The focus ring around hotspot `focus`'s area, as the topmost touchable bottom piece showing the
-// area's centre draws it (the area clipped to that piece), 4 pixels outside it.
 // The money's last change (port/statusbar.h's bar at `bar`): a small kit panel right of it, "+§12"
 // in a light green or "-§1" in a light red, on the bar's layer.
 void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom)
@@ -80,6 +78,8 @@ void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom)
               payout > 0 ? 0xFFB4F0A8 : 0xFFFF9A90, kStatusBarLayer);
 }
 
+// The focus ring around hotspot `focus`'s area, as the topmost touchable bottom piece showing the
+// area's centre draws it (the area clipped to that piece), 4 pixels outside it.
 void AddRing(Composition& c, ScreenState s, int focus)
 {
     const std::vector<Hotspot>& h = HotspotsFor(s);
@@ -239,7 +239,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {
         // The world dimmed behind the touch screen: not playable, the mouse does nothing there.
-        // The stick cursor's screens (no table: SaveSlots, ItemHand, Unknown) get a frame.
+        // The stick cursor's screens (no table: SaveSlots, Unknown) get a frame.
         Piece world = World(topW, worldRows, bar);
         world.touch = false;
         c.pieces.push_back(world);

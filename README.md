@@ -321,7 +321,7 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
   (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
   filter clear) and the casino's cards are; the autopsy, the detector, painting, Moogoo Monkey, the Rat-A-Rang, the scratch tickets and the
   music mixer were played from test states (not reached by walking to them yet; Moogoo opens on Monkey Day, the Rat-A-Rang with the Ratticator's
-  costume), the Super Drencher from the pockets; the slot machine, the skydive and the arcade cabinets were not reached at all. If one shows up wrong, Tab swaps the big screen and 2 shows
+  costume), the Super Drencher from the pockets; the slot machine, the skydive and the arcade cabinets (their animations) and the payout chip beside the status bar were not reached in play (an animation reading as None draws the front-end layout). If one shows up wrong, Tab swaps the big screen and 2 shows
   both.
 - **No wireless play.** Trading, and Moogoo or the cards with a second DS, need two consoles: the
   wireless screen says so and B leaves it.

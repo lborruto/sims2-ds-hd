@@ -565,7 +565,7 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   held a pixel a frame, after `kNudgeFast` (30) three: every pixel is reached (`navigator_test`
   walks all 256 columns a press at a time). It starts in the playfield's middle on each new
   screen. A held is the stylus down at it (`Input::PointerTouch`, before a touch script, after the
-  mouse's own drag); the stylus down caps it at `kPtrDrag` (3) a frame, the autopsy's laser at
+  mouse's own drag); the stylus down caps it at `kPtrDrag` (3) a frame (the stick and the D-pad together: `MovePointer` caps the sum; the Drencher's pump, 8 pixels a frame, is the one verified exception: it is the game's own sweep, not a drag), the autopsy's laser at
   `kPtrLaser` (1: it cuts through in one pass, research). Autopsy: X / Y / RB tap the laser / hand
   / tweezers (16, 96 / 32 / 160), never while A holds the stylus; LB while the hand drags an organ
   (sub 3) or the tweezers hold a parasite (6) glides the pointer to the tray (236,36) or the flask
@@ -648,7 +648,7 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   machine's Insert Coin, an arcade cabinet's, the skydive's Freefall / Land: no screen of their own, the panel stays):
   A on such a row closes the HD menu with its tap, so the world shows big; the money's change shows beside the status bar
   for 240 frames (the coin's "-§1", then the reels' payout, 1 to 20, doubled by a Sim record test). No state reaches them
-  (the casino's walks never target the slot machine): `navigator_test` only, and the chip on the lottery's prize.
+  (the casino's walks never target the slot machine): `navigator_test` only, and the chip on the lottery's prize. The slot machine, skydive and arcade animations and the payout chip were not reached in play; an animation reading as None draws the front-end layout.
 - The complete save's states (in git-ignored `shots/`; run them with
   `--save` a copy of `saves/complete-play.sav` and `--clock "2026-11-05 12:05"`): `sit-casino`
   (`act-cards` quit to the casino's panel, `scripts/hotspots/casino-base.txt`) and

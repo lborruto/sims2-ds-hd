@@ -1388,7 +1388,7 @@ check_pad pad-hotseat hotseat
 check_pad pad-target target
 check_pad pad-buy buy
 # Pockets and Give Gift (src/port/pockets.*, gift.*): from A-pk-slot1-key2 (the Super Drencher
-# selected), MENU, A → the Super Drencher's game (overlay 18, Drencher: CONSOLE's ItemHand); MENU, Left (slot 1), X →
+# selected), MENU, A → the Super Drencher's game (overlay 18, Drencher: CONSOLE's Drencher); MENU, Left (slot 1), X →
 # the game selects the slot (nothing thrown), X again → the bin empties the pockets; from
 # A-gift2-base, Right, A → the bed given (the pockets keep the arcade), back to the panel; from
 # sit-gift, B → the game's X, the panel.

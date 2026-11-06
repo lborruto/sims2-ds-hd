@@ -829,6 +829,23 @@ static void moogoo_scheme()
     CHECK(tapped(&PadState::a, kMooGooArrow));
     // B: the arrow, then (after the load) the game's X.
     CHECK(tapped(&PadState::b, kMooGooArrow));
+    // The tap not taken: the intro persists past the wait, then A and B work again.
+    {
+        Rig s;
+        ram.mooGooIntro = true;
+        s.nav.SetActivityRam(ram);
+        s.Frame(kMooGoo);
+        s.Press(kMooGoo, &PadState::b);
+        CHECK(s.Touched(x, y) && x == kMooGooArrow.x && y == kMooGooArrow.y);
+        s.Drain();
+        for (int i = 0; i < kMooGooChainWait + 5; i++) { s.Frame(kMooGoo); s.Drain(); }
+        s.Press(kMooGoo, &PadState::a);
+        CHECK(s.Touched(x, y) && x == kMooGooArrow.x && y == kMooGooArrow.y);
+        s.Drain();
+        for (int i = 0; i < kMooGooChainWait + 5; i++) { s.Frame(kMooGoo); s.Drain(); }
+        s.Press(kMooGoo, &PadState::b);
+        CHECK(s.Touched(x, y) && x == kMooGooArrow.x && y == kMooGooArrow.y);
+    }
     r.Frame({Screen::Loading, Tab::None});
     ram.mooGooIntro = false;
     r.nav.SetActivityRam(ram);
