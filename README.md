@@ -43,13 +43,12 @@
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
   nothing to set, and it never falls back to the bare two-screen layout. The intro, the title,
   the main menu, Settings and Load-a-Sim are redrawn for the controller too (A or Start takes the
-  intro's last screen, A begins, the D-pad and A pick Create-a-Sim, Load-a-Sim, Settings or DS
-  Wireless; in Settings LB / RB change page, Left / Right move the volume, the concept art opens
+  intro's last screen, A begins, the D-pad and A pick Create-a-Sim, Load-a-Sim or Settings (DS
+  Wireless is greyed: it needs a second DS); in Settings LB / RB change page, Left / Right move the volume, the concept art opens
   with A and the credits roll; in Load-a-Sim A loads a saved Sim), and so is Create-a-Sim: your
-  Sim big on the left, the game's pages on the right (more below); DS Wireless still shows the
-  top screen and the touch screen big, each in its frame; a black load shows only the backdrop.
+  Sim big on the left, the game's pages on the right (more below); a black load shows only the backdrop.
   This needs the European game (see [Good to know](#good-to-know)).
-- **The old layouts are still there.** AUTO, FOCUS, SIDE and STACKED: SETTINGS > DISPLAY > LAYOUT.
+- **The old layouts are still there.** AUTO, FOCUS, SIDE and STACKED: Settings > Layout in the pause menu.
 - **The DS clock is your clock.** The game lives by the time of day (rooms take real hours,
   skill points come at set hours), so it reads your computer's time, also after a save state,
   and fast forward never runs it ahead: the game never sees its clock go back.
@@ -59,8 +58,11 @@
   over the world, the wheel zooms and a right-button drag turns the camera.
 - **Your keyboard or controller is the DS.** Every button has a key and a pad button, all
   remappable; a controller's right stick moves a cursor on the touch screen.
-- **A pause menu.** Esc: save and load state, the settings (display, graphics, sound,
-  controls), quit. Settings are kept between runs.
+- **A pause menu, and a place to start.** Start + Back (or Esc) pauses: Settings, the Controls
+  card and your keys and buttons, four save states with their picture and date (loading one asks
+  first, and can be undone), Quit (asked first: next time *Continue* picks up right there). Before
+  the game, a launch panel: Continue, choose a file (or drop a `.nds` on the window), your recent
+  ROMs, the language. All of it in five languages, with the buttons of the controller you hold.
 - **Sound that keeps up.** When the computer falls behind, the music stretches instead of
   crackling. Copies of your save are kept beside it, every half hour.
 
@@ -87,7 +89,7 @@ It is an early version: see [Good to know](#good-to-know).
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/front-menu.webp" alt="CONSOLE: the main menu in HD: the game's title picture big at the left, its four buttons (Create-a-Sim, Load-a-Sim, Settings, DS Wireless) at the right with the button hints" width="700">
+  <img src="docs/screenshots/front-menu.webp" alt="CONSOLE: the main menu in HD: the game's title picture big at the left, its four buttons (Create-a-Sim, Load-a-Sim, Settings, and DS Wireless greyed) at the right with the button hints" width="700">
 </p>
 
 <p align="center">
@@ -107,8 +109,10 @@ is included here.
 | **Mac** (Apple silicon or Intel, macOS 11+) | `sims2-ds-wide-…-macos-universal.zip` | unzip, move *Sims 2 DS Wide* to Applications; the first time, right click > Open |
 | **Linux** (x86_64) | `sims2-ds-wide-…-linux-x86_64.tar.gz` | unpack, run `./sims2wide` (the file picker needs zenity or kdialog) |
 
-It asks for your `.nds` when it starts, in the folder of the last one you chose. A ROM on the command
-line (`sims2wide path/to/your-sims2.nds`) skips the question.
+It opens on a launch panel: *Choose a file* (or drop your `.nds` on the window), then *Continue*
+starts it next time, where you quit. A ROM on the command line (`sims2wide path/to/your-sims2.nds`)
+skips the panel. A file that is not The Sims 2 is said on the panel; another region's cartridge
+plays, but with the game's own screens (said once, until you press A).
 
 **Or build it** (a few minutes):
 
@@ -135,26 +139,27 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 | Q / W (AZERTY: A / Z) | LB / RB | L / R: turn the camera in town; switch tabs while the menu is open |
 | Enter / Right Shift | Start / left stick click | Start / Select |
 | E | Back (let go) | open the touch screen's menu (the PANEL); B closes it |
-| Esc | Start + Back | the frontend's pause menu: save states, settings, quit |
+| Esc | Start + Back | the pause menu: settings, controls, save states, quit |
 | M (hold) | | blow into the microphone |
 | Tab | right stick click | swap which screen is big (the old layouts) |
 | Space (hold) | RT | fast forward |
-| F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
+| F5 / F7 | | quick save state / load it (in the settings folder, beside the pause menu's four) |
 | F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
 | 0 to 4 | | layout: AUTO / FOCUS / SIDE / STACKED / CONSOLE |
 | Mouse | right stick + LT (the cursor; A too wherever the cursor is the way to touch: DS Wireless, the furniture editor, where B leaves) | the touch screen, wherever it is shown |
 | Mouse wheel / right button drag, over the world | | zoom / turn the camera |
 
-Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND
-BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation and Switch
+Every row but the last few can be changed in the pause menu (Controls > Keys and buttons): A on
+an action, then the key or button you want (Esc, or Start + Back together, keeps what it had;
+Backspace leaves it no key); X clears it, Y sets them all one after another. Xbox, PlayStation and Switch
 controllers are known by their own button names, and the hints on screen show the buttons of the
 controller you used last (A / B / X / Y, ✕ ○ □ △, or the Switch's), or your keys when you last
 typed.
 
 **Before the game** (the front end) the controller does it all: on the intro's last screen
 ("Touch the Touch Screen to continue.") A or Start take the touch, on the title A or Start begin, and on
-the main menu Up / Down and A pick Create-a-Sim, Load-a-Sim, Settings or DS Wireless (the buttons
-fade in first; a press during the fade does nothing). In Settings LB / RB change page (Music,
+the main menu Up / Down and A pick Create-a-Sim, Load-a-Sim or Settings (the buttons fade in
+first; a press during the fade does nothing; DS Wireless is greyed: it needs a second DS). In Settings LB / RB change page (Music,
 SFX, Concept Art, Credits), Left / Right move a volume by a tenth (press as fast as you like:
 every press counts), A shows an unlocked concept picture big (B puts it away), and B goes back to
 the title. In Load-a-Sim Up / Down pick a slot, A loads it and B goes back to the title. In Create-a-Sim B goes back only from the last page, as in the game. The end
@@ -274,7 +279,7 @@ stays the system's. Press Back first: Start first may also open a minigame's hel
 screen's cursor hint shows it too.
 
 **Through Steam** (and on a **Steam Deck**): in Steam, *Add a Game > Add a Non-Steam Game*, pick
-`sims2wide.exe` (or `sims2wide` on Linux), and leave Steam Input on. To skip the file picker, put
+`sims2wide.exe` (or `sims2wide` on Linux), and leave Steam Input on. To skip the launch panel, put
 the ROM's path in its *Properties > Launch Options*, in quotes: `"C:\Games\Sims 2.nds"`. The Deck's
 own buttons then work as a controller; the game fills its 1280 × 800 screen with thin bars above
 and below.
@@ -283,28 +288,27 @@ and below.
 output. Make one with [SDL2 Gamepad Tool](https://generalarcade.com/gamepadtool/) or Steam's
 controller settings and put the line in `gamecontrollerdb.txt` in the settings folder (below); a
 mapping in the `SDL_GAMECONTROLLERCONFIG` environment variable (what Steam sets) wins over it.
-SETTINGS > CONTROLS also has the sticks' dead zone (raise it if the Sim walks on its own), how far
+The pause menu's Settings also have the sticks' dead zone (raise it if the Sim walks on its own), how far
 the triggers go down to count, and rumble. A controller SDL already knows keeps SDL's own mapping;
 the built-in database only adds the others.
 
 ## Settings
 
-Esc opens the pause menu; SETTINGS has four pages:
-
-| Page | Settings |
-|---|---|
-| DISPLAY | fullscreen (F11), smooth scaling, layout |
-| GRAPHICS | 3D resolution, widescreen world, 60 fps |
-| SOUND | volume, sound during fast forward (muted, or at normal pitch skipping ahead) |
-| CONTROLS | stick touch cursor, stick dead zone, trigger press point, rumble, microphone (off, the blow key, the real one), keys and buttons |
+Start + Back (or Esc) opens the pause menu; its Settings: layout, fullscreen (F11), smooth
+scaling, 3D resolution, widescreen world, 60 fps, volume, sound during fast forward (muted, or at
+normal pitch skipping ahead), the stick's cursor, its dead zone, how far a trigger goes down,
+rumble, the microphone (off, the blow key, the real one) and the language of the HD screens.
+Left / Right (or A) change the focused row.
 
 <p align="center">
-  <img src="docs/screenshots/menu.webp" alt="The pause menu's settings page over the town: DISPLAY, GRAPHICS, SOUND, CONTROLS, with a hint for the chosen page" width="700">
+  <img src="docs/screenshots/menu.webp" alt="The pause menu's settings over the dimmed town: a list of rows with their values in pills, the focused one ringed green, the buttons' hints below" width="700">
 </p>
 
 They are kept in `settings.ini` in your user folder (the window's size too): on Windows
 `%APPDATA%\sims2-ds-wide`, on a Mac `~/Library/Application Support/sims2-ds-wide`, on Linux
-`~/.local/share/sims2-ds-wide`. Delete it to start over.
+`~/.local/share/sims2-ds-wide`. Delete it to start over. The save states, the place kept on
+quitting and the recent ROMs are in the same folder (`states/`, `recent.txt`); a save state holds
+a copy of the game's memory: never share one.
 
 ## Layouts
 
@@ -316,14 +320,14 @@ They are kept in `settings.ini` in your user folder (the window's size too): on 
 | **SIDE** | both screens side by side |
 | **STACKED** | as on the DS, one above the other |
 
-Change it in SETTINGS > DISPLAY > LAYOUT or with the 0 to 4 keys; or start with one:
+Change it in the pause menu's Settings or with the 0 to 4 keys; or start with one:
 `--layout focus`. Run `sims2wide --help` to see every option, including the headless mode used
 to study the game's screens ([CONTRIBUTING.md](CONTRIBUTING.md#studying-the-screens)).
 
 ## Looks
 
 Three options make the game look better without changing it. They are on by default; switch them off
-in SETTINGS > GRAPHICS. The options below turn them on for one run.
+in the pause menu's Settings. The options below turn them on for one run.
 
 | Option | What it does | On the command line |
 |---|---|---|
@@ -350,7 +354,7 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
   stick moves it, A touches), and the hints below say so.
 - **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
   world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it. (CONSOLE has no such strip.)
-- **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).
+- **Widescreen is on by default.** Switch it off in the pause menu's Settings if a place shows something odd at the edges. See [Looks](#looks).
 - **Most minigames not checked yet.** The social reactions, the shop, Build Rooms and the vacuum
   (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
   filter clear) and the casino's cards are; the autopsy, the detector, painting, Moogoo Monkey, the Rat-A-Rang, the scratch tickets and the

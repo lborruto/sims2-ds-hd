@@ -502,7 +502,8 @@ def front_cas(page, focus, raw_top=True):
 def front_menu(focus, raw_top=True):
     """The HD main menu (src/port/front.*): the top screen 3x at 24,72 framed, the panel at the
     right with four buttons, each a white label, the focused one ringed in green with the game's
-    green arrow, the others' arrows blue; the hints under them."""
+    green arrow, the others' arrows blue; DS Wireless (button 3) greyed: its label dim, no arrow;
+    the hints under them."""
     expect("canvas", comp.size, (1280, 720))
     if raw_top:
         for x in range(0, 256, 9):
@@ -516,8 +517,16 @@ def front_menu(focus, raw_top=True):
     for i in range(4):
         y0 = 84 + 128 * i
         white = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (255, 255, 255))
-        if white < 30: errors.append(f"button {i}: no label ({white} white pixels)")
         arrow = [C(x, y) for y in range(y0 + 18, y0 + 82) for x in range(1164, 1228)]
+        if i == 3:
+            # Greyed: a dim label (no white), no arrow.
+            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (0xB8, 0xBC, 0xE0))
+            if white or dim < 30: errors.append(f"button 3: not greyed ({white} white, {dim} dim pixels)")
+            if sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40) > 300: errors.append("button 3: an arrow")  # (an arrow: about 1100; the rim alone: under 100)
+            r, g, b = C(835, y0 + 50)
+            if (i == focus) != (g > r + 80 and g > b + 60): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
+            continue
+        if white < 30: errors.append(f"button {i}: no label ({white} white pixels)")
         green = sum(1 for r, g, b in arrow if g > r + 60 and g > b + 40)
         blue = sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40)
         if i == focus:
@@ -1799,8 +1808,9 @@ EOF
 done
 # The front end (src/port/front.*, --print-front): from F-title0, A → the main menu, A on
 # Create-a-Sim once it is live → Create-a-Sim; Start → the menu, A twice while it fades in →
-# nothing chosen (no press lands mid-fade); from s2, A on Load-a-Sim, Settings and DS Wireless →
-# each screen, and B (the game's own) → the title at phase 0, never the menu; from F-boot-900, A
+# nothing chosen (no press lands mid-fade); from s2, A on Load-a-Sim and Settings → each screen,
+# and B (the game's own) → the title at phase 0, never the menu; A on DS Wireless (greyed: a
+# second DS) → nothing, still the menu; from F-boot-900, A
 # or Start (the splash's touch) → the title.
 # (Settings, Load-a-Sim and Wireless have no GScreen: Unknown in RAM, None in the pixels, which
 # PixelsAgree takes as one: --print-game logs no "pixels disagree" there.)
@@ -1829,7 +1839,11 @@ check_pad pad-front-title front_title
 check_pad pad-front-fade front_fade
 check_pad pad-front-load front_back pad-front-load Load
 check_pad pad-front-settings front_back pad-front-settings Settings
-check_pad pad-front-wireless front_back pad-front-wireless Wireless
+front_wireless() {
+    in_order pad-front-wireless 'title phase=3' || return 1
+    ! grep -q -E 'front Wireless' "$tmp/pad-front-wireless.log" || { echo "  pad-front-wireless: DS Wireless opened"; return 1; }
+}
+check_pad pad-front-wireless front_wireless
 check_pad pad-front-boot-a front_boot pad-front-boot-a
 check_pad pad-front-boot-start front_boot pad-front-boot-start
 # Settings and Load-a-Sim (src/port/frontmenus.*, --print-front, copies of the complete save):
@@ -2443,5 +2457,73 @@ PYEOF
 }
 check_pad fx-phone-menu fx_phone_menu
 check_pad fx-return-veil fx_return_veil
+# The HD shell (src/shell.*, src/shellhost.*, scripts/shell/), the pad alone, its files in a scratch
+# --data-dir: from s7, Start + Back opens the pause menu, slot 1 saved (its state and picture),
+# the phone closed, slot 1 loaded after its question (No first: one A closes it, then A, Right, A),
+# the phone back; Undo: the panel back; Quit asked (No first), then Yes: the suspend state written
+# and the run ends. Then --launch from the same folder: Continue (the first item, A) starts the
+# game where it was left (the panel, from frame 5: the launch's turns count) and the suspend
+# state is gone. Pictures: each page of the pause menu over s7 (--shell) and the launch panel:
+# the panel's fill and the world dimmed under the veil.
+mkdir -p "$tmp/shell-data"
+"$bin" "$rom" --headless --frames 700 --state-load "$shots/s7.st" --save "$tmp/shell-states.sav" --data-dir "$tmp/shell-data" \
+    "${town[@]}" --print-shell --print-game --input "$repo/scripts/shell/states.txt" > "$tmp/shell-states.log" 2>&1 &&
+    grep -q '^clock: ' "$tmp/shell-states.log" && touch "$tmp/shell-states.ok"
+"$bin" "$rom" --headless --launch --frames 60 --save "$tmp/shell-states.sav" --data-dir "$tmp/shell-data" \
+    "${town[@]}" --print-shell --print-game --input "$repo/scripts/shell/continue.txt" > "$tmp/shell-continue.log" 2>&1 &&
+    grep -q '^clock: ' "$tmp/shell-continue.log" && touch "$tmp/shell-continue.ok"
+shell_states() {
+    in_order shell-states 'shell open page=main' 'page=states' 'shell save 1 ok' 'shell closed' 'game Panel/Interact' \
+        'ask=load \(no\)' 'ask=none' 'ask=load \(no\)' 'ask=load \(yes\)' 'shell load 1 ok' 'game Phone' \
+        'shell undo 0 ok' 'game Panel/Interact' 'ask=quit \(no\)' 'ask=none' 'ask=quit \(yes\)' 'shell suspend written' || return 1
+    [ -f "$tmp/shell-data/states/ASJP/slot1.st" ] && [ -f "$tmp/shell-data/states/ASJP/slot1.thumb" ] || { echo "  shell-states: no slot 1 files"; return 1; }
+}
+shell_continue() {
+    in_order shell-continue 'shell launch .*\(continue\)' 'suspend state: loaded' '^frame 5: game Panel/Interact' || return 1
+    [ ! -f "$tmp/shell-data/states/ASJP/suspend.st" ] || { echo "  shell-continue: the suspend state kept"; return 1; }
+}
+check_pad shell-states shell_states
+check_pad shell-continue shell_continue
+for page in main settings controls keys states quit; do
+    "$bin" "$rom" --headless --frames 64 --state-load "$shots/s7.st" --save "$tmp/shell-$page.sav" --compose \
+        --shell "$page" --shell-at 60 --shot-at 59,62 --shot-dir "$tmp/shell-$page" "${town[@]}" > "$tmp/shell-$page.log" 2>&1 &
+done
+"$bin" "$rom" --headless --launch --frames 4 --save "$tmp/shell-launch.sav" --data-dir "$tmp/shell-data" --compose \
+    --shot-at 2 --shot-dir "$tmp/shell-launch" "${town[@]}" > "$tmp/shell-launch.log" 2>&1 &
+wait
+if "$python" -I - "$tmp" <<'PYEOF'
+import sys
+from PIL import Image, ImageStat
+t = sys.argv[1]
+bad = []
+def near(p, q, d=8): return all(abs(a - b) <= d for a, b in zip(p, q))
+for page in ["main", "settings", "controls", "keys", "states", "quit"]:
+    try:
+        before = Image.open(f"{t}/shell-{page}/f000059.png").convert("RGB")
+        im = Image.open(f"{t}/shell-{page}/f000062.png").convert("RGB")
+    except OSError:
+        bad.append(f"{page}: no picture"); continue
+    fill = (0x82, 0x8A, 0xCB) if page != "quit" else None
+    # The panel's fill under the hints (veiled once more by the quit question's).
+    if fill and not near(im.getpixel((220, 650)), fill): bad.append(f"{page}: no panel fill at 220,650: {im.getpixel((220, 650))}")
+    # The world beside the panel: darker than without the menu.
+    a = ImageStat.Stat(before.crop((120, 0, 190, 600))).mean
+    b = ImageStat.Stat(im.crop((120, 0, 190, 600))).mean
+    if not sum(b) < 0.6 * sum(a): bad.append(f"{page}: the world not dimmed ({sum(a):.0f} -> {sum(b):.0f})")
+    # White words in the title band (the quit question: in its box, over the veiled title).
+    box = (500, 780, 50, 100) if page != "quit" else (420, 860, 250, 310)
+    if not any(min(im.getpixel((x, y))) > 240 for x in range(box[0], box[1]) for y in range(box[2], box[3], 2)): bad.append(f"{page}: no title")
+try:
+    im = Image.open(f"{t}/shell-launch/f000002.png").convert("RGB")
+    if not near(im.getpixel((10, 10)), (0x10, 0x12, 0x18), 2): bad.append(f"launch: no backdrop {im.getpixel((10, 10))}")
+    if not near(im.getpixel((60, 690)), (0x82, 0x8A, 0xCB)): bad.append(f"launch: no list panel {im.getpixel((60, 690))}")
+    if not near(im.getpixel((1220, 690)), (0x82, 0x8A, 0xCB)): bad.append(f"launch: no controls card {im.getpixel((1220, 690))}")
+except OSError:
+    bad.append("launch: no picture")
+for b in bad: print("  " + b)
+sys.exit(1 if bad else 0)
+PYEOF
+then echo "ok   shell pictures: the pause menu's pages and the launch panel"
+else echo "FAIL shell pictures"; fails=$((fails + 1)); fi
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

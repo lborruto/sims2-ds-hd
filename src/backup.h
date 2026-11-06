@@ -12,7 +12,8 @@ struct Backups
 
     // At start, and then from the frame loop (copies when half an hour has passed).
     void Start(const std::string& savePath);
-    void Tick(unsigned nowTicks);
+    // Whether a copy was made (the window's toast).
+    bool Tick(unsigned nowTicks);
     // The copy itself; what it did, for the terminal and the menu ("" when nothing to copy).
     std::string Copy() const;
 };

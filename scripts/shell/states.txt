@@ -1,0 +1,43 @@
+# The HD shell's save states, from s7 (the phone open), the pad alone: Start + Back opens the pause
+# menu, Down x3 and A the save states, A saves slot 1 (empty), B B back to the game; B closes the
+# phone (the panel); the menu again: A on slot 1 asks (No first: A closes it), A, Right, A loads it
+# (the phone again); then Undo (the panel again); then Quit, asked (No first), Right, A: the
+# suspend state written and the program ends.
+10 2 pad start
+10 2 pad menu
+20 2 pad down
+26 2 pad down
+32 2 pad down
+40 2 pad a
+50 2 pad a
+60 2 pad b
+70 2 pad b
+90 2 pad b
+200 2 pad start
+200 2 pad menu
+210 2 pad down
+216 2 pad down
+222 2 pad down
+230 2 pad a
+240 2 pad a
+250 2 pad a
+260 2 pad a
+270 2 pad right
+280 2 pad a
+380 2 pad start
+380 2 pad menu
+390 2 pad down
+396 2 pad down
+402 2 pad down
+410 2 pad a
+420 2 pad down
+426 2 pad down
+432 2 pad a
+520 2 pad start
+520 2 pad menu
+530 2 pad up
+540 2 pad a
+550 2 pad a
+560 2 pad a
+570 2 pad right
+580 2 pad a

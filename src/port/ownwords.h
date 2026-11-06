@@ -64,6 +64,21 @@ enum class OwnWordId : int
     Select, TrashAgain, NoGoals, NoActions,
     // MooGoo's line for a bet (the game's says "Touch a Monkey!").
     MooGooBetLine,
+    // The HD shell (shell.*): the pause menu, its pages and questions, the settings' rows and
+    // values, the controls card, the bindings, the save states, the toasts, the launch panel.
+    ShellPaused, ShellResume, ShellSettings, ShellControls, ShellStates, ShellQuit, ShellBack, ShellChange, ShellOpen,
+    ShellYes, ShellNo, ShellOk, ShellOn, ShellOff, ShellPauseMenu,
+    SetLayout, SetFullscreen, SetSmooth, SetRes3D, SetWide, SetFps60, SetVolume, SetFastSound, SetStickCursor, SetDeadZone,
+    SetTrigger, SetRumble, SetMic, SetLanguage, MicBlowKey, LangAuto, LangNote,
+    LayoutConsole, LayoutAuto, LayoutFocus, LayoutSide, LayoutStacked,
+    CtlWalk, CtlTouch, CtlBack, CtlZoom, CtlCamera, CtlFast, CtlKeys, CtlBlow,
+    ActRight, ActLeft, ActUp, ActDown, ActSwap, ActSaveState, ActLoadState, ActBlow, ActTouch,
+    KeysPress, KeysCancel, KeysClear, KeysAll, KeysReset, KeysKeyboard, KeysController,
+    StEmpty, StSave, StLoad, StLoadAsk, StOverwriteAsk, StUndo, StSaved, StLoaded, StUndone, StFailed, StNoFolder,
+    QuitAsk, QuitNote,
+    ToastStateSaved, ToastStateLoaded, ToastNoState, ToastShot, ToastBackup, ToastCapture, ToastNotSaving, NotEU,
+    LaunchContinue, LaunchWhere, LaunchChoose, LaunchRecent, LaunchDrop, LaunchWrong, LaunchUnreadable, LaunchStart, LaunchTitle,
+    WirelessNote,
     Count
 };
 

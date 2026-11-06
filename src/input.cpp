@@ -94,7 +94,12 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
     Settings& s = app.settings;
     // Controllers plugged in or out, and which one drives (the last used).
     if (pads.Event(ev, PadOptionsOf(s))) lastKeyboard = false;
-    if (ev.type == SDL_QUIT) app.quit = true;
+    if (ev.type == SDL_QUIT) wantQuit = true;
+    else if (ev.type == SDL_DROPFILE)
+    {
+        if (ev.drop.file) droppedFile = ev.drop.file;
+        SDL_free(ev.drop.file);
+    }
     else if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP)
     {
         const bool down = ev.type == SDL_KEYDOWN;
@@ -121,8 +126,10 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
             else if (k == SDLK_DOWN) nav.down = true;
             else if (k == SDLK_LEFT) nav.left = true;
             else if (k == SDLK_RIGHT) nav.right = true;
-            else if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE || a == A) nav.accept = true;
-            else if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE || a == B) nav.back = true;
+            else if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE || a == A) nav.a = true;
+            else if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE || a == B) nav.b = true;
+            else if (k == SDLK_DELETE || a == X) nav.x = true;
+            else if (a == Y) nav.y = true;
             else if (a == MENU && !ev.key.repeat) wantMenu = true;
             return;
         }
@@ -234,9 +241,25 @@ void Input::Poll(const App& app, bool menuOpen)
     }
     if (capturing)
     {
-        // (Any button, the menu's too: it may be what the action is being given.)
+        // Any button, the menu's too (it may be what the action is being given), taken when it is
+        // let go: Start and Back down together then are the cancel (Esc on a pad).
+        bool any = false;
         for (int i = 0; i < IN_COUNT; i++)
-            if (pad.btn[i] && !prevPad.btn[i]) { newPad = i; break; }
+        {
+            if (pad.btn[i] && !prevPad.btn[i])
+            {
+                if (captureFirst < 0) captureFirst = i;
+                captureSeen |= 1u << i;
+            }
+            any |= pad.btn[i];
+        }
+        if (captureFirst >= 0 && !any)
+        {
+            if ((captureSeen & (1u << IN_START)) && (captureSeen & (1u << IN_BACK))) captureCancel = true;
+            else newPad = captureFirst;
+            captureFirst = -1;
+            captureSeen = 0;
+        }
         return;
     }
     // The menu opens with its button, or with START and BACK together.
@@ -249,12 +272,20 @@ void Input::Poll(const App& app, bool menuOpen)
     auto stickRight = [](const PadRaw& p) { return p.btn[IN_RIGHT] || p.lx > 0.5f; };
     if (menuOpen)
     {
-        nav.up |= stickUp(pad) && !stickUp(prevPad);
-        nav.down |= stickDown(pad) && !stickDown(prevPad);
-        nav.left |= stickLeft(pad) && !stickLeft(prevPad);
-        nav.right |= stickRight(pad) && !stickRight(prevPad);
-        nav.accept |= PadPressed(s, A);
-        nav.back |= PadPressed(s, B);
+        // A direction held repeats: after 18 frames, then every 6.
+        auto rep = [&](bool now, bool before, int& held) {
+            if (!now) { held = 0; return false; }
+            held++;
+            return !before || (held > 18 && (held - 18) % 6 == 0);
+        };
+        nav.up |= rep(stickUp(pad), stickUp(prevPad), navHeld[0]);
+        nav.down |= rep(stickDown(pad), stickDown(prevPad), navHeld[1]);
+        nav.left |= rep(stickLeft(pad), stickLeft(prevPad), navHeld[2]);
+        nav.right |= rep(stickRight(pad), stickRight(prevPad), navHeld[3]);
+        nav.a |= PadPressed(s, A);
+        nav.b |= PadPressed(s, B);
+        nav.x |= PadPressed(s, X);
+        nav.y |= PadPressed(s, Y);
         return;
     }
     if (PadPressed(s, SAVESTATE)) wantSave = true;
@@ -461,9 +492,9 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
 
 void Input::EndFrame()
 {
-    wantMenu = wantSave = wantLoad = wantShot = wantFullscreen = false;
+    wantMenu = wantSave = wantLoad = wantShot = wantFullscreen = wantQuit = false;
     wantLayout = -1;
-    nav = MenuInput();
+    nav = shell::Input();
     newKey = kDefault;
     newPad = -1;
     captureCancel = false;

@@ -65,7 +65,7 @@ void Video::ToOutput(int wx, int wy, float& px, float& py) const
     py = wy * (float)oh / wh;
 }
 
-void Video::Present(const App& app, const Canvas* over)
+void Video::Present(const App& app, const Marks& marks, const std::vector<ui::UiItem>* shell)
 {
     // --- looks: the top screen at its real size (App::TopImage: sharper / widescreen 3D). The
     // texture follows the picture's size (SetSmooth makes it 256 x 192 again; it is re-made here).
@@ -85,22 +85,62 @@ void Video::Present(const App& app, const Canvas* over)
     // --- end looks
     SDL_UpdateTexture(tex[1], nullptr, app.Bottom(), SW * 4);
     Composition comp = Composed(app);
+    // The shell's items, and a toast over the shell when it is open (else over the game).
+    std::vector<ui::UiItem> over;
+    if (shell) over = *shell;
     if (!toast.empty() && SDL_GetTicks() < toastUntil)
     {
         // On a layer of its own above every other, so it rasters alone.
         constexpr float kSize = 26;
         constexpr int kLayer = 9;
-        const int tw = (int)std::ceil(ui::TextWidth(toast, kSize)), w = std::min(tw + 48, comp.cw - 32), h = 56;
-        const Rect box {(comp.cw - w) / 2, 24, w, h};
+        std::vector<ui::UiItem>& to = shell ? over : comp.ui;
+        const int cw = shell ? 1280 : comp.cw;
+        const int tw = (int)std::ceil(ui::TextWidth(toast, kSize)), w = std::min(tw + 48, cw - 32), h = 56;
+        const Rect box {(cw - w) / 2, shell ? 4 : 24, w, h};
         ui::UiItem panel = ui::PanelItem(box);
         ui::UiItem text = ui::TextItem({box.x + 24, box.y, box.w - 48, box.h}, toast, kSize, ui::Align::Centre);
         text.wrap = false;
         text.middle = true;
         panel.layer = text.layer = kLayer;
-        comp.ui.push_back(panel);
-        comp.ui.push_back(text);
+        to.push_back(panel);
+        to.push_back(text);
     }
     else toast.clear();
+    // The stick cursor: a cross where the piece showing its point draws it (yellow while it
+    // presses), on a layer of its own; hidden where no piece shows it.
+    float cx, cy, cs;
+    if (marks.cursor && CanvasFromTouch(comp, marks.x, marks.y, cx, cy, cs))
+    {
+        const float arm = SW * cs / 40 + 3, t = std::max(1.5f, comp.ch / 360.0f);
+        const u32 col = marks.press ? 0xFFFFD75E : 0xFFFFFFFF;
+        for (int pass = 0; pass < 2; pass++)
+            for (int v = 0; v < 2; v++)
+            {
+                const float o = pass ? 0 : 1.5f, w = v ? t : arm, h = v ? arm : t;
+                ui::UiItem bar = ui::PanelItem({(int)std::lround(cx - w - o), (int)std::lround(cy - h - o), (int)std::lround(2 * (w + o)), (int)std::lround(2 * (h + o))});
+                bar.plain = true;
+                bar.fill = pass ? col : 0xFF000000;
+                bar.radius = 1;
+                bar.layer = 8;
+                comp.ui.push_back(bar);
+            }
+    }
+    // Fast forward: a small » plate at the top right.
+    if (marks.fast)
+    {
+        const Rect r {comp.cw - 88, 16, 72, 48};
+        ui::UiItem p = ui::PanelItem(r);
+        p.plain = true;
+        p.fill = 0xB0202436;
+        p.radius = 24;
+        p.layer = 8;
+        ui::UiItem t = ui::TextItem(r, "\xC2\xBB", 40, ui::Align::Centre, ui::Weight::ExtraBold);
+        t.middle = true;
+        t.wrap = false;
+        t.layer = 8;
+        comp.ui.push_back(p);
+        comp.ui.push_back(t);
+    }
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, ow, oh);
@@ -128,24 +168,23 @@ void Video::Present(const App& app, const Canvas* over)
         SDL_RenderCopy(ren, t, &f, &d);
     }
     overlaysBefore((int)comp.pieces.size());
-    if (!comp.ui.empty()) DrawUi(comp, fit);
-    if (over && over->Dirty())
-    {
-        if (!overlay || overlayW != over->w || overlayH != over->h)
-        {
-            if (overlay) SDL_DestroyTexture(overlay);
-            SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
-            overlay = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, over->w, over->h);
-            SDL_SetTextureBlendMode(overlay, SDL_BLENDMODE_BLEND);
-            overlayW = over->w;
-            overlayH = over->h;
-            SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, smooth ? "linear" : "nearest");
-        }
-        // Only the part drawn into is uploaded and shown (the canvas is as large as the output).
-        const SDL_Rect r {over->x0d, over->y0d, over->x1d - over->x0d, over->y1d - over->y0d};
-        SDL_UpdateTexture(overlay, &r, over->px.data() + (size_t)r.y * over->w + r.x, over->w * 4);
-        SDL_RenderCopy(ren, overlay, &r, &r);
-    }
+    if (!comp.ui.empty()) DrawUi(comp.ui, fit, uiStill, uiImages);
+    if (!over.empty()) DrawUi(over, CanvasFit::For(1280, 720, ow, oh), shellStill, shellImages);
+    Finish(ow, oh);
+}
+
+void Video::PresentUi(const std::vector<ui::UiItem>& shell)
+{
+    int ow, oh;
+    SDL_GetRendererOutputSize(ren, &ow, &oh);
+    SDL_SetRenderDrawColor(ren, 16, 18, 24, 255);
+    SDL_RenderClear(ren);
+    DrawUi(shell, CanvasFit::For(1280, 720, ow, oh), shellStill, shellImages);
+    Finish(ow, oh);
+}
+
+void Video::Finish(int ow, int oh)
+{
     if (!shotPath.empty())
     {
         std::vector<u8> rgb((size_t)ow * oh * 3);
@@ -181,7 +220,7 @@ SDL_Texture* Video::OverlayTexture(const Overlay& o, int w, int h)
     return t;
 }
 
-void Video::DrawUi(const Composition& c, const CanvasFit& fit)
+void Video::DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, std::vector<StillTex>& uiStill, std::vector<ImageTex>& uiImages)
 {
     auto texture = [&](SDL_Texture*& t, int& tw, int& th, int w, int h) {
         if (t && tw == w && th == h) return t;
@@ -196,7 +235,7 @@ void Video::DrawUi(const Composition& c, const CanvasFit& fit)
     };
     std::vector<u32> px;
     size_t image = 0, still = 0;
-    for (const ui::LayerAt& l : ui::LayersAt(c.ui, fit.scale, fit.ox, fit.oy))
+    for (const ui::LayerAt& l : ui::LayersAt(items, fit.scale, fit.ox, fit.oy))
     {
         SDL_Texture* t = nullptr;
         bool draw = true;
@@ -262,17 +301,4 @@ bool Video::OverTop(const App& app, int wx, int wy) const
     return OverTopComposition(c, CanvasFit::For(c.cw, c.ch, ow, oh), px, py);
 }
 
-bool Video::TouchToOutput(const App& app, float tx, float ty, int& x, int& y, int& screenW) const
-{
-    const Composition c = Composed(app);
-    float cx, cy, scale;
-    if (!CanvasFromTouch(c, tx, ty, cx, cy, scale)) return false;
-    int ow, oh;
-    SDL_GetRendererOutputSize(ren, &ow, &oh);
-    const CanvasFit fit = CanvasFit::For(c.cw, c.ch, ow, oh);
-    x = (int)(fit.ox + cx * fit.scale);
-    y = (int)(fit.oy + cy * fit.scale);
-    screenW = (int)(SW * scale * fit.scale);
-    return true;
-}
 }

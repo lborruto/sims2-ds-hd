@@ -1,7 +1,7 @@
 // The player's settings: one place for every option, whoever uses it. The comfort work loads and
 // saves them (settings.ini in SDL's per-user folder, settings.cpp) and shows them in the settings
 // page; the other parts only read them. Add a field here with its default, then its line in
-// settings.cpp's Load and Save and its row in menu.cpp; never a setting of your own elsewhere.
+// settings.cpp's Load and Save and its row in shell.cpp; never a setting of your own elsewhere.
 #pragma once
 #include <string>
 
@@ -34,6 +34,7 @@ struct Settings
     int stickDeadZone = 25;     // percent of a stick's travel read as centred (5 to 60)
     int triggerThreshold = 50;  // percent of a trigger's travel past which it is pressed (10 to 90)
     bool rumble = true;         // a short buzz when a controller connects (pads with a motor)
+    int language = 0;           // the HD words' language: 0 automatic (the DS's), 1 English .. 5 Spanish
     Controls::Bindings controls;
 
     // settings.ini in SDL's per-user folder ("" when SDL has none).

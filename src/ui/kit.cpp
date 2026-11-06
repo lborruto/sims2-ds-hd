@@ -487,6 +487,23 @@ Rect ChipRect(int x, int y, Button b, const std::string& label, float size, floa
     return {x, y, (int)std::ceil(w), (int)h};
 }
 
+UiItem ChipItemAs(int x, int y, Face face, const std::string& glyph, const std::string& label, float size, Weight wt)
+{
+    // (Button A: its glyph decides what is drawn; the D-pad's names draw the cross.)
+    const Button b = glyph == "up" || glyph == "down" || glyph == "left" || glyph == "right" ? Button::DPad : Button::A;
+    const float h = ChipHeight(size);
+    float w = ChipWidth(Resolve(b, face, glyph), size);
+    if (!label.empty()) w = w + LabelGap(size) + std::ceil(TextWidth(label, size, wt)) + std::max(1.0f, std::round(size / 24));
+    UiItem it = TextItem({x, y, (int)std::ceil(w), (int)h}, label, size, Align::Left, wt);
+    it.kind = UiItem::Chip;
+    it.button = b;
+    it.face = face;
+    it.glyph = glyph;
+    if (b == Button::DPad) it.button = glyph == "up" ? Button::DPadU : glyph == "down" ? Button::DPadD : glyph == "left" ? Button::DPadL : Button::DPadR;
+    it.wrap = false;
+    return it;
+}
+
 UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, float labelAt, Weight wt)
 {
     UiItem it = TextItem(ChipRect(x, y, b, label, size, labelAt, wt), label, size, Align::Left, wt);

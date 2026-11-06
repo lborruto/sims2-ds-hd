@@ -29,12 +29,13 @@ void Backups::Start(const std::string& path)
     if (!what.empty()) fprintf(stderr, "save backup: %s\n", what.c_str());
 }
 
-void Backups::Tick(unsigned now)
+bool Backups::Tick(unsigned now)
 {
-    if (now - lastTick < kEvery) return;
+    if (now - lastTick < kEvery) return false;
     lastTick = now;
     const std::string what = Copy();
     if (!what.empty()) fprintf(stderr, "save backup: %s\n", what.c_str());
+    return !what.empty() && what.rfind("cannot ", 0) != 0;
 }
 
 std::string Backups::Copy() const

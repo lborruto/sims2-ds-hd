@@ -1,0 +1,3 @@
+# The launch panel (--launch) after states.txt's quit: Continue is first, A starts the game where it
+# was left (the suspend state, then removed).
+5 2 pad a

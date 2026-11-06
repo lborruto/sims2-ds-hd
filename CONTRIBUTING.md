@@ -178,7 +178,7 @@ over the last picture). Each part has its own file pair: `app.h` (the shared sta
 the layout chosen and shown, fast forward), `settings.*` (every option, the file),
 `controls.*` (the key and button bindings), `input.*` (keyboard, mouse, controller),
 `video.*` (the window), `audio.*` (with `audiostretch.h`), `layout.*`, `screens.*` (which
-bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*` (the overlay and the pause menu), `ui/` (the HD UI kit and its font), `port/` (the HD status bar and conversations), `backup.*`, `script.*`,
+bottom screen the game shows), `scene.*` (AUTO's detection), `shell*.*` and `slots.*` (the pause menu, the launch panel, the save states), `ui.*` (milestone 1's 5 × 7 glyphs), `ui/` (the HD UI kit and its font), `port/` (the HD status bar and conversations), `backup.*`, `script.*`,
 `shots.*`, `state.*`, `picker.*`.
 
 - **Input script** (`script.*`): parses `--input` files; the window events in it are pushed as
@@ -239,7 +239,7 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
 - **Settings** (`settings.*`): one `Settings` struct for every option, whoever uses it; loaded
   from `settings.ini` (plain `key=value`) in SDL's per-user folder when the window opens, never
   headless, saved on every change from the menu and when the program closes (with the window's
-  size). Add a field with its default, its two lines in `Load` and `Save`, its row in `menu.cpp`. The defaults are CONSOLE's: `layout=console`, widescreen on,
+  size). Add a field with its default, its two lines in `Load` and `Save`, its row in `shell.cpp` (`Row`, `ChangeRow`, `RowLabel`, `RowValue`, its words in `port/ownwords.*`). The defaults are CONSOLE's: `layout=console`, widescreen on,
   3D resolution 2, 60 fps on; `--layout` overrides the layout for one run. Headless never loads
   settings and starts with the looks off (main.cpp), so its output does not depend on them.
 - **Controls** (`controls.*`, `input.*`): each action (the 12 DS buttons, MENU, FAST FORWARD,
@@ -274,12 +274,17 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   CURSOR PRESS (LT). Over the world, the mouse wheel holds X or Y a few frames per notch (the
   game zooms in with X, out with Y) and a right-button drag holds L or R for a frame every
   three points moved (the game turns the camera continuously while they are held).
-- **The pause menu** (`menu.*`, `ui.*`): a `Canvas` the size of the output (ARGB, a 5 × 7
-  bitmap font: capitals, digits and a few signs only) uploaded as one texture over the game;
-  `Menu` draws a page of rows with values and a hint, and takes keyboard, controller and mouse
-  input (hover chooses a row only when the pointer moves onto another one, so a resting pointer
-  does not fight the keyboard). While it is open nothing is emulated. The same canvas shows the
-  stick cursor, short messages and the fast forward mark.
+- **The HD shell** (`shell.*`, `shellhost.*`, `slots.*`): the pause menu (Start + Back or Esc) and
+  the launch panel, on the UI kit in the port's own words (`port/ownwords.*`, five languages).
+  `shell.*` is pure: a `Model` and one frame's presses in, a `Result` out (save a slot, load
+  one, capture a binding, a setting changed, quit…) and kit items to draw on a 1280 × 720 canvas;
+  `shellhost.*` carries the results out with the emulator, the settings file and the window;
+  `slots.*` keeps the save states, their thumbnails, the suspend state and the recent ROMs in the
+  settings folder. While it is open nothing is emulated. Headless, Start + Back held in a script
+  (or `--shell PAGE`) opens it and the frames count on, so `pad` scripts drive it
+  (`scripts/shell/`); `tests/shell_test.cpp` checks it without the emulator. The stick cursor,
+  the fast forward mark and the toasts are kit items too (`video.cpp`); the 5 × 7 font (`ui.*`)
+  is milestone 1's overlays' only.
 - **Sound** (`audio.*`): the frames' samples go through `AudioStretch` (WSOLA, from FullDex),
   which stretches them at their own pitch when frames take longer than a DS frame, steered to
   keep about 100 ms queued; volume is applied after it; in fast forward the sound is muted or

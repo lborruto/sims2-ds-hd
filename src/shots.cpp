@@ -79,6 +79,13 @@ static void DrawOverlay(std::vector<u8>& rgb, int cw, int ch, const Overlay& o, 
 
 void WriteCompose(const std::string& path, const Composition& c, const u32* top, int topW, int topH, const u32* bottom, int scale)
 {
+    const int k = std::max(scale, 1);
+    const std::vector<u8> rgb = RenderCompose(c, top, topW, topH, bottom, k);
+    stbi_write_png(path.c_str(), c.cw * k, c.ch * k, 3, rgb.data(), c.cw * k * 3);
+}
+
+std::vector<u8> RenderCompose(const Composition& c, const u32* top, int topW, int topH, const u32* bottom, int scale)
+{
     (void)topH;
     const int k = std::max(scale, 1), W = c.cw * k, H = c.ch * k;
     std::vector<u8> rgb((size_t)W * H * 3, 0);
@@ -116,6 +123,6 @@ void WriteCompose(const std::string& path, const Composition& c, const u32* top,
         ui::Rasterise(l.items, (float)k, layer.data(), l.w, l.h, l.ox, l.oy);
         Blend(rgb, W, H, l.x, l.y, layer.data(), l.w, l.h);
     }
-    stbi_write_png(path.c_str(), W, H, 3, rgb.data(), W * 3);
+    return rgb;
 }
 }

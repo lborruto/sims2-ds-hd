@@ -107,6 +107,9 @@ UiItem TextItem(Rect to, const std::string& utf8, float size, Align align = Alig
 // w: the label's weight.
 UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, float labelAt = 0, Weight w = Weight::Bold);
 Rect ChipRect(int x, int y, Button b, const std::string& label, float size, float labelAt = 0, Weight w = Weight::Bold);
+// A chip printed with a given face and glyph rather than the current look's (a binding shown as
+// what it is: the keyboard's key, or a pad input by its settings name, "lb", "rt", "start"…).
+UiItem ChipItemAs(int x, int y, Face face, const std::string& glyph, const std::string& label, float size, Weight w = Weight::Bold);
 UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from);
 
 // The items' bounds on the canvas (shadows included), empty when none draws anything.

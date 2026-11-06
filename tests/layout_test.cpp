@@ -2404,7 +2404,18 @@ int main()
                     if (phase == 0) lands(comp, {0, 0, kConsoleW, kConsoleH}, kFrBigButtonFrom.x, kFrBigButtonFrom.y, kFrBigButtonFrom.w, kFrBigButtonFrom.h);
                     else
                         for (int i = 0; i < kFrMenuButtons; i++)
+                        {
+                            if (i == kFrWireless)
+                            {
+                                // DS Wireless (a second DS): the mouse takes it nowhere.
+                                int tx, ty;
+                                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                                const Rect r = FrontButtonRect(i);
+                                CHECK(!TouchFromComposition(comp, fit, fit.ox + (r.x + r.w / 2) * fit.scale, fit.oy + (r.y + r.h / 2) * fit.scale, tx, ty));
+                                continue;
+                            }
                             lands(comp, FrontButtonRect(i), kFrMenuBoxX, kFrMenuBoxY0 + i * kFrMenuBoxDy, kFrMenuBoxW, kFrMenuBoxH);
+                        }
                 }
             const MenuAction& start = v.buttons[(int)MenuButton::Start];
             if (phase == 0)
@@ -2418,8 +2429,9 @@ int main()
             for (int i = 0; i < kFrMenuButtons; i++)
             {
                 const ViewItem& it = v.items[i];
-                CHECK(it.enabled == (phase == 3) && it.action.empty() == (phase != 3));
-                if (phase != 3) continue;
+                // DS Wireless: focusable at phase 3 (its note), never tapped (a second DS).
+                CHECK(it.enabled == (phase == 3) && it.action.empty() == (phase != 3 || i == kFrWireless));
+                if (phase != 3 || i == kFrWireless) continue;
                 CHECK(it.action.size() == 1 && it.action[0].kind == MenuStep::Tap);
                 const int x = it.action[0].x, y = it.action[0].y, y0 = kFrMenuBoxY0 + i * kFrMenuBoxDy;
                 CHECK(x >= kFrMenuBoxX && x < kFrMenuBoxX + kFrMenuBoxW && y >= y0 && y < y0 + kFrMenuBoxH);

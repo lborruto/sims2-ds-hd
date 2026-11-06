@@ -13,8 +13,8 @@
 #include "navigator.h"
 #include "pads.h"
 #include "script.h"
+#include "shell.h"
 #include "touchscript.h"
-#include "ui.h"
 #include "video.h"
 
 namespace sims2wide
@@ -68,11 +68,20 @@ struct Input
     // What the keys and buttons asked for this frame (one frame each; main.cpp acts on them).
     bool wantMenu = false, wantSave = false, wantLoad = false, wantShot = false, wantFullscreen = false;
     int wantLayout = -1; // a Layout, or -1
-    // While the menu is open: what it understands, from the keyboard, the mouse and the controller.
-    MenuInput nav;
-    // While the menu captures a binding: the first key or controller input pressed.
+    // While the menu is open: what it understands, from the keyboard, the mouse (output pixels: the
+    // host takes them to the shell's canvas) and the controller (a held direction repeats).
+    shell::Input nav;
+    int navHeld[4] = {};
+    // While the menu captures a binding: the first key, or the controller button released first
+    // (Start and Back pressed together: cancelled, as Esc), Backspace no key.
     bool capturing = false, captureCancel = false;
     int newKey = Controls::kDefault, newPad = -1; // kDefault: nothing yet; kNone: cleared
+    int captureFirst = -1;
+    unsigned captureSeen = 0;
+    void StartCapture() { capturing = true; captureFirst = -1; captureSeen = 0; newKey = Controls::kDefault; newPad = -1; captureCancel = false; }
+    // The window was asked to close (the shell asks first); a file was dropped on it.
+    bool wantQuit = false;
+    std::string droppedFile;
 
     // An input script's window events for this turn of the loop (script.h), pushed as SDL events.
     void PushScript(const std::vector<InputEvent>& script, long iter, const Video& video) const;

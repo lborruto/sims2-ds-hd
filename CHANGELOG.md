@@ -9,19 +9,33 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Changed
 
-- CONSOLE is now the default layout (the other layouts stay in SETTINGS > DISPLAY > LAYOUT).
+- CONSOLE is now the default layout (the other layouts stay in the pause menu's Settings).
 - The pad's Back button now opens the TOUCH MENU, and Select moved to L3 (the left stick's
   click), in every layout. Back does nothing outside CONSOLE.
 - Looks for existing settings: a settings file from before CONSOLE that still holds the old
   defaults (3D at 1x, 4:3, 30 fps) is moved to the new ones (sharper, widescreen, 60 fps) the
-  first time it is loaded. To turn them off, change 3D RESOLUTION, WIDESCREEN WORLD and 60 FPS in
-  SETTINGS > GRAPHICS; a file that names a layout is never touched.
+  first time it is loaded. To turn them off, change 3D resolution, Widescreen world and 60 fps in
+  the pause menu's Settings; a file that names a layout is never touched.
 - The Guide / PS / Home button no longer opens the pause menu (it belongs to Steam, the Steam
   Deck and the system): Start + Back (or Esc) does. It can still be given to MENU by hand.
 - With several controllers, the one used last plays (before, every pad's buttons counted at once).
+- The pause menu is new: in HD like the game's menus, in five languages, with the buttons of the
+  controller you hold. Settings as one list (Left / Right change a row), the Controls card, Keys
+  and buttons (A to change one, X to clear it, Y to set them all in turn; Esc or Start + Back
+  keeps a binding), four save states with their picture and date (loading one asks first, and
+  can be undone), and Quit asks first. The quick save state (F5 / F7) moved from beside the ROM to
+  the settings folder.
+- DS Wireless is greyed on the main menu: it needs a second DS.
 
 ### Added
 
+- A launch panel before the game: Continue (where you quit, with its picture), choose a file or
+  drop a `.nds` on the window, your recent ROMs, the language of the HD screens, the controls.
+  A file that is not The Sims 2 is said there; another region's cartridge is said once over the
+  game, until A.
+- Quitting (the menu or the window's close) asks first, focus on No, and keeps your place for
+  Continue. Messages say when a state is saved or loaded, a screenshot taken, the save backed
+  up, a screen recorded, or when the game cannot write its save.
 - Every controller, natively or through Steam: XInput, DirectInput, PlayStation, Switch, 8BitDo
   and the rest SDL knows, plugged in or out at any time; the controller mappings of
   SDL_GameControllerDB built in, and your own `gamecontrollerdb.txt` in the settings folder;

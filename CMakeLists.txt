@@ -142,8 +142,8 @@ target_link_libraries(pads PUBLIC uikit SDL2::SDL2-static)
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
     src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
-    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
-    src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
+    src/looks.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
+    src/settings.cpp src/shell.cpp src/shellhost.cpp src/shots.cpp src/slots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
 target_link_libraries(sims2wide PRIVATE core pads)
@@ -226,6 +226,12 @@ target_include_directories(gamestate_test PRIVATE melonDS/src src)
 add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp src/port/icons.cpp src/port/statusbar.cpp)
 target_include_directories(romdata_test PRIVATE melonDS/src src)
 target_link_libraries(romdata_test PRIVATE uikit)
+
+# Checks of the HD shell: the pause menu, the launch panel, the save states' files (not built by
+# default): ninja -C build shell_test && ./build/shell_test
+add_executable(shell_test EXCLUDE_FROM_ALL tests/shell_test.cpp src/shell.cpp src/slots.cpp src/settings.cpp src/controls.cpp src/layout.cpp src/port/ownwords.cpp src/romdata.cpp)
+target_include_directories(shell_test PRIVATE melonDS/src src)
+target_link_libraries(shell_test PRIVATE uikit SDL2::SDL2-static)
 
 # Checks of the UI kit (wrap, the raster's pixels and determinism; not built by default): ninja -C build uikit_test && ./build/uikit_test
 add_executable(uikit_test EXCLUDE_FROM_ALL tests/uikit_test.cpp)

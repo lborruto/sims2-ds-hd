@@ -16,8 +16,8 @@ class Recorder
 public:
     // dir: where captures go ("" : <SDL pref path>/captures).
     explicit Recorder(std::string dir = "");
-    // Call every frame after app.game is read.
-    void Frame(const App& app, long frame, melonDS::NDS& nds);
+    // Call every frame after app.game is read; whether it recorded a screen (the window's toast).
+    bool Frame(const App& app, long frame, melonDS::NDS& nds);
 
 private:
     std::string dir_;

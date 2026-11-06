@@ -55,6 +55,7 @@ bool Settings::Load(const std::string& path)
         else if (k == "stick_dead_zone") stickDeadZone = std::clamp(atoi(v.c_str()), 5, 60);
         else if (k == "trigger_threshold") triggerThreshold = std::clamp(atoi(v.c_str()), 10, 90);
         else if (k == "rumble") rumble = on;
+        else if (k == "language") language = std::clamp(atoi(v.c_str()), 0, 5);
         else if (k == "window")
         {
             const size_t x = v.find('x');
@@ -88,7 +89,7 @@ bool Settings::Save(const std::string& path) const
     if (path.empty()) return false;
     std::ofstream out(path);
     if (!out) return false;
-    out << "# The Sims 2 DS, one screen: settings. Changed from the pause menu (Esc).\n"
+    out << "# The Sims 2 DS, one screen: settings. Changed from the pause menu (Start + Back, or Esc).\n"
         << "settings_version=2\n"
         << "mic=" << MicKey(mic) << "\n"
         << "layout=" << LayoutName(layout) << "\n"
@@ -104,6 +105,7 @@ bool Settings::Save(const std::string& path) const
         << "stick_dead_zone=" << stickDeadZone << "\n"
         << "trigger_threshold=" << triggerThreshold << "\n"
         << "rumble=" << (rumble ? 1 : 0) << "\n"
+        << "language=" << language << "\n"
         << controls.Lines();
     return out.good();
 }
