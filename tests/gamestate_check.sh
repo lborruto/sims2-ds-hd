@@ -262,7 +262,7 @@ hotel_run h-oinfo M-ci-occ-info hotel; hotel_run h-music M-music late; hotel_run
 hotel_run h-bd BD-list town; hotel_run h-bd3 BD-down3 town; hotel_run h-bdrow2 BD-row2 town; hotel_run h-bdcas BD-cas town; hotel_run h-bdbuy BD-row2-tick town
 hotel_run h-place BD-place-lobby town; hotel_run h-cat h-catalogue-base town; hotel_run h-cat5 BY-sel5 town; hotel_run h-cat4 BY-dn4 town
 hotel_run h-own BY-own4-pay town; hotel_run h-stat SP-stat-base late; hotel_run h-statp SP-skills late; hotel_run h-town s7 town
-hotel_want h-early hotel '^hotel built=0x6b086c6c unlocked=0x942d950f score=0 stayed=0 money=2000 earned=0 spent=0 place=13 slots=33:63:0,' "hotel: the early hotel, one room built of the buildable, no guests"
+hotel_want h-early hotel '^hotel built=0x6b086c6c unlocked=0x942d950f building=0x0 score=0 stayed=0 money=2000 earned=0 spent=0 place=13 slots=33:63:0,' "hotel: the early hotel, one room built of the buildable, no guests"
 hotel_want h-early checkin '^checkin mode=1 guest=-1 score=0 rows=29:ba:-1,8:--:-1,15:--:-1,18:--:-1,20:--:-1$' "hotel: the registry, only the Small Guest Room usable"
 hotel_want h-guest checkin '^checkin mode=0 guest=45 ' "hotel: guest check-in mode, the concierge as the guest"
 hotel_want h-occ checkin 'rows=29:b-:45,8:--:-1' "hotel: the Small Guest Room occupied by Sim 45"

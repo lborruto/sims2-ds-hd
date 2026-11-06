@@ -5,6 +5,7 @@
 
 #include "activities.h"
 #include "hotspots.h"
+#include "port/build.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
@@ -148,6 +149,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             else if (at.screen == Screen::Gift) BuildGiftMenu(c, view, f, *game, *rom, icons, bottom);
             else if (at.screen == Screen::SaveSlots) BuildSaveSlots(c, view, f, *game, *rom);
             else if (at.screen == Screen::Catalogue) BuildCatalogue(c, view, f, *game, *rom, icons);
+            else if (at.screen == Screen::Build) BuildBuildRooms(c, view, f, *game, *rom, icons);
             else if (at.screen == Screen::Phone) BuildPhone(c, view, f, *game, *rom, icons, bottom, strings);
             else BuildNote(c, view, f, *game, *rom, icons);
         };

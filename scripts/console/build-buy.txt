@@ -1,0 +1,9 @@
+# From BD-list (on a copy of a save), CONSOLE: Down (the Art Gallery), A (the question), A (the
+# game's tick: the permit bought, §2,000 -> §1,000, the room's building timer set, the list
+# rebuilt without it), B (the X: the panel, and the game's popup 2628 "Your build permit has been
+# approved..." in HD over it), A (its X: closed).
+20 2 pad down
+40 2 pad a
+80 2 pad a
+140 2 pad b
+260 2 pad a

@@ -1,0 +1,2 @@
+# BD-down (the list at 1): the up arrow (back to 0)
+10 6 touch 112 171

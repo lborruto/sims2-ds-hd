@@ -96,6 +96,11 @@ cases=(
     "catalogue-owned-6:sit-storebuy:300:differs=catalogue-owned-base"
     "catalogue-close:sit-storebuy:120:screens=Catalogue Panel/Interact"
     "build-close:sit-build:120:screens=Build Panel/Interact"
+    "build-room-1:BD-list:80:differs=build-base"
+    "build-room-2:BD-list:80:differs=build-base"
+    "build-room-3:BD-list:80:differs=build-base"
+    "build-scroll-down:BD-list:80:differs=build-base"
+    "build-scroll-up:BD-down:90:differs=build-base"
 )
 
 # run SCRIPT STATE FRAMES: the screens printed in SCRIPT@FRAMES.out, the last picture in

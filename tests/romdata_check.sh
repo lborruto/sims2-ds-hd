@@ -66,7 +66,7 @@ else echo "ok   string -1: refused ($(grep -c . "$tmp/err") lines of usage)"; fi
 # sprite ID FRAME: the frame dumped to $tmp/spr/ID_FRAME.png; what the program said in $tmp/err.
 mkdir -p "$tmp/spr"
 sprite() { game_text --dump-sprite "$1" "$2" "$tmp/spr/$1_$2.png"; }
-icons="2247:5 2250:5 2230:6 2233:6 2419:6 2506:1 2212:1 2215:1 3353:1 4157:1 8448:1 8445:1 5806:1 5803:1 2755:1 2752:1 3068:1 3065:1 7683:1 7680:1 1991:1 8553:1 5033:1 321:1 6667:1 6661:1"
+icons="2247:5 2250:5 2230:6 2233:6 2419:6 2506:1 2212:1 2215:1 3353:1 4157:1 8448:1 8445:1 5806:1 5803:1 2755:1 2752:1 3068:1 3065:1 7683:1 7680:1 1991:1 8553:1 5033:1 321:1 6667:1 6661:1 7665:1 974:1 7698:1 7677:1"
 for entry in $icons; do
     id=${entry%%:*}; want=${entry##*:}; got=0; bad=""
     f=0

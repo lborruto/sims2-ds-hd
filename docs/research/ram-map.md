@@ -147,7 +147,8 @@ screen (vtable and overlay checked), valid on its own, every list capped. Places
   purchasable = `G+0x4408`; static room table at `0x0211F9EC + 4 * place` {u16 permit price, u8 score weight, u8 parent place
   (0x21 none)}; hotel score = the weights of the built rooms (at most 100); guest slots `G+0x2BC0 + 8j`, j < 5 {u32 room
   (0x21 none), u8 Sim (0x3F none), u8 days booked}; guests stayed `G+0x84`; money `G+0x2F60`, earned `G+0x2F64`, spent
-  `G+0x2F68` (each 0..999999); the song code of each room `u8 G+0x449C + place` (0x2A: default); the hero's place
+  `G+0x2F68` (each 0..999999); a room's building ends at `u32 G+0x4418 + 4 place` (Build Rooms sets it to the clock `G+0x480C`
+  + 0x7080 − 0x2D0 × `u8 G+0x5F`; `building`: not yet past the clock, 0x80000000 never set); the song code of each room `u8 G+0x449C + place` (0x2A: default); the hero's place
   `u32 *(0x0213E580) + 0xF4`.
 - **Registry / check-in** (overlay 4, vtable `0x0214A804`): `S+0x26` mode (1 registry, 0 guest), `S+0x25` guest Sim; the five
   rooms are the u8 table `0x0214A7A0` {29, 8, 15, 18, 20}. A row is usable when built, vacant and (Penthouse) game flag 0x15 is set;

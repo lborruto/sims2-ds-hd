@@ -118,6 +118,7 @@ struct EUTable
         // Stat panel (overlay 14)
         u32 vtStat, ovStat, stPage, stTransition, stLevel, stPoints, stSkills, stAliens, stGoons, stVacuum, stMetal;
         u32 stThresholds, stSkillN, stMaxSkill, stGauge;
+        u32 buildTimers;                                     // from G: u32 per place, the time its building ends (vs `clock`; noCheckOut: never set)
     } hotel;
 };
 constexpr EUTable kEU = {
@@ -212,6 +213,7 @@ constexpr EUTable kEU = {
         0x260, 0x26C, 0x264, 0x3C, 0x254, 0x258, 0x268, 0x25D, 0x26D, 0x26E, 0x214, 12, 2, 0x3B,
         0x0214B5A4, 14, 0x38, 0x3C, 0x6C, 0x70, 0x5B, 0x74, 0x78, 0x7C, 0x80,
         0x02121DD8, 5, 10, 20,
+        0x4418,
     },
 };
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
@@ -913,6 +915,16 @@ HotelState ReadHotel(const Reader& m)
         stayed > 99999 || money > 999999 || earned > 999999 || spent > 999999)
         return HotelState{};
     v.guestsStayed = (int)stayed; v.money = (int)money; v.earned = (int)earned; v.spent = (int)spent;
+    // A room is being built while its completion time is not yet past the clock (Build Rooms' own
+    // test leaves it out of the list then: listed when timer < clock).
+    u32 clock;
+    if (!m.R32(G + h.clock, clock)) return HotelState{};
+    for (u32 k = 0; k < (u32)kPlaces; k++)
+    {
+        u32 t;
+        if (!m.R32(G + h.buildTimers + 4 * k, t)) return HotelState{};
+        if (t != h.noCheckOut && t >= clock) v.building |= 1ull << k;
+    }
     u32 world, pl;
     if (m.R32(h.placePtr, world) && m.R32(world + h.placeOff, pl) && pl < (u32)kPlaces) v.place = (int)pl;
     v.valid = true;

@@ -38,6 +38,7 @@
 #include "picker.h"
 #include "romdata.h"
 #include "ui/font.h"
+#include "port/build.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/interact.h"
@@ -103,7 +104,7 @@ static void Usage()
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
-        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue) can show fitted to its box, in --language's\n"
+        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms) can show fitted to its box, in --language's\n"
         "                                words: how many shrink, how many need an ellipsis or a character the font lacks (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load; exit 2 on an overflow or a character the font lacks), and stop\n"
@@ -427,12 +428,18 @@ int main(int argc, char** argv)
         printf("catalogue: %d words, tallest description %d (%d lines), %d shrunk, %d cut, %d names cut", k.checked, k.tallestId, k.tallestLines, k.shrunk, k.cut, k.namesCut);
         for (int id : k.cutIds) printf(" %d", id);
         printf("\n");
+        // Build Rooms: every room's name and place in its boxes, the title, the question, the sums.
+        BlockMeasure bd;
+        MeasureBuild(*app.rom, bd);
+        printf("build: %d words, tallest %d (%d lines), %d shrunk, %d cut", bd.checked, bd.tallestId, bd.tallestLines, bd.shrunk, bd.cut);
+        for (int id : bd.cutIds) printf(" %d", id);
+        printf("\n");
         // A neighbour's name beside the plate may end in an ellipsis (the Italian table has a
         // sentence at an object's name, 463); every other box must hold its words.
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || !lacking.empty() ? 2 : 0;
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.
@@ -777,8 +784,8 @@ int main(int argc, char** argv)
                         for (const GuestSlot& x : v.slots) sl.push_back(num(x.place) + ":" + num(x.sim) + ":" + num(x.days));
                         for (int k = 0; k < kPlaces; k++) if (v.rooms[k].permit) so.push_back(num(k) + ":" + num(v.rooms[k].permit) + "/" + num(v.rooms[k].weight) + "/" + num(v.rooms[k].parent));
                         for (int k = 0; k < kPlaces; k++) sg.push_back(num(v.songs[k]));
-                        fprintf(stderr, "frame %ld: hotel built=0x%llx unlocked=0x%llx score=%d stayed=%d money=%d earned=%d spent=%d place=%d slots=%s rooms=%s songs=%s\n", frame, (unsigned long long)v.built,
-                                (unsigned long long)v.unlocked, v.score, v.guestsStayed, v.money, v.earned, v.spent, v.place, join(sl).c_str(), join(so).c_str(), join(sg).c_str());
+                        fprintf(stderr, "frame %ld: hotel built=0x%llx unlocked=0x%llx building=0x%llx score=%d stayed=%d money=%d earned=%d spent=%d place=%d slots=%s rooms=%s songs=%s\n", frame, (unsigned long long)v.built,
+                                (unsigned long long)v.unlocked, (unsigned long long)v.building, v.score, v.guestsStayed, v.money, v.earned, v.spent, v.place, join(sl).c_str(), join(so).c_str(), join(sg).c_str());
                     }
                 }
                 if (!(g.checkIn == b.checkIn) || frame == 0)

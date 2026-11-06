@@ -1,0 +1,2 @@
+# BD-list: room 2's knob (the question for it)
+10 6 touch 48 103

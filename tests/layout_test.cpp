@@ -15,6 +15,7 @@
 #include "console.h"
 #include "hotspots.h"
 #include "layout.h"
+#include "port/build.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
@@ -1060,6 +1061,119 @@ int main()
             k.catalogue.items[0].row += 1;
             CHECK(CatalogueViewOf(cs, k).items[0].id != before);
         }
+        // Build Rooms (port/build.h) on made-up lists of 0-11 rooms at every scroll, money enough or
+        // not, and page 1 for each room: the rows the game shows (three from its scroll), each
+        // focusable, A its knob only when the money covers the permit; the game's arrows as the
+        // list's scroll while it can move; B the X (the list) or the cross (page 1), the tick the
+        // first focus there; never replayed. Every item inside the panel, layers ascending, the
+        // mouse pieces round trip and land on the game's own buttons.
+        {
+            auto build = [](int count, int scroll, int page, int chosen, int money) {
+                GameState h;
+                h.valid = true;
+                h.screen = GScreen::Build;
+                BuildState& b = h.build;
+                b.valid = true;
+                const int places[] = {0, 1, 8, 12, 15, 16, 18, 21, 26, 28, 31};
+                const int prices[] = {2000, 1000, 1500, 2500, 1000, 1500, 1000, 3500, 1000, 2000, 2500};
+                for (int i = 0; i < count; i++) b.places.push_back({places[i], prices[i], 0x43 + 2, prices[i] <= money});
+                b.scroll = scroll;
+                b.page = page;
+                b.chosen = chosen;
+                b.money = money;
+                return h;
+            };
+            const ScreenState bs {Screen::Build, Tab::None};
+            for (int count : {0, 1, 2, 3, 4, 11})
+                for (int money : {0, 2000, 999999})
+                    for (int scroll = 0; scroll <= std::max(0, count - 3); scroll++)
+                        for (int chosen = -1; chosen < count; chosen++)
+                        {
+                            const int page = chosen < 0 ? 0 : 1;
+                            if (page == 1 && scroll > 0) continue; // (page 1 does not depend on the scroll)
+                            const GameState h = build(count, scroll, page, chosen, money);
+                            const MenuView v = BuildRoomsViewOf(bs, h);
+                            CHECK(v.valid && v.own && !v.replay && v.back.size() == 1);
+                            if (page == 0)
+                            {
+                                const int shown = std::min(3, count - scroll);
+                                CHECK((int)v.items.size() == shown && v.backCloses && v.back[0].x == kBdCloseX && v.back[0].y == kBdCloseY);
+                                CHECK(AllReachable(v));
+                                for (int i = 0; i < shown; i++)
+                                {
+                                    const BuildEntry& e = h.build.places[scroll + i];
+                                    CHECK(v.items[i].enabled && v.items[i].id == kBdRowId + (u32)e.place && v.items[i].group == v.scrollGroup);
+                                    CHECK(v.items[i].action.empty() == !e.affordable);
+                                    if (e.affordable) CHECK(v.items[i].action.size() == 1 && v.items[i].action[0].x == kBdRowX && v.items[i].action[0].y == kBdRowY0 + i * kBdRowDy);
+                                    CHECK(MenuMove(v, i, 2) == i && MenuMove(v, i, 3) == i);
+                                }
+                                if (shown > 0) CHECK(MenuMove(v, 0, 0) == 0 && MenuMove(v, shown - 1, 1) == shown - 1);
+                                if (shown > 1) CHECK(MenuMove(v, 0, 1) == 1 && MenuMove(v, 1, 0) == 0);
+                                CHECK(v.scrollUp.empty() == (scroll == 0) && v.scrollDown.empty() == (scroll + 3 >= count));
+                                if (!v.scrollUp.empty()) CHECK(v.scrollUp[0].x == kBdUpX && v.scrollUp[0].y == kBdArrowY);
+                                if (!v.scrollDown.empty()) CHECK(v.scrollDown[0].x == kBdDownX && v.scrollDown[0].y == kBdArrowY);
+                            }
+                            else
+                            {
+                                CHECK(v.items.size() == 2 && !v.backCloses && v.initial == 1 && MenuFirst(v) == 1);
+                                CHECK(v.items[1].action.size() == 1 && v.items[1].action[0].x == kBdTickX && v.items[1].action[0].y == kBdConfirmY);
+                                CHECK(v.items[0].action[0].x == kBdCrossX && v.back[0].x == kBdCrossX && v.back[0].y == kBdConfirmY);
+                                CHECK(MenuMove(v, 1, 2) == 0 && MenuMove(v, 0, 3) == 1 && MenuMove(v, 1, 0) == 1);
+                            }
+                            for (int focus : {-1, 0, 1, 2})
+                            {
+                                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                                Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                                world.touch = false;
+                                comp.pieces.push_back(world);
+                                BuildBuildRooms(comp, v, focus, h, rom, nullptr);
+                                CHECK(!comp.ui.empty());
+                                int layer = 0;
+                                for (const ui::UiItem& u : comp.ui)
+                                {
+                                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                                    if (u.kind == ui::UiItem::Image) continue;
+                                    CHECK(u.layer >= layer);
+                                    layer = u.layer;
+                                }
+                                if (focus != 0 || money != 2000 || scroll != 0 || (chosen > 1)) continue;
+                                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                    TestConsoleRoundtrip(bs, false, 256, 192, o.first, o.second, true, &comp);
+                                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                                int tx, ty;
+                                // Every row, the cross and the tick land within the game's circle around its point.
+                                for (const ViewItem& it : v.items)
+                                {
+                                    const Rect r = it.rect;
+                                    CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                                    const int px = page == 0 ? kBdRowX : it.id == kBdTickId ? kBdTickX : kBdCrossX;
+                                    const int py = page == 0 ? kBdRowY0 + (r.y - BuildRowRect(0).y) / (BuildRowRect(1).y - BuildRowRect(0).y) * kBdRowDy : kBdConfirmY;
+                                    CHECK(std::abs(tx - px) <= 15 && std::abs(ty - py) <= 15);
+                                }
+                                if (page == 0)
+                                {
+                                    CHECK(TouchFromComposition(comp, fit, kBdUp.x + kBdUp.w / 2.0f, kBdUp.y + kBdUp.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - kBdUpX) <= 15 && std::abs(ty - kBdArrowY) <= 15);
+                                    CHECK(TouchFromComposition(comp, fit, kBdDown.x + kBdDown.w / 2.0f, kBdDown.y + kBdDown.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - kBdDownX) <= 15 && std::abs(ty - kBdArrowY) <= 15);
+                                }
+                                CHECK(TouchFromComposition(comp, fit, kBdClose.x + kBdClose.w / 2.0f, kBdClose.y + kBdClose.h / 2.0f, tx, ty));
+                                CHECK(std::abs(tx - kBdCloseX) <= 15 && std::abs(ty - kBdCloseY) <= 15);
+                                CHECK(!TouchFromComposition(comp, fit, kBdTitle.x + 10.5f, kBdTitle.y + 10.5f, tx, ty)); // the title: nothing
+                                CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty));                          // the dimmed world: nothing
+                            }
+                        }
+            // No view off its screen, without RAM's part or the strings; a row's id follows its room.
+            GameState h = build(4, 0, 0, -1, 2000);
+            CHECK(!BuildRoomsViewOf({Screen::Panel, Tab::Interact}, h).valid);
+            CHECK(!BuildRoomsView(bs, &h, &rom).valid); // no strings: milestone 1's
+            const u32 first = BuildRoomsViewOf(bs, h).items[0].id;
+            h.build.scroll = 1;
+            CHECK(BuildRoomsViewOf(bs, h).items[0].id != first);
+            h.build.valid = false;
+            CHECK(!BuildRoomsViewOf(bs, h).valid);
+        }
         // Goals, Relationships, Options (port/goals.h, relations.h, options.h) and the Save slots
         // on made-up states: the game's selection held (Up / Down its arrows), Options' moves
         // explicit and its sliders' Left / Right the knob's drag by a tenth, the Save slots' A its
@@ -1321,8 +1435,10 @@ int main()
                     off.town.popup.state = 0;
                     CHECK(!PopupViewOf(on, off).valid);
                     off = h;
-                    off.screen = GScreen::Build; // (a screen the port does not redraw: milestone 1's popup)
-                    CHECK(!PopupViewOf({Screen::Build, Tab::None}, off).valid);
+                    off.screen = GScreen::Vacuum; // (a screen the port does not redraw: milestone 1's popup)
+                    CHECK(!PopupViewOf({Screen::Vacuum, Tab::None}, off).valid);
+                    off.screen = GScreen::Build; // (over the HD Build Rooms: the HD popup)
+                    CHECK(PopupViewOf({Screen::Build, Tab::None}, off).valid == PopupViewOf(on, h).valid);
                     off.screen = GScreen::Catalogue; // (over the HD catalogue: the HD popup)
                     CHECK(PopupViewOf({Screen::Catalogue, Tab::None}, off).valid == PopupViewOf(on, h).valid);
                     off = h;

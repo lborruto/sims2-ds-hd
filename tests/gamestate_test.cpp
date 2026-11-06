@@ -764,6 +764,11 @@ static void hotel_block()
     HotelState h = ReadGameState(r.View()).hotel;
     CHECK(h.valid && h.built == ((1u << 29) | (1u << 4)) && h.score == 6 && h.rooms[15].permit == 1000 && h.rooms[15].parent == 27 && h.slots[0].place == 29 && h.slots[0].sim == 45 && h.slots[0].days == 2);
     CHECK(h.guestsStayed == 3 && h.money == 2000 && h.earned == 500 && h.spent == 300 && h.songs[4] == 3 && h.songs[5] == 0 && h.place == 13);
+    // Rooms being built: their completion time (G+0x4418 + 4 place) not yet past the clock (G+0x480C); never set 0x80000000.
+    r.W32(kGb + 0x480C, 100000);
+    for (u32 k = 0; k < 33; k++) r.W32(kGb + 0x4418 + 4 * k, k == 15 ? 100000 + 0x7080 : k == 4 ? 99999 : 0x80000000u);
+    CHECK(ReadGameState(r.View()).hotel.building == (1ull << 15));
+    r.W32(kGb + 0x4418 + 4 * 32, 100000); CHECK(ReadGameState(r.View()).hotel.building == ((1ull << 15) | (1ull << 32)));
     r.W32(kGb + 0x4414, 2); CHECK(!ReadGameState(r.View()).hotel.valid);   // a bit past place 32
     r.W32(kGb + 0x4414, 1); CHECK(ReadGameState(r.View()).hotel.valid);
     r.W32(kGb + 0x4414, 0); r.W8(0x0211F9EC + 4 * 4 + 2, 101); CHECK(!ReadGameState(r.View()).hotel.valid);   // a weight over 100

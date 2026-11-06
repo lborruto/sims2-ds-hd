@@ -35,7 +35,11 @@
 # and A start Hotseat (Cards); from D-cas-right2, Left and Right switch the target (--print-town);
 # from sit-store, A on Buy opens the catalogue; the HD catalogue (src/port/catalogue.*, on copies of
 # the complete save): a couch bought twice, a bed sold, the list scrolled by the game's arrows and
-# closed, a purchase the game refuses not made. In none of them do the pixels disagree with the
+# closed, a purchase the game refuses not made; HD Build Rooms (src/port/build.*, the research's
+# states with game flag 19 patched in, on copies of a save): the list scrolled by the game's arrows,
+# a room chosen and the question cancelled both ways, a room bought (the money less its permit, its
+# building timer set, the list rebuilt without it, the game's popup 2628 in HD once the menu closes),
+# a room the money does not cover refused. In none of them do the pixels disagree with the
 # game for long ("pixels disagree").
 # Then the activities on buttons (src/activities.*, scripts/console/): from act-social, RIGHT
 # answers with the right icon (it lights green; the game itself plays on for about 1600
@@ -136,12 +140,19 @@ run shop-wide sit-storebuy "${town[@]}" --console-focus 0 --wide &
 run shop-sell BY-own4 "${town[@]}" --console-focus 10 &
 run shop-poor BY-dn2 "${town[@]}" --console-focus 6 &
 wait
+run build-list BD-list "${town[@]}" --console-focus 1 &
+run build-list-2x BD-list "${town[@]}" --console-focus 1 --compose-scale 2 &
+run build-list-wide BD-list "${town[@]}" --console-focus 1 --wide &
+run build-ask BD-row2 "${town[@]}" --console-focus 1 &
+run build-poor BD-down3 "${town[@]}" --console-focus 0 &
+run build-empty sit-build "${town[@]}" &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
-    shop shop-2x shop-wide shop-sell shop-poor; do
+    shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -496,6 +507,37 @@ elif case in ("shop", "shop-2x", "shop-wide", "shop-sell", "shop-poor"):
     if len(cell) < 8: errors.append(f"cell 1 has no icon ({len(cell)} colours)")
     if white(630, 490, 840, 540) == (case == "shop-poor"): errors.append(f"Pay's word {'white' if case == 'shop-poor' else 'dim'}")
     not_big()
+elif case in ("build-list", "build-list-2x", "build-list-wide", "build-ask", "build-poor", "build-empty"):
+    # Build Rooms in HD (src/port/build.*): the panel, the title's well, the money in its warm
+    # white; the list: the focus ring on the row given (row 2; build-poor row 1), a row's knob the
+    # game's own sprite, the Spa & Gym's permit red (build-poor: §2,500 against §2,000) and no A
+    # hint for it; the question: the tick focused, its sum (§2,000 - §1,000 = §1,000) in warm white;
+    # the empty list (sit-build: the town's save lists nothing): no row; never the touch screen 3x.
+    expect("panel outline", C(176, 300), OUTLINE)
+    expect("panel band", C(180, 300), hexrgb("6171B2"))
+    expect("title well", C(640, 50), hexrgb("6A72B8"))
+    warm = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
+    if warm(840, 54, 1010, 100) < 20: errors.append("no money in the title")
+    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    red = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if (lambda p: p[0] > 200 and p[1] < 140 and p[2] < 140)(C(x, y)))
+    if case == "build-ask":
+        if not ring(678, 496): errors.append("no focus ring around the tick")
+        if ring(378, 496): errors.append("a focus ring around the cross")
+        if warm(440, 380, 840, 420) < 40: errors.append("no sum under the room")
+        icon = {C(x, y) for y in range(476, 520, 3) for x in range(700, 745, 3)}
+        if len(icon) < 6: errors.append(f"the tick has no sprite ({len(icon)} colours)")
+    elif case == "build-empty":
+        if ring(214, 206) or ring(214, 350): errors.append("a focus ring in the empty list")
+        if warm(600, 140, 720, 560) > 0: errors.append("a price in the empty list")
+    else:
+        at = (214, 206) if case == "build-poor" else (214, 350)
+        if not ring(*at): errors.append(f"no focus ring at {at}")
+        knob = {C(x, y) for y in range(185, 225, 3) for x in range(232, 276, 3)}
+        if len(knob) < 6: errors.append(f"row 1 has no knob ({len(knob)} colours)")
+        if case == "build-poor":
+            if red(600, 180, 720, 230) < 10: errors.append("the Spa & Gym's permit is not red")
+        elif red(200, 124, 1080, 578) > 0: errors.append("a red permit in a list the money covers")
+    not_big()
 elif case in ("pockets-menu", "pockets-armed"):
     # Pockets in HD (src/port/pockets.*): the Pockets tab's icon green, the focus ring around slot
     # 1 (the Arcade-Pie Factory), the counted items' icons the touch screen's pixels 2x (DS 99 +
@@ -691,6 +733,22 @@ pad_shop pad-shop-buy sit-storebuy catalogue-buy 220 &
 pad_shop pad-shop-sell BY-own4 catalogue-sell 120 &
 pad_shop pad-shop-scroll sit-storebuy catalogue-scroll 240 &
 pad_shop pad-shop-poor BY-dn2 catalogue-poor 140 &
+wait
+# pad_build NAME STATE SCRIPT FRAMES: Build Rooms' runs (the research's BD-* states: the town's
+# save with game flag 19 patched in), on a copy of the complete save, with the hotel's records
+# (--print-hotel) and the popups (--print-town).
+pad_build() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 file=$shots/$2.st
+    [ -f "$file" ] || file=$more_shots/$2.st
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$tmp/$name.sav" \
+        --layout console --print-screen --print-game --print-hotel --print-town "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_build pad-build-scroll BD-list build-scroll 260 &
+pad_build pad-build-cancel BD-list build-cancel 260 &
+pad_build pad-build-buy BD-list build-buy 330 &
+pad_build pad-build-poor BD-down3 build-poor 120 &
 pad_late pad-hotseat sit-casino interact-hotseat 300 &
 pad_late pad-target D-cas-right2 interact-target 220 &
 pad pad-buy sit-store interact-buy 200 &
@@ -808,6 +866,30 @@ check_pad pad-shop-buy shop_buy
 check_pad pad-shop-sell shop_sell
 check_pad pad-shop-scroll shop_scroll
 check_pad pad-shop-poor shop_poor
+# Build Rooms: the list scrolled by the game's arrows past the rows (0, 1, 2, back to 1) and closed;
+# the question opened for the Art Gallery and cancelled by B and by its cross (nothing bought);
+# the Art Gallery bought (§2,000 -> §1,000, spent §1,000, its building timer set: bit 1 of
+# `building`; the list rebuilt without it), then B: the panel and the game's popup 2628 in HD,
+# closed by A; the Spa & Gym (§2,500 > §2,000) refused, the Jungle Guest Room's question opened.
+build_scroll() { in_order pad-build-scroll 'build scroll=0 page=0 ' 'build scroll=1 page=0 ' 'build scroll=2 page=0 ' 'build scroll=1 page=0 ' 'game Panel/Interact'; }
+build_cancel() {
+    in_order pad-build-cancel 'build scroll=0 page=1 chosen=1 ' 'build scroll=0 page=0 ' 'build scroll=0 page=1 chosen=1 ' 'build scroll=0 page=0 ' 'game Panel/Interact' || return 1
+    ! grep -q 'hotel .*money=1000 ' "$tmp/pad-build-cancel.log" || { echo "  pad-build-cancel: bought"; return 1; }
+}
+build_buy() {
+    in_order pad-build-buy 'build .*page=1 chosen=1 money=2000 ' 'hotel .*building=0x2 .*money=1000 earned=0 spent=1000 ' \
+        'build scroll=0 page=0 chosen=-1 money=1000 places=0:2000:70:poor,8:' 'game Panel/Interact' 'popup state=2 kind=0 .*text="Your build permit has been approved' \
+        'popup none' || return 1
+    ! grep -q 'money=0 ' "$tmp/pad-build-buy.log" || { echo "  pad-build-buy: bought twice"; return 1; }
+}
+build_poor() {
+    in_order pad-build-poor 'build scroll=3 page=0 ' 'build scroll=3 page=1 chosen=4 ' || return 1
+    ! grep -q 'chosen=3 ' "$tmp/pad-build-poor.log" || { echo "  pad-build-poor: the Spa & Gym's question"; return 1; }
+}
+check_pad pad-build-scroll build_scroll
+check_pad pad-build-cancel build_cancel
+check_pad pad-build-buy build_buy
+check_pad pad-build-poor build_poor
 check_pad pad-gift-close gift_close
 # Goals, Relationships, Options and the Save slots (src/port/goals.*, relations.*, options.*):
 # from B-pg8-goals, MENU, Down x3, Up → the game's selection 1, 2, 3 (its scroll first=1), 2,

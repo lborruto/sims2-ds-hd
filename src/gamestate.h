@@ -303,6 +303,7 @@ struct HotelState
 {
     bool valid = false;
     u64 built = 0, unlocked = 0;      // bit = place id: the room is built / its permit can be bought
+    u64 building = 0;                 // bit = place id: its permit bought, its building not finished (G+0x4418 + 4 place >= the clock)
     RoomRow rooms[kPlaces];           // the static room table
     int score = 0;                    // the hotel score in percent: the weights of the built rooms
     GuestSlot slots[5];
