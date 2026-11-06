@@ -1,5 +1,6 @@
 #include "gamestate.h"
 
+#include <algorithm>
 #include <cstdio>
 
 namespace sims2wide
@@ -88,6 +89,36 @@ struct EUTable
         u32 guests, guestStride, guestSim, guestN, simState, simPlace, guestState, awayPlace, noSim;
         u32 tones, toneStride, toneNamed, toneN;                 // from G
     } x;
+    // Milestone 4: the hotel and the shops (research m4-hotel-shops §1-§7).
+    struct
+    {
+        // The hotel block, from G
+        u32 builtBits, unlockedBits;                         // u32[2] bitsets, bit = place id
+        u32 roomTable, roomStride, roomPermit, roomWeight, roomParent;   // absolute table of {u16 permit, u8 weight, u8 parent place}
+        u32 guestRooms, guestRoomN;                          // absolute: u32 place ids of the furniture records
+        u32 slotDays, simCheckOut;                           // slotDays: from a guest slot (kEU.x.guests) the u8 days booked; simCheckOut: from a Sim record, u32 seconds
+        u32 guestsStayed, earned, spent;                     // from G, s32
+        u32 songs, songNone, customSongs, customStride, customN;   // from G: u8 per place, char[16] names
+        u32 placePtr, placeOff;                              // absolute pointer to the world, the place id u32 in it
+        u32 roomBlock, roomRec, roomCount, roomItems, roomItemStride, maxRoomItems;   // from G: furniture records (count at +0x54, {id, x, y, rot} each)
+        u32 clock, noCheckOut, daySeconds, aspiration;       // from G (clock u32 seconds); aspiration u32 (0 Fortune)
+        u32 penthouse, penthouseFlag, penthouseSims[3];      // place id, game flag (registry gate), the Sims of mission stages 1..3
+        u32 baseValues[5][2], scoreFactors[5][2];            // {place, value}: room base value, bonus factor / 4096
+        u32 serviceMul, serviceShift, fortuneMul, concierge, moodBase, maxMood;
+        // Registry (overlay 4) and Room info (overlay 12), from S
+        u32 vtRegistry, ovRegistry, regGuest, regMode, regRooms, regRoomN;   // regRooms: absolute u8[5] place ids
+        u32 vtRoomInfo, ovRoomInfo, riPlace, riOccupant, riOccupied, riHint;
+        // Music (overlay 5)
+        u32 vtMusic, ovMusic, muScroll, muList, muCount, muPlaying, muRows, songTable, songStride, songN, songEnd;
+        // Build (overlay 1; vtable in overlays[]) and Placement (module 0x14)
+        u32 bdScroll, bdCount, bdPage, bdChosen, bdPlaces, bdMax, bdRows;
+        u32 vtPlacement, plMode, plRoom, plPhase, plSlot, plObject, plRotation, plMax, plRoomMax;
+        // Catalogue (overlay 2; vtable in overlays[])
+        u32 caShop, caLayout, caCount, caList, caSel, caMode, caScroll, caPay, caUp, caDown, caRing, caMaxItems, caPriceMul, caRowMin;
+        // Stat panel (overlay 14)
+        u32 vtStat, ovStat, stPage, stTransition, stLevel, stPoints, stSkills, stAliens, stGoons, stVacuum, stMetal;
+        u32 stThresholds, stSkillN, stMaxSkill, stGauge;
+    } hotel;
 };
 constexpr EUTable kEU = {
     0x02000000, 0x02139FA4,
@@ -158,6 +189,29 @@ constexpr EUTable kEU = {
         0x862, 0x864, 0x866, 0x868, 0x2C,
         0x2BC0, 8, 4, 5, 0x10, 0x4, 5, 0x21, 0x3F,
         0x46DC, 0x40, 0xF, 3,
+    },
+    {
+        0x4410, 0x4408,
+        0x0211F9EC, 4, 0, 2, 3,
+        0x0211F9D4, 6,
+        5, 0x20,
+        0x84, 0x2F64, 0x2F68,
+        0x449C, 0x2A, 0x46AC, 16, 3,
+        0x0213E580, 0xF4,
+        0x41F8, 0x58, 0x54, 0, 4, 14,
+        0x480C, 0x80000000, 86400, 0x68,
+        20, 0x15, {6, 4, 14},
+        {{29, 400}, {15, 600}, {18, 700}, {8, 800}, {20, 1000}},
+        {{29, 0x2199}, {15, 0x2333}, {18, 0x24CC}, {8, 0x2666}, {20, 0x2800}},
+        20, 12, 0x10CC, 45, 2086, 4,
+        0x0214A804, 4, 0x25, 0x26, 0x0214A7A0, 5,
+        0x0214A9BC, 12, 0x30, 0x32, 0x25, 0x34,
+        0x0214ABA8, 5, 0x28, 0x2C, 0x6C, 0x70, 0x74, 0x0214ABBC, 4, 27, 0x2A,
+        0x3C, 0x40, 0x48, 0x44, 0x4C, 33, 3,
+        0x021351A8, 8, 0x24, 0x5C, 0x59, 0x5A, 0x6C, 14, 6,
+        0x260, 0x26C, 0x264, 0x3C, 0x254, 0x258, 0x268, 0x25D, 0x26D, 0x26E, 0x214, 12, 2, 0x3B,
+        0x0214B5A4, 14, 0x38, 0x3C, 0x6C, 0x70, 0x5B, 0x74, 0x78, 0x7C, 0x80,
+        0x02121DD8, 5, 10, 20,
     },
 };
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
@@ -774,6 +828,330 @@ NoteState ReadNote(const Reader& m, u32 S)
     for (u32 id : q.noteNameIds) if (id == text) v.playerName = true;
     return v;
 }
+
+// ---- The hotel and the shops (milestone 4). Each part reads apart from the others, from G or from its screen object.
+bool Bits(const Reader& m, u32 a, u64& out)
+{
+    u32 lo, hi;
+    if (!m.R32(a, lo) || !m.R32(a + 4, hi) || (hi >> (kPlaces - 32)) != 0) return false;   // bits past the last place are never set
+    out = lo | (u64)hi << 32;
+    return true;
+}
+
+bool RoomRowAt(const Reader& m, u32 place, RoomRow& r)
+{
+    const auto& h = kEU.hotel;
+    u32 permit, weight, parent;
+    const u32 a = h.roomTable + h.roomStride * place;
+    if (place >= (u32)kPlaces || !m.R16(a + h.roomPermit, permit) || !m.R8(a + h.roomWeight, weight) || !m.R8(a + h.roomParent, parent) || weight > 100 || parent > (u32)kNoPlace) return false;
+    r.permit = (int)permit; r.weight = (int)weight; r.parent = (int)parent;
+    return true;
+}
+
+// The hotel score: the weights of the built rooms (at most 100).
+bool HotelScore(const Reader& m, u64 built, int& score)
+{
+    score = 0;
+    for (u32 k = 0; k < (u32)kPlaces; k++)
+    {
+        RoomRow r;
+        if (!RoomRowAt(m, k, r)) return false;
+        if ((built >> k) & 1) score += r.weight;
+    }
+    return score <= 100;
+}
+
+bool ReadSlots(const Reader& m, u32 G, GuestSlot out[5])
+{
+    const auto& x = kEU.x; const auto& h = kEU.hotel;
+    for (u32 j = 0; j < x.guestN; j++)
+    {
+        const u32 a = G + x.guests + x.guestStride * j;
+        u32 place, sim, days;
+        if (!m.R32(a, place) || !m.R8(a + x.guestSim, sim) || !m.R8(a + h.slotDays, days) || place > (u32)kNoPlace || (sim >= kEU.town.maxSims && sim != x.noSim)) return false;
+        out[j] = {(int)place, (int)sim, (int)days};
+    }
+    return true;
+}
+
+// The Sim in a room, -1 vacant: the guest slot that holds it, or the story Sim in the Penthouse while the mission runs.
+bool OccupantOf(const Reader& m, u32 G, const GuestSlot slots[5], u32 place, int& sim)
+{
+    const auto& h = kEU.hotel; const auto& q = kEU.menus;
+    sim = -1;
+    if (place == h.penthouse)
+    {
+        u32 stage;
+        if (!m.R8(G + q.missionBase + q.missionStage, stage)) return false;
+        if (stage >= 1 && stage <= 3) { sim = (int)h.penthouseSims[stage - 1]; return true; }
+    }
+    for (u32 j = 0; j < kEU.x.guestN; j++)
+        if (slots[j].place == (int)place) { sim = slots[j].sim == (int)kEU.x.noSim ? -1 : slots[j].sim; return true; }
+    return true;
+}
+
+bool FlagSet(const Reader& m, u32 G, u32 flag)
+{
+    u32 w;
+    return m.R32(G + kEU.menus.flags + 4 * (flag >> 5), w) && ((w >> (flag & 31)) & 1);
+}
+
+HotelState ReadHotel(const Reader& m)
+{
+    const auto& h = kEU.hotel;
+    HotelState v;
+    u32 G, w;
+    if (!m.R32(kEU.gameBlock, G) || !Bits(m, G + h.builtBits, v.built) || !Bits(m, G + h.unlockedBits, v.unlocked)) return v;
+    for (u32 k = 0; k < (u32)kPlaces; k++)
+    {
+        if (!RoomRowAt(m, k, v.rooms[k]) || !m.R8(G + h.songs + k, w)) return HotelState{};
+        v.songs[k] = (int)w;
+    }
+    if (!HotelScore(m, v.built, v.score) || !ReadSlots(m, G, v.slots)) return HotelState{};
+    u32 stayed, money, earned, spent;
+    if (!m.R32(G + h.guestsStayed, stayed) || !m.R32(G + kEU.money, money) || !m.R32(G + h.earned, earned) || !m.R32(G + h.spent, spent) ||
+        stayed > 99999 || money > 999999 || earned > 999999 || spent > 999999)
+        return HotelState{};
+    v.guestsStayed = (int)stayed; v.money = (int)money; v.earned = (int)earned; v.spent = (int)spent;
+    u32 world, pl;
+    if (m.R32(h.placePtr, world) && m.R32(world + h.placeOff, pl) && pl < (u32)kPlaces) v.place = (int)pl;
+    v.valid = true;
+    return v;
+}
+
+CheckInState ReadCheckIn(const Reader& m, u32 S)
+{
+    const auto& h = kEU.hotel;
+    CheckInState v;
+    u32 G, mode, guest, flagOk;
+    u64 built;
+    GuestSlot slots[5];
+    if (!m.R32(kEU.gameBlock, G) || !m.R8(S + h.regMode, mode) || mode > 1 || !m.R8(S + h.regGuest, guest) || !Bits(m, G + h.builtBits, built) ||
+        !ReadSlots(m, G, slots) || !HotelScore(m, built, v.score))
+        return v;
+    if (mode == 0 && guest >= kEU.town.maxSims) return v;
+    flagOk = FlagSet(m, G, h.penthouseFlag);
+    for (u32 i = 0; i < h.regRoomN; i++)
+    {
+        u32 place;
+        int sim;
+        if (!m.R8(h.regRooms + i, place) || place >= (u32)kPlaces || !OccupantOf(m, G, slots, place, sim)) return CheckInState{};
+        RegistryRow& r = v.rows[i];
+        r.place = (int)place;
+        r.built = (built >> place) & 1;
+        r.occupant = sim;
+        r.available = r.built && sim < 0 && (place != h.penthouse || flagOk);
+    }
+    v.mode = (int)mode; v.guest = mode == 0 ? (int)guest : -1;
+    v.valid = true;
+    return v;
+}
+
+// A guest room's daily cost: base + the furniture's service charge + the score's bonus (x 1.05 without the Fortune aspiration).
+bool RoomCost(const Reader& m, u32 G, u32 place, int score, RoomInfoState& v)
+{
+    const auto& h = kEU.hotel; const auto& t = kEU.town;
+    int base = -1, factor = -1;
+    for (const auto& b : h.baseValues) if (b[0] == place) base = (int)b[1];
+    for (const auto& f : h.scoreFactors) if (f[0] == place) factor = (int)f[1];
+    u32 r = h.guestRoomN;
+    for (u32 i = 0; i < h.guestRoomN; i++) { u32 id; if (m.R32(h.guestRooms + 4 * i, id) && id == place) r = i; }
+    u32 n, aspiration;
+    if (base < 0 || factor < 0 || r == h.guestRoomN || !m.R32(G + h.roomBlock + h.roomRec * r + h.roomCount, n) || n > h.maxRoomItems || !m.R32(G + h.aspiration, aspiration)) return false;
+    int sum = 0;
+    for (u32 i = 0; i < n; i++)
+    {
+        u32 id;
+        if (!m.R8(G + h.roomBlock + h.roomRec * r + h.roomItems + h.roomItemStride * i, id)) return false;
+        RecordRow row = ReadRow(m, t.itemRow0 + id);
+        if (!row.valid) return false;
+        sum += (int)(s16)row.price;
+    }
+    v.baseValue = base;
+    v.serviceCharge = (sum * (int)h.serviceMul) >> h.serviceShift;   // truncated: the game's 20.12 product shifted back
+    v.scoreBonus = score * factor / 4096;
+    v.total = v.baseValue + v.serviceCharge + v.scoreBonus;
+    if (aspiration == 0) v.total = v.total * (int)h.fortuneMul >> 12;
+    return true;
+}
+
+RoomInfoState ReadRoomInfo(const Reader& m, u32 S)
+{
+    const auto& h = kEU.hotel; const auto& x = kEU.x; const auto& q = kEU.menus;
+    RoomInfoState v;
+    u32 G, place, occupant, occupied, a, b, c, d;
+    u64 built;
+    int score;
+    if (!m.R32(kEU.gameBlock, G) || !m.R16(S + h.riPlace, place) || place >= (u32)kPlaces || !m.R16(S + h.riOccupant, occupant) || occupant >= kEU.town.maxSims ||
+        !m.R8(S + h.riOccupied, occupied) || occupied > 1 || !Bits(m, G + h.builtBits, built) || !HotelScore(m, built, score) || !RoomCost(m, G, place, score, v))
+        return RoomInfoState{};
+    if (!m.R8(S + h.riHint, a) || !m.R8(S + h.riHint + 1, b) || !m.R8(S + h.riHint + 2, c) || !m.R8(S + h.riHint + 3, d) || a > 1 || b > 1 || c > 1 || d > 1) return RoomInfoState{};
+    v.hint = a && b && c;
+    v.place = (int)place; v.occupant = (int)occupant; v.occupied = occupied == 1;
+    if (v.occupied)
+    {
+        const u32 R = G + kEU.simRecords + kEU.simRecordSize * occupant;
+        u32 mood, out, clock, month, day;
+        if (!m.R8(R + kEU.town.simMood, mood) || mood > h.maxMood || !m.R32(R + h.simCheckOut, out) || !m.R32(G + h.clock, clock) || !m.R32(G + x.phMonth, month) || !m.R32(G + x.phDay, day))
+            return RoomInfoState{};
+        v.moodId = (int)(h.moodBase + mood);
+        u32 stage;
+        const bool story = place == h.penthouse && m.R8(G + q.missionBase + q.missionStage, stage) && stage <= 3;
+        const int diff = (int)(out - clock);
+        if (!story && out != h.noCheckOut && month >= 1 && month <= 12 && day >= 1 && day <= 31 && diff >= 0 && diff / (int)h.daySeconds < 400)
+        {
+            v.days = diff / (int)h.daySeconds + 1;
+            static const int len[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+            int mo = (int)month - 1, dd = (int)day + v.days;
+            while (dd > len[mo]) { dd -= len[mo]; mo = (mo + 1) % 12; }
+            v.month = mo + 1; v.day = dd;
+            v.checkOutKnown = true;
+        }
+    }
+    v.valid = true;
+    return v;
+}
+
+MusicState ReadMusic(const Reader& m, u32 S, const HotelState& hotel)
+{
+    const auto& h = kEU.hotel;
+    MusicState v;
+    u32 count, scroll, playing, rows, G, song;
+    if (!m.R32(S + h.muCount, count) || count > h.songN || !m.R32(S + h.muScroll, scroll) || !m.R32(S + h.muPlaying, playing) || !m.R32(S + h.muRows, rows) ||
+        rows != (count < 5 ? count : 5) || scroll > count - rows || (playing != 0xFF && playing >= count) || !m.R32(kEU.gameBlock, G))
+        return v;
+    for (u32 i = 0; i < count; i++)
+    {
+        u32 idx, code, name;
+        if (!m.R8(S + h.muList + i, idx) || idx >= h.songN) return MusicState{};
+        const u32 e = h.songTable + h.songStride * idx;
+        if (!m.R8(e, code) || code == h.songEnd || !m.R16(e + 2, name)) return MusicState{};
+        const int custom = code >= 0x2B && code < 0x2B + h.customN ? (int)code - 0x2B : -1;
+        v.list.push_back({(int)idx, (int)code, custom < 0 ? (int)name : -1, custom});
+    }
+    v.scroll = (int)scroll; v.playing = playing == 0xFF ? -1 : (int)playing;
+    if (hotel.valid && hotel.place >= 0 && m.R8(G + h.songs + (u32)hotel.place, song)) { v.place = hotel.place; v.roomSong = (int)song; }
+    v.valid = true;
+    return v;
+}
+
+BuildState ReadBuild(const Reader& m, u32 S)
+{
+    const auto& h = kEU.hotel;
+    BuildState v;
+    u32 count, scroll, page, chosen, G, money;
+    if (!m.R32(S + h.bdCount, count) || count > h.bdMax || !m.R32(S + h.bdScroll, scroll) || scroll > (count > h.bdRows ? count - h.bdRows : 0) || !m.R32(S + h.bdPage, page) || page > 1 ||
+        !m.R32(S + h.bdChosen, chosen) || !m.R32(kEU.gameBlock, G) || !m.R32(G + kEU.money, money) || money > 999999)
+        return v;
+    for (u32 i = 0; i < count; i++)
+    {
+        u32 place;
+        RoomRow r;
+        if (!m.R32(S + h.bdPlaces + 4 * i, place) || !RoomRowAt(m, place, r)) return BuildState{};
+        v.places.push_back({(int)place, r.permit, (int)(kEU.menus.hotelPlaceBase + r.parent), (int)money >= r.permit});
+    }
+    if (page == 1 && chosen >= count) return BuildState{};
+    v.scroll = (int)scroll; v.page = (int)page; v.chosen = page == 1 ? (int)chosen : -1; v.money = (int)money;
+    v.valid = true;
+    return v;
+}
+
+PlacementState ReadPlacement(const Reader& m, u32 S)
+{
+    const auto& h = kEU.hotel;
+    PlacementState v;
+    u32 G, mode, room, phase, slot, obj, rot, n;
+    if (!m.R32(kEU.gameBlock, G) || !m.R32(S + h.plMode, mode) || mode < 1 || mode > 2 || !m.R32(S + h.plRoom, room) || room >= h.plRoomMax || !m.R32(S + h.plPhase, phase) || phase > 3 ||
+        !m.R8(S + h.plSlot, slot) || slot >= kEU.town.maxSlots || !m.R8(S + h.plObject, obj) || obj >= h.plMax || !m.R32(S + h.plRotation, rot) || rot > 3)
+        return v;
+    const u32 R = G + h.roomBlock + h.roomRec * room;
+    if (!m.R32(R + h.roomCount, n) || n > h.plMax) return v;
+    for (u32 i = 0; i < n; i++)
+    {
+        u32 id, px, py, pr;
+        const u32 a = R + h.roomItems + h.roomItemStride * i;
+        if (!m.R8(a, id) || !m.R8(a + 1, px) || !m.R8(a + 2, py) || !m.R8(a + 3, pr) || pr > 3) return PlacementState{};
+        v.objects.push_back({(int)id, (int)px, (int)py, (int)pr});
+    }
+    v.mode = (int)mode; v.room = (int)room; v.phase = (int)phase; v.pocketSlot = (int)slot; v.object = (int)obj; v.rotation = (int)rot;
+    v.valid = true;
+    return v;
+}
+
+// A shop row (record row = id + 0x3B): its record names its own item.
+bool ShopItemAt(const Reader& m, u32 row, ShopItem& it)
+{
+    const auto& t = kEU.town; const auto& h = kEU.hotel;
+    if (row < h.caRowMin || row - h.caRowMin >= t.maxItems) return false;
+    const u32 id = row - h.caRowMin;
+    RecordRow r = ReadRow(m, row);
+    if (!r.valid || r.nameId != (int)(t.itemName + id)) return false;
+    it = {(int)row, (int)id, r.nameId, (int)(t.itemDesc + id), r.descRes, r.price * (int)h.caPriceMul, r.price};
+    return true;
+}
+
+CatalogueState ReadCatalogue(const Reader& m, u32 S)
+{
+    const auto& h = kEU.hotel; const auto& t = kEU.town;
+    CatalogueState v;
+    u32 G, shop, layout, count, mode, sel, scroll, pay, up, down, owned, money, ring;
+    if (!m.R32(kEU.gameBlock, G) || !m.R32(S + h.caShop, shop) || shop >= kEU.menus.maxSimIndex || !m.R8(S + h.caLayout, layout) || layout > 1 || !m.R8(S + h.caCount, count) || count == 0 || count > h.caMaxItems ||
+        !m.R32(S + h.caMode, mode) || mode < 1 || mode > 2 || !m.R32(S + h.caSel, sel) || !m.R32(S + h.caScroll, scroll) || scroll >= count || !m.R8(S + h.caPay, pay) || pay > 1 ||
+        !m.R8(S + h.caUp, up) || up > 1 || !m.R8(S + h.caDown, down) || down > 1 || !m.R32(G + t.invCount, owned) || owned > t.maxSlots || !m.R32(G + kEU.money, money) || money > 999999)
+        return v;
+    for (u32 i = 0; i < count; i++)
+    {
+        u32 row;
+        ShopItem it;
+        if (!m.R32(S + h.caList + 4 * i, row) || !ShopItemAt(m, row, it)) return CatalogueState{};
+        v.items.push_back(it);
+    }
+    for (u32 i = 0; i < owned; i++)
+    {
+        u32 id;
+        ShopItem it;
+        if (!m.R16(G + t.invIds + 2 * i, id) || id >= t.maxItems || !ShopItemAt(m, t.itemRow0 + id, it)) return CatalogueState{};
+        v.owned.push_back(it);
+    }
+    // A sale leaves the selection past the list until the next touch: no selection then.
+    v.sell = mode == 2;
+    v.selected = sel < (v.sell ? owned : count) ? (int)sel : -1;
+    v.shop = (int)shop; v.vendor = layout == 1; v.scroll = (int)scroll;
+    v.payEnabled = pay; v.upEnabled = up; v.downEnabled = down;
+    u32 rp, vis;
+    v.ring = Ptr(m, S + h.caRing, 8, rp) && m.R8(rp + 4, vis) && (vis & 1);
+    v.money = (int)money;
+    v.valid = true;
+    return v;
+}
+
+StatState ReadStat(const Reader& m, u32 S)
+{
+    const auto& h = kEU.hotel;
+    StatState v;
+    u32 G, page, tr, asp, level, points, thr = 0;
+    if (!m.R32(kEU.gameBlock, G) || !m.R32(S + h.stPage, page) || page > 4 || !m.R32(S + h.stTransition, tr) || tr > 2 || !m.R32(G + h.aspiration, asp) || asp > 3 ||
+        !m.R32(G + h.stLevel, level) || level > 3 || !m.R32(G + h.stPoints, points) || points > 9999)
+        return v;
+    if (level < 3 && (!m.R32(h.stThresholds + 4 * level, thr) || thr == 0 || thr > 9999)) return v;
+    for (u32 i = 0; i < h.stSkillN; i++)
+    {
+        u32 k;
+        if (!m.R8(G + h.stSkills + i, k) || k > h.stMaxSkill) return StatState{};
+        v.skills[i] = (int)k;
+    }
+    u64 built;
+    u32 stayed, earned, spent, al, go, va, me;
+    if (!Bits(m, G + h.builtBits, built) || !HotelScore(m, built, v.score) || !m.R32(G + h.guestsStayed, stayed) || !m.R32(G + h.earned, earned) || !m.R32(G + h.spent, spent) ||
+        !m.R32(G + h.stAliens, al) || !m.R32(G + h.stGoons, go) || !m.R32(G + h.stVacuum, va) || !m.R32(G + h.stMetal, me))
+        return StatState{};
+    v.page = (int)page; v.transition = (int)tr; v.aspiration = (int)asp; v.level = (int)level; v.points = (int)points;
+    v.gaugeFrame = level < 3 ? (int)std::min<u32>(h.stGauge, (h.stGauge * points + thr / 2) / thr) : (int)h.stGauge;
+    v.guestsStayed = (int)stayed; v.earned = (int)earned; v.spent = (int)spent;
+    v.aliens = (int)al; v.goons = (int)go; v.vacuum = (int)va; v.metal = (int)me;
+    v.valid = true;
+    return v;
+}
 }
 
 RecordRow ReadSimRow(RamView ram, int k)
@@ -822,6 +1200,7 @@ GameState ReadGameState(RamView ram)
     g.town.options = ReadOptions(m);
     g.town.saves = ReadSaves(m);
     g.town.popup = ReadPopup(m, P);
+    g.hotel = ReadHotel(m);
     // The note (overlay 11) has no GScreen of its own: its vtable and overlay say it.
     if (vt == kEU.menus.noteVt && (int)ovRaw == (int)kEU.menus.noteOverlay) g.town.note = ReadNote(m, S);
     g.vtable = vt;
@@ -860,9 +1239,20 @@ GameState ReadGameState(RamView ram)
     case GScreen::Phone: g.selection = m.S8(S + kEU.phoneSel); g.page = m.S8(S + kEU.phonePage); g.town.phone = ReadPhone(m, S); break;
     case GScreen::Gift: g.town.gift = ReadGift(m, S); break;
     case GScreen::Dialogue: g.page = m.S16(S + kEU.dlgPage); g.speech = m.S16(S + kEU.dlgSpeech); g.dialogue = ReadDialogue(m, S); break;
-    case GScreen::Catalogue: g.selection = m.S32(S + kEU.catSel); g.scroll = m.S32(S + kEU.catScroll); g.list = m.S32(S + kEU.catList); break;
+    case GScreen::Catalogue: g.selection = m.S32(S + kEU.catSel); g.scroll = m.S32(S + kEU.catScroll); g.list = m.S32(S + kEU.catList); g.catalogue = ReadCatalogue(m, S); break;
+    case GScreen::Build: g.build = ReadBuild(m, S); break;
     case GScreen::Cards: g.selection = m.S32(S + kEU.cardsSel); break;
     default: break;
+    }
+    // The hotel's own screens have no GScreen (the milestone-1 layouts do not know them): their vtable and overlay say it.
+    {
+        const auto& h = kEU.hotel;
+        const int ov = g.overlay;
+        if (vt == h.vtRegistry && ov == (int)h.ovRegistry) g.checkIn = ReadCheckIn(m, S);
+        else if (vt == h.vtRoomInfo && ov == (int)h.ovRoomInfo) g.roomInfo = ReadRoomInfo(m, S);
+        else if (vt == h.vtMusic && ov == (int)h.ovMusic) g.music = ReadMusic(m, S, g.hotel);
+        else if (vt == h.vtStat && ov == (int)h.ovStat) g.stat = ReadStat(m, S);
+        else if (vt == h.vtPlacement && ov == -1) g.placement = ReadPlacement(m, S);
     }
     return g;
 }

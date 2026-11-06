@@ -138,6 +138,44 @@ Read on the screen that shows them (a tab object is read only while its tab is u
 | Give Gift | `S` (overlay 6): `+0x24` recipient actor (`+0xA` Sim index), `+0x4C` slot, `+0x34+4i` slot buttons (`+0x94` = cannot be given) | title 2422 with name 323 + Sim id |
 | Note | `S` (vtable `0x0214A040`, overlay 11): `u16 +0x2C` text id | `@1` the player's name for 0x4A8, 0x509, 0x657; code only, no state reaches it |
 
+## The hotel and the shops (`GameState::hotel` ... `::stat`)
+
+`H = G + 0x41F8` is the hotel block. `GameState::hotel` reads on any screen; each screen's part is read only on its own
+screen (vtable and overlay checked), valid on its own, every list capped. Places 0..32 name rooms (string `0x43 + place`).
+
+- **Hotel block** (`HotelState`): rooms built = u32[2] at `G+0x4410` (bit = place, nothing above bit 32), permits
+  purchasable = `G+0x4408`; static room table at `0x0211F9EC + 4 * place` {u16 permit price, u8 score weight, u8 parent place
+  (0x21 none)}; hotel score = the weights of the built rooms (at most 100); guest slots `G+0x2BC0 + 8j`, j < 5 {u32 room
+  (0x21 none), u8 Sim (0x3F none), u8 days booked}; guests stayed `G+0x84`; money `G+0x2F60`, earned `G+0x2F64`, spent
+  `G+0x2F68` (each 0..999999); the song code of each room `u8 G+0x449C + place` (0x2A: default); the hero's place
+  `u32 *(0x0213E580) + 0xF4`.
+- **Registry / check-in** (overlay 4, vtable `0x0214A804`): `S+0x26` mode (1 registry, 0 guest), `S+0x25` guest Sim; the five
+  rooms are the u8 table `0x0214A7A0` {29, 8, 15, 18, 20}. A row is usable when built, vacant and (Penthouse) game flag 0x15 is set;
+  occupant = the slot holding the room, or the story Sim (6 / 4 / 14 for mission stage `u8 G+0x2F78` 1..3) in the Penthouse.
+- **Room info** (overlay 12, `0x0214A9BC`): `u16 S+0x30` room, `u16 S+0x32` occupant (45, the Concierge, when vacant), `u8 S+0x25`
+  occupied, `S+0x34..37` hint flags. Values: base 400 / 600 / 700 / 800 / 1000 (Small / Jungle / Modern / Deluxe / Penthouse);
+  service charge `(sum of the furniture's record prices * 20) >> 12` (truncated, as the game's 20.12 product: 557 gives 2; the furniture
+  of guest room `r` of the table `0x0211F9D4` is `u32 H + 0x58r + 0x54` items of `{id, x, y, rotation}` at `H + 0x58r + 4i`);
+  score bonus `score * {0x2199, 0x2333, 0x24CC, 0x2666, 0x2800} / 4096` (truncated); total = sum, times 0x10CC / 4096 when
+  `G+0x68` (aspiration) is Fortune (0). Check out: `u32 R_k+0x20` (R = `G + 0x21DC + 0x2C k`), days = (it - `G+0x480C`) / 86400 + 1,
+  date = today (`G+0x47F4` / `+0x47F8`) + days, counted on a 365-day year (medium: the game's calendar was not decoded).
+- **Music** (overlay 5, `0x0214ABA8`): `S+0x6C` count (at most 27), `S+0x2C + i` indices into the song table `0x0214ABBC` (4 bytes
+  {code, gate, name id}, ended by code 0x2A; codes 0x2B..0x2D are recorded songs, no name id), `S+0x28` scroll,
+  `S+0x70` playing (0xFF none), `S+0x74` rows shown.
+- **Build Rooms** (overlay 1, `0x0214B1D0`): `S+0x40` count (at most 33), `S+0x4C + 4i` places, `S+0x3C` scroll (at most count - 3),
+  `S+0x48` page (0 list, 1 confirm), `S+0x44` chosen (read on page 1). Price and parent from the room table; "too dear" is price > money.
+- **Placement** (module 0x14, `0x021351A8`, no overlay): `S+8` mode, `S+0x24` room index, `S+0x5C` phase, `S+0x59` pocket slot,
+  `S+0x5A` object, `S+0x6C` rotation; the room's furniture (at most 14) from the block above. Stylus only; dropping an object is not decoded.
+- **Catalogue** (overlay 2, `0x0214C194`): `S+0x260` shop (0x33 the General Store), `u8 S+0x26C` layout, `u8 S+0x264` count (at most
+  12), `S+0x3C + 4i` record rows (id + 0x3B; the record must name its own item), `S+0x254` selected, `S+0x258` mode (1 buy, 2 sell),
+  `S+0x268` scroll, `u8 S+0x25D` pay enabled, `S+0x26D` / `S+0x26E` arrows, `S+0x214` the ring (its `+4` bit 0 shown); buy price twice the record's
+  `+0xE`, sell price once; the owned places are the pockets (`G+0x215C`, `G+0x28`). A selection past the list (after a sale) reads as none.
+- **Stat panel** (overlay 14, `0x0214B5A4`): `S+0x38` page 0..4, `S+0x3C` transition; aspiration `G+0x68`, level `G+0x6C`, points `G+0x70`
+  (gauge = round(20 * points / `u32 0x02121DD8[level]`), 20 at level 3), skills `u8 G+0x5B + i` (0..10), aliens / goons / vacuum / metal `G+0x74..0x80`.
+
+`--print-hotel` logs each part when it changes (`hotel`, `checkin`, `roominfo`, `music`, `build`, `placement`, `catalogue`, `stat`).
+Checked by `tests/gamestate_test.cpp` (made-up RAM, garbage per part) and `tests/gamestate_check.sh` (held-out states).
+
 ## Backup signal
 
 Sub-engine BG layer records at 0x02139618, 0x0213968C, 0x02139700 and 0x02139774 (stride 0x74)
