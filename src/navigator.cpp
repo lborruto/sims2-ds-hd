@@ -37,7 +37,8 @@ Mode ModeOf(Screen s, bool menuOpen)
     case Screen::Panel: return menuOpen ? Mode::Focus : Mode::Pass;
     case Screen::Phone: case Screen::Gift: case Screen::Catalogue: case Screen::Build: return Mode::Focus;
     case Screen::Social: case Screen::Cards: case Screen::Vacuum: case Screen::Autopsy: case Screen::Detector: case Screen::Art:
-    case Screen::Drencher: case Screen::MooGoo: case Screen::Crime: return Mode::Activity;
+    case Screen::Drencher: case Screen::MooGoo: case Screen::Crime:
+    case Screen::Scratch: case Screen::Mixer: case Screen::MixerSave: case Screen::Trading: return Mode::Activity;
     case Screen::Popup: return Mode::Popup;
     case Screen::Unknown: return Mode::Cursor;
     // No table yet: as Unknown. The front end (title, main menu, Create-a-Sim, None) is
@@ -379,7 +380,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
 
     const std::vector<Hotspot>& h = HotspotsFor(s);
     cursorScreen_ = h.empty() && !useView && !OwnScheme(s.screen); // (the HD Save slots, the minigames with a scheme of their own: no cursor)
-    cursorPress_ = blow_ = false;
+    cursorPress_ = blow_ = voice_ = false;
     handDx_ = handDy_ = 0;
     // A tap only when nothing else touches: a press while a tap or a drag runs is dropped.
     const bool canTap = !touch.Owns() && closing_ == 0;
@@ -439,8 +440,11 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
                     pendingFrames_ = 0;
                 }
             }
-            if (pressed(&PadState::a) && MenuFocusable(v, focus_) && Run(v.items[focus_].action, touch) && v.items[focus_].closes)
-                closing_ = kClosingFrames;
+            if (pressed(&PadState::a) && MenuFocusable(v, focus_) && Run(v.items[focus_].action, touch))
+            {
+                if (v.items[focus_].closes) closing_ = kClosingFrames;
+                if (v.items[focus_].closesMenu && !v.own) menuOpen_ = false;
+            }
             if (pressed(&PadState::x))
             {
                 // An asking X (Pockets' bin): the first press arms the item (and runs its xArm),
@@ -501,7 +505,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         cursorPress_ = pad.cursor && pad.a;
         break;
     case Mode::Activity:
-        if (s.screen == Screen::Cards && focus_ >= 0 && focus_ < (int)h.size() && move)
+        if ((s.screen == Screen::Cards || s.screen == Screen::MixerSave) && focus_ >= 0 && focus_ < (int)h.size() && move)
         {
             static const int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
             Move(s, dx[dir], dy[dir]);
@@ -514,6 +518,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         // The vacuum's hand is the stick cursor: A held presses it.
         cursorPress_ = activity_.grab;
         blow_ = activity_.blow;
+        voice_ = activity_.voice;
         handDx_ = activity_.handDx;
         handDy_ = activity_.handDy;
         break;
@@ -553,7 +558,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
 void Navigator::Leave(TouchScript& touch)
 {
     touch.Cancel();
-    menuOpen_ = cursorPress_ = cursorScreen_ = blow_ = false;
+    menuOpen_ = cursorPress_ = cursorScreen_ = blow_ = voice_ = false;
     handDx_ = handDy_ = 0;
     activity_ = ActivityState();
     focus_ = -1;

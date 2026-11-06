@@ -256,7 +256,7 @@ static void minigame_frame()
     static u32 bottom[SW * SH] = {};
     for (const auto& top : {std::pair<int, int> {SW, SH}, {341, 192}, {682, 384}})
         for (Screen sc : {Screen::Cards, Screen::Vacuum, Screen::Social, Screen::Autopsy, Screen::Detector, Screen::Art, Screen::MooGoo, Screen::Drencher,
-                          Screen::Crime})
+                          Screen::Crime, Screen::Scratch, Screen::Mixer, Screen::MixerSave, Screen::Trading})
             for (int variant = 0; variant < 4; variant++)
             {
                 GameState g;
@@ -327,21 +327,45 @@ static void minigame_frame()
                 cr.phase = variant == 2 ? 2 : 0;
                 cr.angle = variant == 2 ? -90 : 0;
                 cr.hit = variant == 3;
+                // The lottery: 1 two boxes revealed, one half scratched, 2 won (the game's popup up), 3
+                // lost (the quit asked). The mixer: 1 recording, 2 the song's list (its mark), 3 the
+                // save question. The save page: 1 a used slot asked over, 2 the longest names.
+                ScratchState& sc2 = g.minigame.scratch;
+                sc2.valid = variant > 0;
+                sc2.tier = variant == 3 ? 2 : 0;
+                sc2.prize = variant == 2 ? 100 : 10;
+                sc2.state = variant == 2 ? 2 : variant == 3 ? 3 : 1;
+                sc2.revealed = variant == 3 ? 5 : variant == 2 ? 3 : 2;
+                for (int i = 0; i < kScratchBoxes; i++) sc2.boxes[i] = {i % 7, i < sc2.revealed, i < sc2.revealed ? 1024 : i == 7 ? 400 : 0};
+                MixerState& mx = g.minigame.mixer;
+                mx.valid = variant > 0;
+                mx.phase = variant == 1 ? 2 : variant == 2 ? 7 : variant == 3 ? 0xA : 0;
+                mx.song = variant == 3 ? 8 : 7;
+                mx.instrument = 5;
+                mx.octave = -1;
+                mx.sustain = true;
+                mx.tracks = 0x5A;
+                mx.tempo = 255;
+                MixerSaveState& ms = g.minigame.mixerSave;
+                ms.valid = variant > 0;
+                ms.name = variant == 2 ? "WWWWWWWWWWWWWWW" : "AB";
+                for (int j = 0; j < kMixerSaveSlots; j++) { ms.used[j] = j != 1; ms.slotName[j] = variant == 2 ? "WWWWWWWWWWWWWWW" : "Song"; }
                 PopupState& pop = g.town.popup;
-                pop.valid = variant == 2 && sc == Screen::Art;
+                pop.valid = (variant == 2 && sc == Screen::Art) || (variant == 2 && sc == Screen::Scratch);
                 pop.state = 2;
                 pop.kind = 2;
                 pop.boxY = 80; pop.boxW = 160; pop.boxTiles = 6;
                 PointerView pv;
                 pv.shown = true;
                 pv.down = variant == 1;
-                pv.quitArmed = variant == 2 && sc == Screen::Autopsy;
+                pv.quitArmed = (variant == 2 && sc == Screen::Autopsy) || (variant == 3 && sc == Screen::Scratch) || (variant == 1 && sc == Screen::MixerSave);
                 pv.x = variant == 2 ? SW - 1 : 0;
                 pv.y = variant == 2 ? SH - 1 : 0;
                 if (sc == Screen::MooGoo && variant == 1) pv.mark = MooGooMonkeyRect(5);
+                if (sc == Screen::Mixer && variant == 2) pv.mark = MixerRowRect(7);
                 const size_t overlays0 = 3;   // (the backdrop and the two pictures' frames)
                 Composition c {kConsoleW, kConsoleH, {}, {}};
-                BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom, nullptr, &pv);
+                BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom, nullptr, &pv, sc == Screen::MixerSave ? 27 : -1);
                 CHECK(c.pieces.size() == 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
                       c.pieces[0].to.w == kActivityBottomTo.w && c.pieces[0].to.h == kActivityBottomTo.h);
                 const Rect topTo = c.pieces[1].to;
@@ -377,11 +401,17 @@ static void minigame_frame()
                 CHECK(prompt > 0);
                 // The clog lights the blow's hint; the cards' question has two chips (Yes, No), the message one.
                 const bool litNow = (sc == Screen::Vacuum && variant == 2) || (sc == Screen::Autopsy && variant > 0) || (sc == Screen::Detector && variant == 2) ||
-                                    (sc == Screen::Drencher && variant == 1) || (sc == Screen::Crime && variant == 2);
+                                    (sc == Screen::Drencher && variant == 1) || (sc == Screen::Crime && variant == 2) ||
+                                    (sc == Screen::Scratch && variant == 3) || (sc == Screen::Mixer && variant == 1) || (sc == Screen::MixerSave && variant == 1);
                 CHECK(lit == (sc == Screen::Crime && variant == 1 ? 3 : litNow ? 1 : 0));
                 CHECK(pointer == (OwnScheme(sc) ? 2 : 0));   // (shown: the navigator shows it on the pointing games and the crime game's aim)
                 // MooGoo's focus: one ring over the playfield, around the monkey (an overlay).
-                CHECK(c.overlays.size() == overlays0 + (sc == Screen::MooGoo && variant == 1 ? 1 : 0));
+                CHECK(c.overlays.size() == overlays0 + ((sc == Screen::MooGoo && variant == 1) || (sc == Screen::Mixer && variant == 2) ? 1 : 0));
+                // The lottery's popup: A alone (the game's Close); the mixer's save question: A, B, X;
+                // the wireless lobby: B alone.
+                if (sc == Screen::Scratch && variant == 2) CHECK(chips == 1);
+                if (sc == Screen::Mixer && variant == 3) CHECK(chips == 3);
+                if (sc == Screen::Trading) CHECK(chips == 1);
                 if (sc == Screen::MooGoo && variant == 1)
                 {
                     const Rect o = c.overlays.back().to;

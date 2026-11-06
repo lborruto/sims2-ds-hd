@@ -1,0 +1,3 @@
+# From G-T-trade (the wireless lobby): A does nothing, B its X: back to the title.
+10 2 pad a
+40 2 pad b

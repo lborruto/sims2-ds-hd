@@ -403,6 +403,164 @@ void Crime(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& 
     else if (Pressed(pad, st, &PadState::y)) touch.Tap(kCrimeSubdue.x, kCrimeSubdue.y);
     else if (Pressed(pad, st, &PadState::b)) touch.Tap(kCrimeX.x, kCrimeX.y);
 }
+void Tap(TouchScript& touch, Point p) { touch.Tap(p.x, p.y); }
+
+// The Scratch lottery: the box under the pointer still covered, else the nearest one, or -1.
+int RubTarget(const ActivityState& st)
+{
+    const ActivityRam& r = st.ram;
+    int best = -1;
+    float bestD = 0;
+    for (int i = 0; i < 8; i++)
+    {
+        if (r.scratchOpen[i]) continue;
+        const Point c = ScratchCentre(r.scratchTier, i);
+        const float dx = st.px - c.x, dy = st.py - c.y;
+        if (std::fabs(dx) <= 16 && std::fabs(dy) <= 16) return i;
+        const float d = dx * dx + dy * dy;
+        if (best < 0 || d < bestD) { best = i; bestD = d; }
+    }
+    return best;
+}
+
+void Scratch(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
+{
+    const ActivityRam& r = st.ram;
+    st.pointer = true;
+    auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
+    if (r.scratch && r.scratchPopup)
+    {
+        // The game's popup (the hint, the win, the loss): its own A, B and Start close it.
+        st.rubBox = -1;
+        st.quitArmed = 0;
+        set(pad.a, kA);
+        set(pad.b, kB);
+        set(pad.start, kStart);
+        st.latch = pad.a; // (A let go before it scratches)
+        return;
+    }
+    if (st.quitArmed > 0) st.quitArmed--;
+    const bool quit = Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::start);
+    if (quit)
+    {
+        st.rubBox = -1;
+        if (st.quitArmed > 0 && canTap) { Tap(touch, ScratchX(r.scratchTier)); st.quitArmed = 0; }
+        else st.quitArmed = kQuitWindow;
+        return;
+    }
+    if (Pressed(pad, st, &PadState::a) || Pressed(pad, st, &PadState::x)) st.quitArmed = 0;
+    if (st.rubBox >= 0)
+    {
+        // X's rub: to the path's start (the stylus up), a press there, then along the path.
+        const bool stop = Pressed(pad, st, &PadState::a) || (r.scratch && r.scratchOpen[st.rubBox]) || st.rubAt >= (int)st.rubPath.size();
+        if (stop) { st.rubBox = -1; st.latch = true; return; }
+        const Point to = st.rubPath[st.rubAt];
+        const float dx = to.x - st.px, dy = to.y - st.py, d = std::sqrt(dx * dx + dy * dy);
+        const float cap = st.rubFrames > 0 ? kPtrDrag : kPtrMax;
+        if (d > cap) { st.px += dx * cap / d; st.py += dy * cap / d; }
+        else
+        {
+            st.px = (float)to.x;
+            st.py = (float)to.y;
+            if (st.rubAt > 0) st.rubAt++;
+        }
+        if (st.rubAt == 0 && d <= cap)
+        {
+            // On the start: pressed, still for 2 frames (the press lands inside the box).
+            st.rubFrames++;
+            st.down = true;
+            if (st.rubFrames >= 3) st.rubAt = 1;
+            return;
+        }
+        st.down = st.rubFrames > 0;
+        return;
+    }
+    MovePointer(pad, st, pad.a ? kPtrDrag : kPtrMax, true);
+    PressPointer(pad, st, canTap);
+    if (pad.a || !canTap) return;
+    if (Pressed(pad, st, &PadState::x))
+    {
+        const int box = RubTarget(st);
+        if (box >= 0)
+        {
+            st.rubBox = box;
+            st.rubPath = ScratchRub(r.scratchTier, box);
+            st.rubAt = 0;
+            st.rubFrames = 0;
+        }
+    }
+}
+
+void Mixer(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
+{
+    const ActivityRam& r = st.ram;
+    const int phase = r.mixer ? r.mixerPhase : 0;
+    auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
+    const bool a = Pressed(pad, st, &PadState::a), b = Pressed(pad, st, &PadState::b), x = Pressed(pad, st, &PadState::x);
+    if (phase == 0xA)
+    {
+        // "Do you want to save your song?": A Yes, B No, X Preview.
+        if (!canTap) return;
+        if (a) { Tap(touch, kMixYes); st.latch = true; }
+        else if (b) Tap(touch, kMixNo);
+        else if (x) Tap(touch, kMixPreview);
+        return;
+    }
+    if (phase == 7)
+    {
+        // The song's list: Up / Down a focus over its rows, A picks, B cancels.
+        const int n = std::clamp(r.mixerSongs, 1, 8);
+        if (st.focus < 0 || st.focus >= n) st.focus = 0;
+        if (pad.up && !st.prev.up) st.focus = std::max(0, st.focus - 1);
+        if (pad.down && !st.prev.down) st.focus = std::min(n - 1, st.focus + 1);
+        st.mark = MixerRowRect(st.focus);
+        if (!canTap) return;
+        if (a) { Tap(touch, MixerRow(st.focus)); st.latch = true; }
+        else if (b) Tap(touch, kMixGenre);
+        return;
+    }
+    st.focus = -1;
+    st.pointer = true;
+    // The DS keys the game reads, held: Up / Down the octave, Right sustain, Left PREP.
+    set(pad.up, kUp);
+    set(pad.down, kDown);
+    set(pad.left, kLeft);
+    set(pad.right, kRight);
+    // Y: the microphone (VOX), from the idle mixer; held while the game records it.
+    if (Pressed(pad, st, &PadState::y) && phase == 0 && canTap && !pad.a) Tap(touch, kMixVox);
+    if (!pad.y && st.prev.y && phase == 5 && canTap) Tap(touch, kMixVox);
+    st.voice = pad.y && (phase == 0 || phase == 5);
+    MovePointer(pad, st, pad.a ? kPtrDrag : kPtrMax, false);
+    PressPointer(pad, st, canTap);
+    if (pad.a || !canTap) return;
+    if (phase == 8 || phase == 9) { if (b) Tap(touch, kMixHelp); return; }
+    if (x) Tap(touch, kMixPlay);
+    else if (Pressed(pad, st, &PadState::rb)) Tap(touch, kMixRecord);
+    else if (Pressed(pad, st, &PadState::lb) && phase == 0) Tap(touch, kMixGenre);
+    else if (b) Tap(touch, phase == 1 ? kMixPlay : phase == 2 ? kMixRecord : kMixQuit);
+}
+
+void MixerSave(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap)
+{
+    const std::vector<Hotspot>& h = HotspotsFor({Screen::MixerSave, Tab::None});
+    if (st.focus < 0 || st.focus >= (int)h.size()) st.focus = 0;
+    const int slot = !strncmp(h[st.focus].name, "slot ", 5) ? atoi(h[st.focus].name + 5) - 1 : -1;
+    if (slot != st.armedSlot) st.armedSlot = -1; // (a move forgets the question)
+    if (!canTap) return;
+    if (Pressed(pad, st, &PadState::a))
+    {
+        if (slot >= 0 && st.ram.mixerSave && st.ram.mixerSaveUsed[slot] && st.armedSlot != slot) { st.armedSlot = slot; return; }
+        st.armedSlot = -1;
+        touch.Tap(h[st.focus].x, h[st.focus].y);
+    }
+    else if (Pressed(pad, st, &PadState::y)) { const Hotspot& k = h[Named(h, "backspace")]; touch.Tap(k.x, k.y); }
+    else if (Pressed(pad, st, &PadState::b)) { const Hotspot& k = h[Named(h, "close")]; touch.Tap(k.x, k.y); }
+}
+
+void Trading(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap)
+{
+    if (canTap && Pressed(pad, st, &PadState::b)) Tap(touch, kTradingX);
+}
 }
 
 Point ArtTool(int b)
@@ -419,7 +577,34 @@ Point ArtSwatch(int i)
 
 bool IsPointing(Screen s) { return s == Screen::Autopsy || s == Screen::Detector || s == Screen::Art; }
 bool IsTiming(Screen s) { return s == Screen::MooGoo || s == Screen::Drencher || s == Screen::Crime; }
-bool OwnScheme(Screen s) { return IsPointing(s) || IsTiming(s); }
+bool OwnScheme(Screen s)
+{
+    return IsPointing(s) || IsTiming(s) || s == Screen::Scratch || s == Screen::Mixer || s == Screen::MixerSave || s == Screen::Trading;
+}
+
+Point ScratchCentre(int tier, int i)
+{
+    i = std::clamp(i, 0, 7);
+    const int col = i % 4, row = i / 4;
+    if (tier == 1) return {104 + 40 * col, 64 + 48 * row};
+    if (tier == 2) return {103 + 40 * col, 63 + 48 * row};
+    return {col == 3 ? (row ? 215 : 216) : 95 + 40 * col, 63 + 48 * row};
+}
+
+Point ScratchX(int tier) { return tier == 1 || tier == 2 ? Point {230, 167} : Point {232, 169}; }
+
+std::vector<Point> ScratchRub(int tier, int i)
+{
+    const Point c = ScratchCentre(tier, i);
+    std::vector<Point> p;
+    for (int k = 0, y = c.y - kRubHalf; y <= c.y + kRubHalf; y += kRubStep, k++)
+    {
+        const int x0 = k % 2 ? c.x + kRubHalf : c.x - kRubHalf, x1 = k % 2 ? c.x - kRubHalf : c.x + kRubHalf;
+        p.push_back({x0, y});
+        p.push_back({x1, y});
+    }
+    return p;
+}
 
 void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
 {
@@ -458,10 +643,14 @@ void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKey
     st.handDx = st.handDy = 0;
     st.pointer = st.down = false;
     st.mark = {0, 0, 0, 0};
+    st.voice = false;
     // (The autopsy quits on Start at once: its Start asks first, ActivityInput's Autopsy; MooGoo's
-    // Start is its X.)
-    if (pad.start && s != Screen::Autopsy && s != Screen::MooGoo) dsKeys |= 1u << kStart;
-    if (pad.select) dsKeys |= 1u << kSelect;
+    // Start is its X; the lottery's Start asks as its B; the mixer's and its save page's do nothing
+    // in the game; the wireless lobby's are its own.)
+    if (pad.start && s != Screen::Autopsy && s != Screen::MooGoo && s != Screen::Scratch && s != Screen::Mixer && s != Screen::MixerSave &&
+        s != Screen::Trading)
+        dsKeys |= 1u << kStart;
+    if (pad.select && s != Screen::Trading) dsKeys |= 1u << kSelect;
     const bool canTap = !touch.Owns();
     switch (s)
     {
@@ -474,6 +663,10 @@ void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKey
     case Screen::MooGoo: MooGoo(pad, touch, dsKeys, st, canTap); break;
     case Screen::Drencher: Drencher(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     case Screen::Crime: Crime(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
+    case Screen::Scratch: Scratch(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
+    case Screen::Mixer: Mixer(pad, touch, dsKeys, st, canTap); break;
+    case Screen::MixerSave: MixerSave(pad, touch, st, canTap); break;
+    case Screen::Trading: Trading(pad, touch, st, canTap); st.focus = -1; break;
     default: break;
     }
 }
@@ -505,6 +698,14 @@ std::vector<Hint> ActivityHints(Screen s)
     case Screen::Crime:
         return {{"L-STICK", "WALK"}, {"X", "SCARE"}, {"A", "HOLD: AIM,\nLET GO: THROW"}, {"Y", "SUBDUE"},
                 {"LB", "RUN"}, {"B", "PUT AWAY"}};
+    case Screen::Scratch:
+        return {{"STICK", "POINT (LT SLOW)"}, {"A", "HOLD: SCRATCH"}, {"X", "RUB THE BOX"}, {"B B", "QUIT (TICKET\nLOST)"}};
+    case Screen::Mixer:
+        return {{"STICK", "POINT (LT SLOW)"}, {"A", "HOLD: TOUCH"}, {"X", "PLAY / STOP"}, {"RB", "RECORD"},
+                {"Y", "HOLD: VOX MIC"}, {"D-PAD", "OCTAVE, PREP,\nSUSTAIN"}, {"B", "QUIT"}};
+    case Screen::MixerSave:
+        return {{"D-PAD", "CHOOSE"}, {"A", "TYPE / SAVE"}, {"Y", "BACKSPACE"}, {"B", "BACK"}};
+    case Screen::Trading: return {{nullptr, "NEEDS A SECOND DS"}, {"B", "EXIT"}};
     default: return {};
     }
 }

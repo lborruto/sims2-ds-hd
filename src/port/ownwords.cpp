@@ -111,6 +111,40 @@ constexpr const char* kWords[][5] = {
     {"Ready", "Prêt", "Bereit", "Pronto", "Listo"},
     {"Aim", "Visée", "Ziel", "Mira", "Puntería"},
     {"Hit!", "Touché !", "Treffer!", "Colpito!", "¡Tocado!"},
+    // The Scratch lottery: A, X, B asked once, the prize, the boxes
+    {"Hold: scratch", "Maintenir : gratter", "Halten: rubbeln", "Tieni: gratta", "Mantén: rascar"},
+    {"Scratch this box", "Gratter la case", "Feld freirubbeln", "Gratta la casella", "Rascar la casilla"},
+    {"Again: quit, the ticket lost", "Encore : quitter, ticket perdu", "Nochmal: beenden, Los verloren", "Ancora: esci, biglietto perso", "Otra vez: salir, boleto perdido"},
+    {"Top prize", "Gros lot", "Hauptgewinn", "Primo premio", "Premio mayor"},
+    {"@1 of 5 scratched", "@1 sur 5 grattées", "@1 von 5 gerubbelt", "@1 di 5 grattate", "@1 de 5 rascadas"},
+    // The music mixer: the hints
+    {"Hold: touch", "Maintenir : toucher", "Halten: tippen", "Tieni: tocca", "Mantén: tocar"},
+    {"Touch", "Toucher", "Tippen", "Tocca", "Tocar"},
+    {"Octave", "Octave", "Oktave", "Ottava", "Octava"},
+    {"Sustain", "Tenue", "Halten", "Sostegno", "Sostener"},
+    {"Stop", "Arrêter", "Stopp", "Ferma", "Parar"},
+    {"Hold: VOX (mic)", "Maintenir : VOX (micro)", "Halten: VOX (Mikro)", "Tieni: VOX (micro)", "Mantén: VOX (micro)"},
+    {"Let go: stop", "Relâcher : arrêter", "Loslassen: stopp", "Rilascia: ferma", "Suelta: parar"},
+    {"Choose", "Choisir", "Wählen", "Scegli", "Elegir"},
+    {"Back", "Retour", "Zurück", "Indietro", "Atrás"},
+    {"Octave, sustain, @1", "Octave, tenue, @1", "Oktave, halten, @1", "Ottava, sostegno, @1", "Octava, sostener, @1"},
+    // The mixer's values
+    {"Song", "Morceau", "Song", "Brano", "Canción"},
+    {"Instrument", "Instrument", "Instrument", "Strumento", "Instrumento"},
+    {"Ready", "Prêt", "Bereit", "Pronto", "Listo"},
+    {"Playing", "Lecture", "Spielt", "In riproduzione", "Sonando"},
+    {"Recording", "Enregistrement", "Aufnahme", "Registrazione", "Grabando"},
+    {"Help", "Aide", "Hilfe", "Aiuto", "Ayuda"},
+    // The save page
+    {"Type", "Écrire", "Tippen", "Scrivi", "Escribir"},
+    {"Save here", "Enregistrer ici", "Hier speichern", "Salva qui", "Guardar aquí"},
+    {"Again: save over it", "Encore : écraser", "Nochmal: überschreiben", "Ancora: sovrascrivi", "Otra vez: sobrescribir"},
+    {"Erase", "Effacer", "Löschen", "Cancella", "Borrar"},
+    {"Slot @1", "Emplacement @1", "Platz @1", "Spazio @1", "Espacio @1"},
+    // The wireless lobby
+    {"Wireless play needs a second DS: not in this port.", "Le jeu sans fil demande une deuxième DS : absent de ce portage.",
+     "Drahtlos-Spiel braucht eine zweite DS: nicht in dieser Portierung.", "Il gioco wireless richiede un secondo DS: non in questo port.",
+     "El juego inalámbrico necesita otra DS: no está en esta versión."},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

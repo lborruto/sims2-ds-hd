@@ -39,6 +39,10 @@ constexpr int kInteractRowX = 460, kInteractRowW = 620, kInteractRowY = 210, kIn
 constexpr Rect kInteractStrip {200, 514, 880, 64};
 // Item ids (stable across rebuilds): a row's from its code and place.
 constexpr u32 kInteractRowId = kModInteract + 0x100;
+// The verbs that play an animation on the world and open no screen (research/m6 12): "Insert Coin"
+// 0x18 (the slot machine, an arcade cabinet), "Freefall" 0x32 / "Land" 0x33 (the skydive), "Stop"
+// 0xC (an arcade cabinet): A closes the menu with their tap (ViewItem::closesMenu).
+constexpr bool InteractAnimation(int code) { return code == 0x18 || code == 0x32 || code == 0x33 || code == 0xC; }
 
 // Interact's items appended to v (the rows: one per action the game lists, greyed ones disabled)
 // and its Left / Right (the strip's previous / next target, when there is one).

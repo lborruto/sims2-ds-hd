@@ -233,17 +233,14 @@ static void to_screen_state()
         CHECK(PixelsAgree(g, {Screen::Unknown}) && PixelsAgree(g, {Screen::None}) && !PixelsAgree(g, {Screen::Panel, Tab::Interact}));
         CHECK(ConsoleScreenOf(g, {Screen::None}, false, false) == (ScreenState{sc}));
     }
-    // The timing games too (MooGoo, Crime: the Drencher above); the others the stick cursor's Unknown.
-    for (auto [m, sc] : {std::pair{GScreen::MooGoo, Screen::MooGoo}, {GScreen::Crime, Screen::Crime}})
+    // The timing games too (MooGoo, Crime: the Drencher above), the lottery, the mixer, its save
+    // page and the wireless lobby: every minigame is a screen of its own.
+    for (auto [m, sc] : {std::pair{GScreen::MooGoo, Screen::MooGoo}, {GScreen::Crime, Screen::Crime}, {GScreen::Scratch, Screen::Scratch},
+                         {GScreen::Mixer, Screen::Mixer}, {GScreen::MixerSave, Screen::MixerSave}, {GScreen::Trading, Screen::Trading}})
     {
         g.screen = m;
         CHECK(ToScreenState(g) == (ScreenState{sc}));
         CHECK(PixelsAgree(g, {Screen::Unknown}) && PixelsAgree(g, {Screen::None}) && !PixelsAgree(g, {Screen::Panel, Tab::Interact}));
-    }
-    for (GScreen m : {GScreen::Scratch, GScreen::Mixer, GScreen::MixerSave})
-    {
-        g.screen = m;
-        CHECK(ToScreenState(g) == (ScreenState{Screen::Unknown}));
     }
     // The pixels' answers that go with the game's screens.
     g.screen = GScreen::FrontEnd;
@@ -975,16 +972,19 @@ static void minigame_screens()
         {0x0214EBC4, 0, GScreen::Autopsy}, {0x0214C124, 9, GScreen::Detector}, {0x02152E0C, 10, GScreen::MooGoo}, {0x02152EC8, 10, GScreen::MooGoo},
         {0x0214AFC4, 13, GScreen::Scratch}, {0x0214B8BC, 18, GScreen::Drencher}, {0x02134EC8, -1, GScreen::Crime},
         {0x02134F10, -1, GScreen::Mixer}, {0x02134FA0, -1, GScreen::MixerSave}, {0x02134D70, -1, GScreen::ArtGallery},
+        {0x02136AEC, -1, GScreen::Trading}, {0x02136B7C, -1, GScreen::Trading},
     };
     for (auto& c : t)
     {
         const GameState g = ReadGameState(mg_ram(c.vt, c.ov).View());
         CHECK(g.valid && g.screen == c.s);
         CHECK(std::string(GScreenName(c.s)) == GameStateName(g));
-        // CONSOLE's: the pointing and timing games their own screens, the others the stick cursor's Unknown.
+        // CONSOLE's: every minigame a screen of its own.
         const Screen want = c.s == GScreen::Drencher ? Screen::Drencher : c.s == GScreen::Autopsy ? Screen::Autopsy
                           : c.s == GScreen::Detector ? Screen::Detector : c.s == GScreen::ArtGallery ? Screen::Art
-                          : c.s == GScreen::MooGoo ? Screen::MooGoo : c.s == GScreen::Crime ? Screen::Crime : Screen::Unknown;
+                          : c.s == GScreen::MooGoo ? Screen::MooGoo : c.s == GScreen::Crime ? Screen::Crime
+                          : c.s == GScreen::Scratch ? Screen::Scratch : c.s == GScreen::Mixer ? Screen::Mixer
+                          : c.s == GScreen::MixerSave ? Screen::MixerSave : c.s == GScreen::Trading ? Screen::Trading : Screen::Unknown;
         CHECK(ToScreenState(g) == (ScreenState{want}));
     }
     // The overlay's classes need their overlay; the arm9 classes do not care.

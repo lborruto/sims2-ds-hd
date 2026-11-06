@@ -70,7 +70,7 @@ static void tables_inside_screen()
     std::vector<ScreenState> all;
     for (Screen s : {Screen::None, Screen::Phone, Screen::Dialogue, Screen::Popup, Screen::Gift, Screen::Social,
                      Screen::Vacuum, Screen::Cards, Screen::Catalogue, Screen::Build, Screen::FrontEnd,
-                     Screen::CreateASim, Screen::SaveSlots, Screen::Drencher, Screen::Unknown})
+                     Screen::CreateASim, Screen::SaveSlots, Screen::Drencher, Screen::Unknown, Screen::MixerSave})
         all.push_back({s, Tab::None});
     for (Tab t : {Tab::None, Tab::Interact, Tab::Pockets, Tab::Goals, Tab::Relationships, Tab::Options})
         all.push_back({Screen::Panel, t});
@@ -117,6 +117,8 @@ static void tables_have_their_targets()
     CHECK(Count({Screen::Phone, Tab::None}) == 4);
     CHECK(Has({Screen::Phone, Tab::None}, kPhoneClose));
     CHECK(Count({Screen::Dialogue, Tab::None}) == 1);
+    CHECK(Count({Screen::MixerSave, Tab::None}) == 26 + 1 + 3 + 3 + 1);   // the keys, backspace, the pages, the slots, the X
+    CHECK(HotspotsFor({Screen::Scratch, Tab::None}).empty() && HotspotsFor({Screen::Mixer, Tab::None}).empty());   // (their pointer)
     CHECK(Has({Screen::Dialogue, Tab::None}, kDialogueArrow));
     CHECK(Count({Screen::Popup, Tab::None}) == 1);
     CHECK(Has({Screen::Popup, Tab::None}, kPopupClose));

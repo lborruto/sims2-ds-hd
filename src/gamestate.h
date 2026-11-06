@@ -12,6 +12,10 @@ namespace sims2wide
 enum class GScreen { Unknown, FrontEnd /*title or main menu*/, CreateASim, Panel, Popup, Phone, Dialogue, Gift, Catalogue, Build, Vacuum, Social, Cards, SaveSlots, Drencher,
                // The minigames (milestone 6; MinigameState): CONSOLE knows none of them yet (the stick cursor's screens).
                Autopsy, Detector, MooGoo /*intro and game*/, Scratch, Crime, Mixer, MixerSave, ArtGallery,
+               // The wireless lobby (module 0x1E, CWirelessLobby, "DS Wireless" 2026: the title's way to the
+               // trading session, Keelhaulin' and MooGoo over wireless) and its trading screen (CTradingGame):
+               // out of the port's scope (one DS), shown safely.
+               Trading,
                ItemHand = Drencher /*the old name: Pockets > the hand with the Super Drencher, overlay 18*/ };
 
 // The status bar (top screen rows 176-191), from the game-state block G. valid: G reads and every

@@ -30,11 +30,14 @@
   that say what A, X and B do: do an action, use or throw away an item, give a gift, read your
   goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend, buy
   and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions, the Alien Autopsy, the Metal
-  Detector, painting at the Art Gallery, Moogoo Monkey, the Super Drencher, the Ratticator's Rat-A-Rang) keep their own playfield, big, in an HD frame: the game's name,
+  Detector, painting at the Art Gallery, Moogoo Monkey, the Super Drencher, the Ratticator's Rat-A-Rang, the
+  scratch tickets, the music mixer) keep their own playfield, big, in an HD frame: the game's name,
   its numbers (the cards' score board, the vacuum's earnings, the organs' health, the detector's charge
-  and signal, your brush and color, Moogoo's round and fruit, the Drencher's water and pressure) and the buttons' hints, which follow what the game asks (the cards'
-  quit question, a clogged filter, an organ to carry); the hints are our own words, translated into the
-  game's five languages. The pointing games have a pointer on the sticks.
+  and signal, your brush and color, Moogoo's round and fruit, the Drencher's water and pressure, the ticket's
+  prize and boxes, the mixer's song, tempo and tracks) and the buttons' hints, which follow what the game asks (the cards'
+  quit question, a clogged filter, an organ to carry, the mixer's "save your song?"); the hints are our own words, translated into the
+  game's five languages. The pointing games have a pointer on the sticks. The slot machine and the
+  other animations show the world big, with what you won beside the status bar.
   No mouse needed, though it works.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
@@ -202,6 +205,21 @@ comes back on the same row after it. A note closes on A or B.
 | | S / A | X / Y | scare / subdue |
 | | X (hold) + arrows | A (hold) + a stick or the D-pad | aim; let go to throw |
 | | Q / Z | LB / B | run / put it away |
+| Scratch ticket | Arrows | either stick (LT: slow), D-pad | move the pointer |
+| | X (hold) | A (hold) | scratch |
+| | S | X | scratch the box under the pointer for you |
+| | X / Z / Enter | A / B / Start | close the game's message (a win is paid when you close it) |
+| | Z twice | B twice | quit (the ticket is lost) |
+| Music mixer | the mouse | either stick (LT: slow) | move the pointer |
+| | X (hold) | A (hold) | press a key, a button, a slider |
+| | Arrows (hold) | D-pad (hold) | Up / Down: an octave up / down; Right: sustain; Left: PREP |
+| | S / W / Q | X / RB / LB | PLAY, RECORD, GENRE (Z / B stops) |
+| | A (hold) | Y (hold) | record your voice (VOX): the microphone while held |
+| | Z | B | quit; in the song list: back |
+| | X / Z / S | A / B / X | "save your song?": yes / no / preview |
+| Saving a song | Arrows | D-pad or left stick | choose a letter, a page, a slot |
+| | X | A | type it, or save into the slot (a used slot asks: again to save over it) |
+| | A / Z | Y / B | erase a letter / back to the mixer |
 
 <p align="center">
   <img src="docs/screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big at the left, the world small at the top right, the buttons' hints below it" width="440">
@@ -277,9 +295,12 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
 - **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).
 - **Most minigames not checked yet.** The social reactions, the shop, Build Rooms and the vacuum
   (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
-  filter clear) and the casino's cards are; the autopsy, the detector, painting, Moogoo Monkey and the Rat-A-Rang were played from test states
-  (not reached by walking to them yet; Moogoo opens on Monkey Day, the Rat-A-Rang with the Ratticator's costume), the Super Drencher from the pockets; the music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows
+  filter clear) and the casino's cards are; the autopsy, the detector, painting, Moogoo Monkey, the Rat-A-Rang, the scratch tickets and the
+  music mixer were played from test states (not reached by walking to them yet; Moogoo opens on Monkey Day, the Rat-A-Rang with the Ratticator's
+  costume), the Super Drencher from the pockets; the slot machine, the skydive and the arcade cabinets were not reached at all. If one shows up wrong, Tab swaps the big screen and 2 shows
   both.
+- **No wireless play.** Trading, and Moogoo or the cards with a second DS, need two consoles: the
+  wireless screen says so and B leaves it.
 - **CONSOLE needs the European game** (code `ASJP`): it reads the game's screens from its memory,
   and that map is the European one. With another version, CONSOLE falls back to recognising the
   screens by their pixels (as before) and the program says so. The American one should work

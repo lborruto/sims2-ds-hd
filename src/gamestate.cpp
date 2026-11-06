@@ -125,7 +125,7 @@ struct EUTable
     // The minigames (milestone 6; docs/research/ram-map.md, "The minigames"): every screen's (overlay, vtable) and the offsets from S.
     struct Minigames
     {
-        OvScreen screens[9];                                 // ov kAnyOverlay: the class has no overlay of its own (its vtable says it)
+        OvScreen screens[11];                                 // ov kAnyOverlay: the class has no overlay of its own (its vtable says it)
         u32 vtMooGooIntro;                                   // the intro's vtable (screens[] names the game's)
         // Alien Autopsy
         u32 auOrgans, auOrganStride, auDamage, auKind, auFreed;      // from S: organ slots {+0xC u16 damage, +0xE u8 kind, +0xF u8 freed}
@@ -258,6 +258,7 @@ constexpr EUTable kEU = {
             {0, 0x0214EBC4, GScreen::Autopsy}, {9, 0x0214C124, GScreen::Detector}, {10, 0x02152E0C, GScreen::MooGoo}, {10, 0x02152EC8, GScreen::MooGoo},
             {13, 0x0214AFC4, GScreen::Scratch}, {kAnyOverlay, 0x02134EC8, GScreen::Crime}, {kAnyOverlay, 0x02134F10, GScreen::Mixer},
             {kAnyOverlay, 0x02134FA0, GScreen::MixerSave}, {kAnyOverlay, 0x02134D70, GScreen::ArtGallery},
+            {kAnyOverlay, 0x02136AEC, GScreen::Trading}, {kAnyOverlay, 0x02136B7C, GScreen::Trading},
         },
         0x02152EC8,
         0x28, 0x10, 0xC, 0xE, 0xF,
@@ -1834,6 +1835,7 @@ const char* GScreenName(GScreen s)
     case GScreen::Mixer: return "Mixer";
     case GScreen::MixerSave: return "MixerSave";
     case GScreen::ArtGallery: return "ArtGallery";
+    case GScreen::Trading: return "Trading";
     default: return "Unknown";
     }
 }
@@ -1878,8 +1880,10 @@ ScreenState ToScreenState(const GameState& g)
     case GScreen::ArtGallery: return {Screen::Art};
     case GScreen::MooGoo: return {Screen::MooGoo};
     case GScreen::Crime: return {Screen::Crime};
-    case GScreen::Scratch:
-    case GScreen::Mixer: case GScreen::MixerSave:
+    case GScreen::Scratch: return {Screen::Scratch};
+    case GScreen::Mixer: return {Screen::Mixer};
+    case GScreen::MixerSave: return {Screen::MixerSave};
+    case GScreen::Trading: return {Screen::Trading};
     case GScreen::Unknown: break;
     }
     return {Screen::Unknown};
@@ -1895,7 +1899,8 @@ bool PixelsAgree(const GameState& g, ScreenState pixels)
     case Screen::FrontEnd: case Screen::CreateASim: return pixels.screen == Screen::None;
     case Screen::SaveSlots: case Screen::Drencher: return pixels.screen == Screen::Unknown;
     // (The minigames: no rule of their own in the pixels.)
-    case Screen::Autopsy: case Screen::Detector: case Screen::Art: case Screen::MooGoo: case Screen::Crime: return pixels.screen == Screen::Unknown || pixels.screen == Screen::None;
+    case Screen::Autopsy: case Screen::Detector: case Screen::Art: case Screen::MooGoo: case Screen::Crime:
+    case Screen::Scratch: case Screen::Mixer: case Screen::MixerSave: case Screen::Trading: return pixels.screen == Screen::Unknown || pixels.screen == Screen::None;
     default: return false;
     }
 }

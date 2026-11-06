@@ -57,7 +57,10 @@
 # the pointer in the playfield's middle, the hints lit as the game asks); and the mg-* runs: an organ
 # carried to the tray and banked, the payout, the autopsy quit (B twice) and not quit (B once), a dig
 # with the depth slider moved, the detector off, a stroke, undo, the bucket's fill and a colour, the
-# painting's question answered both ways.
+# painting's question answered both ways. The lottery, the mixer, its save page and the wireless lobby
+# (pictures scratch, mixer, mixer-wide, mixer-save, trading; the mg-scratch-*, mg-mixer-*,
+# mg-mixersave-back and mg-trading-exit runs): a ticket won and paid, a quit asked then done, a
+# recording saved into a slot, the microphone recorded, the save page left, the lobby left.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
 #   bash tests/console_check.sh
 # Override with SIMS2WIDE, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh),
@@ -153,6 +156,14 @@ run drencher G-C-wg-pump "${late[@]}" &
 run drencher-wide G-C-wg-pump "${late[@]}" --wide &
 wait
 run crime G-X-crime "${late[@]}" &
+# The Scratch lottery (two boxes revealed, the prize 10), the music mixer (and --wide), its save page
+# (the focus on the first key), the wireless lobby (out of scope: its note).
+run scratch G-B-sc-two-p10 "${late[@]}" &
+run mixer G-X-music "${late[@]}" &
+wait
+run mixer-wide G-X-music "${late[@]}" --wide &
+run mixer-save G-D-mus-save "${late[@]}" --console-focus 0 &
+run trading G-T-trade "${late[@]}" &
 wait
 run s2 s2 "${town[@]}" &
 run s4 s4 "${town[@]}" &
@@ -224,7 +235,7 @@ wait
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
     cards-m1 cards-ask cards-wide vacuum-clog vacuum-2x social-wide autopsy autopsy-2x detector detector-wide art art-ask \
-    moogoo moogoo-2x drencher drencher-wide crime \
+    moogoo moogoo-2x drencher drencher-wide crime scratch mixer mixer-wide mixer-save trading \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
@@ -262,9 +273,9 @@ def expect(what, got, want):
         errors.append(f"{what}: {got} (want {want})")
 
 # Canvas points the pointing minigames' pointer covers (its ring, 15 around its point): not compared.
-SKIP = [(421, 356)] if case.split("-")[0] in ("autopsy", "art") else []
+SKIP = [(421, 356)] if case.split("-")[0] in ("autopsy", "art", "scratch") or case in ("mixer", "mixer-wide") else []
 # DS rectangles a ring is drawn around (MooGoo's focus: the first monkey, 56,32 24 x 32): not compared.
-SKIP_DS = [(50, 26, 86, 70)] if case.split("-")[0] == "moogoo" else []
+SKIP_DS = [(50, 26, 86, 70)] if case.split("-")[0] == "moogoo" else [(0, 68, 31, 110)] if case == "mixer-save" else []
 
 def piece(what, fx, fy, fw, fh, tx, ty, scale, step=5):
     """A piece of the bottom screen drawn whole-number times bigger: each DS pixel's block."""
@@ -424,7 +435,8 @@ def minigame_frame(side_top):
     expect("prompt bar fill", C(40, 686), FRAME)
     bar = white_text("prompt bar", 40, 664, 1240, 708)
     if case in ("cards", "cards-ask", "cards-wide", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "detector-wide",
-                "art", "art-ask", "moogoo", "moogoo-2x", "drencher", "drencher-wide", "crime"):
+                "art", "art-ask", "moogoo", "moogoo-2x", "drencher", "drencher-wide", "crime", "scratch", "mixer", "mixer-wide", "mixer-save",
+                "trading"):
         white_text("title plate", 40, 12, 400, 52)
     else:
         for y in range(10, 54, 4):
@@ -454,7 +466,14 @@ def minigame_frame(side_top):
         ring = [C(x, y) for y in range(150, 270) for x in range(190, 290)]
         if RING not in ring:
             errors.append("no focus ring around the first monkey")
-    if case.split("-")[0] in ("autopsy", "art"):
+    if case == "trading" and (not has(red) or has(green) or has(blue)):
+        errors.append("the wireless lobby's prompts are not B alone")
+    if case == "mixer-save":
+        # The focus: the ring around the keyboard's first key (DS 6,74 19 x 30: canvas 54,290).
+        ring = [C(x, y) for y in range(276, 394) for x in range(40, 126)]
+        if RING not in ring:
+            errors.append("no focus ring around the first key")
+    if case.split("-")[0] in ("autopsy", "art", "scratch") or case in ("mixer", "mixer-wide"):
         # The pointer: its ring's white (or gold) around the playfield's middle (DS 128,96).
         ring = [C(x, y) for y in range(338, 376) for x in range(402, 442)]
         if (255, 255, 255) not in ring:
@@ -856,13 +875,13 @@ elif case in ("s5-hd", "s5-hd-wide"):
         for cx, cy in ((2, 100), (1277, 100), (640, 300), (40, 440)):
             expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * tw // 1280, cy * rows // h)))
 elif case in ("social", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",
-              "moogoo", "moogoo-2x", "drencher", "crime"):
+              "moogoo", "moogoo-2x", "drencher", "crime", "scratch", "mixer", "mixer-save", "trading"):
     activity(176)
 elif case in ("cards", "cards-ask", "cards-m1"):
     # The card game has no HUD: its world whole, no status bar.
     expect("canvas", comp.size, (1280, 720))
     activity(hd=case != "cards-m1")
-elif case in ("cards-wide", "social-wide", "detector-wide", "drencher-wide"):
+elif case in ("cards-wide", "social-wide", "detector-wide", "drencher-wide", "mixer-wide"):
     # The widescreen top screen: the secondary panel shorter, the side panel under it.
     expect("background", C(10, 10), PANEL)
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
@@ -1464,17 +1483,6 @@ for lang in 1 2 3 4 5; do
     if out=$("$bin" "$rom" --language $lang --measure-menu 2> "$tmp/menu-$lang.log"); then echo "ok   menu-words-$lang: $out"
     else echo "FAIL menu-words-$lang: $out $(tail -n 1 "$tmp/menu-$lang.log")"; fails=$((fails + 1)); fi
 done
-# The minigames (milestone 6) CONSOLE does not play yet (`GScreen::MooGoo` ... `MixerSave`): each is the
-# stick cursor's Unknown screen as before the kinds existed: the game's kind is printed, the pixels
-# agree (no "pixels disagree"), and the run (a stick move, A) ends well.
-for st in G-X-scratch:Scratch G-X-music:Mixer G-D-mus-save:MixerSave; do
-    pad "pad-mg-${st%%:*}" "${st%%:*}" minigame 120 &
-done
-wait
-for st in G-X-scratch:Scratch G-X-music:Mixer G-D-mus-save:MixerSave; do
-    mg_cursor() { in_order "pad-mg-${st%%:*}" "game ${st#*:}"; }
-    check_pad "pad-mg-${st%%:*}" mg_cursor
-done
 # The pointing minigames on the controller (src/activities.*, the research's held-out states on
 # copies of the complete save, --print-minigame: the game's own fields, and the pointer's presses):
 # pad_mg NAME STATE SCRIPT FRAMES.
@@ -1611,6 +1619,53 @@ crime_throw() {
         'game Panel/Interact'
 }
 check_pad mg-crime crime_throw
+# The Scratch lottery, the music mixer, its save page and the wireless lobby on the controller (the
+# research's held-out states on copies of the complete save; G-T-trade the lobby, reached as the
+# research reached the others: its request written into the casino state).
+pad_mg mg-scratch-win G-B-sc-two-p10 scratch-win 560 &
+pad_mg mg-scratch-quit G-X-scratch scratch-quit 150 &
+pad_mg mg-scratch-stay G-X-scratch scratch-quit-once 300 &
+pad_mg mg-mixer-record G-X-music mixer-record 700 &
+wait
+pad_mg mg-mixer-vox G-X-music mixer-vox 200 &
+pad_mg mg-mixersave-back G-D-mus-save mixersave-back 160 &
+pad_mg mg-trading-exit G-T-trade trading-exit 120 &
+wait
+# The lottery: the pointer taken to box 7 (the stick's D-pad), X rubs it from its top left corner
+# (the stylus pressed at 200,96) until the game reveals it, the third 4: won; A closes the game's
+# "Congratulations": the prize paid (§14,843 -> §14,853), the panel.
+scratch_win() {
+    in_order mg-scratch-win 'pointer down at 200,96' 'minigame scratch .*active=7 ' 'pointer up' 'minigame scratch .*state=2 revealed=3 ' \
+        'hud money=14853 ' 'game Panel/Interact' && grep -Eq 'minigame scratch .*state=1 .*,4:6[89][0-9]:open$' "$tmp/mg-scratch-win.log"
+}
+check_pad mg-scratch-win scratch_win
+# B on the ticket asks (the hint closed by A first), a second B taps its X: the panel; one B alone
+# leaves the ticket up.
+scratch_quit() { in_order mg-scratch-quit 'game Scratch' 'popup none' 'game Panel/Interact'; }
+check_pad mg-scratch-quit scratch_quit
+scratch_stay() {
+    if grep -q 'game Panel' "$tmp/mg-scratch-stay.log"; then echo "  mg-scratch-stay: quit on one B"; return 1; fi
+    in_order mg-scratch-stay 'minigame scratch .*state=1 ' 'popup none'
+}
+check_pad mg-scratch-stay scratch_stay
+# The mixer: RB records (phase 2), the D key played with the pointer and A, RB stops: the save
+# question (phase 10), A Yes: the save page; "AB" typed, saved into the second slot, back to the mixer.
+mixer_record() {
+    in_order mg-mixer-record 'minigame mixer .*phase=2 ' 'minigame mixer .*phase=2 .*keys=2,' 'pointer down at 73,176' 'minigame mixer .*phase=10 ' \
+        'game MixerSave' 'minigame mixersave .*name="AB" slots=empty,empty,empty' 'minigame mixersave .*slots=empty,"AB",empty' 'game Mixer'
+}
+check_pad mg-mixer-record mixer_record
+# Y held records the microphone (phase 5: the game reads it), its release stops it (the voice is
+# instrument 5), B quits: the panel.
+mixer_vox() {
+    in_order mg-mixer-vox 'minigame mixer .*phase=5 ' 'minigame mixer .*phase=0 .*instrument=5 ' 'game Panel/Interact' &&
+        grep -Eq 'mic: [1-9][0-9]* samples' "$tmp/mg-mixer-vox.log"
+}
+check_pad mg-mixer-vox mixer_vox
+mixersave_back() { in_order mg-mixersave-back 'name="A"' 'name=""' 'game Mixer'; }
+check_pad mg-mixersave-back mixersave_back
+trading_exit() { in_order mg-trading-exit 'game Trading' 'game FrontEnd'; }
+check_pad mg-trading-exit trading_exit
 # Its scare and subdue buttons (X, Y): the game's own fail animation where the stylus touched (no
 # goon near), against the same run without them.
 for v in crime-buttons crime-none; do

@@ -18,7 +18,10 @@
 // Today: Keelhaulin' Cards, the vacuum and the social reaction games (their schemes from
 // milestone 1: activities.*), and the pointing games (milestone 6): Alien Autopsy, the Metal
 // Detector and the Art Gallery's painting, their pointer drawn over the playfield (a ring, gold
-// while the stylus is down).
+// while the stylus is down); the timing games (MooGoo Monkey, the Super Drencher, the crime game);
+// the Scratch lottery (the ticket, its prize, each box's scratching, the game's result), the music
+// mixer (the song, tempo, instrument, octave, tracks, what it does now) and its save page (the
+// title typed, the three slots), and the wireless lobby (out of scope: a note, B its X).
 #pragma once
 #include <string>
 
@@ -55,7 +58,19 @@ constexpr int kStrMgMooGoo = 493, kStrMgDrencher = 1969, kStrMgRatARang = 733, k
 constexpr int kStrMgSimName0 = 323, kStrMgObjectName0 = 463;
 constexpr int kStrMgDrencherObjectEnd = 822;   // (the objects' names end where their descriptions begin: --measure-menu measures them all)
 constexpr int kDrencherPressureMax = 125, kDrencherPressureLow = 30;   // the gauge's top; under it the pump's hint is lit
-constexpr int kStrMgMax = kStrMgOpponent;   // the largest id used
+// The Scratch lottery: the tickets' names (314 + tier: "Cash Mummy!", "Milking For Moo-lah", "The
+// Emperor's Coffers"), the game's results ("Congratulations, you won $@1!" 317, "Sorry, better luck
+// next time!" 318), its popups' "Close" 1866. The music mixer: "Music Mixer" 491, the songs (1770 +
+// song), its buttons' own names (PLAY 1778, RECORD 1780, QUIT 1782, GENRE 1784, VOX 1788, PREP 1790,
+// TEMPO 1794, TRACKS 1796), "Select Song" 1763, "The microphone is recording." 1764, "Do you want to
+// save your song?" 1765, "Preview" 1766; the save page's "Song Title" 1804, "Burn Song to Cartridge"
+// 1805 and the slots' "No Data" 11. The wireless lobby: "DS Wireless" 2026, "Exit" 2030.
+constexpr int kStrMgTicket0 = 314, kStrMgWon = 317, kStrMgLost = 318, kStrMgClose = 1866;
+constexpr int kStrMgMixer = 491, kStrMgMixSong0 = 1770, kStrMgMixPlay = 1778, kStrMgMixRecord = 1780, kStrMgMixQuit = 1782, kStrMgMixGenre = 1784;
+constexpr int kStrMgMixVox = 1788, kStrMgMixPrep = 1790, kStrMgMixTempo = 1794, kStrMgMixTracks = 1796;
+constexpr int kStrMgMixSelect = 1763, kStrMgMixMic = 1764, kStrMgMixSaveAsk = 1765, kStrMgMixPreview = 1766;
+constexpr int kStrMgSongTitle = 1804, kStrMgBurn = 1805, kStrMgNoData = 11, kStrMgWireless = 2026, kStrMgExit = 2030;
+constexpr int kStrMgMax = kStrMgExit;   // the largest id used
 
 // The frame's geometry (canvas pixels). The playfield stays milestone 1's kActivityBottomTo (36,68,
 // 768 x 576, framed), the secondary panel kActivityTopX/Y (384 wide); the title plate over the
@@ -89,8 +104,9 @@ bool MinigameFramed(ScreenState s, const GameState* game, const RomData* rom);
 // not the cards), the side panel (values, hints). bottom: the DS's touch screen (the live crops;
 // null: none). The focus ring (the cards') is console.cpp's, over the playfield piece.
 // icons: unused today (null fine); pointer: a pointing game's pointer (null or not shown: none).
+// focus: the save page's (an index in its HotspotsFor: the slot it is on changes A's word).
 void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudState* hud, const HudStrings* strings, const GameState& game,
-                   const RomData& rom, const u32* bottom, IconCache* icons = nullptr, const PointerView* pointer = nullptr);
+                   const RomData& rom, const u32* bottom, IconCache* icons = nullptr, const PointerView* pointer = nullptr, int focus = -1);
 // The pointer's layer (it moves every frame: nothing else rasters again).
 constexpr int kMgPointerLayer = 6;
 

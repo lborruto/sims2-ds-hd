@@ -50,6 +50,10 @@ struct Input
     // CONSOLE: the touch screen's menu, focus and taps from the buttons (Steer).
     Navigator navigator;
     bool steering = false;        // the navigator ran last frame (CONSOLE was shown)
+    // The money's last change (App::consolePayout): the money last frame (-1 not known), the frames
+    // it is still shown.
+    int lastMoney_ = -1, payoutFrames_ = 0;
+    static constexpr int kPayoutFrames = 240;
     PadState scriptPad;           // this frame's "pad" events of the input script (script.h)
     // The pad's TOUCH MENU acts on release, unless Start was held meanwhile (the pause menu).
     ReleasePulse panelButton;

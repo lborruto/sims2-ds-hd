@@ -16,10 +16,13 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <string>
+#include <vector>
 
 #include "hotspots.h"
 #include "navigator.h"
+#include "port/interact.h"
 
 using namespace sims2wide;
 
@@ -978,6 +981,245 @@ static void crime_scheme()
     CHECK(tapped(&PadState::b, kCrimeX));
 }
 
+static const ScreenState kScratch {Screen::Scratch, Tab::None};
+static const ScreenState kMixer {Screen::Mixer, Tab::None};
+static const ScreenState kMixerSave {Screen::MixerSave, Tab::None};
+static const ScreenState kTrading {Screen::Trading, Tab::None};
+
+// The Scratch lottery: the pointer and A held scratch; X rubs the box under the pointer (or the
+// nearest covered one): the stylus pressed inside it, swept in passes kRubStep apart over its
+// whole square, let go when RAM reveals it; a popup's A / B / Start are the game's; B asks, a
+// second B taps the ticket's X (tier 0 and 2's).
+static void scratch_scheme()
+{
+    Rig r;
+    ActivityRam ram;
+    ram.scratch = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kScratch);
+    CHECK(r.nav.PointerShown() && !r.nav.CursorScreen());
+    PadState a;
+    a.a = true;
+    a.lx = 1;
+    float x = r.nav.PointerX();
+    r.Frame(kScratch, a);
+    CHECK(r.nav.PointerDown() && std::fabs(r.nav.PointerX() - x - kPtrDrag) < 1e-4f);
+    r.Frame(kScratch);
+    // The box centres the game puts on each tier; the rub's path over a box stays inside its square.
+    CHECK(ScratchCentre(0, 0).x == 95 && ScratchCentre(0, 3).x == 216 && ScratchCentre(0, 7).x == 215 && ScratchCentre(0, 7).y == 111);
+    CHECK(ScratchCentre(1, 4).x == 104 && ScratchCentre(1, 4).y == 112 && ScratchCentre(2, 3).x == 223 && ScratchCentre(2, 3).y == 63);
+    CHECK(ScratchX(0).x == 232 && ScratchX(2).y == 167);
+    for (int t = 0; t < 3; t++)
+        for (int i = 0; i < 8; i++)
+        {
+            const Point c = ScratchCentre(t, i);
+            const std::vector<Point> p = ScratchRub(t, i);
+            CHECK(p.size() == 2 * (2 * kRubHalf / kRubStep + 1));
+            for (Point q : p) CHECK(std::abs(q.x - c.x) <= kRubHalf && std::abs(q.y - c.y) <= kRubHalf);
+        }
+    // X from the middle: the nearest covered box is 5 (135,111); box 5 revealed: box 1 (135,63).
+    Rig b;
+    ram.scratchOpen[5] = true;
+    b.nav.SetActivityRam(ram);
+    b.Frame(kScratch);
+    b.Press(kScratch, &PadState::x);
+    const Point start = ScratchRub(0, 1)[0];
+    int f = 0, downs = 0, minY = 999, maxY = -1;
+    for (; f < 400 && !b.nav.PointerDown(); f++) b.Frame(kScratch);
+    CHECK(b.nav.PointerX() == start.x && b.nav.PointerY() == start.y);   // (pressed on the path's start, inside the box)
+    for (; f < 800 && b.nav.PointerDown(); f++)
+    {
+        downs++;
+        minY = std::min(minY, (int)b.nav.PointerY());
+        maxY = std::max(maxY, (int)b.nav.PointerY());
+        b.Frame(kScratch);
+    }
+    CHECK(downs > 100 && minY == 63 - kRubHalf && maxY == 63 + kRubHalf && !b.nav.PointerDown());
+    // RAM revealing the box ends it at once; A stops it too.
+    Rig c;
+    ram.scratchOpen[5] = false;
+    c.nav.SetActivityRam(ram);
+    c.Frame(kScratch);
+    c.Press(kScratch, &PadState::x);
+    for (int i = 0; i < 40; i++) c.Frame(kScratch);
+    CHECK(c.nav.PointerDown());
+    ram.scratchOpen[5] = true;
+    c.nav.SetActivityRam(ram);
+    c.Frame(kScratch);
+    CHECK(!c.nav.PointerDown());
+    ram.scratchOpen[5] = false;
+    c.nav.SetActivityRam(ram);
+    c.Press(kScratch, &PadState::x);
+    for (int i = 0; i < 40; i++) c.Frame(kScratch);
+    c.Press(kScratch, &PadState::a);
+    c.Frame(kScratch);
+    CHECK(!c.nav.PointerDown());
+    // B asks, a second taps the X; another press forgets the question; Start as B, never the DS's.
+    int tx, ty;
+    r.Press(kScratch, &PadState::b);
+    CHECK(r.nav.QuitArmed() && !r.touch.Owns());
+    r.Press(kScratch, &PadState::x);
+    r.Drain();
+    for (int i = 0; i < 200; i++) r.Frame(kScratch);
+    r.Drain();
+    CHECK(!r.nav.QuitArmed());
+    PadState st;
+    st.start = true;
+    CHECK(!(r.Frame(kScratch, st) & (1u << kStart)));
+    r.Frame(kScratch);
+    CHECK(r.nav.QuitArmed());
+    r.Press(kScratch, &PadState::b);
+    CHECK(r.Touched(tx, ty) && tx == ScratchX(0).x && ty == ScratchX(0).y);
+    r.Drain();
+    // A popup of the game's: A, B and Start are its own (no question, no tap, no stylus).
+    ram.scratchPopup = true;
+    r.nav.SetActivityRam(ram);
+    PadState all;
+    all.a = all.b = all.start = true;
+    const u32 k = r.Frame(kScratch, all);
+    CHECK((k & (1u << kA)) && (k & (1u << kB)) && (k & (1u << kStart)) && !r.nav.PointerDown() && !r.touch.Owns() && !r.nav.QuitArmed());
+    // (A still held when it has gone: no stylus until A is let go.)
+    ram.scratchPopup = false;
+    r.nav.SetActivityRam(ram);
+    PadState held;
+    held.a = true;
+    r.Frame(kScratch, held);
+    CHECK(!r.nav.PointerDown());
+}
+
+// The music mixer: the D-pad is the game's own (held: octave, sustain, PREP); X PLAY, RB RECORD, LB
+// GENRE, B QUIT (stop while it plays or records); Y taps VOX and holds the microphone, its release
+// taps it again while the game records; the song's list (7): Up / Down a mark over its rows, A
+// picks, B cancels; the save question (0xA): A Yes, B No, X Preview; help: B the ?.
+static void mixer_scheme()
+{
+    Rig r;
+    ActivityRam ram;
+    ram.mixer = true;
+    ram.mixerSongs = 6;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kMixer);
+    CHECK(r.nav.PointerShown() && !r.nav.CursorScreen());
+    PadState d;
+    d.up = d.right = true;
+    const u32 k = r.Frame(kMixer, d);
+    CHECK((k & (1u << kUp)) && (k & (1u << kRight)) && r.nav.PointerX() == SW / 2);   // (the D-pad is the game's, not the pointer's)
+    r.Frame(kMixer);
+    int x, y;
+    auto tapped = [&](bool PadState::*b, Point q) {
+        r.Press(kMixer, b);
+        const bool ok = r.Touched(x, y) && x == q.x && y == q.y;
+        r.Drain();
+        return ok;
+    };
+    CHECK(tapped(&PadState::x, kMixPlay));
+    CHECK(tapped(&PadState::rb, kMixRecord));
+    CHECK(tapped(&PadState::lb, kMixGenre));
+    CHECK(tapped(&PadState::b, kMixQuit));
+    ram.mixerPhase = 1;
+    r.nav.SetActivityRam(ram);
+    CHECK(tapped(&PadState::b, kMixPlay));
+    ram.mixerPhase = 2;
+    r.nav.SetActivityRam(ram);
+    CHECK(tapped(&PadState::b, kMixRecord));
+    PadState st;
+    st.start = true;
+    CHECK(!(r.Frame(kMixer, st) & (1u << kStart)));
+    r.Frame(kMixer);
+    // Y: VOX tapped from the idle mixer, the microphone held; the release taps it again while it records.
+    ram.mixerPhase = 0;
+    r.nav.SetActivityRam(ram);
+    PadState yy;
+    yy.y = true;
+    r.Frame(kMixer, yy);
+    CHECK(r.Touched(x, y) && x == kMixVox.x && y == kMixVox.y && r.nav.Voice() && !r.nav.Blow());
+    r.Drain();
+    ram.mixerPhase = 5;
+    r.nav.SetActivityRam(ram);
+    for (int i = 0; i < 30; i++) r.Frame(kMixer, yy);
+    CHECK(r.nav.Voice() && !r.touch.Owns());
+    r.Frame(kMixer);
+    CHECK(!r.nav.Voice() && r.Touched(x, y) && x == kMixVox.x);
+    r.Drain();
+    // The song's list.
+    ram.mixerPhase = 7;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kMixer);
+    CHECK(r.nav.Mark().y == MixerRowRect(0).y && !r.nav.PointerShown());
+    for (int i = 0; i < 9; i++) r.Press(kMixer, &PadState::down);
+    CHECK(r.nav.Mark().y == MixerRowRect(5).y);   // (held at the list's last song)
+    r.Press(kMixer, &PadState::up);
+    CHECK(tapped(&PadState::a, MixerRow(4)));
+    CHECK(tapped(&PadState::b, kMixGenre));
+    // The save question and help.
+    ram.mixerPhase = 0xA;
+    r.nav.SetActivityRam(ram);
+    CHECK(tapped(&PadState::a, kMixYes));
+    CHECK(tapped(&PadState::b, kMixNo));
+    CHECK(tapped(&PadState::x, kMixPreview));
+    ram.mixerPhase = 8;
+    r.nav.SetActivityRam(ram);
+    CHECK(tapped(&PadState::b, kMixHelp));
+}
+
+// The mixer's save page: the D-pad moves the focus over its table (from the first key), A taps the
+// focused target, a used slot asks first (A again saves, a move forgets it), Y backspace, B the X.
+static void mixer_save_scheme()
+{
+    Rig r;
+    ActivityRam ram;
+    ram.mixerSave = true;
+    ram.mixerSaveUsed[0] = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kMixerSave);
+    const std::vector<Hotspot>& h = HotspotsFor(kMixerSave);
+    CHECK(r.nav.Focus() == 0 && !r.nav.PointerShown() && !r.nav.CursorScreen());
+    int x, y;
+    r.Press(kMixerSave, &PadState::a);
+    CHECK(r.Touched(x, y) && x == h[0].x && y == h[0].y);
+    r.Drain();
+    r.Press(kMixerSave, &PadState::right);
+    CHECK(r.nav.Focus() == 1);
+    r.Press(kMixerSave, &PadState::y);
+    CHECK(r.Touched(x, y) && x == 94 && y == 174);
+    r.Drain();
+    r.Press(kMixerSave, &PadState::b);
+    CHECK(r.Touched(x, y) && x == 235 && y == 18);
+    r.Drain();
+    // To slot 1 (the right column): asked first, then saved.
+    for (int i = 0; i < 12 && strncmp(h[r.nav.Focus()].name, "slot ", 5); i++) r.Press(kMixerSave, &PadState::right);
+    CHECK(!strcmp(h[r.nav.Focus()].name, "slot 2"));   // (the top row's Right: the nearer slot)
+    r.Press(kMixerSave, &PadState::up);
+    CHECK(!strcmp(h[r.nav.Focus()].name, "slot 1"));
+    r.Press(kMixerSave, &PadState::a);
+    CHECK(!r.touch.Owns() && r.nav.QuitArmed());
+    r.Press(kMixerSave, &PadState::a);
+    CHECK(r.Touched(x, y) && x == 235 && y == 57 && !r.nav.QuitArmed());
+    r.Drain();
+    r.Press(kMixerSave, &PadState::a);
+    CHECK(r.nav.QuitArmed());
+    r.Press(kMixerSave, &PadState::down);
+    CHECK(!r.nav.QuitArmed() && !strcmp(h[r.nav.Focus()].name, "slot 2"));
+    r.Press(kMixerSave, &PadState::a);   // (an empty slot: at once)
+    CHECK(r.Touched(x, y) && x == 235 && y == 109);
+    r.Drain();
+}
+
+// The wireless lobby: B its X, nothing else reaches the game.
+static void trading_scheme()
+{
+    Rig r;
+    r.Frame(kTrading);
+    PadState all;
+    all.a = all.x = all.y = all.start = all.select = all.up = true;
+    CHECK(r.Frame(kTrading, all) == 0 && !r.touch.Owns());
+    r.Frame(kTrading);
+    int x, y;
+    r.Press(kTrading, &PadState::b);
+    CHECK(r.Touched(x, y) && x == kTradingX.x && y == kTradingX.y);
+    CHECK(!r.nav.CursorScreen() && !r.nav.PointerShown());
+}
+
 // The Art Gallery: LB / RB the previous / next tool in the ring of ten, X the next swatch, Y undo,
 // B the game's X; its question: A the tick, B the cross, the rest waiting.
 static void art_scheme()
@@ -1283,6 +1525,28 @@ static void view_focus_skips_greyed_and_a_runs()
     // B closes the menu (no back action), no tap.
     q.Press(kInteract, &PadState::b);
     CHECK(!q.nav.MenuOpen() && !q.touch.Owns());
+}
+
+// An item whose A starts an animation on the world (the slot machine's Insert Coin, research/m6 12):
+// its tap runs and the panel's menu closes with it, so the world shows big; the others keep it open.
+static void view_animation_closes_the_menu()
+{
+    Rig r;
+    MenuView v = ListView();
+    v.items[1].closesMenu = true;
+    r.view = &v;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::a);   // (row 0: the menu stays)
+    CHECK(r.nav.MenuOpen());
+    r.Drain();
+    for (int i = 0; i < 4; i++) r.Frame(kInteract);
+    r.Press(kInteract, &PadState::down);
+    r.Press(kInteract, &PadState::a);
+    int x, y;
+    CHECK(!r.nav.MenuOpen() && r.Touched(x, y) && x == 201 && y == 51);
+    r.Drain();
+    CHECK(InteractAnimation(0x18) && InteractAnimation(0x32) && InteractAnimation(0x33) && InteractAnimation(0xC) && !InteractAnimation(0x62));
 }
 
 static void view_buttons_keys_and_sequences()
@@ -2285,6 +2549,10 @@ int main()
     moogoo_scheme();
     drencher_scheme();
     crime_scheme();
+    scratch_scheme();
+    mixer_scheme();
+    mixer_save_scheme();
+    trading_scheme();
     unsettled_press_waits();
     unsettled_press_dropped_after_90();
     unsettled_ds_buttons_pass();
@@ -2293,6 +2561,7 @@ int main()
     front_end_screens_touch_with_a();
     popup_opening_holds_a();
     view_focus_skips_greyed_and_a_runs();
+    view_animation_closes_the_menu();
     view_buttons_keys_and_sequences();
     view_content_changes();
     view_scrolls_with_the_game();

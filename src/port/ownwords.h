@@ -40,6 +40,14 @@ enum class OwnWordId : int
     DrencherNone,
     // The Ratticator's crime game (its run and put away: the Drencher's words).
     CrimeScare, CrimeAim, CrimeThrow, CrimeSubdue, CrimeReady, CrimeAimLabel, CrimeHit,
+    // The Scratch lottery.
+    ScratchHold, ScratchRub, ScratchQuitAgain, ScratchTopPrize, ScratchOpened,
+    // The music mixer and its save page.
+    MixerTouch, MixerPoint, MixerOctave, MixerSustain, MixerStop, MixerVox, MixerVoxStop, MixerChoose, MixerBack,
+    MixerDpad, MixerSong, MixerInstrument, MixerReady, MixerPlaying, MixerRecording, MixerHelp,
+    SaveType, SaveHere, SaveOverwrite, SaveErase, SaveSlot,
+    // The wireless lobby.
+    TradingNote,
     Count
 };
 

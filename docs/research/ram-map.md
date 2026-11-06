@@ -66,6 +66,7 @@ Options > Quit is a popup (popup = 2 over the Options tab).
 | 0x02152E0C / 0x02152EC8 | 10 | MooGoo Monkey game / intro |
 | 0x0214AFC4 | 13 | Scratch lottery |
 | 0x02134EC8, 0x02134F10, 0x02134FA0, 0x02134D70 | -1 | Crime, Music Mixer, its save menu, Art Gallery painting |
+| 0x02136AEC, 0x02136B7C | -1 | The wireless lobby (module 0x1E) and its trading screen |
 
 Not separable: title versus main menu, Create-a-Sim versus its confirmation. A screen not in the
 table is reported as `Unknown(ov=N,vt=0x...)`: log it, it is a new screen to map.
@@ -199,6 +200,7 @@ tap must last two frames or more. Fields are from `S` unless said; the values ar
 | Crime (Ratarang) | none | 0x02134EC8 | 0x2A | `Crime` |
 | Music Mixer / its save menu | none | 0x02134F10 / 0x02134FA0 | 0x12 / 0x13 | `Mixer` / `MixerSave` |
 | Art Gallery painting | none | 0x02134D70 | 0xB | `ArtGallery` |
+| The wireless lobby ("DS Wireless", the title's way to trading) / its trading screen | none | 0x02136AEC / 0x02136B7C | 0x1E | `Trading` (no part: out of scope, shown safely; its X at 236,178) |
 
 The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the social games and the vacuum keep their screens (milestone 1); the cards and the vacuum have a part each (the HD frame's values, `port/minigame.*`):
 

@@ -1,5 +1,0 @@
-# From a minigame screen (a G-* state, CONSOLE): CONSOLE has no frame for them yet, so each stays the
-# stick cursor's screen: the left stick and A are passed on as the cursor and a touch. The run only has
-# to end with the game's own kind printed and the pixels agreeing.
-30 2 pad left
-60 2 pad a

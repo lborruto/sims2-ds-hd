@@ -103,7 +103,10 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // pointer (port/minigame.h draws it; null: none).
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
                          const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
-                         const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0, const PointerView* pointer = nullptr);
+                         const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0, const PointerView* pointer = nullptr,
+                         int payout = 0);
+// payout (above): the money's last change (App::consolePayout: the slot machine's coin and its
+// payout, a ticket's prize, ...), shown on the panel's world beside the HD status bar while not 0.
 
 // The world (the top picture's first `rows` rows, topW wide) as CONSOLE draws it: 720 high,
 // centred when narrower than the canvas; keepSides: never cut at its sides (fitted to the

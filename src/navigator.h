@@ -118,6 +118,9 @@ public:
     float HandDy() const { return handDy_; }
     // The vacuum's Y: blow into the microphone this frame.
     bool Blow() const { return blow_; }
+    // The mixer's Y (activities.h): its microphone held (VOX): the blow's signal, or the computer's
+    // own microphone when the settings choose it (Input::Steer).
+    bool Voice() const { return voice_; }
     // The pointing minigames (activities.h): their pointer, drawn (PointerShown), and the stylus
     // down at it this frame (PointerDown: also the detector's slider knob, not drawn), DS pixels.
     bool PointerShown() const { return activity_.pointer; }
@@ -126,8 +129,9 @@ public:
     float PointerY() const { return activity_.py; }
     // MooGoo's focus on the playfield (DS pixels; w 0 none).
     Rect Mark() const { return activity_.mark; }
-    // The autopsy's quit asked once (a second B / Start quits).
-    bool QuitArmed() const { return activity_.quitArmed > 0; }
+    // The autopsy's or the lottery's quit asked once (a second B / Start quits); the mixer's save
+    // page asking before it saves over a slot.
+    bool QuitArmed() const { return activity_.quitArmed > 0 || activity_.armedSlot >= 0; }
 
 private:
     void Move(ScreenState s, int dx, int dy);
@@ -150,7 +154,7 @@ private:
     PadState prev_;
     bool fresh_ = true;  // take the next pad as the previous one (no presses)
     ScreenState screen_;
-    bool menuOpen_ = false, cursorPress_ = false, cursorScreen_ = false, blow_ = false;
+    bool menuOpen_ = false, cursorPress_ = false, cursorScreen_ = false, blow_ = false, voice_ = false;
     float handDx_ = 0, handDy_ = 0;
     ActivityState activity_;
     ActivityRam activityRam_;

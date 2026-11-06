@@ -52,6 +52,27 @@
 //     centre rat, kCrimeRat), a stick or the D-pad aims (the rat slides along its row, kCrimeAimMin
 //     to kCrimeAimMax: 1.125 degrees a pixel, at most kCrimeAimSpeed a frame), letting A go throws;
 //     B the game's X (the way out).
+//   The Scratch lottery (milestone 6): the pointer (the pointing games'), A held scratches (the
+//     stylus down at the pointer, capped at kPtrDrag a frame); X rubs the box under the pointer
+//     (or the nearest one still covered) for you: the pointer goes there, presses inside it and
+//     sweeps it in passes kRubStep apart (ScratchRub) until the game reveals it, A or B stopping
+//     it. While a popup of the game's is up (the hint, the win, the loss) A, B and Start are the
+//     game's own (they close it; the win's pays). B or Start taps the ticket's X, which the game
+//     takes at once and silently (the ticket lost): the first asks (quitArmed), a second within
+//     kQuitWindow frames quits.
+//   The music mixer: its own DS keys as the game reads them, held: the D-pad (Up / Down the octave
+//     up / down, Right sustain, Left PREP). The pointer and A held touch the keys, buttons and
+//     sliders; X taps PLAY (stop while it plays), RB RECORD, LB GENRE, B QUIT (stop while it plays
+//     or records); Y held records the microphone (VOX: tapped on the press, again on the release
+//     while the game still records; meanwhile `voice`: the blow's signal, or the computer's own
+//     microphone when the settings say so). The song's list (phase 7): Up / Down a focus over its
+//     rows (`mark`), A picks, B cancels (GENRE again). The save question (0xA): A Yes, B No, X
+//     Preview. Help (8, 9): B taps ? again.
+//   The mixer's save page: the D-pad moves the focus over its targets (HotspotsFor: the keyboard,
+//     backspace, the pages, the three slots, the X), A taps the focused one (a slot already used:
+//     the first A asks, armedSlot, a second saves over it), Y backspace, B the X (back to the
+//     mixer).
+//   The wireless lobby (Trading): out of scope; B taps its X (back to the title), the rest waits.
 // The other DS buttons stay the DS's where the game may use them (Start, Select; the vacuum's
 // B, L, R). Presses are edges against ActivityState::prev (the navigator's previous PadState);
 // a tap or drag is queued only when the touch script does not own the stylus.
@@ -103,6 +124,17 @@ struct ActivityRam
     int drencherPump = 0;                  // the pump handle, 0..180
     bool crime = false;
     int crimePhase = 0;                    // the throw: 0 idle, 1 grabbed, 2 aiming, 3 released
+    // The Scratch lottery: the ticket's tier (its boxes' places), a popup of the game's up over it
+    // (the hint, the result), which boxes are revealed (or wiping).
+    bool scratch = false, scratchPopup = false;
+    int scratchTier = 0;
+    bool scratchOpen[8] = {};
+    // The music mixer: its phase (MixerState::phase), the songs its list shows; the save page's
+    // slots already used.
+    bool mixer = false;
+    int mixerPhase = 0, mixerSongs = 0;
+    bool mixerSave = false;
+    bool mixerSaveUsed[3] = {};
     // A question of the game's popup is up over the minigame (kind 2 shown): its tick and cross.
     bool ask = false;
     Point askYes {0, 0}, askNo {0, 0};
@@ -144,6 +176,13 @@ struct ActivityState
     int pumpFrames = 0, pumpDir = 1;  // the Drencher: frames the pump is held, the stroke's way
     int aimFrames = 0;                // the crime game: frames A has held the rat
     int lastSub = -1;                 // MooGoo: the turn's sub-state last frame (a new one: the focus starts again)
+    // The Scratch lottery's rub (X): the box, the path (DS pixels), where along it, frames pressed.
+    int rubBox = -1, rubAt = 0, rubFrames = 0;
+    std::vector<Point> rubPath;
+    // The mixer: out, the microphone held (Y: VOX); Y's tap waiting to start it.
+    bool voice = false;
+    // The save page: the slot whose overwrite was asked (-1 none).
+    int armedSlot = -1;
 };
 
 // What CONSOLE draws of a pointing minigame's pointer (App::consolePointer, from the navigator):
@@ -184,7 +223,8 @@ void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad);
 bool IsPointing(Screen s);
 // The timing minigames (MooGoo, the Drencher, the crime game).
 bool IsTiming(Screen s);
-// A minigame with a scheme of its own (pointing or timing): no stick cursor there.
+// A minigame with a scheme of its own (pointing or timing, the lottery, the mixer and its save
+// page, the wireless lobby): no stick cursor there.
 bool OwnScheme(Screen s);
 
 // Alien Autopsy's buttons (the game's own rectangles: the tools x 0-31, the tray and flask at the
@@ -223,4 +263,20 @@ constexpr float kPumpSpeed = 8.0f;     // a frame (16 a tick of the game's: past
 constexpr Point kCrimeX {224, 32}, kCrimeScare {128, 35}, kCrimeSubdue {128, 156}, kCrimeRat {128, 96};
 constexpr int kCrimeAimMin = 47, kCrimeAimMax = 207;
 constexpr float kCrimeAimSpeed = 3.0f;
+// The Scratch lottery (research/m6 code-B 2.2): box i's centre on a ticket of tier t (its cover the
+// 32 x 32 square around it, a press within 16 of it), the ticket's X; a rub's passes (the game
+// erases 3 x 3 around the stylus: passes 3 apart clear the box; it reveals it at 684 of 1024).
+Point ScratchCentre(int tier, int i);
+Point ScratchX(int tier);
+constexpr int kRubHalf = 15, kRubStep = 3;
+// The rub's path over box i of tier t: from its top left corner, passes along x, kRubStep apart.
+std::vector<Point> ScratchRub(int tier, int i);
+// The music mixer's buttons (research/m6 code-D 1.3, 1.7): PLAY, RECORD, QUIT, GENRE, ?, VOX; the
+// song list's row i (its tap, its rectangle); the save question's Yes, No, Preview.
+constexpr Point kMixPlay {82, 40}, kMixRecord {82, 68}, kMixQuit {17, 13}, kMixGenre {43, 12}, kMixHelp {82, 13}, kMixVox {20, 147};
+constexpr Point MixerRow(int i) { return {62, 44 + 16 * i}; }
+constexpr Rect MixerRowRect(int i) { return {18, 36 + 16 * i, 88, 16}; }
+constexpr Point kMixYes {86, 102}, kMixNo {128, 102}, kMixPreview {170, 102};
+// The wireless lobby's X (both its pages: back to the title from the lobby).
+constexpr Point kTradingX {236, 178};
 }

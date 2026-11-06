@@ -81,6 +81,9 @@ struct ViewItem
     // A performs a tap that closes the screen (a popup's X): A and B then wait for the screen to
     // change (the navigator's closing wait), as after the phone's X.
     bool closes = false;
+    // A's action starts an animation on the world (the slot machine's reels, an arcade cabinet, the
+    // skydive): the panel's menu closes with it, so the world shows big.
+    bool closesMenu = false;
 };
 
 // Screen-wide buttons (not the focused item's). LB / RB: a screen's own pages (the stat panel's);

@@ -335,9 +335,19 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         app.consoleArmed = navigator.Armed();
         app.consolePointer = {navigator.PointerShown(), navigator.PointerDown(), navigator.QuitArmed(), navigator.PointerX(), navigator.PointerY(),
                               navigator.Mark()};
-        // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding).
-        app.micBlow = navigator.Blow();
-        app.micForce = navigator.Blow();
+        // The money's last change, shown on the panel's world for kPayoutFrames frames (an
+        // animation's payout: the slot machine's coin then its win; a ticket's prize).
+        if (game && game->valid && game->hud.valid)
+        {
+            if (lastMoney_ >= 0 && game->hud.money != lastMoney_) { app.consolePayout = game->hud.money - lastMoney_; payoutFrames_ = kPayoutFrames; }
+            lastMoney_ = game->hud.money;
+        }
+        if (payoutFrames_ > 0 && --payoutFrames_ == 0) app.consolePayout = 0;
+        // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding); the
+        // mixer's Y (its VOX): the computer's microphone when the settings choose it, else the blow.
+        const bool voiceBlow = navigator.Voice() && app.settings.mic != MicMode::Real;
+        app.micBlow = navigator.Blow() || voiceBlow;
+        app.micForce = navigator.Blow() || voiceBlow;
     }
     else if (steering)
     {
@@ -347,6 +357,9 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
         app.consoleArmed = 0;
         app.consolePointer = {};
+        app.consolePayout = 0;
+        payoutFrames_ = 0;
+        lastMoney_ = -1;
         app.micBlow = false;
         app.micForce = false;
     }
@@ -395,7 +408,7 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     const bool fastNow = held[FAST] || PadOn(s, FAST);
     if (fastNow != fastPrev) app.fast = fastNow;
     fastPrev = fastNow;
-    app.micBlow = held[BLOW] || PadOn(s, BLOW) || (app.shown == Layout::Console && navigator.Blow());
+    app.micBlow = held[BLOW] || PadOn(s, BLOW) || (app.shown == Layout::Console && (navigator.Blow() || (navigator.Voice() && s.mic != MicMode::Real)));
 
     // The mouse's camera: the wheel's zoom and the drag's turn, as the game's own buttons.
     if (zoom > 0) { keys |= 1u << kX; zoom--; }

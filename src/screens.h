@@ -18,8 +18,10 @@ enum class Screen { None, Panel, Phone, Dialogue, Popup, Gift, Social, Vacuum, C
                     FrontEnd, CreateASim, SaveSlots, Drencher, Unknown, Loading,
                     // The minigames with a scheme of their own (milestone 6, from RAM only): the pointing games
                     // (GScreen::Autopsy, Detector, ArtGallery) and the timing games (GScreen::MooGoo, Crime; the
-                    // Super Drencher is Drencher above, GScreen::Drencher, Pockets > the item in hand).
-                    Autopsy, Detector, Art, MooGoo, Crime };
+                    // Super Drencher is Drencher above, GScreen::Drencher, Pockets > the item in hand); the
+                    // Scratch lottery, the music mixer and its save page (GScreen::Scratch, Mixer, MixerSave)
+                    // and the wireless lobby (GScreen::Trading: shown safely, wireless play is out of scope).
+                    Autopsy, Detector, Art, MooGoo, Crime, Scratch, Mixer, MixerSave, Trading };
 // The panel's tab (only with Screen::Panel).
 enum class Tab { None, Interact, Pockets, Goals, Relationships, Options };
 
