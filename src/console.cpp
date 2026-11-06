@@ -24,6 +24,7 @@
 #include "port/phone.h"
 #include "port/statusbar.h"
 #include "port/popup.h"
+#include "port/prompt.h"
 #include "port/ownwords.h"
 #include "romdata.h"
 
@@ -180,7 +181,7 @@ const char* ConsoleBranchName(ConsoleBranch b)
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
                          const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed, const PointerView* pointer,
-                         int payout, bool pictureClosed, bool veiled, int worldOnlyFrames, ConsoleBranch* branch)
+                         int payout, bool pictureClosed, bool veiled, int worldOnlyFrames, ConsoleBranch* branch, int promptFrames)
 {
     ConsoleBranch dummy;
     ConsoleBranch& b = branch ? *branch : dummy;
@@ -377,6 +378,8 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             const Rect r = AddStatusBar(c, *hud, *strings);
             // The money's last change (an animation's payout, a prize) beside the bar, in the game's words.
             if (payout != 0 && rom && rom->StringCount() > kStrMgMoney) AddPayout(c, r, payout, *rom);
+            // What A does here (port/prompt.h), on its own layer above the bar's.
+            if (game && rom && rom->StringCount() > 0) AddWorldPrompt(c, s, *game, *rom, promptFrames);
         }
     }
     else if (s.screen == Screen::Dialogue && game && game->valid && rom && rom->StringCount() > 0 && bottom)

@@ -13,6 +13,7 @@
 #include "gamestate.h"
 #include "layout.h"
 #include "port/icons.h"
+#include "port/prompt.h"
 #include "port/statusbar.h"
 #include "romdata.h"
 #include "scene.h"
@@ -38,6 +39,7 @@ struct App
     int consoleWorldOnly = 0;      // CONSOLE: frames in a row on the panel without its tab / no bottom object (Input::Steer)
     u32 consoleArmed = 0;          // CONSOLE: the HD view item whose X is armed (Navigator::Armed), 0 none
     PointerView consolePointer;    // CONSOLE: a pointing minigame's pointer (the navigator's), drawn by its HD frame
+    PromptSteady consolePrompt;    // CONSOLE: how long the Interact target has been steady (Input::Steer), for the world's prompt
     int consolePayout = 0;         // CONSOLE: the money's last change, for kPayoutFrames frames (Input::Steer), 0 none
     ConsoleHold consoleHold;       // CONSOLE: the picture shown, the last HD one held through the game's swaps (consolehold.h)
     // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus

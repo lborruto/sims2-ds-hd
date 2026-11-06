@@ -264,6 +264,13 @@ run cas-hair F-hair-s3-40 "${town[@]}" --console-focus 10 &
 run cas-face F-face-5-40 "${town[@]}" --console-focus 4 &
 run cas-clothes F-thr-6-40 "${town[@]}" --console-focus 11 &
 wait
+# The world's prompt (src/port/prompt.*): the store's clerk (A Buy), the hotel's concierge (three
+# actions: the hold hint), no target (City Hall), another tab up (Pockets: no Interact object).
+run prompt-store L-sit-store-none-250 "${late[@]}" &
+run prompt-concierge D-hotel-down "${hotel[@]}" &
+run prompt-none L-sit-cityhall-none-250 "${late[@]}" &
+run prompt-pockets A-pk-town-cnt1 "${late[@]}" &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3-m1 slots load casino casino-2x \
@@ -276,7 +283,8 @@ for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
     registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint \
-    music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats; do
+    music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats \
+    prompt-store prompt-concierge prompt-none prompt-pockets; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -352,9 +360,10 @@ def rail():
     expect("no rail: backdrop where its tabs were", C(1200, 300), BACK)
     expect("no rail: backdrop where its phone was", C(1210, 174), BACK)
     menu_hint_chip()
-    # The world without the game's status bar (its last 16 rows): 176 rows 720 high.
+    # The world without the game's status bar (its last 16 rows): 176 rows 720 high (sampled clear
+    # of the world's prompt, src/port/prompt.*, centred above row 646, and its shadow).
     w = world_full(176)
-    for cx, cy in ((400, 100), (700, 650), (1000, 300), (900, 715)):
+    for cx, cy in ((400, 100), (1050, 650), (1000, 300), (900, 715)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
 
 WELL = hexrgb("6A72B8")
@@ -1283,6 +1292,23 @@ elif case == "opt-menu":
     expect("SFX knob", C(1012, 536), FRAME)
     r, g, b = C(197, 360)
     if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the music volume")
+elif case.startswith("prompt-"):
+    # The world's prompt: a kit plate (the panel's fill) centred at the world's foot, above the
+    # status bar's row 650, white words in it; none without a target or on another tab.
+    cols = [x for x in range(16, 1264) if any(C(x, y) == FRAME for y in range(562, 646, 6))]
+    if case in ("prompt-store", "prompt-concierge"):
+        if not cols:
+            errors.append("no prompt plate")
+        else:
+            lo, hi = min(cols), max(cols)
+            if abs((lo + hi) / 2 - 640) > 12: errors.append(f"the plate not centred: {lo}..{hi}")
+            if case == "prompt-store" and not 120 < hi - lo < 320: errors.append(f"the store's plate (A Buy, the clerk): {lo}..{hi}")
+            if case == "prompt-concierge" and hi - lo < 340: errors.append(f"no hint beside the concierge's verb: {lo}..{hi}")
+            if (255, 255, 255) not in [C(x, y) for y in range(600, 640) for x in range(lo, hi)]: errors.append("no verb")
+        if any(C(x, 652) == FRAME for x in range(500, 780)): errors.append("the plate below row 650")
+    elif len(cols) > 20:
+        errors.append(f"a prompt plate where none belongs ({len(cols)} columns)")
+    status_bar()
 for e in errors[:5]:
     print(f"  {case}: {e}")
 sys.exit(1 if errors else 0)

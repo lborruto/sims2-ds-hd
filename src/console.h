@@ -115,7 +115,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
                          const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
                          const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0, const PointerView* pointer = nullptr,
                          int payout = 0, bool pictureClosed = false, bool veiled = false, int worldOnlyFrames = 0,
-                         ConsoleBranch* branch = nullptr);
+                         ConsoleBranch* branch = nullptr, int promptFrames = 0);
 // pictureClosed: the view's big picture (MenuView::picture: Settings' concept art) closed by B.
 // veiled: the panel's menu is coming back (Navigator::Returning: B from the Save slots or the phone
 // opened from it, the game passing through Interact first): the dimmed world and the status bar
@@ -124,6 +124,9 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
 // (App::consoleWorldOnly): the town's world for kWorldOnlyMax of them, then milestone 1's framed
 // touch screen and the cursor's hints (an unforeseen screen is never a dead end).
 constexpr int kWorldOnlyMax = 10;
+// promptFrames: how long the Interact target has been steady (App::consolePrompt, port/prompt.h):
+// the town's world shows what A does there ("A Buy", the target's name) once it reaches
+// kPromptSteadyFrames, on its own layer above the status bar.
 // payout (above): the money's last change (App::consolePayout: the slot machine's coin and its
 // payout, a ticket's prize, ...), shown on the panel's world beside the HD status bar while not 0.
 

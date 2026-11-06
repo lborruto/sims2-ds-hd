@@ -361,6 +361,10 @@ constexpr const char* kWords[][5] = {
     {"The game saves beside the ROM again: @1", "Le jeu sauvegarde de nouveau à côté de la ROM : @1",
      "Das Spiel speichert wieder neben dem ROM: @1", "Il gioco salva di nuovo accanto alla ROM: @1",
      "El juego vuelve a guardar junto a la ROM: @1"},
+    // The world's prompt
+    {"Hold for more", "Maintenir : plus", "Halten: mehr", "Tieni premuto: altro", "Mantén: más"},
+    {"Choose", "Choisir", "Wählen", "Scegli", "Elegir"},
+    {"Other target", "Autre cible", "Anderes Ziel", "Altro obiettivo", "Otro objetivo"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

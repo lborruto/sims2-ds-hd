@@ -89,6 +89,9 @@ enum class OwnWordId : int
     BatteryNote, BackgroundNote, FastBootNote, ScalingNote, SaveElsewhere, ToastShotAt,
     // The save back beside the ROM (its folder writable again) from the settings folder's copy.
     SaveMovedBack,
+    // The world's prompt (port/prompt.*): A held shows the other actions, Up / Down choose one
+    // while it is held, Left / Right switch to the next target near the hero.
+    PromptMore, PromptChoose, PromptOther,
     Count
 };
 
