@@ -33,9 +33,13 @@
   laid out big. No mouse needed, though it works.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
-  nothing to set, and it never falls back to the bare two-screen layout. Title, menus and
-  Create-a-Sim show the top screen and the touch screen big, each in its frame; a black load
-  shows only the backdrop.
+  nothing to set, and it never falls back to the bare two-screen layout. The intro, the title,
+  the main menu, Settings and Load-a-Sim are redrawn for the controller too (A or Start takes the
+  intro's last screen, A begins, the D-pad and A pick Create-a-Sim, Load-a-Sim, Settings or DS
+  Wireless; in Settings LB / RB change page, Left / Right move the volume, the concept art opens
+  with A and the credits roll; in Load-a-Sim A loads a saved Sim), and so is Create-a-Sim: your
+  Sim big on the left, the game's pages on the right (more below); DS Wireless still shows the
+  top screen and the touch screen big, each in its frame; a black load shows only the backdrop.
   This needs the European game (see [Good to know](#good-to-know)).
 - **The old layouts are still there.** AUTO, FOCUS, SIDE and STACKED: SETTINGS > DISPLAY > LAYOUT.
 - **The DS clock is your clock.** The game lives by the time of day (rooms take real hours,
@@ -75,7 +79,11 @@ It is an early version: see [Good to know](#good-to-know).
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/create-a-sim.webp" alt="CONSOLE in Create-a-Sim: the Sim in a frame on the left, the name keyboard big in a frame on the right, the buttons' hint below" width="700">
+  <img src="docs/screenshots/front-menu.webp" alt="CONSOLE: the main menu in HD: the game's title picture big at the left, its four buttons (Create-a-Sim, Load-a-Sim, Settings, DS Wireless) at the right with the button hints" width="700">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/create-a-sim.webp" alt="CONSOLE in Create-a-Sim: the Sim big in a frame on the left, the HD panel on the right with the page tabs, the name in seven slots, the gender and skin buttons and the keyboard, the button hints" width="700">
 </p>
 
 ## Get started
@@ -126,12 +134,20 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 | F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
 | F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
 | 0 to 4 | | layout: AUTO / FOCUS / SIDE / STACKED / CONSOLE |
-| Mouse | right stick + LT (the cursor; A too wherever the cursor is the way to touch: the title, menus, Create-a-Sim, the furniture editor) | the touch screen, wherever it is shown |
+| Mouse | right stick + LT (the cursor; A too wherever the cursor is the way to touch: DS Wireless, the furniture editor) | the touch screen, wherever it is shown |
 | Mouse wheel / right button drag, over the world | | zoom / turn the camera |
 
 Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND
 BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation and Switch
 controllers are known by their own button names.
+
+**Before the game** (the front end) the controller does it all: on the intro's last screen
+("Touch the Touch Screen to continue.") A or Start take the touch, on the title A begins, and on
+the main menu Up / Down and A pick Create-a-Sim, Load-a-Sim, Settings or DS Wireless (the buttons
+fade in first; a press during the fade does nothing). In Settings LB / RB change page (Music,
+SFX, Concept Art, Credits), Left / Right move a volume by a tenth, A opens an unlocked concept
+picture, and B goes back to the title. In Load-a-Sim Up / Down pick a slot, A loads it and B goes back to the title. In Create-a-Sim B goes back only from the last page, as in the game. The end
+credits the game shows after the story are still the game's own picture.
 
 **In town** the buttons are the DS's. **The menu** (phone, tabs, shop, the rest of the touch
 screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes. On the
@@ -151,6 +167,12 @@ a day; A on a line explains it), and when a guest checks in, A on a free room gi
 B goes back. On a music panel, A plays the highlighted song (the room keeps it), Up / Down past
 the list scroll it, B closes. On the stat panel, A opens a page, LB / RB (or Left / Right on a
 page) go to the previous / next one, B goes back to the first page, then closes.
+**In Create-a-Sim** LB / RB change page and Start goes to the next one; the right stick (or the
+mouse's right drag) turns your Sim, and so do X / Y after the first page. On the first page the D-pad and A type the name on the
+game's keyboard (seven letters at most), Y erases a letter and X changes the letters (ABC, abc,
+123!); the gender and skin buttons are above it. Hair, face and clothes are picked with the D-pad
+and A (Left / Right past the edge show more, as the game's arrows do). On the last page pick an
+aspiration, then A on the tick starts the game; B (or the cross) goes back to the title.
 The phone's Up / Down / A are the phone's own buttons (A on a row goes there and presses OK); B
 hangs up. **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or
 B; a question (Quit?) takes A for yes and B for no; when a popup opens over the menu, the menu
@@ -204,7 +226,7 @@ They are kept in `settings.ini` in your user folder (the window's size too): on 
 
 | Layout | What you see |
 |---|---|
-| **CONSOLE** (default) | the window as a console game: the world big (widescreen, sharper, 60 fps), the touch screen's menu, conversations, popups and games laid out big, with hints; title and Create-a-Sim framed, the touch screen big |
+| **CONSOLE** (default) | the window as a console game: the world big (widescreen, sharper, 60 fps), the touch screen's menu, conversations, popups and games laid out big, with hints; the title, Create-a-Sim and the menus redrawn big |
 | **AUTO** | FOCUS in town (the touch screen big during a social game, in the shop's catalogue or Build Rooms), SIDE everywhere else |
 | **FOCUS** | the world big, the touch screen at twice its size over the world's right edge, a little see-through (Tab makes the touch screen the big one instead) |
 | **SIDE** | both screens side by side |
@@ -238,7 +260,8 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
 - **An early version.** Town, conversations, Create-a-Sim, the shop, Build Rooms, the hotel's
   lobby, basement, Registry and music, the social games, the vacuum and the casino's card game are
   checked; not everything the game has is yet.
-- **A few screens are still the game's own picture.** The furniture editor of a hotel room, and
+- **A few screens are still the game's own picture.** The end credits (after the story),
+  the furniture editor of a hotel room, and
   any screen CONSOLE has no HD page for, are drawn big with the stick as a cursor (the right
   stick moves it, A touches), and a hint box says so.
 - **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the

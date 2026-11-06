@@ -118,6 +118,7 @@ bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
         if (b == &PadState::menu) return v.own && !v.popup && !v.back.empty(); // (an own screen's MENU is B)
         if (b == &PadState::x) return !XAction(v, f).empty();
         if (b == &PadState::y) return !v.buttons[(int)MenuButton::Y].empty();
+        if (b == &PadState::start) return !v.buttons[(int)MenuButton::Start].empty();
         if (b == &PadState::lb || b == &PadState::rb)
         {
             if (s.screen == Screen::Panel) return true; // (the panel's tabs)
@@ -250,7 +251,7 @@ int Navigator::Arrive(const MenuView& v) const
     // Another screen module on the same screen (the Registry and its room info, both Unknown):
     // the item it last had the focus on, else its first.
     const u32 tag = v.items.empty() ? 0 : v.items[0].id >> 24;
-    if (focusId_ != 0 && !HasModule(v, focusId_ >> 24) && tag < 16 && moduleId_[tag]) return MenuKeep(v, moduleId_[tag], MenuFirst(v));
+    if (focusId_ != 0 && !HasModule(v, focusId_ >> 24) && tag < 32 && moduleId_[tag]) return MenuKeep(v, moduleId_[tag], MenuFirst(v));
     return MenuFirst(v);
 }
 
@@ -349,7 +350,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     if (held_ && ++heldFrames_ > kHoldFrames) held_ = nullptr;
     if (mode == Mode::Focus || mode == Mode::Popup)
     {
-        static bool PadState::*const kTapButtons[] = {&PadState::a, &PadState::b, &PadState::menu, &PadState::lb, &PadState::rb, &PadState::x, &PadState::y};
+        static bool PadState::*const kTapButtons[] = {&PadState::a, &PadState::b, &PadState::menu, &PadState::lb, &PadState::rb, &PadState::x, &PadState::y, &PadState::start};
         if (!settled)
         {
             for (bool PadState::*b : kTapButtons)
@@ -444,6 +445,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
                 else if (Run(a, touch) && asks) armed_ = 0;
             }
             if (pressed(&PadState::y)) Run(v.buttons[(int)MenuButton::Y], touch);
+            // Start: the view's own (the front end's touch); else nothing (or passed on, below).
+            if (!v.buttons[(int)MenuButton::Start].empty() && pressed(&PadState::start)) Run(v.buttons[(int)MenuButton::Start], touch);
             const int t = s.tab == Tab::None ? -1 : (int)s.tab - (int)Tab::Interact;
             if (s.screen == Screen::Panel && pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
             else if (s.screen == Screen::Panel && pressed(&PadState::lb)) tap(kTabIcon[t < 0 ? 4 : (t + 4) % 5]);
@@ -456,6 +459,12 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             else if ((back || menu) && !v.own) menuOpen_ = false;
             // DS buttons the view passes on (Game Paused's Start).
             if (v.passKeys) dsKeys |= DsKeys(pad, true) & v.passKeys;
+            // The right stick turns what the game turns on L / R (Create-a-Sim's model).
+            if (v.stickTurns && pad.rx < -kStick) dsKeys |= 1u << kL;
+            else if (v.stickTurns && pad.rx > kStick) dsKeys |= 1u << kR;
+            // X / Y the same (the keyboard's way: no right stick).
+            if (v.xyTurns && pad.x) dsKeys |= 1u << kL;
+            if (v.xyTurns && pad.y) dsKeys |= 1u << kR;
             break;
         }
         if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);
@@ -524,7 +533,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         {
             if (!MenuFocusable(*view_, focus_)) focus_ = Arrive(*view_);
             focusId_ = focus_ >= 0 ? view_->items[focus_].id : 0;
-            if ((focusId_ >> 24) < 16) moduleId_[focusId_ >> 24] = focusId_;
+            if ((focusId_ >> 24) < 32) moduleId_[focusId_ >> 24] = focusId_;
             viewHash_ = view_->Hash();
             viewPage_ = view_->page;
             viewQuestion_ = view_->question;

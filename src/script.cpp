@@ -22,6 +22,8 @@ static bool PadAction(const std::string& name, PadState& p)
         {"l", &PadState::lb}, {"lb", &PadState::lb}, {"r", &PadState::rb}, {"rb", &PadState::rb},
         {"start", &PadState::start}, {"select", &PadState::select}, {"menu", &PadState::menu},
         {"up", &PadState::up}, {"down", &PadState::down}, {"left", &PadState::left}, {"right", &PadState::right}};
+    // The right stick pushed fully left / right (Create-a-Sim's model turns).
+    if (name == "rsleft" || name == "rsright") { p.rx = name == "rsleft" ? -1.0f : 1.0f; return true; }
     auto it = kPad.find(name);
     if (it == kPad.end()) return false;
     p.*(it->second) = true;

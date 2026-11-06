@@ -12,6 +12,9 @@
 #include "port/statpanel.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
+#include "port/front.h"
+#include "port/frontmenus.h"
+#include "port/cas.h"
 #include "port/gift.h"
 #include "port/note.h"
 #include "port/options.h"
@@ -128,6 +131,35 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
     const bool bar = hud && strings && strings->ok;
     const int worldRows = bar ? HudCropRows(topH) : topH;
+    // The front end's boot, title and main menu (port/front.h), Settings and Load-a-Sim
+    // (port/frontmenus.h) in HD: the whole canvas theirs; Load's "Loading" popup (port/popup.h) over it.
+    if (s.screen == Screen::FrontEnd || s.screen == Screen::None || s.screen == Screen::Loading)
+        if (const MenuView v = ConsoleView(s, game, rom); v.valid)
+        {
+            // The module by the front end's kind (FrontView takes the boot, title and main menu,
+            // which win over Settings and Load in FrontState::kind).
+            const FrontKind kind = game->front.kind;
+            auto screen = [&](const MenuView& view, int f) {
+                if (kind == FrontKind::Settings) BuildSettings(c, view, f, *game, *rom, bottom, icons, topW, topH);
+                else if (kind == FrontKind::Load) BuildLoad(c, view, f, *game, *rom, icons, topW, topH);
+                else BuildFront(c, view, f, s, *game, *rom, icons, topW, topH);
+            };
+            if (v.popup)
+            {
+                if (const MenuView u = ScreenView(s, game, rom); u.valid) screen(u, -1);
+                BuildPopup(c, v, focus, *game, *rom);
+                SortUi(c.ui);
+            }
+            else screen(v, focus);
+            return c;
+        }
+    // Create-a-Sim in HD (port/cas.h): the whole canvas its.
+    if (s.screen == Screen::CreateASim)
+        if (const MenuView v = ConsoleView(s, game, rom); v.valid)
+        {
+            BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH);
+            return c;
+        }
     // A black load (both screens black, RAM between screens): the bare backdrop.
     if (s.screen == Screen::Loading) return c;
     const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::ItemHand || s.screen == Screen::Unknown;
@@ -136,9 +168,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         // No HUD (title, main menu, Create-a-Sim, an unmapped front-end screen; None from the pixels
         // when RAM does not read): both screens matter alike. The top
         // screen fitted in its box at its own shape, centred; the touch screen 2.5x; both framed.
-        const double k = std::min((double)kFrontTopBox.w / topW, (double)kFrontTopBox.h / topH);
-        const int w = std::min(kFrontTopBox.w, (int)std::lround(topW * k)), h = std::min(kFrontTopBox.h, (int)std::lround(topH * k));
-        const Rect topTo {kFrontTopBox.x + (kFrontTopBox.w - w) / 2, kFrontTopBox.y + (kFrontTopBox.h - h) / 2, w, h};
+        const Rect topTo = FrontFit(kFrontTopBox, topW, topH);
         c.overlays.push_back(FrameAround(topTo, 0));
         c.overlays.push_back(FrameAround(kFrontBottomTo, 0));
         c.pieces.push_back({Src::Top, {0, 0, topW, topH}, topTo});

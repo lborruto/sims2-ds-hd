@@ -19,6 +19,14 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
+- The front end in HD, played with a controller: the intro's splashes (the video big, the game's
+  last splash with A and Start chips), the title, the main menu (the four buttons big, in the
+  game's order and words), Settings (the volume, the concept art, the credits' roll) and
+  Load-a-Sim (the three slots: name, money, place, date), and Create-a-Sim (your Sim big, the
+  name on the game's keyboard, gender, skin, hair, face, clothes, aspiration). Everything is the
+  game's own taps, read from its memory and your ROM; the end credits after the story stay the
+  game's picture. Checks and flags: `--print-front`, `--print-game` for the front end,
+  `tests/gamestate_check.sh`'s front-end states and `tests/console_check.sh`'s pad scripts.
 - The whole town in HD, played with a controller: the touch screen's menu opens big over the
   town with its five tabs in the game's own look and words. Interact lists what the object or
   person can do (D-pad and A, Left / Right for the next one nearby); Pockets shows the six

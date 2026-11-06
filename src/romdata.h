@@ -97,6 +97,10 @@ std::string DropEscapes(const std::string& in);
 
 // The game's raw text bytes (a RAM buffer, e.g. a popup's) as UTF-8, as RomData::String decodes them.
 std::string GameTextToUtf8(const std::string& raw);
+// Whether the game's charset draws byte b as a letter (printable ASCII to 0x7A, or one of its
+// accented letters and signs from 0x7B): what a name typed on its keyboard may hold (the French,
+// German, Italian and Spanish keyboards have é è à î ë ê, ä ü ö Ä Ü Ö ß, ò à ù ì è é, ¡ ñ Ñ).
+bool GameTextByte(unsigned char b);
 
 // The language the game shows: the firmware's user language (0 Japanese to 5 Spanish), which
 // the game reads at start; any other value (Chinese, reserved) is taken as English.

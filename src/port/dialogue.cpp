@@ -77,7 +77,7 @@ std::string DialogueText(const std::string& raw, const HudState& hud, const std:
         else if (clock && tag == "hh") value = std::to_string(hud.hour % 12 == 0 ? 12 : hud.hour % 12);
         else if (clock && tag == "mm") value = (hud.minute < 10 ? "0" : "") + std::to_string(hud.minute);
         else if (clock && tag == "am") value = hud.hour < 12 ? am : pm;
-        // (The name is ASCII from RAM; anything else in it is not shown.)
+        // (The name is UTF-8 decoded from the game's charset in RAM.)
         value.erase(std::remove_if(value.begin(), value.end(), [](char c) { return c == '@' || c == '{' || c == '}'; }), value.end());
         Push(out, dropped, value, value.empty());
         i = j - 1;

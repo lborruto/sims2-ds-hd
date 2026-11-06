@@ -26,7 +26,7 @@ enum class Align { Left, Centre, Right };
 // (the D-pad as a cross).
 // DPadV / DPadH: the cross with its up and down (left and right) arms lit and the others faint:
 // Up / Down (Left / Right) do something there.
-enum class Button { A, B, X, Y, LB, RB, Start, DPad, DPadV, DPadH };
+enum class Button { A, B, X, Y, LB, RB, Start, DPad, DPadV, DPadH, RS };
 
 struct UiItem
 {

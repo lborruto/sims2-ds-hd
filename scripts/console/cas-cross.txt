@@ -1,0 +1,2 @@
+# From s4, CONSOLE: B → the game's cross: the title at phase 0.
+10 2 pad b

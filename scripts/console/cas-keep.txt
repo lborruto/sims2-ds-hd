@@ -1,0 +1,6 @@
+# From s4 (Keep this Sim?, Fortune), CONSOLE: Right, A → Popularity; Down, A → the tick: the game
+# starts (the town).
+10 2 pad right
+20 2 pad a
+50 2 pad down
+60 2 pad a

@@ -1,0 +1,2 @@
+# From s3, CONSOLE: the right stick held left 40 frames (the DS's L: the model turns).
+5 40 pad rsleft

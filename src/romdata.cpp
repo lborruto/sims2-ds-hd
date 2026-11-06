@@ -280,6 +280,7 @@ std::string DropEscapes(const std::string& in)
 }
 
 std::string GameTextToUtf8(const std::string& raw) { return ToUtf8(raw); }
+bool GameTextByte(unsigned char b) { return (b >= 0x20 && b < kCharsetFirst) || (b >= kCharsetFirst && b < kCharsetFirst + std::size(kCharset) && kCharset[b - kCharsetFirst]); }
 
 std::string RomData::String(int id) const
 {

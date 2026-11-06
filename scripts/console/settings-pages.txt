@@ -1,0 +1,11 @@
+# From F-copt-concept-80 (Settings > Concept Art on the complete save: picture 4 unlocked, the
+# focus on it), CONSOLE: A → the art on the top screen; Left → a locked picture, A → nothing; RB →
+# Credits (scrolling); RB → Music (the ring); LB, LB → Concept Art again; B → the title.
+10 2 pad a
+60 2 pad left
+70 2 pad a
+110 2 pad rb
+200 2 pad rb
+240 2 pad lb
+280 2 pad lb
+330 2 pad b

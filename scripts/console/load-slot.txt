@@ -1,0 +1,5 @@
+# From F-cload-150 (Load-a-Sim on a copy of the complete save, slot 1 current), CONSOLE: Down,
+# Up (the focus on the used slots), A → slot 1's tick: the game's "Loading" popup, then the town.
+10 2 pad down
+20 2 pad up
+30 2 pad a

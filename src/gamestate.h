@@ -20,7 +20,7 @@ struct HudState
     int hour = -1, minute = -1;     // the DS clock the game shows (24 h)
     int sanity = 0, sanityMax = 0;  // whole units (the game keeps them 20.12 fixed)
     int tier = -1;                  // 0 red, 1 green, 2 yellow, 3 lavender bar
-    std::string simName;            // the current Sim, ASCII, at most 8 characters
+    std::string simName;            // the current Sim, UTF-8 from the game's charset, at most 7 characters
     bool operator==(const HudState&) const = default;
 };
 
@@ -110,7 +110,7 @@ struct SaveSlot
     bool used = false;
     int money = 0, place = -1;        // place: string 0x43 + place
     u32 time = 0;                     // the header's raw time word
-    std::string simName;              // ASCII (blank when it does not read)
+    std::string simName;              // UTF-8 from the game's charset (blank when it does not read)
     bool operator==(const SaveSlot&) const = default;
 };
 struct SaveSlots
@@ -454,6 +454,114 @@ struct StatState
     bool operator==(const StatState&) const = default;
 };
 
+// Milestone 5: the front end (title, Settings, Load-a-Sim, Create-a-Sim, the boot screens, the video),
+// read from RAM (research m5-front-end). Each part reads only on its own screen and is valid on its
+// own; none of it is in GameState ==.
+enum class FrontKind { None, Title, MainMenu, Settings, Load, Wireless, CreateASim, KeepSim, Boot, Video };
+struct TitleState
+{
+    bool valid = false;
+    int phase = -1;                   // T+0x25: 0 "touch to begin", 1 delay, 2 menu fading in, 3 menu, 4 a choice made
+    bool menu = false;                // phase >= 2: the four buttons (Create-a-Sim, Load-a-Sim, Settings, DS Wireless) are up
+    int button = -1;                  // T+0x26: the button under the stylus 0..3, -1 none
+    bool operator==(const TitleState&) const = default;
+};
+struct SettingsState
+{
+    bool valid = false;
+    int page = -1;                    // 0 Music, 1 SFX, 2 Concept Art, 3 Credits
+    int music = 0, sfx = 0;           // volume 0..4096 (G, 20.12)
+    bool art = false;                 // a concept art is on the top screen
+    bool conceptKnown = false;        // `concept` read (the Concept page's buttons)
+    u16 conceptBits = 0;                 // bit i: concept art i (0..11) is unlocked
+    bool creditsKnown = false;        // the credits page's scroll read
+    int creditsPos = 0, creditsLine = 0;   // 16.16 scroll position, current line
+    bool operator==(const SettingsState&) const = default;
+};
+constexpr int kLoadRows = 3;
+struct LoadRow
+{
+    bool used = false;
+    std::string name;                 // the Sim's name (the game's default when empty), UTF-8 from the game's charset
+    int money = 0;
+    int place = -1, placeNameId = -1; // header place, name string 67 + place
+    bool timeKnown = false;           // `month`.. decoded from the header's time
+    int month = 0, day = 0;           // 1..12, 1..31
+    int hour12 = 0, minute = 0;       // 1..12, 0..59
+    bool pm = false;
+    bool operator==(const LoadRow&) const = default;
+};
+struct LoadScreen
+{
+    bool valid = false;
+    bool wireless = false;            // the DS Wireless screen (same rows)
+    int green = -1;                   // the slot drawn green (0x0213D84C), -1 none
+    int tapped = -1;                  // S+0x70: the row whose tick was tapped, -1 none
+    LoadRow rows[kLoadRows];
+    bool operator==(const LoadScreen&) const = default;
+};
+constexpr int kCasName = 7;           // the game's name limit
+struct CasState
+{
+    bool valid = false;
+    int page = -1;                    // S+0x74: 0 Name, 1 Hair, 2 Face, 3 Clothes, 4 Keep this Sim?; in game 5 Tan, 6 Hair, 7 Clothes
+    bool switching = false;           // the page object is not yet the page's (a page change in flight, 2-4 frames): no page fields
+    int gender = -1;                  // 0 female, 1 male
+    std::string simName;              // G+0x53, the committed name, at most 7 characters, as UTF-8
+    int skin = -1;                    // skin figure 0..3 (hero), -1 not read
+    int hairColour = -1;              // 0..7 (hero), -1 not read
+    // Name page
+    bool nameKnown = false;
+    std::string name;                 // the live buffer as UTF-8 (the game's charset: accented letters too)
+    int nameLength = 0;               // its characters, at most kCasName
+    int keyboard = -1;                // 0 ABC, 1 abc, 2 123!
+    // Hair page
+    bool hairKnown = false;
+    int hairStyle = -1;               // selected 0..17
+    int hairScroll = -1;              // column scroll 0..7
+    int hairPos = -1;                 // the chosen style's place in the two rows of nine: column + 9 row (0..17; shown when column - scroll is 0 or 1)
+    // Hair and Clothes: the game's arrows (shown only where it can scroll), from the page's sprites
+    bool arrowsKnown = false;
+    bool canLeft = false, canRight = false;
+    // Face page
+    int face = -1;                    // selected 0..8
+    // Clothes page
+    bool clothesKnown = false;
+    int category = -1, clothesPage = -1, item = -1;   // category 0..5, page 0..11
+    int clothesCell = -1;             // the cell (0..5, row by row) the game's ring is on; -1 not on this page
+    // Keep this Sim?
+    bool keepKnown = false;
+    int aspiration = -1;              // 0 Fortune, 1 Romance, 2 Popularity, 3 Party
+    int answer = -1;                  // 0 choosing, 1 tick pressed, 2 cross pressed
+    bool operator==(const CasState&) const = default;
+};
+struct BootState
+{
+    bool valid = false;
+    int mode = -1;                    // CBGDisplayMenu +0x28: 0 touch to continue, 1 Maxis, 2 EA, 3 legal, 4 popup, 5 zoom, 6 blank
+    int countdown = 0, duration = 0;
+    bool top = false;                 // the object is in the top slot
+    bool operator==(const BootState&) const = default;
+};
+struct VideoState
+{
+    bool valid = false;
+    int movie = -1;                   // CVideoScreenMenu +0x2C, 0..3 (the intro is 3)
+    bool operator==(const VideoState&) const = default;
+};
+struct FrontState
+{
+    FrontKind kind = FrontKind::None;
+    TitleState title;
+    SettingsState settings;
+    LoadScreen load;
+    CasState cas;
+    BootState boot;
+    VideoState video;
+    bool operator==(const FrontState&) const = default;
+};
+const char* FrontKindName(FrontKind);
+
 struct GameState
 {
     bool valid = false;            // the manager pointer chain read cleanly
@@ -481,6 +589,7 @@ struct GameState
     PlacementState placement;
     CatalogueState catalogue;
     StatState stat;
+    FrontState front;              // milestone 5: the front end's screens (logged apart: --print-front)
     // Screen identity only: hud and dialogue change every minute / page and are logged apart
     // (--print-hud), so --print-game stays one line per screen change.
     bool operator==(const GameState& o) const

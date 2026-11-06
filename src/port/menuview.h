@@ -46,6 +46,7 @@ constexpr u32 kModInteract = 1u << 24, kModPockets = 2u << 24, kModGift = 3u << 
               kModRelations = 5u << 24, kModPhone = 6u << 24, kModOptions = 7u << 24, kModPopup = 8u << 24,
               kModNote = 9u << 24, kModCatalogue = 10u << 24, kModBuild = 11u << 24,
               kModCheckIn = 12u << 24, kModRoomInfo = 13u << 24, kModMusic = 14u << 24, kModStat = 15u << 24;
+// (port/front.h: kModFront = 16 << 24; port/frontmenus.h: kModFrontMenus = 17 << 24; port/cas.h: kModCas = 18 << 24.)
 
 // ViewItem::next's "no move that way".
 constexpr int kNoMove = -2;
@@ -84,8 +85,8 @@ struct ViewItem
 };
 
 // Screen-wide buttons (not the focused item's). LB / RB: a screen's own pages (the stat panel's);
-// on the panel they stay its tabs.
-enum class MenuButton { Left, Right, X, Y, LB, RB, Count };
+// on the panel they stay its tabs. Start: the front end's (the boot's and the title's touch).
+enum class MenuButton { Left, Right, X, Y, LB, RB, Start, Count };
 
 struct MenuView
 {
@@ -129,6 +130,12 @@ struct MenuView
     bool backCloses = false;
     // DS buttons passed on while held (Game Paused's Start), whatever the focus.
     u32 passKeys = 0;
+    // The right stick's horizontal holds the DS's L (left) / R (right) while deflected: Create-a-
+    // Sim's model turns as the game turns it on L / R (LB / RB are the screen's pages there).
+    bool stickTurns = false;
+    // X / Y hold the DS's L / R while held (the keyboard's way to turn Create-a-Sim's model; the
+    // view's X / Y actions then empty).
+    bool xyTurns = false;
     // (Drawing only, not hashed: set by CONSOLE from the navigator) the id of the item whose X is
     // armed (xAsks), 0 none.
     u32 armed = 0;
