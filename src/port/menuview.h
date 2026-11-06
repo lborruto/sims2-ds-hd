@@ -85,6 +85,11 @@ struct ViewItem
     // A's action starts an animation on the world (the slot machine's reels, an arcade cabinet, the
     // skydive): the panel's menu closes with it, so the world shows big.
     bool closesMenu = false;
+    // Its Left / Right step a value the game reads back (a volume slider): every press counts.
+    // Presses made while a step runs or before the game took it are queued and coalesced (Left
+    // and Right cancel out), and each queued step runs once the item's Left / Right have been
+    // rebuilt from the game's new value (the drag starts where the knob now is).
+    bool queues = false;
 };
 
 // Screen-wide buttons (not the focused item's). LB / RB: a screen's own pages (the stat panel's);
@@ -112,6 +117,13 @@ struct MenuView
     // on (by id: the room the question was about), else `initial`.
     int page = 0;
     bool question = false;
+    // B's safe landing (an index; -1 none): B first moves the focus to this item (Keep this Sim?'s
+    // cross), and only B pressed again there runs `back`: one B never discards.
+    int backFocus = -1;
+    // A picture the screen shows big (Settings' concept art: the game keeps it on its top screen
+    // until Settings closes): the first B closes the big picture (the navigator's PictureClosed,
+    // drawing only) instead of running `back`; an A that runs opens it again.
+    bool picture = false;
     // A selection the game owns (Relationships' Sim, the phone's row): when >= 0 and enabled, the
     // focus is held on that item while it is in the list (scrollGroup), and every Up / Down there
     // performs scrollUp / scrollDown (the game's own buttons move its selection; the rebuilt view

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -192,6 +193,9 @@ void BuildGoals(Composition& c, const MenuView& v, int focus, const GameState& g
         if (l1 > l0) AddMousePiece(c, {kGoalsLineX, kGoalsLineY0 + kGoalsLineH * (l0 - g.first), kGoalsLineW, kGoalsLineH * (l1 - l0)}, r);
     }
     AddScrollBar(c, {list.x + list.w - kGoalsPad - 10, list.y + kGoalsPad, 10, list.h - 2 * kGoalsPad}, first, last - first, (int)g.entries.size());
+    // No goal: the port's words in the list's well (the game's table has none for it).
+    if (g.entries.empty())
+        PanelText(c, {list.x + 24, list.y, list.w - 48, list.h}, OwnWord(&rom, OwnWordId::NoGoals), kGoalsSize, 20, Align::Centre, Weight::ExtraBold);
     if (g.footer)
     {
         const Rect f {kGoalsFooter.x + 20, kGoalsFooter.y, kGoalsFooter.w - 40, kGoalsFooter.h};

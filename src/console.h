@@ -106,7 +106,8 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
                          const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
                          const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0, const PointerView* pointer = nullptr,
-                         int payout = 0);
+                         int payout = 0, bool pictureClosed = false);
+// pictureClosed: the view's big picture (MenuView::picture: Settings' concept art) closed by B.
 // payout (above): the money's last change (App::consolePayout: the slot machine's coin and its
 // payout, a ticket's prize, ...), shown on the panel's world beside the HD status bar while not 0.
 

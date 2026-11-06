@@ -38,7 +38,7 @@ constexpr Rect kPopClose {kPopBox.x + (kPopBox.w - 320) / 2, kPopBtnY, 320, kPop
 constexpr Rect kPopNo {kPopBox.x + 48, kPopBtnY, 260, kPopBtnH};
 constexpr Rect kPopYes {kPopBox.x + kPopBox.w - 308, kPopBtnY, 260, kPopBtnH};
 constexpr int kPopLayer = 4;   // above the screen beneath (0, 1), the status bar (2) and the phone's clock (3); the bar is lifted above it (kPopLayer + 1: never dimmed)
-constexpr u32 kPopCloseId = kModPopup + 0x700, kPopYesId = kModPopup + 0x701;
+constexpr u32 kPopCloseId = kModPopup + 0x700, kPopYesId = kModPopup + 0x701, kPopNoId = kModPopup + 0x702;
 
 // The game's button `index` of popup p (0: the X or the cross, 1: the tick), its centre on the
 // touch screen (x, y): the manager's own rectangles (0x02057314, 24 x 24 from the box's place

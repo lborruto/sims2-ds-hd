@@ -152,24 +152,27 @@ controller you used last (A / B / X / Y, ✕ ○ □ △, or the Switch's), or y
 typed.
 
 **Before the game** (the front end) the controller does it all: on the intro's last screen
-("Touch the Touch Screen to continue.") A or Start take the touch, on the title A begins, and on
+("Touch the Touch Screen to continue.") A or Start take the touch, on the title A or Start begin, and on
 the main menu Up / Down and A pick Create-a-Sim, Load-a-Sim, Settings or DS Wireless (the buttons
 fade in first; a press during the fade does nothing). In Settings LB / RB change page (Music,
-SFX, Concept Art, Credits), Left / Right move a volume by a tenth, A opens an unlocked concept
-picture, and B goes back to the title. In Load-a-Sim Up / Down pick a slot, A loads it and B goes back to the title. In Create-a-Sim B goes back only from the last page, as in the game. The end
+SFX, Concept Art, Credits), Left / Right move a volume by a tenth (press as fast as you like:
+every press counts), A shows an unlocked concept picture big (B puts it away), and B goes back to
+the title. In Load-a-Sim Up / Down pick a slot, A loads it and B goes back to the title. In Create-a-Sim B goes back only from the last page, as in the game. The end
 credits the game shows after the story are still the game's own picture.
 
 **In town** the buttons are the DS's. **The menu** (phone, tabs, shop, the rest of the touch
 screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes. On the
 Interact tab, A does the highlighted action and Left / Right pick the next thing or person nearby.
 In Pockets, A uses the highlighted item and X throws it away (press X twice: the first only asks,
-the bin turns green; moving away cancels). In Give Gift, A gives the highlighted item and B closes. In Goals and
+the bin turns green and the hint says "Again"; moving away cancels). In Give Gift, A gives the
+highlighted item (or the bow, the selected one) and B closes. The save slots and the phone, opened
+from the menu, come back to the menu where you were. In Goals and
 Relationships, Up / Down move the game's own selection; in Options, Left / Right turn a volume
-up or down a notch, and A on Save opens the save slots (A saves into the highlighted one: an
-empty slot at once, a used one after the game asks, A yes, B no; B closes).
-In the shop, A on an item picks it (a shop item to buy, one of yours to sell, with its price),
-A on the simoleon button buys or sells it (greyed when the game would not), Up / Down past the
-list scroll it, B closes. In Build Rooms, A on a room asks the game's question (its permit and
+up or down a notch (every press counts), and A on Save opens the save slots (A saves into the
+highlighted one: an empty slot at once, a used one after the game asks, which opens on No; B closes).
+In the shop, A on an item selects it (a shop item to buy, one of yours to sell, with its price),
+A on the simoleon button buys or sells it (it names the selected item and its price; greyed when
+the game would not), Up / Down past the list scroll it, B closes. In Build Rooms, A on a room asks the game's question (its permit and
 the money left shown first; the focus starts on No, so a stray double press never spends), Right
 and A buy it, A on No or B goes back (B on the list closes). In the hotel's
 Registry, A on a room shows its page (who stays, their mood, when they leave, what the room earns
@@ -182,10 +185,11 @@ mouse's right drag) turns your Sim, and so do X / Y after the first page. On the
 game's keyboard (seven letters at most), Y erases a letter and X changes the letters (ABC, abc,
 123!); the gender and skin buttons are above it. Hair, face and clothes are picked with the D-pad
 and A (Left / Right past the edge show more, as the game's arrows do). On the last page pick an
-aspiration, then A on the tick starts the game; B (or the cross) goes back to the title.
+aspiration, then A on the tick starts the game; A on the cross goes back to the title (B first
+moves to the cross, B again presses it: one stray B never throws your Sim away).
 The phone's Up / Down / A are the phone's own buttons (A on a row goes there and presses OK); B
 hangs up. **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or
-B; a question (Quit?) takes A for yes and B for no; when a popup opens over the menu, the menu
+B; a question (Quit? Overwrite this save?) opens on No (Right then A for yes; B is always no); when a popup opens over the menu, the menu
 comes back on the same row after it. A note closes on A or B.
 
 **The activities** are all played on the buttons, each in its own HD frame with the buttons' hints in a bar below (they follow what the game asks):

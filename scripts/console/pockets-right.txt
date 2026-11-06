@@ -1,0 +1,6 @@
+# From A-pk-cnt3-slot1 (the complete save, Pockets, slot 1 selected), CONSOLE: MENU, Right (its
+# row's key item), Right, Right: the focus stays there (never the phone).
+20 2 pad menu
+50 2 pad right
+70 2 pad right
+90 2 pad right

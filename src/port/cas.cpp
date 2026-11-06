@@ -118,8 +118,9 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
     // A page change in flight: the new page's tab, nothing to press until its object is there.
     if (cs.switching) { v.page = 0x7F; return v; }
     v.page = 0x40 + cs.page;
-    v.buttons[(int)MenuButton::LB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * ((cs.page + kCasPages - 1) % kCasPages))};
-    v.buttons[(int)MenuButton::RB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * ((cs.page + 1) % kCasPages))};
+    // LB / RB the pages, ends included (no ring: LB on the Name page never lands on Keep this Sim?).
+    if (cs.page > 0) v.buttons[(int)MenuButton::LB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page - 1))};
+    if (cs.page < kCasPages - 1) v.buttons[(int)MenuButton::RB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page + 1))};
     if (cs.page < 4) v.buttons[(int)MenuButton::Start] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page + 1))};
     // X / Y turn the model on every page but the Name page (there the keyboard's page and the
     // backspace): the keyboard's way, with no right stick.
@@ -154,6 +155,13 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
         ViewItem back = Item(kCasBackRect, kCasBackId, {});
         if (!cs.name.empty()) back.action = {Tap(kCasBackX, kCasBackY)};
         v.items.push_back(back);
+        // Down from a key: the key under it, else the next row's last key (123!'s short last
+        // row), and only from the last row the backspace: never by surprise from the middle.
+        {
+            const int base = v.initial, count = kCasKeyCount[kb], rows = (count + 8) / 9;
+            for (int i = 0; i < count; i++)
+                v.items[base + i].next[1] = i / 9 + 1 < rows ? base + std::min(i + 9, count - 1) : base + kCasKeys;
+        }
         v.buttons[(int)MenuButton::Y] = back.action;
         v.buttons[(int)MenuButton::X] = {Tap(kCasKbX, kCasKbY[(kb + 1) % 3])};
         break;
@@ -238,6 +246,9 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
         {
             v.back = cross.action;
             v.backCloses = true;
+            // One B only puts the focus on the cross ("No": the Sim is discarded); B again there
+            // (or A) answers.
+            v.backFocus = (int)v.items.size() - 1;
         }
         v.initial = live ? Slot(cs.aspiration) : -1;
         break;
@@ -267,6 +278,23 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         {
             c.ui.push_back(ChipItem(cx - rs.w / 2 - 16 - xr.w, y + (rs.h - xr.h) / 2, Button::X, "", 28));
             c.ui.push_back(ChipItem(cx + rs.w / 2 + 16, y + (rs.h - xr.h) / 2, Button::Y, "", 28));
+        }
+        // The game's own "L" / "R" pills on its arrows (the DS's shoulder buttons: LB / RB are the
+        // pages here) covered by the pad's turn chips: X / Y off the Name page, else the right stick.
+        const float sx = (float)top.w / topW, sy = (float)top.h / topH;
+        const int ox = (topW - SW) / 2; // (a wide picture: the 2D layer centred)
+        for (int k = 0; k < 2; k++)
+        {
+            const Rect pill = kCasTurnPill[k];
+            const Rect r {top.x + (int)((pill.x + ox) * sx) - 3, top.y + (int)(pill.y * sy) - 3, (int)(pill.w * sx) + 6, (int)(pill.h * sy) + 6};
+            UiItem plate = PanelItem(r);
+            plate.plain = true;
+            plate.fill = th.frameDark;
+            plate.radius = r.h / 2.0f;
+            c.ui.push_back(plate);
+            const Button b = v.xyTurns ? (k == 0 ? Button::X : Button::Y) : Button::RStick;
+            const Rect cr = ChipRect(0, 0, b, "", 26);
+            c.ui.push_back(ChipItem(r.x + (r.w - cr.w) / 2, r.y + (r.h - cr.h) / 2, b, "", 26));
         }
     }
 

@@ -4,6 +4,7 @@
 #include <cctype>
 
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "romdata.h"
 #include "ui/kit.h"
@@ -93,6 +94,9 @@ void AddInteractView(MenuView& v, const InteractState& in, const RomData* rom)
         it.id = kInteractRowId + ((u32)in.actions[i].code << 4) + (u32)i;
         it.closesMenu = InteractAnimation(in.actions[i].code);
         if (rom) it.word = InteractLabel(*rom, in.actions[i].labelId, in.actions[i].amount);
+        // Left / Right are the strip's targets; with one target, nothing (never the phone by the
+        // geometry: it is Up from the first row).
+        it.next[2] = it.next[3] = kNoMove;
         v.items.push_back(it);
     }
     if (in.prev.kind != TargetRef::None) v.buttons[(int)MenuButton::Left] = {TapStep(kInteractPrevX, kInteractStripY)};
@@ -139,6 +143,13 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
         label.layer = 1;
         c.ui.push_back(label);
         AddMousePiece(c, {kInteractArrowFrom.x, kInteractArrowFrom.y + i * kInteractArrowStep, kInteractArrowFrom.w, kInteractArrowFrom.h}, r);
+    }
+
+    // No action at all (no target, or one that offers none): the port's words in the rows' place.
+    if (n == 0)
+    {
+        const Rect area {RowRect(0).x, RowRect(0).y, RowRect(0).w, RowRect(kInteractRows - 1).y + RowRect(0).h - RowRect(0).y};
+        PanelText(c, area, OwnWord(&rom, OwnWordId::NoActions), kPmTextSize, kPmTextMin, Align::Centre, Weight::ExtraBold, 0xFFE6E6FA);
     }
 
     // The strip: the previous target at the left, the current one in the middle (on a plate with

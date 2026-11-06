@@ -131,6 +131,8 @@ MenuAction StatPageAction(const StatState& st, int to)
         {
             a.push_back(WaitStep(kStSwitchWait));
             a.push_back(TapStep(kStButtonX[to], kStButtonY[to]));
+            // (running on until the game shows the new page: the page left stays drawn till then)
+            a.push_back(WaitStep(kStShowWait));
         }
     }
     return a;
@@ -162,10 +164,19 @@ MenuView StatPanelView(ScreenState s, const GameState* game, const RomData* rom)
     return StatPanelViewOf(s, *game, rom);
 }
 
+// The stat panel as CONSOLE shows it: the game's, but while the pad goes from one page to another
+// (by Main, which the game shows for about 48 frames between), the page it left (StatState::held).
+StatState Shown(const StatState& s)
+{
+    StatState t = s;
+    if (s.held > 0) { t.page = s.held; t.transition = 0; }
+    return t;
+}
+
 MenuView StatPanelViewOf(ScreenState s, const GameState& game, const RomData* rom)
 {
     MenuView v;
-    const StatState& st = game.stat;
+    const StatState st = Shown(game.stat);
     if (s.screen != Screen::Unknown || !game.valid || !st.valid || st.page < 0 || st.page >= kStPages) return v;
     if (rom) v.title = PageName(*rom, st.page);
     if (st.page == 0)
@@ -205,7 +216,7 @@ MenuView StatPanelViewOf(ScreenState s, const GameState& game, const RomData* ro
 void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons)
 {
     const Theme& th = GameTheme();
-    const StatState& st = game.stat;
+    const StatState st = Shown(game.stat);
     const int page = st.page;
     if (page < 0 || page >= kStPages || v.items.empty()) return;
     const size_t first = c.ui.size();

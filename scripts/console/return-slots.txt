@@ -1,0 +1,5 @@
+# From B-cas-opt (the complete save, Options), CONSOLE: MENU, A on Save (the Save slots), B (their
+# X: the game goes back to the panel's Interact tab): the menu open again on Options, on Save.
+20 2 pad menu
+50 2 pad a
+200 2 pad b

@@ -94,6 +94,11 @@ struct Input
     // and App::consoleMenu / consoleFocus follow it (unless pinned by --console-menu or
     // --console-focus). CONSOLE left: the navigator lets go of everything (Navigator::Leave).
     void Steer(App& app, const PadState& p, u32& keys);
+    // After the frame ran (the game's new screen known), when the screen changed or a popup came
+    // or went: App::consoleFocus as an index of the view CONSOLE now draws, by the focused item's
+    // id (the navigator ran on the frame before's view: the old index would show for one frame,
+    // on the wrong item). Within one view (a list scrolled) the index stays as the navigator left it.
+    void FocusForDrawing(App& app, bool screenChanged);
     // The touch script's touch this frame, over any other while it owns the stylus.
     void ScriptTouch(bool& touching, int& tx, int& ty);
     // A pointing minigame's stylus at its pointer (the navigator's; CONSOLE), before ScriptTouch.

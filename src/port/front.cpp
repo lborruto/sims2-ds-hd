@@ -148,9 +148,10 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         c.pieces.push_back(top);
         // The whole canvas is the game's big button for the mouse.
         AddMousePiece(c, kFrBigButtonFrom, {0, 0, kConsoleW, kConsoleH});
-        // At its foot, on a dark plate: the A chip and the game's blue ▶.
+        // At its foot, on a dark plate: the A and START chips (both start) and the game's blue ▶.
         const Rect chip = ChipRect(0, 0, Button::A, "", 40, 0, Weight::ExtraBold);
-        const int gap = 16, arrow = 48, pw = 28 + chip.w + gap + arrow + 28, ph = 72;
+        const Rect start = ChipRect(0, 0, Button::Start, "", 40, 0, Weight::ExtraBold);
+        const int gap = 16, arrow = 48, pw = 28 + chip.w + gap + start.w + gap + arrow + 28, ph = 72;
         const Rect plate {(kConsoleW - pw) / 2, kConsoleH - ph - 14, pw, ph};
         UiItem p = PanelItem(plate);
         p.plain = true;
@@ -160,7 +161,10 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         UiItem a = ChipItem(plate.x + 28, plate.y + (ph - chip.h) / 2, Button::A, "", 40, 0, Weight::ExtraBold);
         a.layer = 1;
         c.ui.push_back(a);
-        AddSpriteIcon(c, icons, kSprFrArrow, 0, 2, {plate.x + 28 + chip.w + gap, plate.y + (ph - arrow) / 2, arrow, arrow});
+        UiItem st = ChipItem(plate.x + 28 + chip.w + gap, plate.y + (ph - start.h) / 2, Button::Start, "", 40, 0, Weight::ExtraBold);
+        st.layer = 1;
+        c.ui.push_back(st);
+        AddSpriteIcon(c, icons, kSprFrArrow, 0, 2, {plate.x + 28 + chip.w + gap + start.w + gap, plate.y + (ph - arrow) / 2, arrow, arrow});
     }
     else if (at == FrontScreen::Menu)
     {
@@ -191,13 +195,15 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
             images.push_back({focused ? kSprFrArrowOn : kSprFrArrow, 0, 2, {r.x + r.w - 12 - arrow, r.y + (r.h - arrow) / 2, arrow, arrow}});
             AddMousePiece(c, {kFrMenuBoxX, kFrMenuBoxY0 + i * kFrMenuBoxDy, kFrMenuBoxW, kFrMenuBoxH}, r);
         }
-        // The hints: the D-pad's Up / Down and A (none while the buttons fade in).
+        // The hints: the D-pad's Up / Down and A with the focused button's label (none while the
+        // buttons fade in).
         if (MenuFocusable(v, focus))
         {
-            const Rect ar = ChipRect(0, 0, Button::A, "", kPmHintSize, 0, Weight::ExtraBold);
+            const FittedText w = FitLine(v.items[focus].word, kPmHintSize, 18, kFrHints.w - 140, Weight::ExtraBold);
+            const Rect ar = ChipRect(0, 0, Button::A, w.text, kPmHintSize, 0, Weight::ExtraBold);
             const Rect dr = ChipRect(0, 0, Button::DPadV, "", kPmHintSize, 0, Weight::ExtraBold);
             const int right = kFrHints.x + kFrHints.w;
-            UiItem a = ChipItem(right - ar.w, kFrHints.y + (kFrHints.h - ar.h) / 2, Button::A, "", kPmHintSize, 0, Weight::ExtraBold);
+            UiItem a = ChipItem(right - ar.w, kFrHints.y + (kFrHints.h - ar.h) / 2, Button::A, w.text, kPmHintSize, 0, Weight::ExtraBold);
             a.layer = 1;
             c.ui.push_back(a);
             UiItem d = ChipItem(right - ar.w - 28 - dr.w, kFrHints.y + (kFrHints.h - dr.h) / 2, Button::DPadV, "", kPmHintSize, 0, Weight::ExtraBold);

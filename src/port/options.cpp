@@ -151,6 +151,7 @@ void AddOptionsView(MenuView& v, const OptionsState& o, const RomData* rom)
         s.id = i == 0 ? kOptMusicId : kOptSfxId;
         s.left = KnobDrag(notch[i], notch[i] - 1, dsY[i]);
         s.right = KnobDrag(notch[i], notch[i] + 1, dsY[i]);
+        s.queues = true; // (fast presses all count)
         // (Left / Right at an end: nothing to drag; the focus stays, as a move would go nowhere.)
         if (i == 0) s.next[0] = b;
         if (s.left.empty()) s.next[2] = (int)v.items.size();
@@ -277,7 +278,7 @@ void BuildSaveSlots(Composition& c, const MenuView& v, int focus, const GameStat
             UiItem e = TextItem({tx, r.y, tw, r.h}, nd.text, nd.size, Align::Left, Weight::ExtraBold);
             e.wrap = false;
             e.middle = true;
-            e.colour = kLabel;
+            e.colour = focused ? 0xFFFFFFFF : kLabel;
             e.layer = 1;
             c.ui.push_back(e);
         }
@@ -303,7 +304,7 @@ void BuildSaveSlots(Composition& c, const MenuView& v, int focus, const GameStat
                 UiItem pt = TextItem({tx, r.y + 74, tw, 44}, pl.text, pl.size, Align::Left, Weight::Bold);
                 pt.wrap = false;
                 pt.middle = true;
-                pt.colour = kLabel;
+                pt.colour = focused ? 0xFFFFFFFF : kLabel; // (white on the focused row's light fill)
                 pt.layer = 1;
                 c.ui.push_back(pt);
             }

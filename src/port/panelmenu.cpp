@@ -8,6 +8,7 @@
 #include "port/goals.h"
 #include "port/icons.h"
 #include "port/interact.h"
+#include "port/ownwords.h"
 #include "port/options.h"
 #include "port/pockets.h"
 #include "port/relations.h"
@@ -282,7 +283,10 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     }
     if (MenuFocusable(v, focus) && !v.items[focus].buttonX.empty())
     {
-        const FittedText x = FitLine(v.items[focus].xWord, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+        // An asking X armed (Pockets' bin): the hint says what the second X does.
+        const bool armed = v.items[focus].xAsks && v.armed != 0 && v.armed == v.items[focus].id;
+        const std::string word = armed ? OwnWord(&rom, OwnWordId::TrashAgain) : v.items[focus].xWord;
+        const FittedText x = FitLine(word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
         right = AddHint(c, right, Button::X, x.text);
     }
     // The D-pad's Up / Down (its vertical arms lit: the game has no word for its arrows) while they

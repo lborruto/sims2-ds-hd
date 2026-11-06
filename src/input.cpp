@@ -293,6 +293,16 @@ PadState Input::Actions(const Settings& s) const
     return p;
 }
 
+void Input::FocusForDrawing(App& app, bool screenChanged)
+{
+    if (app.shown != Layout::Console || app.consolePinned || !steering) return;
+    const GameState* game = app.portSupported ? &app.game : nullptr;
+    const MenuView v = ConsoleView(app.ConsoleScreen(), game, app.rom.get());
+    if (!v.valid || !(navigator.ViewFocus() || v.own || v.popup)) return;
+    if (!screenChanged && v.popup == navigator.PopupUp()) return;
+    app.consoleFocus = navigator.FocusFor(v);
+}
+
 void Input::Steer(App& app, const PadState& p, u32& keys)
 {
     if (app.shown == Layout::Console)
@@ -308,6 +318,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
         app.consoleArmed = navigator.Armed();
+        app.consolePictureClosed = navigator.PictureClosed();
         app.consolePointer = {navigator.PointerShown(), navigator.PointerDown(), navigator.QuitArmed(), navigator.PointerX(), navigator.PointerY(),
                               navigator.Mark()};
         // The money's last change, shown on the panel's world for kPayoutFrames frames (an
@@ -333,6 +344,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         steering = false;
         if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
         app.consoleArmed = 0;
+        app.consolePictureClosed = false;
         app.consolePointer = {};
         app.consolePayout = 0;
         payoutFrames_ = 0;

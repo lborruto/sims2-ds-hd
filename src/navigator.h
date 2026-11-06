@@ -94,12 +94,23 @@ public:
     void SetActivityRam(const ActivityRam& r) { activityRam_ = r; }
 
     // The panel's menu is up (the touch screen 3x over the dimmed world).
-    bool MenuOpen() const { return menuOpen_; }
+    // (Not drawn open while it is coming back to the tab it was left on: the game shows Interact
+    // first for a few frames.)
+    bool MenuOpen() const { return menuOpen_ && !(returnFocus_ > 0 && screen_.tab != returnTab_); }
     // The focused target, an index in HotspotsFor(screen) or, when ViewFocus, in the MenuView's
     // items; -1: no focus on this screen.
     int Focus() const { return focus_; }
     // The focus is over the last Update's MenuView.
     bool ViewFocus() const { return viewFocus_; }
+    // The focus the next Update would put on view v (an index of v): the focused item's id there,
+    // else (a popup gone, its screen back) the item it was on before the popup, else the view's
+    // first focus (a question's initial No). For drawing the frame after the game changed screen.
+    int FocusFor(const MenuView& v) const;
+    // A popup's view was up at the last Update.
+    bool PopupUp() const { return popupUp_; }
+    // The view's big picture (MenuView::picture) not opened by an A on this screen, or closed by
+    // B since (the screen drawn without it).
+    bool PictureClosed() const { return !pictureOpen_; }
     // The id of the focused view item whose X is armed (ViewItem::xAsks: one more X performs it),
     // 0 none.
     u32 Armed() const { return armed_; }
@@ -176,6 +187,27 @@ private:
     int viewPage_ = 0;   // the view's page last frame (MenuView::page)
     bool viewQuestion_ = false;   // and whether it was a question
     u32 pageKeptId_ = 0; // the focused item's id when the last non-question page was left
+    int pageKeptIndex_ = -1;
+    bool pictureOpen_ = false; // MenuView::picture shown big: an A ran; B, LB / RB or another screen close it
+    // The Save slots or the phone opened from the menu: the tab and item it was opened from, the
+    // frames left to come back to the panel (returnFrames_) and to put the focus back
+    // (returnFocus_), the tab still to tap (the game comes back on Interact).
+    Tab returnTab_ = Tab::None;
+    u32 returnId_ = 0;
+    int returnFrames_ = 0, returnFocus_ = 0;
+    Tab leftTab_ = Tab::None; // (the menu's tab and item when it was last left for another screen)
+    u32 leftId_ = 0;
+    int leftFrames_ = 0;
+    bool returnTap_ = false; // and its index (the item gone when the page is back: the one in its place)
+    // A slider's presses (ViewItem::queues): the steps still owed in the order pressed (-1 Left,
+    // +1 Right; 16 at most), its item's id, the Left / Right it had when the last step ran (the next waits until they change: the
+    // game took it), and how long the queue has waited.
+    std::vector<int> queue_;
+    int queueFrames_ = 0;
+    u32 queueId_ = 0;
+    bool queueWaiting_ = false;
+    MenuAction queueLeft_, queueRight_;
+    void ClearQueue() { queue_.clear(); queueFrames_ = 0; queueId_ = 0; queueWaiting_ = false; queueLeft_.clear(); queueRight_.clear(); }
     std::vector<MenuStep> running_;
     int pendingDir_ = -1, pendingFrames_ = 0;
     // A popup's view last frame; what was under it when it came (the screen, the menu open, the

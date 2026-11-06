@@ -59,6 +59,9 @@ enum class OwnWordId : int
     // The painting's next palette page; a minigame's help ("?"): what a button does, leaving it;
     // the stick cursor (the cursor's hint).
     ArtNextPalette, HelpWhat, HelpLeave, Cursor,
+    // The menus: a shop cell's A (it selects; Pay buys), the bin armed (X again throws the item
+    // away), an empty Goals / Interact tab.
+    Select, TrashAgain, NoGoals, NoActions,
     Count
 };
 

@@ -1,0 +1,4 @@
+# From s2 (the main menu, the focus on Create-a-Sim), CONSOLE: A → Create-a-Sim, which the game
+# fades in from black: the bare backdrop while black, then the HD screen fading in with it (a veil),
+# never a bright panel of black crops.
+10 2 pad a

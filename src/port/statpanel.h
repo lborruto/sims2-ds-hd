@@ -46,7 +46,7 @@ constexpr Rect kStCloseFrom {212, 9, 32, 32};
 // Frames: a page's fade-out before the new page's buttons take a tap (measured: the old page fades
 // out for about 33 frames after the tap, S+0x3C 1, then the new one fades in with its buttons
 // up, 2), and an X's wait before Main's buttons do (the tap's own frames and that fade).
-constexpr int kStFadeWait = 40, kStSwitchWait = 44;
+constexpr int kStFadeWait = 40, kStSwitchWait = 44, kStShowWait = 16;
 
 // The game's sprites (descriptor ids).
 constexpr int kSprStMain = 7630;                                             // the Stat Panel object's own picture (the Main tab)

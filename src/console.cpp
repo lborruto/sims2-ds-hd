@@ -32,6 +32,9 @@ namespace sims2wide
 namespace
 {
 constexpr Rect kCanvas {0, 0, kConsoleW, kConsoleH};
+// Create-a-Sim's fade in (the bottom's brightest channel: every page has a white of 251): black
+// below kCasFadeBlack, a veil until kCasFadeWhite, on a layer above every still one.
+constexpr int kCasFadeBlack = 16, kCasFadeWhite = 245, kCasFadeLayer = 9;
 
 Overlay Frame(Rect r, int before) { return {r, kFrameArgb, 16, 6, kOutlineArgb, before}; }
 // A frame hugging a piece: its 6-pixel border just outside it.
@@ -170,7 +173,7 @@ static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right 
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
                          const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed, const PointerView* pointer,
-                         int payout)
+                         int payout, bool pictureClosed)
 {
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
@@ -185,7 +188,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             // which win over Settings and Load in FrontState::kind).
             const FrontKind kind = game->front.kind;
             auto screen = [&](const MenuView& view, int f) {
-                if (kind == FrontKind::Settings) BuildSettings(c, view, f, *game, *rom, bottom, icons, topW, topH);
+                if (kind == FrontKind::Settings) BuildSettings(c, view, f, *game, *rom, bottom, icons, topW, topH, view.picture && !pictureClosed);
                 else if (kind == FrontKind::Load) BuildLoad(c, view, f, *game, *rom, icons, topW, topH);
                 else BuildFront(c, view, f, s, *game, *rom, icons, topW, topH);
             };
@@ -202,7 +205,29 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     if (s.screen == Screen::CreateASim)
         if (const MenuView v = ConsoleView(s, game, rom); v.valid)
         {
+            // The game fading in from black (from the main menu or a load, about 14 frames): the
+            // bare backdrop while it is black, then the HD screen under a veil as dark as the
+            // game's fade (every page has a white of 251 at full brightness), so the panel never
+            // shows bright around black crops.
+            int brightest = 255;
+            if (bottom)
+            {
+                brightest = 0;
+                for (int i = 0; i < SW * SH; i += 3)
+                    brightest = std::max({brightest, (int)((bottom[i] >> 16) & 0xFF), (int)((bottom[i] >> 8) & 0xFF), (int)(bottom[i] & 0xFF)});
+            }
+            if (brightest < kCasFadeBlack) return c;
             BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH);
+            if (brightest < kCasFadeWhite)
+            {
+                ui::UiItem veil = ui::PanelItem(kCanvas);
+                veil.plain = true;
+                veil.radius = 0;
+                veil.fill = (u32)(255 * (kCasFadeWhite - brightest) / kCasFadeWhite) << 24;
+                veil.layer = kCasFadeLayer;
+                c.ui.push_back(veil);
+                SortUi(c.ui);
+            }
             return c;
         }
     // A black load (both screens black, RAM between screens): the bare backdrop.

@@ -176,6 +176,8 @@ void AddPocketsView(MenuView& v, const InventoryState& inv, const PocketsSel& se
     v.items[k0].next[2] = lastIn(0);
     v.items[k0 + 1].next[2] = lastIn(1) >= 0 ? lastIn(1) : lastIn(0);
     v.items[k0 + 2].next[2] = first + kSlots + kKeys + kCounted - 1;
+    // Right from a key item: nothing (the column's end; the phone is Up from the top row).
+    for (int k = 0; k < kKeys; k++) v.items[k0 + k].next[3] = kNoMove;
     // The first focus: the game's own selection, else the first item.
     if (sel.slot >= 0 && sel.slot < (int)inv.slots.size()) v.initial = first + sel.slot;
     else if (sel.key >= 0 && sel.key < kKeys) v.initial = first + kSlots + sel.key;

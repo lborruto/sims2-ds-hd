@@ -228,7 +228,8 @@ static void phone_closed_by_b()
     r.Drain();
     r.Frame(kInteract);
     CHECK(!r.nav.MenuOpen());
-    // Opened from the menu's phone icon: closing it closes the menu as well.
+    // Opened from the menu's phone icon: closing it opens the menu again on the tab it came from
+    // (the game comes back on Interact: Goals' icon tapped, once the panel is there).
     r.Press(kInteract, &PadState::menu);
     r.Frame(kPhone);
     r.Press(kPhone, &PadState::menu);
@@ -236,7 +237,29 @@ static void phone_closed_by_b()
     CHECK(x == kPhoneClose.x && y == kPhoneClose.y);
     r.Drain();
     r.Frame(kInteract);
+    CHECK(r.nav.MenuOpen() && !r.touch.Owns());
+    r.Press(kInteract, &PadState::b);
     CHECK(!r.nav.MenuOpen());
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::rb);
+    r.Drain();
+    r.Frame(kGoals);
+    r.Frame(kPhone);
+    r.Press(kPhone, &PadState::b);
+    r.Drain();
+    r.Frame(kInteract);
+    CHECK(!r.nav.MenuOpen()); // (drawn closed while the tab comes back)
+    CHECK(r.Touched(x, y) && x == kTabIcon[2].x && y == kTabIcon[2].y);
+    r.Drain();
+    r.Frame(kGoals);
+    CHECK(r.nav.MenuOpen());
+    // From the world (not the menu): the phone's X leaves the menu closed.
+    r.Press(kGoals, &PadState::b);
+    r.Frame(kPhone);
+    r.Press(kPhone, &PadState::b);
+    r.Drain();
+    r.Frame(kInteract);
+    CHECK(!r.nav.MenuOpen() && !r.touch.Owns());
 }
 
 static void town_and_dialogue_keep_the_buttons()
@@ -2083,6 +2106,220 @@ static void view_item_x_and_gift()
     CHECK(q.Touched(x, y) && x == 235 && y == 19);
 }
 
+// A slider's fast presses (ViewItem::queues): none dropped while a drag runs; each owed step runs
+// in the order pressed once the game has read the last one back (its Left / Right rebuilt from the
+// new value), past an end a step does nothing, and the queue runs on when the focus moves on.
+static void slider_presses_queue()
+{
+    const ScreenState opt {Screen::Panel, Tab::Options};
+    int value = 5;
+    MenuView v;
+    auto build = [&]() {
+        v = MenuView();
+        v.valid = v.own = true;
+        ViewItem s;
+        s.rect = {200, 300, 880, 130};
+        s.id = 0x7000010;
+        s.queues = true;
+        if (value > 0) s.left = {DragStep(72 + 16 * value, 121, 72 + 16 * (value - 1), 121)};
+        if (value < 10) s.right = {DragStep(72 + 16 * value, 121, 72 + 16 * (value + 1), 121)};
+        for (int& n : s.next) n = kNoMove;
+        s.next[1] = 1;
+        v.items.push_back(s);
+        ViewItem other;
+        other.rect = {200, 460, 880, 130};
+        other.id = 0x7000011;
+        other.next[0] = 0;
+        v.items.push_back(other);
+    };
+    build();
+    Rig r;
+    r.view = &v;
+    r.Frame(opt);
+    CHECK(r.nav.Focus() == 0);
+    // Left, Left, Right pressed while the first drag runs: one drag now.
+    r.Press(opt, &PadState::left);
+    r.Press(opt, &PadState::left);
+    r.Press(opt, &PadState::right);
+    int x0, y0, x1, y1;
+    CHECK(r.Path(x0, y0, x1, y1) && x0 == 72 + 16 * 5 && x1 == 72 + 16 * 4);
+    // The game has not read it back yet: nothing more.
+    r.Frame(opt);
+    CHECK(!r.touch.Owns());
+    value = 4; build();
+    r.Frame(opt);
+    CHECK(r.Path(x0, y0, x1, y1) && x0 == 72 + 16 * 4 && x1 == 72 + 16 * 3);
+    value = 3; build();
+    // The focus moves on: the owed Right still runs on the slider.
+    r.Press(opt, &PadState::down);
+    CHECK(r.nav.Focus() == 1);
+    CHECK(r.Path(x0, y0, x1, y1) && x0 == 72 + 16 * 3 && x1 == 72 + 16 * 4);
+    value = 4; build();
+    for (int i = 0; i < 40; i++) r.Frame(opt);
+    CHECK(!r.touch.Owns());
+    // Past an end: the press does nothing, the next one still counts.
+    r.Press(opt, &PadState::up);
+    value = 10; build();
+    r.Frame(opt);
+    r.Press(opt, &PadState::right);
+    CHECK(!r.touch.Owns());
+    r.Press(opt, &PadState::left);
+    CHECK(r.Path(x0, y0, x1, y1) && x0 == 72 + 16 * 10 && x1 == 72 + 16 * 9);
+}
+
+// A question (a popup's Yes / No) opens on No whatever the focus beneath was; Yes is one Right
+// away; when it goes, the screen beneath gets its item back (FocusFor: on the first frame too).
+static void question_opens_on_no()
+{
+    const ScreenState opt {Screen::Panel, Tab::Options};
+    MenuView panel;
+    panel.valid = true;
+    for (int i = 0; i < 2; i++)
+    {
+        ViewItem it;
+        it.rect = {200 + 440 * i, 206, 432, 80};
+        it.action = {TapStep(57 + 177 * i, 44)};
+        it.id = 0x7000001 + (u32)i;
+        panel.items.push_back(it);
+    }
+    MenuView q;
+    q.valid = q.own = q.popup = q.question = true;
+    q.replay = false;
+    for (int i = 0; i < 2; i++)
+    {
+        ViewItem it;
+        it.rect = {348 + 400 * i, 420, 260, 72};
+        it.action = {TapStep(92 + 72 * i, 116)};
+        it.id = 0x8000702 - (u32)i; // (No, Yes)
+        it.closes = true;
+        q.items.push_back(it);
+    }
+    q.back = {TapStep(92, 116)};
+    q.initial = 0;
+    Rig r;
+    r.view = &panel;
+    r.Frame(opt);
+    r.Press(opt, &PadState::menu);
+    r.Press(opt, &PadState::right);
+    CHECK(r.nav.Focus() == 1);
+    CHECK(r.nav.FocusFor(q) == 0); // (the first frame the popup is drawn)
+    r.view = &q;
+    r.Frame(opt);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(opt, &PadState::a);
+    int x, y;
+    CHECK(r.Touched(x, y) && x == 92 && y == 116);
+    r.Drain();
+    CHECK(r.nav.FocusFor(panel) == 1); // (the frame the popup has gone: Quit, not Save)
+    r.view = &panel;
+    r.Frame(opt);
+    CHECK(r.nav.Focus() == 1 && r.nav.MenuOpen());
+    // Again, Right then A: Yes.
+    r.view = &q;
+    r.Frame(opt);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(opt, &PadState::right);
+    for (int i = 0; i < 100; i++) r.Frame(opt); // (No's closing wait over)
+    CHECK(r.nav.Focus() == 1);
+    r.Press(opt, &PadState::a);
+    CHECK(r.Touched(x, y) && x == 164 && y == 116);
+}
+
+// A list page left for its question and back without the item it was on (Build Rooms' room
+// just bought): the focus on the item now in its place, never the list's top.
+static void page_back_without_its_item()
+{
+    const ScreenState build {Screen::Build, Tab::None};
+    auto list = [](std::vector<u32> ids) {
+        MenuView v;
+        v.valid = v.own = true;
+        for (size_t i = 0; i < ids.size(); i++)
+        {
+            ViewItem it;
+            it.rect = {200, 150 + (int)i * 110, 600, 100};
+            it.action = {TapStep(48, 68 + 35 * (int)i)};
+            it.id = ids[i];
+            v.items.push_back(it);
+        }
+        return v;
+    };
+    MenuView l = list({0x0B000001, 0x0B000002, 0x0B000003});
+    MenuView q = list({0x0B000101, 0x0B000102});
+    q.page = 1;
+    q.question = true;
+    q.initial = 0;
+    Rig r;
+    r.view = &l;
+    r.Frame(build);
+    r.Press(build, &PadState::down);
+    CHECK(r.nav.Focus() == 1);
+    r.view = &q;
+    r.Frame(build);
+    CHECK(r.nav.Focus() == 0);
+    MenuView after = list({0x0B000001, 0x0B000003});
+    r.view = &after;
+    r.Frame(build);
+    CHECK(r.nav.Focus() == 1 && after.items[1].id == 0x0B000003);
+}
+
+// B's safe landing (MenuView::backFocus, Keep this Sim?'s cross): one B moves the focus there,
+// B again there runs back.
+static void back_focus_first()
+{
+    const ScreenState cas {Screen::CreateASim, Tab::None};
+    MenuView v;
+    v.valid = v.own = true;
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {700 + 120 * i, 400, 100, 80};
+        it.action = {TapStep(80 + 40 * i, 170)};
+        it.id = 0x12000000 + (u32)i;
+        v.items.push_back(it);
+    }
+    v.back = {TapStep(160, 170)};
+    v.backFocus = 2;
+    v.initial = 0;
+    Rig r;
+    r.view = &v;
+    r.Frame(cas);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(cas, &PadState::b);
+    CHECK(r.nav.Focus() == 2 && !r.touch.Owns());
+    r.Press(cas, &PadState::b);
+    int x, y;
+    CHECK(r.Touched(x, y) && x == 160 && y == 170);
+
+    // A big picture (MenuView::picture: Settings' concept art): shown big once an A ran; the first
+    // B closes it (no tap), the next one is the screen's B; LB / RB close it too.
+    const ScreenState fe {Screen::FrontEnd, Tab::None};
+    MenuView p;
+    p.valid = p.own = p.picture = true;
+    ViewItem cell;
+    cell.rect = {840, 300, 88, 72};
+    cell.action = {TapStep(76, 88)};
+    cell.id = 0x11000200;
+    p.items.push_back(cell);
+    p.back = {TapStep(19, 17)};
+    p.buttons[(int)MenuButton::RB] = {TapStep(21, 54)};
+    Rig q;
+    q.view = &p;
+    q.Frame(fe);
+    CHECK(q.nav.PictureClosed());
+    q.Press(fe, &PadState::a);
+    q.Drain();
+    CHECK(!q.nav.PictureClosed());
+    q.Press(fe, &PadState::b);
+    CHECK(q.nav.PictureClosed() && !q.touch.Owns());
+    q.Press(fe, &PadState::b);
+    CHECK(q.Touched(x, y) && x == 19 && y == 17);
+    q.Drain();
+    q.Press(fe, &PadState::a);
+    q.Drain();
+    q.Press(fe, &PadState::rb);
+    CHECK(q.nav.PictureClosed());
+}
+
 // The HD Save slots (a valid view, no menu to open): a focus screen, not the stick cursor's; A
 // taps the focused slot's tick, B the game's X. Without a view: the cursor's, as before. Options'
 // slider: Left / Right drag the game's knob (its own actions), not a focus move.
@@ -2913,6 +3150,10 @@ int main()
     view_catalogue_spends_once();
     menu_opens_and_closes();
     view_save_slots_and_slider();
+    slider_presses_queue();
+    question_opens_on_no();
+    back_focus_first();
+    page_back_without_its_item();
     view_selection_phone_and_no_replay();
     dpad_moves_focus();
     a_taps_focused();

@@ -1,2 +1,4 @@
-# From s4, CONSOLE: B → the game's cross: the title at phase 0.
+# From s4 (Keep this Sim?), CONSOLE: B → only the focus on the cross (nothing discarded); B again →
+# the game's cross: the title at phase 0.
 10 2 pad b
+60 2 pad b

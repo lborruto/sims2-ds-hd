@@ -104,6 +104,9 @@ constexpr const char* kCasKbLabel[3] = {"ABC", "abc", "123!"};
 
 // HD geometry (canvas).
 constexpr Rect kCasTopBox {16, 16, 664, 640};                  // the model, fitted at its shape
+// The game's "L" / "R" pills over its turn arrows on the top screen (DS pixels, measured on s3):
+// covered by the pad's chips.
+constexpr Rect kCasTurnPill[2] = {{29, 144, 28, 13}, {200, 144, 28, 13}};
 constexpr Rect kCasPanel {696, 16, 568, 688};
 constexpr int kCasX = 716, kCasW = 528;                        // the panel's inside
 constexpr Rect kCasTabBar {kCasX, 30, kCasW, 76};

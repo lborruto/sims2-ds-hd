@@ -705,6 +705,17 @@ int main(int argc, char** argv)
                 if (ph.valid && ph.page == 7 && !ph.contactsKnown && ph.contacts == 0)
                     ph.contactsWait = before.town.phone.valid ? before.town.phone.contactsWait + 1 : 1;
             }
+            {   // the stat panel: the page left drawn while the pad's action goes by Main to another page
+                StatState& st = app.game.stat;
+                if (st.valid && st.page == 0 && before.stat.valid && input.navigator.Running())
+                    st.held = before.stat.held > 0 ? before.stat.held : before.stat.page > 0 ? before.stat.page : 0;
+            }
+            {   // Load-a-Sim's "Loading" popup seen (kind 3): the list is done, never shown again after it
+                LoadScreen& ld = app.game.front.load;
+                const PopupState& p = app.game.town.popup;
+                if (ld.valid)
+                    ld.loading = (before.front.load.valid && before.front.load.loading) || (p.valid && p.kind == 3 && p.state >= 1 && p.state <= 3);
+            }
             {   // room info's hint: which line the stylus opened it on (not in RAM), kept while it is up
                 RoomInfoState& ri = app.game.roomInfo;
                 // (a touch before the room info rose opened it, or something else: never a line's)
@@ -958,8 +969,9 @@ int main(int argc, char** argv)
                     const StatState& v = g.stat;
                     if (!v.valid) fprintf(stderr, "frame %ld: stat none\n", frame);
                     else
-                        fprintf(stderr, "frame %ld: stat page=%d transition=%d aspiration=%d level=%d points=%d gauge=%d skills=%d,%d,%d,%d,%d score=%d stayed=%d earned=%d spent=%d aliens=%d goons=%d vacuum=%d metal=%d\n", frame, v.page,
-                                v.transition, v.aspiration, v.level, v.points, v.gaugeFrame, v.skills[0], v.skills[1], v.skills[2], v.skills[3], v.skills[4], v.score, v.guestsStayed, v.earned, v.spent, v.aliens, v.goons, v.vacuum, v.metal);
+                        fprintf(stderr, "frame %ld: stat page=%d transition=%d aspiration=%d level=%d points=%d gauge=%d skills=%d,%d,%d,%d,%d score=%d stayed=%d earned=%d spent=%d aliens=%d goons=%d vacuum=%d metal=%d%s\n", frame, v.page,
+                                v.transition, v.aspiration, v.level, v.points, v.gaugeFrame, v.skills[0], v.skills[1], v.skills[2], v.skills[3], v.skills[4], v.score, v.guestsStayed, v.earned, v.spent, v.aliens, v.goons, v.vacuum, v.metal,
+                                v.held > 0 ? (" held=" + std::to_string(v.held)).c_str() : "");
                 }
             }
             if (app.portSupported && printFront)
@@ -1001,7 +1013,7 @@ int main(int argc, char** argv)
                                 }
                                 rows += (rows.empty() ? "" : ",") + e;
                             }
-                            fprintf(stderr, "frame %ld: load wireless=%d green=%d tapped=%d rows=%s\n", frame, l.wireless ? 1 : 0, l.green, l.tapped, rows.c_str());
+                            fprintf(stderr, "frame %ld: load wireless=%d green=%d tapped=%d rows=%s%s\n", frame, l.wireless ? 1 : 0, l.green, l.tapped, rows.c_str(), l.loading ? " loading" : "");
                         }
                     }
                     if (!(v.cas == b.cas) || frame == 0)
@@ -1062,6 +1074,7 @@ int main(int argc, char** argv)
                 app.consoleMenu = false;
                 app.consoleFocus = -1;
             }
+            input.FocusForDrawing(app, !(consoleNow == consoleBefore)); // (the focus by id on the view drawn now)
             if (printScreen && !(now == before)) fprintf(stderr, "frame %ld: screen %s\n", frame, ScreenStateName(now).c_str());
             // The game's screen and the pixels' answer apart for more than 90 frames while the
             // game's screen is settled: said once (RAM leads the pixels by up to about 60 frames).

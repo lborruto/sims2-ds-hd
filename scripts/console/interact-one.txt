@@ -1,0 +1,5 @@
+# From sit-casino (the complete save, one target: the slot machine), CONSOLE: MENU, Right, Right:
+# the focus stays on the row (Left / Right are the strip's targets; never the phone by the geometry).
+10 2 pad menu
+40 2 pad right
+60 2 pad right

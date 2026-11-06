@@ -1,0 +1,10 @@
+# From B-cas-opt (the complete save, Options, both volumes 100 %), CONSOLE: MENU, Down (the music
+# slider), five Lefts six frames apart (all counted: 50 %, read back from RAM), Down (SFX) at once.
+20 2 pad menu
+50 2 pad down
+80 2 pad left
+86 2 pad left
+92 2 pad left
+98 2 pad left
+104 2 pad left
+110 2 pad down

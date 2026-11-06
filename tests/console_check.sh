@@ -455,9 +455,14 @@ def front_cas(page, focus, raw_top=True):
         k = 664 / 256
         for x in range(0, 256, 11):
             for y in range(0, 192, 11):
+                # (the game's "L" / "R" pills on its turn arrows: covered by the pad's turn chips)
+                if (26 <= x <= 59 or 197 <= x <= 230) and 141 <= y <= 159:
+                    continue
                 expect(f"top DS {x},{y}", C(16 + int((x + 0.5) * k), 87 + int((y + 0.5) * k)), top(x, y))
                 if len(errors) > 4:
                     return
+        # The game's "L" pill (DS 29-56, 144-156) under the pad's chip's dark plate (#5961A2).
+        expect("turn pill covered", C(16 + int(31 * k), 87 + int(150 * k)), hexrgb("5961A2"))
     expect("top frame", C(12, 300), OUTLINE)
     expect("backdrop", C(5, 5), BACKDROP)
     expect("panel", C(704, 640), FRAME)
@@ -788,7 +793,7 @@ def hd_phone(y, wide=False):
 
 def hd_popup(kind, title, menu):
     """A popup in HD: its outline and fill, the text's well with white letters, the title plate,
-    the buttons (kind 0: Close focused; kind 2: No plain, Yes focused)."""
+    the buttons (kind 0: Close focused; kind 2: No focused, the safe answer, Yes plain)."""
     expect("popup outline", C(300, 350), OUTLINE)
     expect("popup fill", C(310, 350), FRAME)
     expect("popup well", C(340, 300), WELL)
@@ -800,9 +805,12 @@ def hd_popup(kind, title, menu):
         r, g, b = C(477, 448)
         if not (g > r + 60 and g > b + 40): errors.append("no focus ring around Close")
     else:
-        expect("No", C(400, 448), WELL)
+        expect("No", C(400, 448), hexrgb("9AA2E3"))
+        r, g, b = C(345, 448)
+        if not (g > r + 60 and g > b + 40): errors.append("no focus ring around No")
         r, g, b = C(670, 448)
-        if not (g > r + 60 and g > b + 40): errors.append("no focus ring around Yes")
+        if g > r + 60 and g > b + 40: errors.append("a focus ring around Yes")
+        expect("Yes", C(880, 448), WELL)
     if menu:
         r, g, b = C(190, 300)
         if not b > r + 30: errors.append("no HD menu beneath")
@@ -1261,6 +1269,9 @@ in_order() {
         from=$((from + n))
     done
 }
+# (the frame of a log line, the first one matching)
+first_frame() { grep -m 1 -E "$2" "$tmp/$1.log" | sed -n 's/^frame \([0-9]*\):.*/\1/p'; }
+last_before() { awk -v F="$2" -v P="$3" '$1=="frame" && ($2+0)<=F && $0 ~ P {l=$0} END{print l}' "$tmp/$1.log"; }
 # pad_late NAME STATE SCRIPT FRAMES: the same on the complete save (its clock).
 pad_late() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4
@@ -1873,7 +1884,12 @@ cas_looks() {
         'scroll=2' 'scroll=1' 'scroll=0' 'cas page=2 ' 'face=4' 'cas page=3 ' 'item=15' 'clothespage=1 item=15'
 }
 cas_keep() { in_order pad-cas-keep 'aspiration=0 answer=0' 'aspiration=2 answer=0' 'aspiration=2 answer=1' 'game Panel/Interact'; }
-cas_cross() { in_order pad-cas-cross 'aspiration=0 answer=2' 'front Title' 'title phase=0'; }
+# (one B only puts the focus on the cross: the answer comes from the second, at frame 60)
+cas_cross() {
+    in_order pad-cas-cross 'aspiration=0 answer=2' 'front Title' 'title phase=0' || return 1
+    local f; f=$(first_frame pad-cas-cross 'answer=2')
+    [ -n "$f" ] && [ "$f" -ge 60 ] || { echo "  pad-cas-cross: one B discarded the Sim (frame $f)"; return 1; }
+}
 cas_turn() {
     "$python" -I -c '
 import sys
@@ -2144,5 +2160,111 @@ check_pad pad-placement-leave placement_leave
 boot_late() { in_order "$1" 'boot mode=0' 'front Title' 'title phase=0'; }
 check_pad pad-boot-late-start boot_late pad-boot-late-start
 check_pad pad-boot-late-a boot_late pad-boot-late-a
+# Console manners (the remake's polish, task 2; copies of the complete save, pad only): a question
+# opens on No (two quick A on "Overwrite this save?" and on Quit answer No), one B on Keep this Sim?
+# lands on its cross (the second discards), LB on the Name page goes nowhere, 123!'s Down never lands
+# on the backspace, fast slider presses all count (Settings: twelve Lefts at five a second → 0 %,
+# three Rights → 30 %; Options: five Lefts six frames apart → 50 %), B on a concept art shown big
+# closes it (still Settings), B from the Save slots or the phone opened from the menu comes back to
+# the menu on Options and on the item, Right on Interact's single target or Pockets' key items stays,
+# the Give Gift bow takes the focus and gives, the stat panel keeps the page it leaves (held) while
+# it goes by Main, Load-a-Sim's list is done after "Loading", Create-a-Sim's fade in from black shows
+# no panel of black crops.
+pad_t2() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 clock=$5; shift 5
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-game --print-screen --print-town --print-front --print-hotel --clock "$clock" --input "$input" "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_t2 t2-ask-aa B-cas-opt-save saveslots-ask-aa 200 "2026-11-05 12:05" &
+pad_t2 t2-quit-aa B-cas-opt popup-quit-aa 280 "2026-11-05 12:05" &
+pad_t2 t2-cas-lb s3 cas-lb 120 "2026-01-01 12:00" &
+pad_t2 t2-cas-kb s3 cas-keyboard-down 170 "2026-01-01 12:00" &
+wait
+pad_t2 t2-settings-fast F-mm-opt-150 settings-fast 460 "2026-11-05 12:05" &
+pad_t2 t2-options-fast B-cas-opt options-fast 300 "2026-11-05 12:05" &
+pad_t2 t2-concept-b F-copt-concept-80 concept-b 240 "2026-11-05 12:05" &
+pad_t2 t2-return-slots B-cas-opt return-slots 340 "2026-11-05 12:05" &
+wait
+pad_t2 t2-return-phone B-cas-opt return-phone 340 "2026-11-05 12:05" &
+pad_t2 t2-interact-one sit-casino interact-one 100 "2026-11-05 12:05" &
+pad_t2 t2-pockets-right A-pk-cnt3-slot1 pockets-right 120 "2026-11-05 12:05" &
+pad_t2 t2-gift-bow A-gift2-base gift-bow 200 "2026-01-01 12:00" &
+wait
+pad_t2 t2-cas-arrive s2 cas-arrive 140 "2026-01-01 12:00" --compose --shot-every 1 --shot-dir "$tmp/t2-cas-arrive" &
+wait
+ask_aa() {
+    in_order t2-ask-aa 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup none' || return 1
+    if grep -q -E 'kind=3|2=Jun/14843' "$tmp/t2-ask-aa.log"; then echo "  t2-ask-aa: saved by the second A"; return 1; fi
+}
+quit_aa() {
+    in_order t2-quit-aa 'popup state=1 kind=2 .*Quit' 'console menu open, focus 0' 'popup none' 'game Panel/Options' 'console menu open, focus 1' || return 1
+    if grep -q 'game FrontEnd' "$tmp/t2-quit-aa.log"; then echo "  t2-quit-aa: quit by the second A"; return 1; fi
+}
+cas_lb() {
+    in_order t2-cas-lb 'cas page=0 ' 'cas page=1 ' || return 1
+    if grep -q 'cas page=4' "$tmp/t2-cas-lb.log"; then echo "  t2-cas-lb: LB went round to Keep this Sim?"; return 1; fi
+}
+cas_kb() { in_order t2-cas-kb 'keyboard=2' 'name=[^ ]*\) len='; }
+settings_fast() {
+    last_before t2-settings-fast 320 'settings page' | grep -q 'page=0 music=0 sfx=4096' || { echo "  t2-settings-fast: music not 0 % after twelve Lefts"; return 1; }
+    last_before t2-settings-fast 459 'settings page' | grep -q -E 'page=0 music=1(1[5-9]|2[0-9]|30)[0-9] sfx=4096' || { echo "  t2-settings-fast: music not 30 % after three Rights"; return 1; }
+}
+options_fast() {
+    in_order t2-options-fast 'options music=3686 ' 'options music=3277 ' 'options music=2867 ' 'options music=2458 ' 'options music=2048 sfx=4096' || return 1
+    if grep -q -E 'music=1638|sfx=3686' "$tmp/t2-options-fast.log"; then echo "  t2-options-fast: a press counted twice or on SFX"; return 1; fi
+}
+concept_b() {
+    in_order t2-concept-b 'settings page=2 .*art=1' 'front Title' || return 1
+    local f; f=$(first_frame t2-concept-b 'front Title')
+    [ -n "$f" ] && [ "$f" -ge 160 ] || { echo "  t2-concept-b: Settings left by the B that closed the picture (frame $f)"; return 1; }
+}
+return_slots() { in_order t2-return-slots 'game SaveSlots' 'game Panel/Interact' 'game Panel/Options' 'console menu open, focus 0'; }
+return_phone() { in_order t2-return-phone 'console menu open, focus 4' 'game Phone' 'game Panel/Interact' 'game Panel/Options' 'console menu open, focus 4'; }
+interact_one() {
+    in_order t2-interact-one 'console menu open, focus 0' || return 1
+    if grep -q -E 'focus [1-9]' "$tmp/t2-interact-one.log"; then echo "  t2-interact-one: Right moved the focus"; return 1; fi
+}
+pockets_right() {
+    in_order t2-pockets-right 'console menu open, focus 0' 'focus 6' || return 1
+    if grep -q 'focus 13' "$tmp/t2-pockets-right.log"; then echo "  t2-pockets-right: Right went to the phone"; return 1; fi
+}
+gift_bow() { in_order t2-gift-bow 'game Gift' 'console menu closed, focus 6' 'inventory slots=106:[^,]* counted' 'game Panel/Interact'; }
+cas_arrive() {
+    in_order t2-cas-arrive 'game CreateASim' || return 1
+    # Every frame: an HD panel drawn (its fill at the right) never over black tab crops.
+    "$python" -I - "$tmp/t2-cas-arrive" <<'PYEOF'
+import glob, sys
+from PIL import Image
+bad = []
+for f in sorted(glob.glob(sys.argv[1] + "/f*.png")):
+    im = Image.open(f).convert("RGB")
+    panel = im.getpixel((980, 640)) == (0x82, 0x8A, 0xCB)
+    tabs = [im.getpixel((x, 67)) for x in (820, 900, 980, 1060, 1140)]  # (the five tabs' crops' centres)
+    if panel and all(max(p) < 16 for p in tabs):
+        bad.append(f.rsplit("/", 1)[1])
+if bad:
+    print(f"  t2-cas-arrive: a panel over black crops: {bad[:3]}")
+sys.exit(1 if bad else 0)
+PYEOF
+}
+check_pad t2-ask-aa ask_aa
+check_pad t2-quit-aa quit_aa
+check_pad t2-cas-lb cas_lb
+check_pad t2-cas-kb cas_kb
+check_pad t2-settings-fast settings_fast
+check_pad t2-options-fast options_fast
+check_pad t2-concept-b concept_b
+check_pad t2-return-slots return_slots
+check_pad t2-return-phone return_phone
+check_pad t2-interact-one interact_one
+check_pad t2-pockets-right pockets_right
+check_pad t2-gift-bow gift_bow
+check_pad t2-cas-arrive cas_arrive
+stat_held() { grep -q -E 'stat page=0 .* held=[1-4]' "$tmp/pad-stat.log" || { echo "  pad-stat: the page left not held while the game showed Main"; return 1; }; }
+check_pad pad-stat stat_held
+load_done() { in_order pad-load-slot 'popup state=[1-3] kind=3 .*title="Loading"' 'load .* loading' 'front None'; }
+check_pad pad-load-slot load_done
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

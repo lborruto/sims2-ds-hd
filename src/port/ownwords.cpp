@@ -158,6 +158,11 @@ constexpr const char* kWords[][5] = {
     {"What it does", "À quoi ça sert", "Was es tut", "A cosa serve", "Para qué sirve"},
     {"Leave help", "Quitter l'aide", "Hilfe beenden", "Esci dall'aiuto", "Salir de la ayuda"},
     {"Cursor", "Curseur", "Cursor", "Cursore", "Cursor"},
+    // The menus
+    {"Select", "Choisir", "Wählen", "Scegli", "Elegir"},
+    {"Again: throw it away", "Encore : le jeter", "Nochmal: wegwerfen", "Ancora: buttalo", "Otra vez: tirarlo"},
+    {"No goals for now.", "Aucun objectif pour l'instant.", "Zurzeit keine Ziele.", "Nessun obiettivo per ora.", "Ningún objetivo por ahora."},
+    {"Nothing to do here.", "Rien à faire ici.", "Hier gibt es nichts zu tun.", "Niente da fare qui.", "Aquí no hay nada que hacer."},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

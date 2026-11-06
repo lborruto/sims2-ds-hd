@@ -20,6 +20,12 @@ constexpr int kHoldFrames = 90;
 // A direction held: one focus move, then one every kRepeatEvery frames after kRepeatAfter.
 constexpr int kRepeatAfter = 18, kRepeatEvery = 6;
 constexpr float kStick = 0.5f;
+// A slider's queued step (ViewItem::queues) waits for the game to read the last one back this
+// many frames at most (an end: nothing changes).
+constexpr int kQueueRead = 30;
+// Back from the Save slots or the phone opened from the menu: the panel within this many frames
+// (the slots' saving and its popup included), then its tab and item.
+constexpr int kReturnFrames = 900, kLeftFrames = 60;
 
 enum class Mode
 {
@@ -116,7 +122,7 @@ bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
         const MenuView& v = *view_;
         const int f = MenuFocusable(v, focus_) ? focus_ : MenuFirst(v);
         if (b == &PadState::a) return f >= 0 && !v.items[f].action.empty();
-        if (b == &PadState::b) return !v.back.empty();
+        if (b == &PadState::b) return !v.back.empty() && !(MenuFocusable(v, v.backFocus) && f != v.backFocus) && !(v.picture && pictureOpen_);
         if (b == &PadState::menu) return v.own && !v.popup && !v.back.empty(); // (an own screen's MENU is B)
         if (b == &PadState::x) return !XAction(v, f).empty();
         if (b == &PadState::y) return !v.buttons[(int)MenuButton::Y].empty();
@@ -248,6 +254,16 @@ static bool HasModule(const MenuView& v, u32 tag)
     return false;
 }
 
+int Navigator::FocusFor(const MenuView& v) const
+{
+    if (!v.valid) return focus_;
+    for (int i = 0; i < (int)v.items.size(); i++)
+        if (v.items[i].id == focusId_ && v.items[i].enabled) return i;
+    if (popupUp_ && !v.popup && resumeValid_) return MenuKeep(v, resumeId_, resumeIndex_);
+    if (v.popup) return MenuFirst(v);
+    return Arrive(v);
+}
+
 int Navigator::Arrive(const MenuView& v) const
 {
     // Another screen module on the same screen (the Registry and its room info, both Unknown):
@@ -291,11 +307,40 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     const bool back = !popupNow && popupUp_ && resumeValid_ && s == resumeScreen_;
     if (!(s == screen_))
     {
+        const bool wasOpen = menuOpen_;
         // The menu stays up only while the panel changes tab, or under a popup (and again when
         // the screen it was over is back); the focus starts again (or comes back: the resume).
         if (popupNow) {}
         else if (popupUp_ && s == resumeScreen_) menuOpen_ = resumeMenu_;
         else if (s.screen != Screen::Panel || screen_.screen != Screen::Panel) menuOpen_ = false;
+        // A screen of its own opened from the panel's menu (Options > Save's slots, the phone
+        // button): when the panel is back (its X, a save done), the menu opens again on the tab
+        // it came from (the game goes back to Interact, its menu closed), on the item it was on.
+        // (The menu left for another screen: kept a moment, the way there may pass through an
+        // Unknown frame.)
+        if (screen_.screen == Screen::Panel && wasOpen && screen_.tab != Tab::None && s.screen != Screen::Panel)
+        {
+            leftTab_ = screen_.tab;
+            leftId_ = focusId_;
+            leftFrames_ = kLeftFrames;
+        }
+        if ((s.screen == Screen::SaveSlots || s.screen == Screen::Phone) && leftFrames_ > 0)
+        {
+            returnTab_ = leftTab_;
+            returnId_ = leftId_;
+            returnFrames_ = kReturnFrames;
+            leftFrames_ = 0;
+        }
+        else if (s.screen == Screen::Panel && s.tab != Tab::None && returnFrames_ > 0)
+        {
+            menuOpen_ = true;
+            returnTap_ = s.tab != returnTab_;
+            returnFrames_ = 0;
+            returnFocus_ = kReturnFrames;
+        }
+        else if (s.screen != Screen::Panel && s.screen != Screen::SaveSlots && s.screen != Screen::Phone && s.screen != Screen::Popup &&
+                 s.screen != Screen::Unknown && s.screen != Screen::Loading)
+            returnFrames_ = returnFocus_ = 0, returnTap_ = false;
         focus_ = -1;
         closing_ = 0;
         screen_ = s;
@@ -313,6 +358,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         viewPage_ = 0;
         viewQuestion_ = false;
         pageKeptId_ = 0;
+        pageKeptIndex_ = -1;
+        pictureOpen_ = false;
+        ClearQueue();
         armed_ = 0; // (an armed X belongs to the screen or tab it was pressed on)
         for (u32& id : moduleId_) id = 0; // (the modules' last focus belongs to their screen)
     }
@@ -337,15 +385,23 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         // (below: the page's first item; the module's last item, else its first).
         if (!popupNow && !popupUp_ && view_->page != viewPage_)
         {
-            if (!viewQuestion_) pageKeptId_ = focusId_;
+            if (!viewQuestion_) { pageKeptId_ = focusId_; pageKeptIndex_ = focus_; }
             focus_ = -1;
-            for (int i = 0; i < (int)view_->items.size() && !view_->question && pageKeptId_; i++)
-                if (view_->items[i].id == pageKeptId_ && view_->items[i].enabled) focus_ = i;
+            // Back on the item it was left on; that item gone (Build Rooms' room just bought), the
+            // one in its place, never the list's top.
+            if (!view_->question && pageKeptId_) focus_ = MenuKeep(*view_, pageKeptId_, pageKeptIndex_);
         }
         else if (!popupNow && !popupUp_ && !view_->items.empty() && !HasModule(*view_, focusId_ >> 24)) focus_ = -1;
         else focus_ = MenuKeep(*view_, focusId_, focus_);
     }
     if (!useView && viewFocus_) focus_ = -1; // (an index of the view means nothing to HotspotsFor)
+    // A popup coming: its own first focus (MenuView::initial: a question's No), never the index
+    // the screen beneath had, nor an answer a popup before it left the focus on.
+    if (popupNow && !popupUp_ && useView)
+    {
+        focus_ = -1;
+        if (!view_->items.empty() && (view_->items[0].id >> 24) < 32) moduleId_[view_->items[0].id >> 24] = 0;
+    }
     // The resume: the item the focus was on before the popup, once its view is back.
     if (restore_ && useView)
     {
@@ -385,6 +441,15 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     handDx_ = handDy_ = 0;
     // A tap only when nothing else touches: a press while a tap or a drag runs is dropped.
     const bool canTap = !touch.Owns() && closing_ == 0;
+    // Back from the Save slots or the phone: the tab it came from, tapped once the panel is settled.
+    if (returnFrames_ > 0) returnFrames_--;
+    if (leftFrames_ > 0) leftFrames_--;
+    if (returnFocus_ > 0) returnFocus_--;
+    if (returnTap_ && s.screen == Screen::Panel && settled && canTap && running_.empty())
+    {
+        touch.Tap(kTabIcon[(int)returnTab_ - (int)Tab::Interact].x, kTabIcon[(int)returnTab_ - (int)Tab::Interact].y);
+        returnTap_ = false;
+    }
     auto tap = [&](const Hotspot& t) { if (canTap) touch.Tap(t.x, t.y); return canTap; };
 
     // The focus moves on a newly held direction, then repeats while it is held.
@@ -409,6 +474,12 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             // (held while the focus is in the list: the phone above it keeps the focus)
             if (MenuFocusable(v, v.selected) && (!MenuFocusable(v, focus_) || v.items[focus_].group == v.scrollGroup)) focus_ = v.selected;
             if (!MenuFocusable(v, focus_)) focus_ = Arrive(v);
+            // Back on the tab a screen of its own was opened from: the item it was opened by.
+            if (returnFocus_ > 0 && s.screen == Screen::Panel && s.tab == returnTab_ && !returnTap_)
+            {
+                if (const int f = MenuKeep(v, returnId_, focus_); f >= 0) focus_ = f;
+                returnFocus_ = 0;
+            }
             // A move that waited for the list's own scroll: once the rebuilt view shows more.
             if (pendingDir_ >= 0 && (viewChanged || ++pendingFrames_ > kHoldFrames))
             {
@@ -422,6 +493,53 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             int act = -1;
             for (int d = 0; d < 4; d++)
                 if (replay == kDirs[d]) act = d;
+            // A slider (ViewItem::queues): its Left / Right owed, not dropped while a step runs.
+            if (move && act < 0 && (dir == 2 || dir == 3) && MenuFocusable(v, focus_) && v.items[focus_].queues)
+            {
+                const ViewItem& it = v.items[focus_];
+                const bool busy = queueId_ == it.id && (!queue_.empty() || queueWaiting_);
+                if (busy || !(dir == 2 ? it.left : it.right).empty())
+                {
+                    if (queueId_ != it.id) { ClearQueue(); queueId_ = it.id; }
+                    if (queue_.size() < 16) queue_.push_back(dir == 2 ? -1 : 1);
+                    queueFrames_ = 0;
+                    move = false;
+                }
+            }
+            if (queueId_ != 0)
+            {
+                // (by id: the focus may have moved on; the owed steps still run)
+                int qi = -1;
+                for (int i = 0; i < (int)v.items.size(); i++)
+                    if (v.items[i].id == queueId_ && v.items[i].enabled) qi = i;
+                if (qi < 0) ClearQueue();
+                else
+                {
+                    const ViewItem& it = v.items[qi];
+                    ++queueFrames_;
+                    // The game took the last step: its Left / Right rebuilt from the new value
+                    // (or it never moves: an end, after kQueueRead frames).
+                    if (queueWaiting_ && (it.left != queueLeft_ || it.right != queueRight_ || queueFrames_ > kQueueRead))
+                    {
+                        queueWaiting_ = false;
+                        queueFrames_ = 0;
+                    }
+                    if (queueFrames_ > kHoldFrames || (!queueWaiting_ && queue_.empty())) ClearQueue();
+                    else if (!queueWaiting_ && settled)
+                    {
+                        const MenuAction& a = queue_.front() < 0 ? it.left : it.right;
+                        if (a.empty()) queue_.erase(queue_.begin()); // (past an end: that press does nothing)
+                        else if (Run(a, touch))
+                        {
+                            queueLeft_ = it.left;
+                            queueRight_ = it.right;
+                            queueWaiting_ = true;
+                            queue_.erase(queue_.begin());
+                            queueFrames_ = 0;
+                        }
+                    }
+                }
+            }
             if (move && act < 0)
             {
                 bool scroll = false;
@@ -443,6 +561,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             }
             if (pressed(&PadState::a) && MenuFocusable(v, focus_) && Run(v.items[focus_].action, touch))
             {
+                pictureOpen_ = true; // (the picture it shows, if any: big)
                 if (v.items[focus_].closes) closing_ = kClosingFrames;
                 if (v.items[focus_].closesMenu && !v.own) menuOpen_ = false;
             }
@@ -461,12 +580,16 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             const int t = s.tab == Tab::None ? -1 : (int)s.tab - (int)Tab::Interact;
             if (s.screen == Screen::Panel && pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
             else if (s.screen == Screen::Panel && pressed(&PadState::lb)) tap(kTabIcon[t < 0 ? 4 : (t + 4) % 5]);
-            else if (s.screen != Screen::Panel && pressed(&PadState::rb)) Run(v.buttons[(int)MenuButton::RB], touch);
-            else if (s.screen != Screen::Panel && pressed(&PadState::lb)) Run(v.buttons[(int)MenuButton::LB], touch);
+            else if (s.screen != Screen::Panel && pressed(&PadState::rb)) { Run(v.buttons[(int)MenuButton::RB], touch); pictureOpen_ = false; }
+            else if (s.screen != Screen::Panel && pressed(&PadState::lb)) { Run(v.buttons[(int)MenuButton::LB], touch); pictureOpen_ = false; }
             const bool back = pressed(&PadState::b), menu = pressed(&PadState::menu);
             // MENU does what B does on a screen of its own (not a popup: its question is B's)
             const bool backKey = back || (menu && v.own && !v.popup);
-            if (backKey && !v.back.empty()) { if (Run(v.back, touch) && v.backCloses) closing_ = kClosingFrames; }
+            // A big picture first: B closes it. B's safe landing (Keep this Sim?'s cross): one B
+            // never discards.
+            if (backKey && v.picture && pictureOpen_) pictureOpen_ = false;
+            else if (backKey && MenuFocusable(v, v.backFocus) && focus_ != v.backFocus) focus_ = v.backFocus;
+            else if (backKey && !v.back.empty()) { if (Run(v.back, touch) && v.backCloses) closing_ = kClosingFrames; }
             else if ((back || menu) && !v.own) menuOpen_ = false;
             // DS buttons the view passes on (Game Paused's Start).
             if (v.passKeys) dsKeys |= DsKeys(pad, true) & v.passKeys;
@@ -587,6 +710,11 @@ void Navigator::Leave(TouchScript& touch)
     viewPage_ = 0;
     viewQuestion_ = false;
     pageKeptId_ = 0;
+    pageKeptIndex_ = -1;
+    pictureOpen_ = false;
+    returnFrames_ = returnFocus_ = leftFrames_ = 0;
+    returnTap_ = false;
+    ClearQueue();
     armed_ = 0;
     popupUp_ = resumeMenu_ = resumeValid_ = restore_ = false;
     screen_ = ScreenState();

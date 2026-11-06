@@ -19,6 +19,7 @@
 #include "port/pockets.h"
 #include "port/statusbar.h"
 #include "romdata.h"
+#include "ui/font.h"
 #include "ui/kit.h"
 
 namespace sims2wide
@@ -29,6 +30,7 @@ using namespace ui;
 
 constexpr u32 kBtnFill = 0xFF6A72B8, kBtnFocusFill = 0xFF9AA2E3, kBtnPressed = 0xFF309A41; // the game's green while held
 constexpr u32 kVeil = 0x8C181C38;
+constexpr Button kWordOnly = (Button)-1;
 constexpr Rect kCanvas {0, 0, 1280, 720};
 
 bool Overlaps(Rect a, Rect b) { return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h; }
@@ -96,12 +98,24 @@ MenuView PopupViewOf(ScreenState s, const GameState& game, const RomData* rom)
     else if (p.kind == 2)
     {
         if (!PopupButton(p, 0, x0, y0) || !PopupButton(p, 1, x1, y1)) return v;
+        // No first, and the focus opens there (a question's safe answer: two quick A never say
+        // Yes); Yes one Right away.
+        ViewItem no;
+        no.rect = kPopNo;
+        no.id = kPopNoId;
+        no.action = {TapStep(x0, y0)};
+        no.closes = true;
+        if (rom) no.word = MenuWords(*rom, kStrPopNo);
+        v.items.push_back(no);
         ViewItem yes;
         yes.rect = kPopYes;
         yes.id = kPopYesId;
         yes.action = {TapStep(x1, y1)};
         yes.closes = true;
+        if (rom) yes.word = MenuWords(*rom, kStrPopYes);
         v.items.push_back(yes);
+        v.initial = 0;
+        v.question = true;
         v.back = {TapStep(x0, y0)};
         v.backCloses = true;
         v.replay = false; // (a late A answers Yes: never replayed)
@@ -232,16 +246,25 @@ void BoxButton(Composition& c, Rect r, bool pressed, bool focused, const std::ve
     add(bt);
     int total = 0;
     std::vector<Rect> rs;
+    // (kWordOnly: the word alone, no chip: an answer A does not press until it has the focus.)
     for (auto& [ch, word] : chips)
     {
-        rs.push_back(ChipRect(0, 0, ch, word, 28, 0, Weight::ExtraBold));
+        if (ch == kWordOnly) rs.push_back({0, 0, (int)TextWidth(word, 28, Weight::ExtraBold) + 2, 36});
+        else rs.push_back(ChipRect(0, 0, ch, word, 28, 0, Weight::ExtraBold));
         total += rs.back().w;
     }
     total += 12 * ((int)chips.size() - 1);
     int x = r.x + (r.w - total) / 2;
     for (size_t i = 0; i < chips.size(); i++)
     {
-        add(ChipItem(x, r.y + (r.h - rs[i].h) / 2, chips[i].first, chips[i].second, 28, 0, Weight::ExtraBold));
+        if (chips[i].first == kWordOnly)
+        {
+            UiItem t = TextItem({x, r.y, rs[i].w, r.h}, chips[i].second, 28, Align::Left, Weight::ExtraBold);
+            t.wrap = false;
+            t.middle = true;
+            add(t);
+        }
+        else add(ChipItem(x, r.y + (r.h - rs[i].h) / 2, chips[i].first, chips[i].second, 28, 0, Weight::ExtraBold));
         x += rs[i].w + 12;
     }
     if (from.w > 0) AddMousePiece(c, from, r);
@@ -264,8 +287,12 @@ void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& gam
         button(kPopClose, 0, focus == 0, {{Button::A, ""}, {Button::B, MenuWords(rom, kStrPopClose)}});
     else if (p.kind == 2)
     {
-        button(kPopNo, 0, false, {{Button::B, MenuWords(rom, kStrPopNo)}});
-        button(kPopYes, 1, focus == 0, {{Button::A, MenuWords(rom, kStrPopYes)}});
+        // A answers the focused button (No first), B is always No.
+        const std::string no = MenuWords(rom, kStrPopNo), yes = MenuWords(rom, kStrPopYes);
+        if (focus == 1) button(kPopNo, 0, false, {{Button::B, no}});
+        else button(kPopNo, 0, true, {{Button::A, ""}, {Button::B, no}});
+        if (focus == 1) button(kPopYes, 1, true, {{Button::A, yes}});
+        else button(kPopYes, 1, false, {{kWordOnly, yes}});
     }
 }
 
@@ -306,7 +333,10 @@ void MeasurePopups(const RomData& rom, BlockMeasure& m)
         const Rect r = ChipRect(0, 0, Button::B, MenuWords(rom, id), 28, 0, Weight::ExtraBold);
         const Rect a = ChipRect(0, 0, Button::A, "", 28, 0, Weight::ExtraBold);
         m.checked++;
-        if (id == kStrPopClose ? r.w + 12 + a.w > kPopClose.w - 24 : r.w > kPopNo.w - 24) { m.cut++; m.cutIds.push_back(id); }
+        // (Close and the focused No beside the A chip.)
+        const bool withA = id == kStrPopClose || id == kStrPopNo;
+        const int room = (id == kStrPopClose ? kPopClose.w : kPopNo.w) - 24;
+        if ((withA ? r.w + 12 + a.w : r.w) > room) { m.cut++; m.cutIds.push_back(id); }
     }
 }
 }

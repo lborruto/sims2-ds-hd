@@ -16,7 +16,8 @@ namespace
 using namespace ui;
 
 constexpr u32 kRowFill = 0xFF6A72B8, kRowFocusFill = 0xFF9AA2E3;   // (Interact's rows)
-constexpr u32 kSubColour = 0xFFD8DAF4;                             // a pale lavender (Build Rooms' places)
+constexpr u32 kSubColour = 0xFFD8DAF4;
+constexpr u32 kPinkPlate = 0xE0302F5C;                             // the pink names' plate: dark, the rows' hue                             // a pale lavender (Build Rooms' places)
 constexpr u32 kScoreColour = 0xFFFFE9A0;                           // a warm white (the money's)
 constexpr u32 kIconWell = 0xFF5961A2;                              // the game's row button
 
@@ -57,6 +58,19 @@ std::string Status(const RomData& rom, const RegistryRow& r)
 bool Takes(const CheckInState& ci, const RegistryRow& r) { return ci.mode == 1 ? r.infoOk : r.available; }
 
 void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0) { PanelText(c, r, s, size, minSize, a, w, colour); }
+// The game's pink (a room not built or taken) on a dark plate as wide as the words: read on the
+// lavender rows (one line, left-aligned in r, fitted as Text fits it).
+void PinkPlate(Composition& c, Rect r, const std::string& s, float size, float minSize)
+{
+    const FittedText f = FitLine(s, size, minSize, r.w, Weight::ExtraBold);
+    const int w = (int)TextWidth(f.text, f.size, Weight::ExtraBold) + 20, h = (int)f.size + 12;
+    UiItem p = PanelItem({r.x - 10, r.y + (r.h - h) / 2, std::min(w, r.w + 20), h});
+    p.plain = true;
+    p.fill = kPinkPlate;
+    p.radius = h / 2.0f;
+    p.layer = 1;
+    c.ui.push_back(p);
+}
 
 // A room's picture in `box`: the occupant's portrait (the game's own row button, live) at `scale`,
 // else the game's key (frame 0) or its silhouette (frame 1, not built).
@@ -180,10 +194,12 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
         const int x = rr.x + 88, w = rr.w - 88 - 16;
         const std::string sub = Status(rom, r);
         const u32 colour = r.available ? kCiNameOk : kCiNamePink;
-        if (sub.empty()) Text(c, {x, rr.y, w, rr.h}, RoomName(rom, r.place), kCiNameSize, kCiNameMin, Align::Left, Weight::ExtraBold, colour);
+        const Rect nameAt = sub.empty() ? Rect {x, rr.y, w, rr.h} : Rect {x, rr.y + 4, w, 40};
+        if (!r.available) PinkPlate(c, nameAt, RoomName(rom, r.place), kCiNameSize, kCiNameMin);
+        if (sub.empty()) Text(c, nameAt, RoomName(rom, r.place), kCiNameSize, kCiNameMin, Align::Left, Weight::ExtraBold, colour);
         else
         {
-            Text(c, {x, rr.y + 4, w, 40}, RoomName(rom, r.place), kCiNameSize, kCiNameMin, Align::Left, Weight::ExtraBold, colour);
+            Text(c, nameAt, RoomName(rom, r.place), kCiNameSize, kCiNameMin, Align::Left, Weight::ExtraBold, colour);
             Text(c, {x, rr.y + 42, w, 30}, sub, kCiSubSize, kCiSubMin, Align::Left, Weight::Bold, focused ? 0xFFFFFFFF : kSubColour);
         }
         AddMousePiece(c, {kCiRowX - 15, kCiRowY0 + i * kCiRowDy - 15, 30, 30}, rr);
@@ -201,6 +217,17 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
     bw.layer = 1;
     c.ui.push_back(bw);
     const FittedBlock name = FitBlock(RoomName(rom, fr.place), kCiNameSize, 22, {ix, kCiInfo.y + 140, iw, 84});
+    if (!fr.available)
+    {
+        // (the pink on its dark plate, the block's lines tall)
+        const int h = std::min(84, (int)(name.lines * Metrics(name.size).lineHeight) + 16);
+        UiItem p = PanelItem({ix, kCiInfo.y + 140 + (84 - h) / 2, iw, h});
+        p.plain = true;
+        p.fill = kPinkPlate;
+        p.radius = 16;
+        p.layer = 1;
+        c.ui.push_back(p);
+    }
     UiItem nt = TextItem({ix, kCiInfo.y + 140, iw, 84}, name.text, name.size, Align::Centre, Weight::ExtraBold);
     nt.colour = fr.available ? kCiNameOk : kCiNamePink;
     nt.layer = 1;

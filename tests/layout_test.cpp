@@ -30,6 +30,7 @@
 #include "port/goals.h"
 #include "port/note.h"
 #include "port/options.h"
+#include "port/ownwords.h"
 #include "port/phone.h"
 #include "port/popup.h"
 #include "port/relations.h"
@@ -1100,7 +1101,14 @@ int main()
                 CHECK(MenuMove(p, 13, 1) == MenuFirst(p));
                 if (h.town.pockets.slot >= 0) CHECK(MenuFirst(p) == h.town.pockets.slot);
                 const MenuView g = GiftMenuViewOf(gs, h);
-                CHECK(g.valid && g.items.size() == 6 && g.back.size() == 1 && g.back[0].x == kGiftCloseX);
+                // The six slots, then the bow (focusable: it gives the game's selection, when it may).
+                CHECK(g.valid && g.items.size() == 7 && g.back.size() == 1 && g.back[0].x == kGiftCloseX && g.items[6].id == kGiftBowId);
+                {
+                    const int sl = h.town.gift.slot;
+                    const bool may = sl >= 0 && sl < 6 && g.items[sl].enabled;
+                    CHECK(g.items[6].action.empty() == !may);
+                    if (may) CHECK(g.items[6].action.size() == 1 && g.items[6].action[0].x == kGiftBowX && g.items[6].action[0].y == kGiftBowY);
+                }
                 for (int i = 0; i < 6; i++)
                 {
                     CHECK(g.items[i].enabled == (i < n && !(n == 4 && i == 2)));
@@ -1323,8 +1331,8 @@ int main()
                 q.catalogue.items[0].buyPrice = -20;
                 CHECK(!CataloguePays(q.catalogue));
             }
-            // The cells' A word is the mode their tap sets (none without the strings).
-            CHECK(CatalogueViewOf(cs, shop(false, 12, 0, 1, false, 0, 100)).items[0].word.empty());
+            // The cells' A word says what A does there: it selects (Pay buys); the port's own word.
+            CHECK(CatalogueViewOf(cs, shop(false, 12, 0, 1, false, 0, 100)).items[0].word == OwnWord(nullptr, OwnWordId::Select));
             // The ids: a re-rolled list is other items (the focus does not stay on a new item by its place).
             GameState k = shop(false, 12, 0, 0, false, 0, 100);
             const u32 before = CatalogueViewOf(cs, k).items[0].id;
@@ -1775,7 +1783,8 @@ int main()
                         {
                             CHECK(a[k].kind == MenuStep::Tap && a[k].x == kStCloseX && a[k].y == kStCloseY);
                             if (to == 0) CHECK(a.size() == k + 1);
-                            else CHECK(a.size() == k + 3 && a[k + 1].kind == MenuStep::Wait && a[k + 1].frames == kStSwitchWait && a[k + 2].x == kStButtonX[to] && a[k + 2].y == kStButtonY[to]);
+                            else CHECK(a.size() == k + 4 && a[k + 1].kind == MenuStep::Wait && a[k + 1].frames == kStSwitchWait && a[k + 2].x == kStButtonX[to] && a[k + 2].y == kStButtonY[to] &&
+                                       a[k + 3].kind == MenuStep::Wait && a[k + 3].frames == kStShowWait);
                         }
                         // Every tap inside the game's own rectangle for it.
                         for (const MenuStep& s : a)
@@ -1914,6 +1923,12 @@ int main()
                         for (int i = 0; i + 1 < (int)v.items.size(); i++)
                             CHECK(v.items[i].rect.y >= list.y && v.items[i].rect.y + v.items[i].rect.h <= list.y + list.h);
                         const Composition comp = check(gs, v, h, v.selected >= 0 ? v.selected : 0);
+                        // No goal: the port's words in the list (else none of them).
+                        {
+                            int said = 0;
+                            for (const ui::UiItem& u : comp.ui) said += u.text == OwnWord(&rom, OwnWordId::NoGoals);
+                            CHECK(said == (n == 0 ? 1 : 0));
+                        }
                         // A goal the touch screen shows: its bar lands on its lines.
                         for (int i = 0; i + 1 < (int)v.items.size(); i++)
                         {
@@ -2009,8 +2024,11 @@ int main()
                 const MenuView a = SaveSlotsViewOf(ss, pq);
                 CHECK(a.valid && a.items.size() == 3 && MenuFirst(a) == -1 && a.back.empty());
                 const MenuView ap = PopupViewOf(ss, pq);
-                CHECK(ap.valid && ap.popup && ap.own && ap.items.size() == 1 && !ap.replay);
-                CHECK(ap.items[0].action[0].x == 164 && ap.items[0].action[0].y == 108 && ap.back[0].x == 92 && ap.back[0].y == 108);
+                // No first and the first focus (the safe answer), Yes one Right away; B No.
+                CHECK(ap.valid && ap.popup && ap.own && ap.items.size() == 2 && !ap.replay && ap.question && MenuFirst(ap) == 0);
+                CHECK(ap.items[0].id == kPopNoId && ap.items[0].action[0].x == 92 && ap.items[0].action[0].y == 108 && ap.items[0].closes);
+                CHECK(ap.items[1].id == kPopYesId && ap.items[1].action[0].x == 164 && ap.items[1].action[0].y == 108 && ap.items[1].closes);
+                CHECK(ap.back[0].x == 92 && ap.back[0].y == 108 && MenuMove(ap, 0, 3) == 1 && MenuMove(ap, 1, 2) == 0);
                 pq.town.popup = {true, 2, 3, "Do not turn off", "Saving", -1, false, 48, 160, 6};
                 const MenuView w = SaveSlotsViewOf(ss, pq);
                 CHECK(w.valid && MenuFirst(w) == -1 && w.back.empty());
@@ -2049,7 +2067,8 @@ int main()
                     h.town.popup = {true, 2, kind, std::string(300, 'w'), kind == 2 ? "stale" : "Title", -1, false, 56, 160, 6};
                     h.town.options = {true, 4096, 2048};
                     const MenuView v = PopupViewOf(on, h);
-                    CHECK(v.valid && v.own && v.popup && (int)v.items.size() == (kind == 3 ? 0 : 1) && v.back.empty() == (kind == 3));
+                    CHECK(v.valid && v.own && v.popup && (int)v.items.size() == (kind == 3 ? 0 : kind == 2 ? 2 : 1) && v.back.empty() == (kind == 3));
+                    if (kind == 2) CHECK(MenuFirst(v) == 0 && v.items[0].id == kPopNoId);
                     CHECK(UnderScreen(on, h).screen == Screen::Panel);
                     Composition comp {kConsoleW, kConsoleH, {}, {}};
                     Piece world = ConsoleWorld(256, HudCropRows(192), true);
@@ -2649,6 +2668,17 @@ int main()
                     }
         CHECK(lids.size() == (size_t)kLoadRows);
         for (u32 id : lids) CHECK(!ids.count(id));
+        // After the game's "Loading" popup (LoadScreen::loading): nothing to press, nothing but the
+        // backdrop drawn (the list never flashes back before the town).
+        {
+            GameState g = load(7, 0, false, false);
+            g.front.load.loading = true;
+            const MenuView v = LoadViewOf(none, g);
+            CHECK(v.valid && MenuFirst(v) < 0 && v.back.empty());
+            Composition comp {kConsoleW, kConsoleH, {}, {}};
+            BuildLoad(comp, v, -1, g, rom, nullptr, 256, 192);
+            CHECK(comp.ui.empty() && comp.pieces.size() == 1);
+        }
         GameState bad = load(7, 0, false, false);
         bad.front.load.valid = false;
         CHECK(!LoadViewOf(none, bad).valid);
@@ -2746,10 +2776,14 @@ int main()
                 const MenuAction& lb = v.buttons[(int)MenuButton::LB];
                 const MenuAction& rb = v.buttons[(int)MenuButton::RB];
                 const MenuAction& start = v.buttons[(int)MenuButton::Start];
-                CHECK(lb.size() == 1 && lb[0].x == kCasTabX && lb[0].y == kCasTabY0 + kCasTabDy * ((page + 4) % 5));
-                CHECK(rb.size() == 1 && rb[0].x == kCasTabX && rb[0].y == kCasTabY0 + kCasTabDy * ((page + 1) % 5));
+                // The pages' ends (no ring: LB on the Name page never lands on Keep this Sim?).
+                CHECK(page == 0 ? lb.empty() : lb.size() == 1 && lb[0].x == kCasTabX && lb[0].y == kCasTabY0 + kCasTabDy * (page - 1));
+                CHECK(page == 4 ? rb.empty() : rb.size() == 1 && rb[0].x == kCasTabX && rb[0].y == kCasTabY0 + kCasTabDy * (page + 1));
                 CHECK(start.empty() == (page == 4));
                 if (page < 4) CHECK(start == rb);
+                // Keep this Sim?: one B lands on the cross; only B there (or A) discards.
+                if (page == 4 && !v.back.empty()) CHECK(MenuFocusable(v, v.backFocus) && v.items[v.backFocus].id == kCasCrossId);
+                if (page != 4) CHECK(v.backFocus == -1);
             }
             for (int topW : {256, 341})
                 for (int focus : {-1, MenuFirst(v), (int)v.items.size() - 1})
@@ -2814,6 +2848,15 @@ int main()
                     const MenuAction& x = v.buttons[(int)MenuButton::X];
                     CHECK(x.size() == 1 && x[0].x == kCasKbX && x[0].y == kCasKbY[(kb + 1) % 3]);
                     for (int p = 0; p < 3; p++) CHECK(v.items[6 + p].action.empty() == (p == kb));
+                    // Down: the key under, else the next row's last key; the backspace only from the
+                    // last row (123!'s middle row never lands on it).
+                    const int base = 9, count = kCasKeyCount[kb], rows = (count + 8) / 9, bs = (int)v.items.size() - 1;
+                    for (int i = 0; i < count; i++)
+                    {
+                        const int down = MenuMove(v, base + i, 1);
+                        if (i / 9 + 1 < rows) CHECK(down == base + std::min(i + 9, count - 1));
+                        else CHECK(down == bs);
+                    }
                 }
         // Hair: the arrows only where the game shows them; the first focus the game's style when in view.
         for (int scroll : {0, 3, 7})
