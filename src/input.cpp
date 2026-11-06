@@ -264,13 +264,8 @@ void Input::Poll(const App& app, bool menuOpen)
     ui::SetChipLook(ChipLookFor(lastKeyboard, padStyle, s.controls, labels, pads.Type()));
     // One controller drives: the last one used (pads.h), its sticks outside the dead zone.
     pad = pads.Read(PadOptionsOf(s));
-    // Left-handed: the two sticks (and their clicks) swapped.
-    if (s.leftHanded)
-    {
-        std::swap(pad.lx, pad.rx);
-        std::swap(pad.ly, pad.ry);
-        std::swap(pad.btn[IN_LS], pad.btn[IN_RS]);
-    }
+    // Left-handed: the two sticks (and their clicks) swapped; the camera with them.
+    if (s.leftHanded) SwapSticks(pad);
     if (!pads.Any()) { panelButton = ReleasePulse(); return; }
     // TOUCH MENU on the pad: on release, spoiled by Start (Start + Back opens the pause menu
     // whichever goes down first), by the pause menu and by a binding being captured.
@@ -348,6 +343,9 @@ PadState Input::Actions(const Settings& s) const
     p.y |= on(Y);
     p.lb |= on(L);
     p.rb |= on(R);
+    // The world's camera: the keyboard's L / R keys, a pad's only when the player gave them one.
+    p.turnL |= held[L] || (s.controls.PadOwn(L) && PadOn(s, L));
+    p.turnR |= held[R] || (s.controls.PadOwn(R) && PadOn(s, R));
     p.start |= on(START);
     p.select |= on(SELECT);
     // The keyboard's on the press; the pad's on release (Poll: Start + Back is the pause menu).

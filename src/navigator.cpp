@@ -20,6 +20,9 @@ constexpr int kHoldFrames = 90;
 // A direction held: one focus move, then one every kRepeatEvery frames after kRepeatAfter.
 constexpr int kRepeatAfter = 18, kRepeatEvery = 6;
 constexpr float kStick = 0.5f;
+// The world's camera on the right stick (WorldKeys): past these (the stick reads 0 inside the
+// player's dead zone and from its edge on: pads.h) it turns / zooms.
+constexpr float kTurnStick = 0.35f, kZoomStick = 0.5f;
 // A slider's queued step (ViewItem::queues) waits for the game to read the last one back this
 // many frames at most (an end: nothing changes).
 constexpr int kQueueRead = 30;
@@ -90,6 +93,25 @@ u32 DsKeys(const PadState& p, bool withA)
     set(Down(p), kDown);
     set(Left(p), kLeft);
     set(Right(p), kRight);
+    return k;
+}
+
+// The world's buttons (the town, no HD menu open): the DS's, but the camera on the right stick as
+// in a console game. The game turns its camera while L / R are held (about 156 frames a full turn)
+// and zooms while X / Y are held (measured from s7: X held 2, 4, 8, 16 frames zooms further each
+// time, the whole range in about 32; one frame does nothing): its pace, so the stick holds them,
+// a flick a small step, a push held a steady turn or zoom. The axis pushed further wins (a turn
+// with the stick a little up never zooms). LB / RB (the DS's L / R by default) no longer turn
+// here: only the keyboard's L / R keys and a pad input the player gave L / R himself do
+// (PadState::turnL / turnR). X / Y themselves still zoom.
+u32 WorldKeys(const PadState& p)
+{
+    u32 k = DsKeys(p, true) & ~((1u << kL) | (1u << kR));
+    const float ax = p.rx < 0 ? -p.rx : p.rx, ay = p.ry < 0 ? -p.ry : p.ry;
+    if (ax > kTurnStick && ax >= ay) k |= 1u << (p.rx < 0 ? kL : kR);
+    else if (ay > kZoomStick && ay > ax) k |= 1u << (p.ry < 0 ? kX : kY);
+    if (p.turnL) k |= 1u << kL;
+    if (p.turnR) k |= 1u << kR;
     return k;
 }
 
@@ -492,7 +514,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     switch (mode)
     {
     case Mode::Pass:
-        dsKeys |= DsKeys(pad, true);
+        if (s.screen == Screen::Panel) dsKeys |= WorldKeys(pad); // (the town, no HD menu open: the camera on the right stick)
+        else dsKeys |= DsKeys(pad, true);
         if (s.screen == Screen::Panel && pressed(&PadState::menu)) menuOpen_ = true;
         break;
     case Mode::Focus: // (the taps here are listed again in WouldTap, for the gate)

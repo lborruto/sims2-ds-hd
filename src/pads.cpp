@@ -248,6 +248,13 @@ bool Pads::Event(const SDL_Event& ev, const PadOptions& o)
     }
 }
 
+void SwapSticks(PadRaw& p)
+{
+    std::swap(p.lx, p.rx);
+    std::swap(p.ly, p.ry);
+    std::swap(p.btn[Controls::IN_LS], p.btn[Controls::IN_RS]);
+}
+
 PadRaw Pads::Read(const PadOptions& o) const
 {
     PadRaw r;

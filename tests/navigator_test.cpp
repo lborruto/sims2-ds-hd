@@ -164,10 +164,10 @@ static void lb_rb_tap_tabs()
 {
     Rig r;
     r.Frame(kInteract);
-    // In town L and R are the DS's (the camera).
+    // In town LB / RB are no longer the camera (the right stick is: world_camera_on_the_right_stick).
     PadState l;
     l.lb = true;
-    CHECK(r.Frame(kInteract, l) & (1u << kL));
+    CHECK(!(r.Frame(kInteract, l) & (1u << kL)));
     CHECK(!r.touch.Owns());
     r.Frame(kInteract);
     r.Press(kInteract, &PadState::menu);
@@ -285,6 +285,62 @@ static void town_and_dialogue_keep_the_buttons()
     CHECK(r.Frame(kDialogue, c) & (1u << kA));
     CHECK(!r.nav.CursorScreen() && !r.nav.CursorPress());
     CHECK(r.Frame(kInteract, p) & (1u << kA));
+}
+
+// The world's camera (the town, no HD menu open): the right stick holds the DS's L / R past its
+// dead zone (the game turns while they are held) and its vertical X (zoom in, up) / Y (out,
+// down), the axis pushed further winning; LB / RB (the shoulders' default L / R) no longer turn
+// there, the keyboard's L / R keys and a pad input of the player's own (turnL / turnR) still do;
+// X / Y themselves still zoom. Elsewhere LB / RB keep their work: the open menu's tabs, the
+// DS's L / R on a conversation.
+static void world_camera_on_the_right_stick()
+{
+    const u32 LR = (1u << kL) | (1u << kR), XY = (1u << kX) | (1u << kY);
+    Rig r;
+    r.Frame(kInteract);
+    auto with = [&](float rx, float ry) { PadState p; p.rx = rx; p.ry = ry; return r.Frame(kInteract, p) & (LR | XY); };
+    CHECK(with(-0.9f, 0) == (1u << kL));
+    CHECK(with(0.9f, 0) == (1u << kR));
+    CHECK(with(-0.4f, 0) == (1u << kL));          // (past the turn's dead zone)
+    CHECK(with(0.3f, 0) == 0);
+    CHECK(with(0, -0.9f) == (1u << kX));          // up: closer
+    CHECK(with(0, 0.9f) == (1u << kY));           // down: further
+    CHECK(with(0, -0.45f) == 0);
+    CHECK(with(-0.8f, -0.5f) == (1u << kL));      // a turn a little up never zooms
+    CHECK(with(0.5f, 0.85f) == (1u << kY));       // a zoom a little sideways never turns
+    // held: held every frame (the game's own pace), let go: nothing
+    for (int i = 0; i < 30; i++) CHECK(with(-1.0f, 0) == (1u << kL));
+    CHECK(with(0, 0) == 0);
+    PadState lb;
+    lb.lb = true;
+    CHECK((r.Frame(kInteract, lb) & LR) == 0);
+    PadState rb;
+    rb.rb = true;
+    CHECK((r.Frame(kInteract, rb) & LR) == 0);
+    PadState keyL;
+    keyL.lb = keyL.turnL = true;                    // (the keyboard's L key, or the player's own input)
+    CHECK((r.Frame(kInteract, keyL) & LR) == (1u << kL));
+    PadState keyR;
+    keyR.rb = keyR.turnR = true;
+    CHECK((r.Frame(kInteract, keyR) & LR) == (1u << kR));
+    PadState x;
+    x.x = true;
+    CHECK((r.Frame(kInteract, x) & XY) == (1u << kX));
+    CHECK(!r.nav.MenuOpen() && !r.touch.Owns());
+    // A conversation keeps the DS's L / R on the shoulders, and the stick changes nothing there.
+    CHECK((r.Frame(kDialogue, lb) & LR) == (1u << kL));
+    PadState stick;
+    stick.rx = -1.0f;
+    CHECK((r.Frame(kDialogue, stick) & (LR | XY)) == 0);
+    // The menu open: RB taps the next tab, never the DS's R; the stick turns nothing.
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    CHECK(r.nav.MenuOpen());
+    CHECK((r.Frame(kInteract, rb) & LR) == 0);
+    int tx, ty;
+    CHECK(r.Touched(tx, ty));
+    r.Drain();
+    CHECK((r.Frame(kInteract, stick) & LR) == 0);
 }
 
 static void unknown_presses_the_cursor()
@@ -3275,6 +3331,7 @@ int main()
     popup_closed_by_a();
     phone_closed_by_b();
     town_and_dialogue_keep_the_buttons();
+    world_camera_on_the_right_stick();
     unknown_presses_the_cursor();
     placement_editor_leaves();
     unknown_without_a_cursor_keeps_a();

@@ -138,7 +138,9 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 |---|---|---|
 | Arrows | D-pad or left stick | walk (town); move the highlight (menus, games) |
 | X / Z / S / A (AZERTY: X / W / S / Q) | A / B / X / Y (as labelled) | the DS's A / B / X / Y |
-| Q / W (AZERTY: A / Z) | LB / RB | L / R: turn the camera in town; switch tabs while the menu is open |
+| Q / W (AZERTY: A / Z) | right stick left / right | L / R: turn the camera in town |
+| S / A (the DS's X / Y) | right stick up / down | zoom the camera in / out in town |
+| Q / W | LB / RB | L / R: switch tabs and pages in the menus (in town LB / RB do nothing unless you give L / R other buttons) |
 | Enter / Right Shift | Start / left stick click | Start / Select |
 | E | Back (let go) | open the touch screen's menu (the PANEL); B closes it |
 | Esc | Start + Back | the pause menu: settings, controls, save states, quit |

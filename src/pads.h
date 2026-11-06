@@ -25,6 +25,11 @@ struct PadRaw
     float lx = 0, ly = 0, rx = 0, ry = 0;
 };
 
+// Settings' "Swap the sticks" (left_handed): the two sticks and their clicks swapped, before
+// anything reads them, so all that the right stick does (the world's camera, the cursor) goes to
+// the left one, and walking to the right one.
+void SwapSticks(PadRaw& p);
+
 struct PadOptions
 {
     float deadZone = 0.25f; // of a stick's travel, round (both axes together)

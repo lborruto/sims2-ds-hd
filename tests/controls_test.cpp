@@ -221,8 +221,40 @@ static void controller_settings()
     remove(path.c_str());
 }
 
+// The world's camera (navigator.h): the shoulders' default L / R no longer turn there, a pad input
+// the player gave L / R himself does (PadOwn). An older file that names the default (`pad_l=lb`,
+// written by a capture of the same button) moves with the default; a remap is kept, through a
+// save and a load too; LB / RB stay L / R's inputs (the menus' pages and tabs).
+static void world_camera_bindings()
+{
+    Bindings d;
+    CHECK(d.Pad(L) == IN_LB && d.Pad(R) == IN_RB && !d.PadOwn(L) && !d.PadOwn(R));
+    Bindings old;
+    old.Apply("pad_l", "lb");
+    old.Apply("pad_r", "rb");
+    CHECK(old.Pad(L) == IN_LB && !old.PadOwn(L) && !old.PadOwn(R) && OneEach(old));
+    Bindings own;
+    own.Apply("pad_l", "lt");          // L on the left trigger: TOUCH (LT's default) gets LB
+    CHECK(own.Pad(L) == IN_LT && own.PadOwn(L) && !own.PadOwn(R) && OneEach(own));
+    Bindings back;
+    for (size_t at = 0, nl; (nl = own.Lines().find('\n', at)) != std::string::npos; at = nl + 1)
+    {
+        const std::string line = own.Lines().substr(at, nl - at);
+        const size_t eq = line.find('=');
+        back.Apply(line.substr(0, eq), line.substr(eq + 1));
+    }
+    CHECK(back.Pad(L) == IN_LT && back.PadOwn(L) && OneEach(back));
+    Bindings swapped;
+    swapped.Apply("pad_l", "rb");      // the shoulders swapped: both the player's own
+    CHECK(swapped.Pad(L) == IN_RB && swapped.Pad(R) == IN_LB && swapped.PadOwn(L) && swapped.PadOwn(R));
+    Bindings none;
+    none.Apply("pad_l", "none");
+    CHECK(none.Pad(L) == kNone && none.PadOwn(L));
+}
+
 int main(int, char**)
 {
+    world_camera_bindings();
     controller_settings();
     upgrade_looks();
     upgrade_layout();
