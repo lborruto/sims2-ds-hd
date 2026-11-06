@@ -52,6 +52,9 @@ bool Settings::Load(const std::string& path)
         else if (k == "volume") volume = std::clamp(atoi(v.c_str()), 0, 100);
         else if (k == "fast_forward_sound") fastSound = on;
         else if (k == "stick_cursor") stickCursor = on;
+        else if (k == "stick_dead_zone") stickDeadZone = std::clamp(atoi(v.c_str()), 5, 60);
+        else if (k == "trigger_threshold") triggerThreshold = std::clamp(atoi(v.c_str()), 10, 90);
+        else if (k == "rumble") rumble = on;
         else if (k == "window")
         {
             const size_t x = v.find('x');
@@ -98,6 +101,9 @@ bool Settings::Save(const std::string& path) const
         << "volume=" << volume << "\n"
         << "fast_forward_sound=" << (fastSound ? 1 : 0) << "\n"
         << "stick_cursor=" << (stickCursor ? 1 : 0) << "\n"
+        << "stick_dead_zone=" << stickDeadZone << "\n"
+        << "trigger_threshold=" << triggerThreshold << "\n"
+        << "rumble=" << (rumble ? 1 : 0) << "\n"
         << controls.Lines();
     return out.good();
 }

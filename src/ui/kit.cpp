@@ -20,32 +20,73 @@ namespace
 float ChipHeight(float size) { return std::round(size * 1.3f); }
 bool Cross(Button b) { return b == Button::DPad || b == Button::DPadV || b == Button::DPadH || b == Button::DPadL || b == Button::DPadU ||
                         b == Button::DPadR || b == Button::DPadD; }
-bool Round(Button b) { return b == Button::A || b == Button::B || b == Button::X || b == Button::Y || Cross(b) || b == Button::LStick ||
-                        b == Button::RStick; }
-const char* ButtonText(Button b)
+float PillText(float size) { return size * 0.56f; }
+
+// What a chip's face shows, from its button, face and glyph (UiItem::face / glyph).
+enum class Mark { Letter, Pill, Key, Stick, Cross, PsCross, PsCircle, PsSquare, PsTriangle };
+struct Resolved
+{
+    Mark mark = Mark::Pill;
+    std::string text;
+    u32 colour = 0xFFFFFFFF;
+};
+const char* DefaultGlyph(Button b)
 {
     switch (b)
     {
-    case Button::A: return "A";
-    case Button::B: return "B";
-    case Button::X: return "X";
-    case Button::Y: return "Y";
-    case Button::LB: return "LB";
-    case Button::RB: return "RB";
-    case Button::LT: return "LT";
-    case Button::Start: return "START";
-    case Button::LStick: return "L";
-    case Button::RStick: return "R";
-    case Button::DPad: case Button::DPadV: case Button::DPadH: case Button::DPadL: case Button::DPadU: case Button::DPadR: case Button::DPadD: return "";
+    case Button::A: return "a";
+    case Button::B: return "b";
+    case Button::X: return "x";
+    case Button::Y: return "y";
+    case Button::LB: return "lb";
+    case Button::RB: return "rb";
+    case Button::LT: return "lt";
+    case Button::Start: return "start";
+    case Button::Back: return "back";
+    case Button::Pause: return "start+back";
+    case Button::LStick: return "ls";
+    case Button::RStick: return "rs";
+    default: return "";
     }
-    return "";
 }
-float PillText(float size) { return size * 0.56f; }
-float ChipWidth(Button b, float size)
+Resolved Resolve(Button b, Face face, const std::string& glyph)
+{
+    Resolved r;
+    if (Cross(b)) { r.mark = Mark::Cross; return r; } // the D-pad: drawn alike everywhere (the arrows' cross too)
+    if (face == Face::Keyboard && !glyph.empty()) { r.mark = Mark::Key; r.text = glyph; return r; }
+    if (face == Face::Keyboard) face = Face::Xbox; // no key: the controller's look
+    const std::string g = glyph.empty() ? DefaultGlyph(b) : glyph;
+    const bool ps = face == Face::PlayStation, nin = face == Face::Nintendo;
+    auto letter = [&](const char* t, u32 xbox, u32 snes) { r.mark = Mark::Letter; r.text = t; r.colour = nin ? snes : xbox; };
+    if (g == "a") { if (ps) { r.mark = Mark::PsCross; r.colour = 0xFF7DB4F0; } else letter("A", 0xFF6EDB5E, 0xFFFF6A5E); }
+    else if (g == "b") { if (ps) { r.mark = Mark::PsCircle; r.colour = 0xFFFF6A6A; } else letter("B", 0xFFFF6A5E, 0xFFFFD34D); }
+    else if (g == "x") { if (ps) { r.mark = Mark::PsSquare; r.colour = 0xFFF09CD2; } else letter("X", 0xFF5CB4FF, 0xFF5CB4FF); }
+    else if (g == "y") { if (ps) { r.mark = Mark::PsTriangle; r.colour = 0xFF4FD6B0; } else letter("Y", 0xFFFFD34D, 0xFF6EDB5E); }
+    else if (g == "ls" || g == "rs") { r.mark = Mark::Stick; r.text = g == "ls" ? "L" : "R"; }
+    else if (g == "up" || g == "down" || g == "left" || g == "right") r.mark = Mark::Cross;
+    else
+    {
+        r.mark = Mark::Pill;
+        struct N { const char *key, *xbox, *ps, *nin; };
+        static const N names[] = {{"lb", "LB", "L1", "L"}, {"rb", "RB", "R1", "R"}, {"lt", "LT", "L2", "ZL"}, {"rt", "RT", "R2", "ZR"},
+                                  {"start", "START", "OPTIONS", "+"}, {"back", "BACK", "SHARE", "-"}, {"create", "BACK", "CREATE", "-"}, {"select", "BACK", "SELECT", "-"},
+                                  {"start+back", "START + BACK", "OPTIONS + SHARE", "+ / -"}, {"start+create", "START + BACK", "OPTIONS + CREATE", "+ / -"},
+                                  {"start+select", "START + BACK", "START + SELECT", "+ / -"}, {"guide", "GUIDE", "PS", "HOME"}};
+        r.text = g;
+        for (const N& n : names)
+            if (g == n.key) r.text = ps ? n.ps : nin ? n.nin : n.xbox;
+    }
+    return r;
+}
+Resolved Resolve(const UiItem& it) { return Resolve(it.button, it.face, it.glyph); }
+bool RoundMark(Mark m) { return m != Mark::Pill && m != Mark::Key; }
+float KeyText(float size, const std::string& t) { return t.size() <= 2 ? size * 0.62f : PillText(size); }
+float ChipWidth(const Resolved& r, float size)
 {
     const float h = ChipHeight(size);
-    if (Round(b)) return h;
-    return std::max(std::round(TextWidth(ButtonText(b), PillText(size), Weight::ExtraBold) + h * 0.75f), std::round(h * 1.4f));
+    if (RoundMark(r.mark)) return h;
+    if (r.mark == Mark::Key) return std::max(std::round(TextWidth(r.text, KeyText(size, r.text), Weight::ExtraBold) + h * 0.6f), h);
+    return std::max(std::round(TextWidth(r.text, PillText(size), Weight::ExtraBold) + h * 0.75f), std::round(h * 1.4f));
 }
 float LabelGap(float size) { return std::round(size * 0.38f); }
 
@@ -193,33 +234,93 @@ void DrawPanel(Layer& L, const UiItem& it, float s, float ox, float oy)
     }
 }
 
+// A shape given by its signed distance (layer pixels, negative inside), anti-aliased over the box.
+template <class F> void FillDistance(Layer& L, float x0, float y0, float x1, float y1, u32 argb, F dist)
+{
+    const int X0 = std::max((int)std::floor(x0) - 1, 0), X1 = std::min((int)std::ceil(x1) + 1, L.w);
+    const int Y0 = std::max((int)std::floor(y0) - 1, 0), Y1 = std::min((int)std::ceil(y1) + 1, L.h);
+    for (int y = Y0; y < Y1; y++)
+        for (int x = X0; x < X1; x++)
+        {
+            const float c = std::clamp(0.5f - dist(x + 0.5f, y + 0.5f), 0.0f, 1.0f);
+            if (c > 0) L.Over(x, y, argb, c);
+        }
+}
+float SegmentDistance(float px, float py, float ax, float ay, float bx, float by)
+{
+    const float vx = bx - ax, vy = by - ay, wx = px - ax, wy = py - ay;
+    const float t = std::clamp((wx * vx + wy * vy) / (vx * vx + vy * vy), 0.0f, 1.0f);
+    const float dx = wx - t * vx, dy = wy - t * vy;
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+// PlayStation's face symbols, outlined, centred at (cx, cy) in a chip of height hs (layer pixels).
+void DrawPsMark(Layer& L, Mark m, float cx, float cy, float hs, u32 c)
+{
+    const float R = hs * 0.25f, w = std::max(1.0f, hs * 0.075f) / 2;
+    switch (m)
+    {
+    case Mark::PsCircle:
+        FillDistance(L, cx - R - w, cy - R - w, cx + R + w, cy + R + w, c,
+                     [&](float x, float y) { return std::fabs(std::hypot(x - cx, y - cy) - R) - w; });
+        break;
+    case Mark::PsSquare:
+    {
+        const float q = R * 0.82f;
+        FillDistance(L, cx - q - w, cy - q - w, cx + q + w, cy + q + w, c,
+                     [&](float x, float y) { return std::fabs(RoundRectDistance(x, y, cx - q, cy - q, cx + q, cy + q, w)) - w; });
+        break;
+    }
+    case Mark::PsTriangle:
+    {
+        const float tx = cx, ty = cy - R, lx = cx - R * 0.95f, ly = cy + R * 0.62f, rx = cx + R * 0.95f, ry = ly;
+        FillDistance(L, lx - w, ty - w, rx + w, ly + w, c, [&](float x, float y) {
+            return std::min({SegmentDistance(x, y, tx, ty, lx, ly), SegmentDistance(x, y, lx, ly, rx, ry), SegmentDistance(x, y, rx, ry, tx, ty)}) - w;
+        });
+        break;
+    }
+    default: // the cross
+    {
+        const float q = R * 0.8f;
+        FillDistance(L, cx - q - w, cy - q - w, cx + q + w, cy + q + w, c, [&](float x, float y) {
+            return std::min(SegmentDistance(x, y, cx - q, cy - q, cx + q, cy + q), SegmentDistance(x, y, cx - q, cy + q, cx + q, cy - q)) - w;
+        });
+        break;
+    }
+    }
+}
+
 void DrawChip(Layer& L, const UiItem& it, float s, float ox, float oy)
 {
-    const float size = it.size, h = ChipHeight(size), cw = ChipWidth(it.button, size);
+    const Resolved rv = Resolve(it);
+    const float size = it.size, h = ChipHeight(size), cw = ChipWidth(rv, size);
     // In a column (labelAt), the chip is centred in the room before its label.
     const float shift = it.labelAt > 0 ? std::max(0.0f, std::round((it.labelAt - LabelGap(size) - cw) / 2)) : 0;
     const float x0 = (it.to.x + shift - ox) * s, y0 = (it.to.y - oy) * s + (it.to.h - h) / 2 * s;
-    const float x1 = x0 + cw * s, y1 = y0 + h * s, r = h / 2 * s, line = std::max(1.0f, std::round(s * 1.25f));
+    // A key is a keycap: a rounded square rather than a pill.
+    const float x1 = x0 + cw * s, y1 = y0 + h * s, r = (rv.mark == Mark::Key ? h * 0.24f : h / 2) * s, line = std::max(1.0f, std::round(s * 1.25f));
     FillRoundRect(L, x0, y0 + 1.5f * s, x1, y1 + 1.5f * s, r, 0x59000000, 1.5f * s);
     FillRoundRect(L, x0, y0, x1, y1, r, 0xFFE4E7FA);                                // the light rim
     FillRoundRect(L, x0 + line, y0 + line, x1 - line, y1 - line, r - line, 0xFF2E3063); // the dark face
     // A soft sheen on the face's upper half.
-    FillRoundRect(L, x0 + line * 2, y0 + line * 1.5f, x1 - line * 2, (y0 + y1) / 2, r - line * 2, 0x1FFFFFFF);
-    if (it.button == Button::DPad || it.button == Button::DPadV || it.button == Button::DPadH)
+    FillRoundRect(L, x0 + line * 2, y0 + line * 1.5f, x1 - line * 2, (y0 + y1) / 2, std::max(0.0f, r - line * 2), 0x1FFFFFFF);
+    // The D-pad's look: the button's own, or the direction a glyph names.
+    Button d = it.button;
+    if (!Cross(d)) d = it.glyph == "up" ? Button::DPadU : it.glyph == "down" ? Button::DPadD : it.glyph == "left" ? Button::DPadL : Button::DPadR;
+    if (rv.mark == Mark::Cross && (d == Button::DPad || d == Button::DPadV || d == Button::DPadH))
     {
         // A cross: two rounded bars (one faint when only the other's directions do something).
         const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
-        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, it.button == Button::DPadV ? 0x59FFFFFF : 0xFFFFFFFF);
-        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, it.button == Button::DPadH ? 0x59FFFFFF : 0xFFFFFFFF);
+        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, d == Button::DPadV ? 0x59FFFFFF : 0xFFFFFFFF);
+        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, d == Button::DPadH ? 0x59FFFFFF : 0xFFFFFFFF);
     }
-    else if (Cross(it.button))
+    else if (rv.mark == Mark::Cross)
     {
         // The cross faint, its one arm lit (from the centre out).
         const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
         FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0x38FFFFFF);
         FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0x38FFFFFF);
         // The lit arm a little wider than the cross, from its centre out.
-        const Button d = it.button;
         const float w = b * 1.45f;
         const float l = d == Button::DPadL ? cx - a : d == Button::DPadR ? cx - w * 0.5f : cx - w;
         const float r = d == Button::DPadR ? cx + a : d == Button::DPadL ? cx + w * 0.5f : cx + w;
@@ -227,31 +328,24 @@ void DrawChip(Layer& L, const UiItem& it, float s, float ox, float oy)
         const float u = d == Button::DPadD ? cy + a : d == Button::DPadU ? cy + w * 0.5f : cy + w;
         FillRoundRect(L, l, t, r, u, w * 0.5f, 0xFFFFFFFF);
     }
+    else if (rv.mark == Mark::PsCross || rv.mark == Mark::PsCircle || rv.mark == Mark::PsSquare || rv.mark == Mark::PsTriangle)
+        DrawPsMark(L, rv.mark, (x0 + x1) / 2, (y0 + y1) / 2, h * s, rv.colour);
     else
     {
-        // The face buttons in their usual colours; the others white.
-        u32 c = 0xFFFFFFFF;
-        switch (it.button)
-        {
-        case Button::A: c = 0xFF6EDB5E; break;
-        case Button::B: c = 0xFFFF6A5E; break;
-        case Button::X: c = 0xFF5CB4FF; break;
-        case Button::Y: c = 0xFFFFD34D; break;
-        default: break;
-        }
-        const bool round = Round(it.button);
-        if (it.button == Button::LStick || it.button == Button::RStick)
+        // The face buttons in their face's colours; the others white.
+        if (rv.mark == Mark::Stick)
         {
             // A stick: a light ring inside the face, the letter smaller.
             const float in = (y1 - y0) * 0.16f;
             FillRoundRect(L, x0 + in, y0 + in, x1 - in, y1 - in, r - in, 0xB3E4E7FA);
             FillRoundRect(L, x0 + in + line, y0 + in + line, x1 - in - line, y1 - in - line, r - in - line, 0xFF2E3063);
         }
-        const float ts = it.button == Button::LStick || it.button == Button::RStick ? size * 0.6f : round ? size * 0.82f : PillText(size);
+        const float ts = rv.mark == Mark::Stick ? size * 0.6f : rv.mark == Mark::Letter ? size * 0.82f
+                       : rv.mark == Mark::Key   ? KeyText(size, rv.text) : PillText(size);
         const LineMetrics m = Metrics(ts, Weight::ExtraBold);
         // Centred on the cap height (about 0.7 em).
         const float base = (h + ts * 0.70f) / 2;
-        DrawTextBox(L, {ButtonText(it.button)}, ts, Weight::ExtraBold, Align::Centre, s, x0, y0, x1, y1, c, 0, m.lineHeight, base);
+        DrawTextBox(L, {rv.text}, ts, Weight::ExtraBold, Align::Centre, s, x0, y0, x1, y1, rv.colour, 0, m.lineHeight, base);
     }
     if (!it.text.empty())
     {
@@ -367,10 +461,28 @@ UiItem TextItem(Rect to, const std::string& utf8, float size, Align align, Weigh
     return it;
 }
 
+namespace
+{
+ChipLook gLook;
+// The current look's face and glyph for a button; the Xbox look of a button's own input is
+// stored as none, so the items (and their hash) are exactly what they always were.
+void LookOf(Button b, Face& face, std::string& glyph)
+{
+    face = gLook.face;
+    glyph = gLook.glyph[(int)b];
+    if (face == Face::Xbox && glyph == DefaultGlyph(b)) glyph.clear();
+}
+}
+
+void SetChipLook(const ChipLook& look) { gLook = look; }
+
 Rect ChipRect(int x, int y, Button b, const std::string& label, float size, float labelAt, Weight wt)
 {
     const float h = ChipHeight(size);
-    float w = ChipWidth(b, size);
+    Face face;
+    std::string glyph;
+    LookOf(b, face, glyph);
+    float w = ChipWidth(Resolve(b, face, glyph), size);
     if (!label.empty()) w = std::max(w + LabelGap(size), labelAt) + std::ceil(TextWidth(label, size, wt)) + std::max(1.0f, std::round(size / 24));
     return {x, y, (int)std::ceil(w), (int)h};
 }
@@ -381,6 +493,7 @@ UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, fl
     it.labelAt = labelAt;
     it.kind = UiItem::Chip;
     it.button = b;
+    LookOf(b, it.face, it.glyph);
     it.wrap = false;
     return it;
 }
@@ -432,6 +545,11 @@ u64 Hash(const std::vector<UiItem>& items)
         Mix(h, it.text.size());
         for (char c : it.text) Mix(h, (u8)c);
         if (it.layer != 0) Mix(h, 0x4C41594552ull ^ (u64)(u32)it.layer); // (layer 0 hashes as before)
+        if (it.face != Face::Xbox || !it.glyph.empty())
+        {   // (a chip of the Xbox look hashes as before)
+            Mix(h, 0x46414345ull ^ (u64)it.face);
+            for (char c : it.glyph) Mix(h, (u8)c);
+        }
     }
     return h;
 }

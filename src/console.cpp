@@ -133,14 +133,28 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
 // The cursor's hint box at y: the text with its shadow (TextRect) and, on each side, the padding
 // and the box's 4-pixel border; centred, or (right) at the canvas's right edge, clear of the HD
 // status bar under the touch screen. Kept on the canvas.
-static void AddCursorHint(Composition& c, int y, bool right = false)
+static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right = false)
 {
     constexpr int border = 4;
     const Rect t = TextRect(0, 0, kFrontHint, 3);
-    const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset, bx = right ? kConsoleW - bw - 24 : (kConsoleW - bw) / 2;
+    const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset;
+    // Beside it, a kit panel: the pause menu's chip (Start + Back, as the device used last prints
+    // them; Esc on the keyboard) and the word, now that the Guide button is Steam's.
+    constexpr float kSize = 24;
+    constexpr int kGap = 12, kPad = 14;
+    const char* word = OwnWord(rom, OwnWordId::Pause);
+    const Rect chip = ui::ChipRect(0, 0, ui::Button::Pause, word, kSize);
+    const int pw = kPad + chip.w + kPad;
+    // Centred: side by side. At the right (the stick cursor's screens, the status bar at the left
+    // of the same rows): the panel above the hint, right of the touch screen's frame.
+    const int bx = right ? kConsoleW - bw - 24 : (kConsoleW - (bw + kGap + pw)) / 2;
     y = std::min(y, kConsoleH - bh - 4);
     c.overlays.push_back({{bx, y, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
     c.overlays.push_back(Text(bx + inset, y + inset, kFrontHint, 3));
+    const Rect panel = right ? Rect {std::max(kMenuTo.x + kMenuTo.w + 12, kConsoleW - 16 - pw), y - bh - kGap, pw, bh}
+                             : Rect {bx + bw + kGap, y, pw, bh};
+    c.ui.push_back(ui::PanelItem(panel));
+    c.ui.push_back(ui::ChipItem(panel.x + kPad, panel.y + (bh - chip.h) / 2, ui::Button::Pause, word, kSize));
 }
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
@@ -193,7 +207,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.overlays.push_back(FrameAround(kFrontBottomTo, 0));
         c.pieces.push_back({Src::Top, {0, 0, topW, topH}, topTo});
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kFrontBottomTo));
-        AddCursorHint(c, kFrontHintY);
+        AddCursorHint(c, kFrontHintY, rom);
     }
     else if (MenuView v = ConsoleView(s, game, rom); v.valid && (v.own || (s.screen == Screen::Panel && menuOpen)))
     {
@@ -248,7 +262,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         if (cursorScreen)
         {
             c.overlays.push_back(FrameAround(kMenuTo, 1));
-            AddCursorHint(c, kMenuTo.y + kMenuTo.h + 10, true);   // (a controller player: how to leave, as on the title)
+            AddCursorHint(c, kMenuTo.y + kMenuTo.h + 10, rom, true);   // (a controller player: how to leave, as on the title)
         }
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
         // Not dimmed: the game keeps its status bar up while the touch screen is used.
@@ -259,14 +273,18 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(World(topW, worldRows, bar));
         if (ConsoleView(s, game, rom).valid)
         {
-            // The HD menu has the tabs: no rail, a small chip says how to open it, level with the bar.
+            // The HD menu has the tabs: no rail. A small kit panel level with the status bar says
+            // how to open it: the TOUCH MENU's button as the device used last prints it (the pad's
+            // Back / View, Share, -; the keyboard's key, E by default: ui::ChipLook) and the word.
             const char* word = OwnWord(rom, OwnWordId::Menu);
-            const int tw = TextRect(0, 0, word, 2).w, bw = TextRect(0, 0, "BACK", 2).w + 14, h = kHintChipH;
-            const int w = 8 + bw + 10 + tw + 12, x = kConsoleW - 16 - w, y = kStatusBarY + (kStatusBarH - h - 8) / 2;
-            c.overlays.push_back({{x, y, w, h + 8}, kFrameArgb, 14, 3, kOutlineArgb});
-            c.overlays.push_back({{x + 8, y + 4 + 0, bw, h}, kPanelArgb, 9, 3, kOutlineArgb});
-            c.overlays.push_back(Text(x + 8 + 8, y + 4 + (h - 14) / 2, "BACK", 2));
-            c.overlays.push_back(Text(x + 8 + bw + 10, y + 4 + (h - 14) / 2, word, 2));
+            constexpr float kSize = 24;
+            constexpr int kPad = 14;
+            const Rect chip = ui::ChipRect(0, 0, ui::Button::Back, word, kSize);
+            const Rect box {kConsoleW - 16 - (chip.w + 2 * kPad), kStatusBarY, chip.w + 2 * kPad, kStatusBarH};
+            const size_t first = c.ui.size();
+            c.ui.push_back(ui::PanelItem(box));
+            c.ui.push_back(ui::ChipItem(box.x + kPad, box.y + (box.h - chip.h) / 2, ui::Button::Back, word, kSize));
+            for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
         }
         else
         {

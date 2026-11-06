@@ -103,11 +103,13 @@ int DefaultPad(int a)
     case DOWN: return IN_DOWN;
     case LEFT: return IN_LEFT;
     case RIGHT: return IN_RIGHT;
-    case MENU: return IN_GUIDE;
+    // MENU (the pause menu) has no button of its own: Start + Back opens it (Esc on the keyboard).
+    // The Guide / Home / PS button belongs to the system: Steam's overlay, the Steam Deck's
+    // menu, Xbox Game Bar. It can still be given to an action by hand.
     case FAST: return IN_RT;
     case SWAP: return IN_RS;
     case TOUCH: return IN_LT;
-    default: return kNone; // SAVESTATE, LOADSTATE, BLOW: none until given one
+    default: return kNone; // MENU, SAVESTATE, LOADSTATE, BLOW: none until given one
     }
 }
 

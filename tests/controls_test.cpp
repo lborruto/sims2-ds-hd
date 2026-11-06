@@ -189,8 +189,41 @@ static void upgrade_layout()
     remove(path.c_str());
 }
 
+// The controller's settings round-trip, clamped to their ranges; the Guide button has no action
+// by default (it is Steam's and the system's): the pause menu is Start + Back, or Esc.
+static void controller_settings()
+{
+    Settings d;
+    CHECK(d.stickDeadZone == 25 && d.triggerThreshold == 50 && d.rumble);
+    Bindings b;
+    CHECK(b.Pad(MENU) == kNone);
+    CHECK(b.ActionOfPad(IN_GUIDE) == -1);
+    CHECK(OneEach(b));
+    const std::string path = "controls_test_pad.ini";
+    Settings a;
+    a.stickDeadZone = 40;
+    a.triggerThreshold = 30;
+    a.rumble = false;
+    CHECK(a.Save(path));
+    Settings c;
+    CHECK(c.Load(path));
+    CHECK(c.stickDeadZone == 40 && c.triggerThreshold == 30 && !c.rumble);
+    FILE* f = fopen(path.c_str(), "w");
+    fputs("stick_dead_zone=99\ntrigger_threshold=0\n", f);
+    fclose(f);
+    Settings e;
+    CHECK(e.Load(path));
+    CHECK(e.stickDeadZone == 60 && e.triggerThreshold == 10 && e.rumble);
+    // A file that gave the pause menu the Guide button keeps it.
+    Bindings g;
+    g.Apply("pad_menu", "guide");
+    CHECK(g.Pad(MENU) == IN_GUIDE && OneEach(g));
+    remove(path.c_str());
+}
+
 int main(int, char**)
 {
+    controller_settings();
     upgrade_looks();
     upgrade_layout();
     layout_round_trip();

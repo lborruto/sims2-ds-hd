@@ -13,28 +13,18 @@ using namespace Controls;
 
 static constexpr int kZoomFramesPerNotch = 6;   // X or Y held this long per wheel notch
 static constexpr int kDragPixelsPerFrame = 3;   // a right-button drag: this many points = one frame of L or R
-static constexpr float kStickDead = 0.25f;
 
-void Input::OpenPad(int index)
+// Marks the keys an input script pushes (a window id no window has): they are not the
+// player's, so the chips do not turn to the keyboard for them.
+static constexpr Uint32 kScriptedWindow = 0x5C5C5C5Cu;
+
+PadOptions Input::PadOptionsOf(const Settings& s)
 {
-    if (!SDL_IsGameController(index)) return;
-    SDL_GameController* c = SDL_GameControllerOpen(index);
-    if (!c) { fprintf(stderr, "controller %d: %s\n", index, SDL_GetError()); return; }
-    const SDL_JoystickID id = SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(c));
-    for (SDL_GameController* p : pads)
-        if (SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(p)) == id) { SDL_GameControllerClose(c); return; }
-    pads.push_back(c);
-    switch (SDL_GameControllerGetType(c))
-    {
-    case SDL_CONTROLLER_TYPE_PS3: case SDL_CONTROLLER_TYPE_PS4: case SDL_CONTROLLER_TYPE_PS5: padStyle = PLAYSTATION; break;
-    case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_PRO:
-    case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_LEFT:
-    case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_RIGHT:
-    case SDL_CONTROLLER_TYPE_NINTENDO_SWITCH_JOYCON_PAIR: padStyle = NINTENDO; break;
-    default: padStyle = XBOX; break;
-    }
-    const char* name = SDL_GameControllerName(c);
-    fprintf(stderr, "controller: %s\n", name ? name : "?");
+    PadOptions o;
+    o.deadZone = s.stickDeadZone / 100.0f;
+    o.trigger = s.triggerThreshold / 100.0f;
+    o.rumble = s.rumble;
+    return o;
 }
 
 void Input::PushScript(const std::vector<InputEvent>& script, long iter, const Video& video) const
@@ -52,6 +42,7 @@ void Input::PushScript(const std::vector<InputEvent>& script, long iter, const V
             ev.key.keysym.sym = k;
             ev.key.keysym.scancode = SDL_GetScancodeFromKey(k);
             ev.key.state = down ? SDL_PRESSED : SDL_RELEASED;
+            ev.key.windowID = kScriptedWindow;
         }
         else if (e.move && down)
         {
@@ -88,35 +79,26 @@ void Input::PushScript(const std::vector<InputEvent>& script, long iter, const V
     (void)video;
 }
 
-void Input::OpenPads()
+void Input::OpenPads(const Settings& s)
 {
-    for (int i = 0; i < SDL_NumJoysticks(); i++) OpenPad(i);
+    pads.OpenAll(PadOptionsOf(s));
 }
 
 void Input::ClosePads()
 {
-    for (SDL_GameController* p : pads) SDL_GameControllerClose(p);
-    pads.clear();
+    pads.CloseAll();
 }
 
 void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool menuOpen)
 {
     Settings& s = app.settings;
+    // Controllers plugged in or out, and which one drives (the last used).
+    if (pads.Event(ev, PadOptionsOf(s))) lastKeyboard = false;
     if (ev.type == SDL_QUIT) app.quit = true;
-    else if (ev.type == SDL_CONTROLLERDEVICEADDED) OpenPad(ev.cdevice.which);
-    else if (ev.type == SDL_CONTROLLERDEVICEREMOVED)
-    {
-        for (size_t i = 0; i < pads.size(); i++)
-            if (SDL_JoystickInstanceID(SDL_GameControllerGetJoystick(pads[i])) == ev.cdevice.which)
-            {
-                SDL_GameControllerClose(pads[i]);
-                pads.erase(pads.begin() + i);
-                break;
-            }
-    }
     else if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP)
     {
         const bool down = ev.type == SDL_KEYDOWN;
+        if (down && ev.key.windowID != kScriptedWindow) lastKeyboard = true;
         const SDL_Keycode k = ev.key.keysym.sym;
         const int a = s.controls.ActionOfKey(k);
         if (!down)
@@ -234,22 +216,15 @@ void Input::Poll(const App& app, bool menuOpen)
 {
     const Settings& s = app.settings;
     prevPad = pad;
-    pad = PadRaw();
     panelPulse = false;
-    if (pads.empty()) { panelButton = ReleasePulse(); return; }
-    // Each button pressed on any controller; each stick as far as on the one pushed furthest.
-    auto merge = [](float& to, float v) { if (std::fabs(v) > std::fabs(to)) to = v; };
-    for (SDL_GameController* c : pads)
-    {
-        for (int i = 0; i <= IN_RIGHT; i++) pad.btn[i] |= SDL_GameControllerGetButton(c, (SDL_GameControllerButton)i) != 0;
-        auto axis = [&](SDL_GameControllerAxis a) { return SDL_GameControllerGetAxis(c, a) / 32767.0f; };
-        merge(pad.lx, axis(SDL_CONTROLLER_AXIS_LEFTX));
-        merge(pad.ly, axis(SDL_CONTROLLER_AXIS_LEFTY));
-        merge(pad.rx, axis(SDL_CONTROLLER_AXIS_RIGHTX));
-        merge(pad.ry, axis(SDL_CONTROLLER_AXIS_RIGHTY));
-        pad.btn[IN_LT] |= axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT) > 0.5f;
-        pad.btn[IN_RT] |= axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > 0.5f;
-    }
+    // The HD chips: the keys when the keyboard was used last, else the driving pad's buttons.
+    padStyle = pads.Style();
+    const bool labels = NintendoLabels();
+    if (!pads.Any()) lastKeyboard = true; // (no controller: the keyboard's keys, whatever was pressed)
+    ui::SetChipLook(ChipLookFor(lastKeyboard, padStyle, s.controls, labels, pads.Type()));
+    // One controller drives: the last one used (pads.h), its sticks outside the dead zone.
+    pad = pads.Read(PadOptionsOf(s));
+    if (!pads.Any()) { panelButton = ReleasePulse(); return; }
     // TOUCH MENU on the pad: on release, spoiled by Start (Start + Back opens the pause menu
     // whichever goes down first), by the pause menu and by a binding being captured.
     {
@@ -305,7 +280,7 @@ PadState Input::Actions(const Settings& s) const
     p.left |= on(LEFT);
     p.right |= on(RIGHT);
     // The sticks and triggers as read (the triggers past half way are buttons too).
-    if (!pads.empty())
+    if (pads.Any())
     {
         p.lx = pad.lx;
         p.ly = pad.ly;
@@ -314,7 +289,7 @@ PadState Input::Actions(const Settings& s) const
         p.lt = pad.btn[IN_LT] ? 1.0f : 0.0f;
         p.rt = pad.btn[IN_RT] ? 1.0f : 0.0f;
     }
-    p.cursor = s.stickCursor && !pads.empty();
+    p.cursor = s.stickCursor && pads.Any();
     return p;
 }
 
@@ -431,13 +406,14 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     const bool hand = console && navigator.Hand();
     cursorPress = held[TOUCH] || PadOn(s, TOUCH) || (console && navigator.CursorPress());
     if (console && !navigator.CursorScreen()) cursorShownUntil = 0; // (not left over from a screen before)
-    if ((s.stickCursor && !pads.empty() && (!console || navigator.CursorScreen())) || hand)
+    if ((s.stickCursor && pads.Any() && (!console || navigator.CursorScreen())) || hand)
     {
-        const float mag = pads.empty() ? 0.0f : std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry);
+        // (The stick reads 0 inside its dead zone: Pads::Read.)
+        const float mag = pads.Any() ? std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry) : 0.0f;
         const bool stepped = hand && (navigator.HandDx() != 0 || navigator.HandDy() != 0);
-        if (mag > kStickDead || stepped || cursorPress)
+        if (mag > 0 || stepped || cursorPress)
         {
-            if (mag > kStickDead)
+            if (mag > 0)
             {
                 const float step = 1.0f + 3.5f * mag;
                 cursorX = std::clamp(cursorX + pad.rx * step, 0.0f, (float)(SW - 1));

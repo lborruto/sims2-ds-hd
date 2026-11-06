@@ -32,6 +32,11 @@ struct Video
     std::vector<ImageTex> uiImages;
     void DrawUi(const Composition& c, const CanvasFit& fit);
     bool smooth = false;
+    // A short HD message over the picture (a controller connected: how to pause), at the top of
+    // the canvas in the kit's panel and Nunito, until toastUntil (SDL ticks).
+    std::string toast;
+    Uint32 toastUntil = 0;
+    void Toast(const std::string& text, Uint32 ms) { toast = text; toastUntil = SDL_GetTicks() + ms; }
 
     bool Open(const Settings& s); // after SDL_Init(SDL_INIT_VIDEO): the remembered size, fullscreen as set
     void SetFullscreen(bool on);  // borderless, the desktop's size

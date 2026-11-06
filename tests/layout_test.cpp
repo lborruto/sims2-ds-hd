@@ -492,12 +492,26 @@ int main()
                     CHECK(std::abs(w.to.w * w.from.h - w.to.h * w.from.w) <= w.from.h + w.from.w);
                     CHECK(w.to.y == 0 && w.to.x >= 0 && w.to.x + w.to.w <= kConsoleW && w.to.h <= kConsoleH);
                     CHECK(top.first * 3 == top.second * 4 ? w.to.h == kConsoleH : (w.to.w == kConsoleW && w.to.h == 661));
-                    CHECK(!c.ui.empty());
-                    const Rect b = c.ui[0].to;
+                    // The bar's items (its layer); the stick cursor's screens also have the pause
+                    // chip's panel (layer 0) beside their hint, right of the touch screen's frame.
+                    size_t first = 0;
+                    while (first < c.ui.size() && c.ui[first].layer != kStatusBarLayer) first++;
+                    CHECK(first < c.ui.size());
+                    if (first >= c.ui.size()) continue;
+                    const Rect b = c.ui[first].to;
                     CHECK(b.y == kStatusBarY && b.h == kStatusBarH && b.x >= std::max(w.to.x, 0) && b.x + b.w <= std::min(w.to.x + w.to.w, kConsoleW));
                     CHECK(b.y > kMenuTo.y + kMenuTo.h + 6);
-                    for (const ui::UiItem& it : c.ui)
-                        CHECK(it.to.x >= b.x && it.to.y >= b.y && it.to.x + it.to.w <= b.x + b.w && it.to.y + it.to.h <= b.y + b.h);
+                    for (size_t i = 0; i < c.ui.size(); i++)
+                    {
+                        const Rect r = c.ui[i].to;
+                        if (i >= first)
+                            CHECK(r.x >= b.x && r.y >= b.y && r.x + r.w <= b.x + b.w && r.y + r.h <= b.y + b.h);
+                        else
+                        {
+                            CHECK(st.screen == Screen::SaveSlots && c.ui[i].layer == 0);
+                            CHECK(r.x > kMenuTo.x + kMenuTo.w && r.x + r.w <= kConsoleW && r.y + r.h < b.y); // never over the bar or the frame
+                        }
+                    }
                 }
             for (Screen sc : {Screen::Social, Screen::Vacuum, Screen::Catalogue, Screen::Build, Screen::Cards})
             {
@@ -2362,7 +2376,9 @@ int main()
                 g.front.boot.valid = false;
                 CHECK(!FrontViewOf(at, g).valid);
             }
-        CHECK(!FrontViewOf(fe, front(-1, 0)).valid && !FrontViewOf(none, front(0, -1)).valid);
+        // The boot's splash on the FrontEnd screen is the legal splash's (GScreen FrontEnd): its
+        // view; the title's object on None is no view.
+        CHECK(FrontViewOf(fe, front(-1, 0)).valid && !FrontViewOf(none, front(0, -1)).valid);
         GameState bad = front(3, -1);
         bad.valid = false;
         CHECK(!FrontViewOf(fe, bad).valid);

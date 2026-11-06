@@ -149,6 +149,10 @@ constexpr const char* kWords[][5] = {
     {"Close", "Fermer", "Schließen", "Chiudi", "Cerrar"},
     // The town's menu hint
     {"Menu", "Menu", "Menü", "Menu", "Menú"},
+    // Controllers
+    {"@1: @2 opens the pause menu", "@1 : @2 ouvre le menu pause", "@1: @2 öffnet das Pausenmenü", "@1: @2 apre il menu di pausa",
+     "@1: @2 abre el menú de pausa"},
+    {"Pause", "Pause", "Pause", "Pausa", "Pausa"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

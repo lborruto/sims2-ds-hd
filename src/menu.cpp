@@ -14,7 +14,7 @@ enum Id
     M_FULLSCREEN, M_SMOOTH, M_LAYOUT,
     M_RES3D, M_WIDE, M_FPS60,
     M_VOLUME, M_FFSOUND,
-    M_STICK, M_MIC, M_KEYS, M_RESET,
+    M_STICK, M_DEADZONE, M_TRIGGER, M_RUMBLE, M_MIC, M_KEYS, M_RESET,
     M_ACTION0 // + the action
 };
 
@@ -88,6 +88,9 @@ void PauseMenu::Build(const App& app, const Input& input)
         break;
     case CONTROLS:
         add(M_STICK, "STICK TOUCH CURSOR", OnOff(s.stickCursor), "RIGHT STICK MOVES, CURSOR PRESS TOUCHES");
+        add(M_DEADZONE, "STICK DEAD ZONE", std::to_string(s.stickDeadZone), "5 TO 60: HIGHER IF A STICK DRIFTS");
+        add(M_TRIGGER, "TRIGGER PRESS AT", std::to_string(s.triggerThreshold), "10 TO 90: HOW FAR LT / RT GO DOWN");
+        add(M_RUMBLE, "RUMBLE", OnOff(s.rumble), "A SHORT BUZZ WHEN A CONTROLLER CONNECTS");
         add(M_MIC, "MICROPHONE", s.mic == MicMode::Off ? "OFF" : s.mic == MicMode::Real ? "MICROPHONE" : "BLOW KEY",
             "BLOW KEY: THE BLOW KEY. MICROPHONE: THE REAL ONE (ASKS)");
         add(M_KEYS, "KEYS AND BUTTONS", "", "CHANGE WHAT EACH KEY AND BUTTON DOES");
@@ -97,7 +100,7 @@ void PauseMenu::Build(const App& app, const Input& input)
         for (int a = 0; a < Controls::COUNT; a++)
         {
             std::string v = capturing == a ? "PRESS A KEY OR BUTTON"
-                : Controls::KeyName(s.controls.Key(a)) + " / " + Controls::InputName(s.controls.Pad(a), input.padStyle);
+                : Controls::KeyName(s.controls.Key(a)) + " / " + Controls::InputName(PrintedInput(s.controls.Pad(a), input.padStyle, NintendoLabels()), input.padStyle);
             add(M_ACTION0 + a, Controls::ActionName(a), v, "ENTER: CHANGE. ESC: KEEP. BACKSPACE: NO KEY");
         }
         add(M_RESET, "RESET TO DEFAULTS");
@@ -194,6 +197,9 @@ void PauseMenu::Frame(App& app, Video& video, Input& input, const std::string& s
     case M_VOLUME: s.volume = std::clamp(s.volume + (dir < 0 ? -10 : 10), 0, 100); break;
     case M_FFSOUND: s.fastSound = !s.fastSound; break;
     case M_STICK: s.stickCursor = !s.stickCursor; break;
+    case M_DEADZONE: s.stickDeadZone = std::clamp(s.stickDeadZone + (dir < 0 ? -5 : 5), 5, 60); break;
+    case M_TRIGGER: s.triggerThreshold = std::clamp(s.triggerThreshold + (dir < 0 ? -10 : 10), 10, 90); break;
+    case M_RUMBLE: s.rumble = !s.rumble; break;
     case M_MIC:
     {
         const int m = ((int)s.mic + 3 + (dir < 0 ? -1 : 1)) % 3;

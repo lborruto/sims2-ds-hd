@@ -16,8 +16,19 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   defaults (3D at 1x, 4:3, 30 fps) is moved to the new ones (sharper, widescreen, 60 fps) the
   first time it is loaded. To turn them off, change 3D RESOLUTION, WIDESCREEN WORLD and 60 FPS in
   SETTINGS > GRAPHICS; a file that names a layout is never touched.
+- The Guide / PS / Home button no longer opens the pause menu (it belongs to Steam, the Steam
+  Deck and the system): Start + Back (or Esc) does. It can still be given to MENU by hand.
+- With several controllers, the one used last plays (before, every pad's buttons counted at once).
 
 ### Added
+
+- Every controller, natively or through Steam: XInput, DirectInput, PlayStation, Switch, 8BitDo
+  and the rest SDL knows, plugged in or out at any time; the controller mappings of
+  SDL_GameControllerDB built in, and your own `gamecontrollerdb.txt` in the settings folder;
+  added to Steam as a non-Steam game with Steam Input (and on the Steam Deck) Steam's virtual pad
+  is the one read, never twice. The on-screen button hints show the controller you used last
+  (A / B / X / Y, ✕ ○ □ △, or the Switch's) or your keys when you last typed. New in
+  SETTINGS > CONTROLS: the sticks' dead zone, how far the triggers go down to count, rumble.
 
 - Every minigame on the controller, in an HD frame of its own: the game's name, its numbers
   (the cards' score board, the vacuum's earnings, the Alien Autopsy's organs, the Metal Detector's
