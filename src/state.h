@@ -11,6 +11,8 @@ namespace sims2wide
 {
 bool SaveState(melonDS::NDS& nds, const std::string& path);
 bool LoadState(melonDS::NDS& nds, const std::string& path);
+// A state's bytes to a file, as SaveState writes it (beside it first, synced, then renamed).
+bool WriteStateBytes(const void* data, size_t size, const std::string& path);
 // The machine in memory and back (a load's way back when the load fails half-way).
 bool SaveStateTo(melonDS::NDS& nds, std::vector<u8>& out);
 bool LoadStateFrom(melonDS::NDS& nds, std::vector<u8>& data);

@@ -6,6 +6,7 @@
 #pragma once
 #include <functional>
 #include <string>
+#include <vector>
 
 #include "NDS.h"
 #include "app.h"
@@ -51,13 +52,16 @@ struct ShellHost
     void CloseAsked(App& app, Video& video, Input& input);
     // A short message: a toast in the window, a line on stderr headless.
     void Say(Video& video, const std::string& text) const;
-    // A state load with the save's copy first (beforeLoad).
-    bool Load(App& app, const std::string& path);
+    // A state load with the save's copy first (beforeLoad). A failed load puts back the machine of
+    // a moment before, taken in memory (snapshot: given back to the caller, empty when it could not
+    // be taken); when that fails too (restoreFailed) it is said on stderr, the caller toasts.
+    bool Load(App& app, const std::string& path, std::vector<u8>* snapshot = nullptr);
+    bool restoreFailed = false; // the last Load failed and the machine of before did not come back
     // F5 / F7: the quick state with its maker (F7 refuses another ROM file's, by a toast).
     bool QuickSave(App& app, Video& video);
     bool QuickLoad(App& app, Video& video);
     // The suspend state, its picture and its ROM (quitting).
-    bool WriteSuspend(App& app, const Video& video);
+    bool WriteSuspend(App& app, Video& video);
     // The composed picture of now, made small.
     Thumb ThumbNow(const App& app, const Video& video) const;
 

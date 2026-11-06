@@ -358,53 +358,97 @@ static void launch_panel()
     CheckBuild(sh, f.m, "launch without a suspend state");
 }
 
-// A cleared or moved A / B never locks the menu: the pad's own south / east then.
+// A cleared or moved A / B never locks the menu: the pad's own south / east then, and one press
+// is one shell action (the other action on that button does nothing in the shell).
 static void pad_fallback()
 {
     using namespace Controls;
+    auto press = [](int in) {
+        static bool n[IN_COUNT];
+        for (bool& x : n) x = false;
+        if (in >= 0) n[in] = true;
+        return (const bool*)n;
+    };
+    const bool none[IN_COUNT] = {};
+    auto count = [](const PadNav& n) { return (int)n.a + n.b + n.x + n.y; };
     Bindings b;
-    bool now[IN_COUNT] = {}, before[IN_COUNT] = {};
-    now[IN_A] = true;
-    CHECK(PadPress(b, A, IN_A, now, before));          // the default: A on south
-    before[IN_A] = true;
-    CHECK(!PadPress(b, A, IN_A, now, before));         // held: no press
-    b.pad[A] = kNone;                                  // cleared
-    before[IN_A] = false;
-    CHECK(PadPress(b, A, IN_A, now, before));          // south still accepts
+    {
+        const PadNav n = ShellPadNav(b, press(IN_A), none);
+        CHECK(n.a && count(n) == 1);                    // the default: A on south
+        CHECK(!ShellPadNav(b, press(IN_A), press(IN_A)).a); // held: no press
+        CHECK(ShellPadNav(b, press(IN_B), none).b);
+    }
+    b.pad[A] = kNone;                                   // cleared
+    CHECK(ShellPadNav(b, press(IN_A), none).a);         // south still accepts
     b.pad[B] = kNone;
-    now[IN_A] = false;
-    now[IN_B] = true;
-    CHECK(PadPress(b, B, IN_B, now, before));          // east still goes back
-    b.SetPad(A, IN_X);                                 // moved to X: X accepts (as its chip says)
-    now[IN_B] = false;
-    now[IN_X] = true;
-    CHECK(PadPress(b, A, IN_A, now, before) && !PadPress(b, A, IN_A, before, before));
-    // X bound to south, A cleared: one press is one action (X's), never A's fallback too.
+    CHECK(ShellPadNav(b, press(IN_B), none).b);         // east still goes back
+    b.SetPad(A, IN_X);                                  // moved to X: X accepts (as its chip says)
+    {
+        const PadNav n = ShellPadNav(b, press(IN_X), none);
+        CHECK(n.a && count(n) == 1);
+        CHECK(!ShellPadNav(b, press(IN_A), none).a);    // south is no longer accept
+    }
+    // X bound to south, A cleared: south is accept, X does nothing in the shell.
     {
         Bindings c;
         c.pad[A] = kNone;
         c.SetPad(X, IN_A);
-        bool n[IN_COUNT] = {}, p[IN_COUNT] = {};
-        n[IN_A] = true;
-        CHECK(PadPress(c, X, -1, n, p) && !PadPress(c, A, IN_A, n, p));
+        CHECK(ShellPadIns(c).accept == IN_A);
+        const PadNav n = ShellPadNav(c, press(IN_A), none);
+        CHECK(n.a && !n.x && count(n) == 1);
     }
-    // A on east, B cleared: east is A's (the main page's entries still activate), never B's too.
+    // Y bound to east, B cleared: east is back, Y does nothing in the shell.
     {
         Bindings c;
-        c.SetPad(A, IN_B);
         c.pad[B] = kNone;
-        bool n[IN_COUNT] = {}, p[IN_COUNT] = {};
-        n[IN_B] = true;
-        CHECK(PadPress(c, A, IN_A, n, p) && !PadPress(c, B, IN_B, n, p));
+        c.SetPad(Y, IN_B);
+        CHECK(ShellPadIns(c).back == IN_B);
+        const PadNav n = ShellPadNav(c, press(IN_B), none);
+        CHECK(n.b && !n.y && count(n) == 1);
+    }
+    // B moved to south, A cleared: south stays back, accept is east.
+    {
+        Bindings c;
+        c.SetPad(B, IN_A);                              // (A gets east)
+        c.pad[A] = kNone;
+        const PadIns ins = ShellPadIns(c);
+        CHECK(ins.accept == IN_B && ins.back == IN_A);
+        CHECK(count(ShellPadNav(c, press(IN_A), none)) == 1 && ShellPadNav(c, press(IN_A), none).b);
+        CHECK(count(ShellPadNav(c, press(IN_B), none)) == 1 && ShellPadNav(c, press(IN_B), none).a);
+    }
+    // A on east, B cleared: east is accept (A's) and the main page's entries activate; back is
+    // south while nobody owns it, else none from the pad (Esc).
+    {
+        Bindings c;
+        c.SetPad(A, IN_B);                              // (B gets south)
+        c.pad[B] = kNone;                               // south now nobody's
+        PadIns ins = ShellPadIns(c);
+        CHECK(ins.accept == IN_B && ins.back == IN_A);
+        const PadNav n = ShellPadNav(c, press(IN_B), none);
+        CHECK(n.a && count(n) == 1);
+        CHECK(ShellPadNav(c, press(IN_A), none).b && count(ShellPadNav(c, press(IN_A), none)) == 1);
         Fixture f;
         Shell sh;
         sh.Open(Page::Main);
         Input in;
-        in.a = PadPress(c, A, IN_A, n, p);
-        in.b = PadPress(c, B, IN_B, n, p);
+        in.a = n.a;
+        in.b = n.b;
         sh.focus = 1;
         sh.Update(in, f.m);
         CHECK(sh.page == Page::Settings);
+        c.SetPad(X, IN_A);                              // X on south: back none from the pad
+        ins = ShellPadIns(c);
+        CHECK(ins.accept == IN_B && ins.back < 0);
+        const PadNav s = ShellPadNav(c, press(IN_A), none);
+        CHECK(s.x && count(s) == 1);
+        CHECK(count(ShellPadNav(c, press(IN_B), none)) == 1);
+    }
+    // Nothing bound anywhere: the pad's south and east still work.
+    {
+        Bindings c;
+        for (int a = 0; a < COUNT; a++) c.pad[a] = kNone;
+        const PadIns ins = ShellPadIns(c);
+        CHECK(ins.accept == IN_A && ins.back == IN_B);
     }
 }
 

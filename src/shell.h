@@ -140,9 +140,13 @@ std::string ActionLabel(int action, int language);
 // The pause menu's main page, in order (the saves' folder only with Model::canOpenFolder).
 enum class MainItem { Resume, Settings, Controls, States, ChangeGame, OpenFolder, Quit };
 std::vector<MainItem> MainEntries(const Model& m);
-// A shell press on a pad (now / before: PadRaw::btn): the action's own input, or the controller's
-// own button (fallback: Controls::IN_A south, IN_B east) when the action has none and no other
-// action owns that button, so a cleared A or B never locks the menu and one press is never two
-// actions (another action on that button keeps it: Enter / Esc and the other face buttons stay).
-bool PadPress(const Controls::Bindings& b, int action, int fallback, const bool* now, const bool* before);
+// The pad in the shell (the pause menu and the launch panel): accept is A's own input, else (A
+// cleared) the pad's south (east when B owns south); back is B's own input, else east, else (east
+// is accept) south while no action owns it, else none (the keyboard's Esc). One press is one
+// shell action: X / Y on the accept or back input do nothing there. So a cleared A or B never
+// locks the menu (checked in shell_test).
+struct PadIns { int accept = -1, back = -1; };
+PadIns ShellPadIns(const Controls::Bindings& b);
+struct PadNav { bool a = false, b = false, x = false, y = false; };
+PadNav ShellPadNav(const Controls::Bindings& b, const bool* now, const bool* before);
 }

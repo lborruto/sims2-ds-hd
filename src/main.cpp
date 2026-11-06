@@ -829,7 +829,7 @@ relaunch:
         {
             const bool ok = host.Load(app, host.data.Suspend(app.romCode));
             fprintf(stderr, "suspend state: %s\n", ok ? "loaded" : "cannot load");
-            if (!ok) host.Say(video, OwnWord(app.rom.get(), OwnWordId::LaunchContinueFailed));
+            if (!ok) host.Say(video, OwnWord(app.rom.get(), host.restoreFailed ? OwnWordId::StFailed : OwnWordId::LaunchContinueFailed));
             drop = true;
         }
         if (drop)
@@ -1002,7 +1002,11 @@ relaunch:
             if (input.wantLoad)
             {
                 if (host.data.Ok()) host.QuickLoad(app, video);
-                else host.Say(video, OwnWordIn(lang, host.Load(app, quickState) ? OwnWordId::ToastStateLoaded : OwnWordId::ToastNoState));
+                else
+                {
+                    const bool ok = host.Load(app, quickState);
+                    host.Say(video, OwnWordIn(lang, ok ? OwnWordId::ToastStateLoaded : host.restoreFailed ? OwnWordId::StFailed : OwnWordId::ToastNoState));
+                }
             }
             if (input.wantShot) { WriteShot(shotFile, app.Top(), app.Bottom()); host.Say(video, OwnWordIn(lang, OwnWordId::ToastShot)); }
             if (input.wantLayout >= 0) app.settings.layout = app.layout = (Layout)input.wantLayout;

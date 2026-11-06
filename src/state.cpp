@@ -1,10 +1,10 @@
 #include "state.h"
 
 #include <cstdio>
-#include <cstring>
 #ifdef _WIN32
 #include <io.h>
 #else
+#include <fcntl.h>
 #include <unistd.h>
 #endif
 #include <filesystem>
@@ -17,25 +17,34 @@
 
 namespace sims2wide
 {
-bool SaveState(melonDS::NDS& nds, const std::string& path)
+namespace
 {
-    melonDS::Savestate st;
-    if (st.Error || !nds.DoSavestate(&st)) return false;
-    st.Finish();
+// On the disk, not in a cache (macOS: fsync leaves it in the drive's cache; F_FULLFSYNC does not).
+bool Sync(FILE* f)
+{
+#ifdef _WIN32
+    return _commit(_fileno(f)) == 0;
+#else
+#ifdef F_FULLFSYNC
+    if (fcntl(fileno(f), F_FULLFSYNC) == 0) return true; // (else: a file system without it)
+#endif
+    return fsync(fileno(f)) == 0;
+#endif
+}
+}
+
+bool WriteStateBytes(const void* data, size_t size, const std::string& path)
+{
     // Written beside it first, checked, then put in its place: a full disk or a cut never leaves
     // a broken state where a good one was.
     const std::string tmp = path + ".tmp";
     FILE* f = fopen(tmp.c_str(), "wb");
     if (!f) return false;
-    bool ok = fwrite(st.Buffer(), 1, st.Length(), f) == st.Length();
+    bool ok = fwrite(data, 1, size, f) == size;
     // On the disk before it takes the old one's place (a power cut after the rename never leaves
     // an empty file under the state's name).
     ok = fflush(f) == 0 && ok;
-#ifdef _WIN32
-    ok = _commit(_fileno(f)) == 0 && ok;
-#else
-    ok = fsync(fileno(f)) == 0 && ok;
-#endif
+    ok = Sync(f) && ok;
     ok = (fclose(f) == 0) && ok;
     std::error_code ec;
     if (ok) std::filesystem::rename(tmp, path, ec);
@@ -45,6 +54,14 @@ bool SaveState(melonDS::NDS& nds, const std::string& path)
         return false;
     }
     return true;
+}
+
+bool SaveState(melonDS::NDS& nds, const std::string& path)
+{
+    melonDS::Savestate st;
+    if (st.Error || !nds.DoSavestate(&st)) return false;
+    st.Finish();
+    return WriteStateBytes(st.Buffer(), st.Length(), path);
 }
 
 bool LoadState(melonDS::NDS& nds, const std::string& path)
