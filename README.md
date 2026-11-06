@@ -169,7 +169,9 @@ every press counts), A shows an unlocked concept picture big (B puts it away), a
 the title. In Load-a-Sim Up / Down pick a slot, A loads it and B goes back to the title. In Create-a-Sim B goes back only from the last page, as in the game. The end
 credits the game shows after the story are still the game's own picture.
 
-**In town** the buttons are the DS's. **The menu** (phone, tabs, shop, the rest of the touch
+**In town** the buttons are the DS's. Near someone or something you can use, a small plate at
+the bottom says what A does there ("A Buy", and who or what): tap A to do it, hold A for the other
+actions (Up / Down choose, let go to do it); hold A, then Left / Right for the next thing nearby. **The menu** (phone, tabs, shop, the rest of the touch
 screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes. On the
 Interact tab, A does the highlighted action and Left / Right pick the next thing or person nearby.
 In Pockets, A uses the highlighted item and X throws it away (press X twice: the first only asks,

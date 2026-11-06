@@ -24,6 +24,7 @@
 #include "port/phone.h"
 #include "port/statusbar.h"
 #include "port/popup.h"
+#include "port/prompt.h"
 #include "port/ownwords.h"
 #include "romdata.h"
 
@@ -49,6 +50,8 @@ constexpr Rect kStripInside {0, kStripY + 1 + kStripBand, kConsoleW, kConsoleH -
 constexpr float kStripAnchorY = kStripContentY + kStatusBarH / 2.0f;
 float StripZoom(float z) { return std::min(z, (kStripAnchorY - kStripInside.y) / (kStatusBarH / 2.0f)); }
 float MenuZoom(float z) { return std::min(z, 1.0f); }
+// The world's prompt (port/prompt.h): its plate's bottom and its drop shadow above the strip.
+constexpr Rect kPromptLimit {4, 4, kConsoleW - 8, kStripY - kPromptShadow - 4};
 
 Overlay Frame(Rect r, int before) { return {r, kFrameArgb, 16, 6, kOutlineArgb, before}; }
 // A frame hugging a piece: its 6-pixel border just outside it.
@@ -237,7 +240,7 @@ const char* ConsoleBranchName(ConsoleBranch b)
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
                          const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed, const PointerView* pointer,
-                         int payout, bool pictureClosed, bool veiled, int worldOnlyFrames, ConsoleBranch* branch)
+                         int payout, bool pictureClosed, bool veiled, int worldOnlyFrames, ConsoleBranch* branch, const PromptSteady* prompt)
 {
     ConsoleBranch dummy;
     ConsoleBranch& b = branch ? *branch : dummy;
@@ -446,6 +449,15 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
                 const size_t first = c.ui.size();
                 AddPayout(c, r, payout, *rom, 16 + (int)std::floor((kTownHintsRight - hintsWz - 12 - 16) / zs));
                 ZoomUi(c, first, c.pieces.size(), zs, 16, kStripAnchorY, kStripInside);
+            }
+            // What A does here (port/prompt.h), on its own layer above the strip's: its own group,
+            // zoomed about its bottom centre (kPromptBottom, the canvas's centre), held above the
+            // strip (its drop shadow too) at every UI size.
+            if (bar && hd && game && rom && rom->StringCount() > 0 && prompt)
+            {
+                const size_t first = c.ui.size();
+                AddWorldPrompt(c, s, *game, *rom, *prompt);
+                ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW / 2.0f, (float)kPromptBottom, kPromptLimit);
             }
         }
     }

@@ -91,6 +91,9 @@ enum class OwnWordId : int
     SaveMovedBack,
     // The interface's size and the game's pictures (task 10): the rows, Auto, their notes.
     SetUiSize, UiAuto, UiSizeNote, SetPictures, PicturesNote,
+    // The world's prompt (port/prompt.*): A held shows the other actions, Up / Down choose one
+    // while it is held, Left / Right switch to the next target near the hero.
+    PromptMore, PromptChoose, PromptOther,
     Count
 };
 

@@ -33,6 +33,7 @@
 #include "port/ownwords.h"
 #include "port/phone.h"
 #include "port/popup.h"
+#include "port/prompt.h"
 #include "port/relations.h"
 #include "port/interact.h"
 #include "port/minigame.h"
@@ -3249,6 +3250,113 @@ int main()
             CHECK(!CasViewOf(cas, g).valid);
         }
         CHECK(ids.size() == 2 + 4 + 26 + 1 + 3 + 8 + 4 + 9 + 6 + 6 + 2 + 4 + 2u);
+    }
+
+
+    // The world's prompt (port/prompt.h) on made-up Interact states: shown for a target with an
+    // enabled action (the first one, the lit row while A is held), never for none, all greyed or
+    // right after an action (pad mode 2); its hints; steady frames (a pad mode change keeps them, a
+    // new target restarts them); only on the panel's Interact tab, settled, steady 6 frames; the
+    // plate inside the canvas above row 650, every item inside it on its own layer, with the
+    // longest words and every hint; under the shell's veil its layer is what the window drops.
+    {
+        auto act = [](int code, bool grey) { InteractAction a; a.code = code; a.labelId = 1845 + code; a.greyed = grey; return a; };
+        InteractState in;
+        in.valid = true;
+        in.target.kind = TargetRef::Sim; in.target.index = 51; in.target.nameId = 374;
+        in.actions = {act(43, false)};
+        in.highlighted = 0;
+        WorldPrompt p = WorldPromptOf(in, nullptr);
+        CHECK(p.shown && !p.more && !p.others && !p.held && p.verb.empty());
+        InteractState none = in; none.target = {}; none.actions.clear();
+        CHECK(!WorldPromptOf(none, nullptr).shown);
+        InteractState grey = in; grey.actions = {act(2, true), act(0x3A, true)};
+        CHECK(!WorldPromptOf(grey, nullptr).shown);
+        InteractState after = in; after.padMode = 2;
+        CHECK(!WorldPromptOf(after, nullptr).shown);
+        InteractState invalid = in; invalid.valid = false;
+        CHECK(!WorldPromptOf(invalid, nullptr).shown);
+        InteractState many = in; many.actions = {act(2, true), act(6, false), act(71, false)}; many.prev.kind = TargetRef::Object; many.prev.nameId = 492;
+        p = WorldPromptOf(many, nullptr);
+        CHECK(p.shown && p.more && p.others && !p.held);
+        {
+            // Left / Right switch targets with A held only (without it the D-pad walks): no hint before.
+            Composition k {kConsoleW, kConsoleH, {}, {}};
+            BuildWorldPrompt(k, p, nullptr);
+            int chips = 0;
+            for (const ui::UiItem& it : k.ui) chips += it.kind == ui::UiItem::Chip && it.button == ui::Button::DPadH;
+            CHECK(chips == 0);
+        }
+        many.padMode = 0; many.highlighted = 2;
+        p = WorldPromptOf(many, nullptr);
+        CHECK(p.shown && p.held && p.more);
+        InteractState one = many; one.actions = {act(2, true), act(6, false)};
+        CHECK(!WorldPromptOf(one, nullptr).more);
+
+        PromptSteady st;
+        CHECK(st.Update(nullptr) == 0);
+        for (int i = 1; i <= 7; i++) CHECK(st.Update(&in) == i);
+        InteractState held = in; held.padMode = 0;
+        CHECK(st.Update(&held) == 8);
+        CHECK(st.Update(&many) == 1);
+        CHECK(st.Update(&invalid) == 0 && st.Update(&in) == 1);
+        CHECK(st.Update(&none) == 0 && !st.had && st.Update(&none) == 0);
+
+        GameState g;
+        g.valid = true; g.screen = GScreen::Panel; g.tab = 0; g.settled = true; g.town.interact = in;
+        const ScreenState town {Screen::Panel, Tab::Interact};
+        PromptSteady five, six, lots;
+        for (int i = 0; i < kPromptSteadyFrames - 1; i++) five.Update(&in);
+        for (int i = 0; i < kPromptSteadyFrames; i++) six.Update(&in);
+        for (int i = 0; i < 100; i++) lots.Update(&in);
+        CHECK(PromptUp(town, g, six) && !PromptUp(town, g, five) && !PromptUp(town, g, PromptSteady {}));
+        CHECK(!PromptUp({Screen::Panel, Tab::Pockets}, g, lots));
+        CHECK(!PromptUp({Screen::Popup, Tab::Interact}, g, lots));
+        GameState h = g; h.settled = false; CHECK(!PromptUp(town, h, lots));
+        h = g; h.screen = GScreen::Popup; CHECK(!PromptUp(town, h, lots));
+        h = g; h.tab = 1; CHECK(!PromptUp(town, h, lots));
+        h = g; h.town.interact.valid = false; CHECK(!PromptUp(town, h, lots));
+        h = g; h.screen = GScreen::Dialogue; CHECK(!PromptUp({Screen::Dialogue, Tab::None}, h, lots));
+        // The counter a frame behind the drawn state (Steer runs before the frame's RAM is read): a
+        // state loaded with another target, or the target just switched, never flashes the old
+        // one's words, nor the new one's before it is steady itself.
+        h = g; h.town.interact = many; CHECK(!PromptUp(town, h, lots));
+        h = g; h.town.interact.actions[0].greyed = true; CHECK(!PromptUp(town, h, lots));
+        {
+            Composition k {kConsoleW, kConsoleH, {}, {}};
+            RomData norom;
+            AddWorldPrompt(k, town, h, norom, lots);
+            CHECK(k.ui.empty());
+            AddWorldPrompt(k, town, g, norom, lots);
+            CHECK(!k.ui.empty());
+            DropWorldPrompt(k);
+            CHECK(k.ui.empty());
+        }
+
+        Composition c {kConsoleW, kConsoleH, {}, {}};
+        BuildWorldPrompt(c, WorldPromptOf(none, nullptr), nullptr);
+        CHECK(c.ui.empty());
+        const std::string longVerb = "Wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww (§99,999,999)", longName = "Wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww";
+        for (const auto& [verb, name, more, others, held2] : {std::tuple<std::string, std::string, bool, bool, bool> {"Buy", "Jun", false, false, false},
+                                                               {longVerb, longName, true, true, false}, {longVerb, "", true, false, true},
+                                                               {"Talk", longName, false, true, true}})
+        {
+            WorldPrompt w;
+            w.shown = true; w.verb = verb; w.name = name; w.more = more; w.others = others; w.held = held2;
+            Composition k {kConsoleW, kConsoleH, {}, {}};
+            BuildWorldPrompt(k, w, nullptr);
+            const Rect r = WorldPromptRect(w, nullptr);
+            CHECK(!k.ui.empty() && r.w > 0 && r.x >= 16 && r.x + r.w <= kConsoleW - 16 && r.y >= 0 && r.y + r.h + kPromptShadow < 650);
+            CHECK(r.x + r.w / 2 >= 639 && r.x + r.w / 2 <= 641);
+            int chips = 0;
+            for (const ui::UiItem& it : k.ui)
+            {
+                CHECK(it.layer == kPromptLayer);
+                CHECK(it.to.x >= r.x && it.to.y >= r.y && it.to.x + it.to.w <= r.x + r.w && it.to.y + it.to.h <= r.y + r.h);
+                chips += it.kind == ui::UiItem::Chip;
+            }
+            CHECK(chips == 1 + (more ? 1 : 0) + (others && held2 ? 1 : 0));
+        }
     }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }

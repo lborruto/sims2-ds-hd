@@ -275,6 +275,17 @@ run pockets-smooth A-pk-cnt3-slot1 "${late[@]}" --console-menu --console-focus 0
 run shop-smooth sit-storebuy "${town[@]}" --console-focus 0 --game-pictures smooth &
 run shop-smooth-2x sit-storebuy "${town[@]}" --console-focus 0 --game-pictures smooth --compose-scale 2 &
 wait
+# The world's prompt (src/port/prompt.*): the store's clerk (A Buy), the hotel's concierge (three
+# actions: the hold hint), no target (City Hall), another tab up (Pockets: no Interact object).
+run prompt-store L-sit-store-none-250 "${late[@]}" &
+run prompt-concierge D-hotel-down "${hotel[@]}" &
+run prompt-none L-sit-cityhall-none-250 "${late[@]}" &
+run prompt-pockets A-pk-town-cnt1 "${late[@]}" &
+wait
+# The prompt at the UI's sizes (its own group: bottom centre, above the strip).
+run prompt-store-150 L-sit-store-none-250 "${late[@]}" --ui-scale 150 &
+run prompt-store-75 L-sit-store-none-250 "${late[@]}" --ui-scale 75 &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3-m1 slots load casino casino-2x \
@@ -288,7 +299,8 @@ for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
     registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint \
     music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats \
-    s5-hd-75 s5-hd-150 casino-menu-75 casino-menu-150 pockets-smooth shop-smooth shop-smooth-2x; do
+    s5-hd-75 s5-hd-150 casino-menu-75 casino-menu-150 pockets-smooth shop-smooth shop-smooth-2x \
+    prompt-store prompt-concierge prompt-none prompt-pockets prompt-store-150 prompt-store-75; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -353,9 +365,10 @@ def rail():
     expect("no rail: backdrop where its tabs were", C(1200, 300), BACK)
     expect("no rail: backdrop where its phone was", C(1210, 174), BACK)
     # The world without the game's status bar (its last 16 rows): 176 rows 720 high, its last
-    # rows under the strip.
+    # rows under the strip (sampled clear of the world's prompt, src/port/prompt.*, centred above
+    # row 640, and its shadow).
     w = world_full(176)
-    for cx, cy in ((400, 100), (700, 650), (1000, 300), (900, 658)):
+    for cx, cy in ((400, 100), (1050, 650), (1000, 300), (900, 658)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
 
 WELL = hexrgb("6A72B8")
@@ -1342,6 +1355,35 @@ elif case == "opt-menu":
     expect("SFX knob", C(1012, 536), FRAME)
     r, g, b = C(197, 360)
     if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the music volume")
+elif case.startswith("prompt-"):
+    # The world's prompt: a kit plate (the panel's fill) centred at the world's foot, it and its
+    # shadow above the strip (row 661), white words in it; none without a target or on another tab.
+    # -75 / -150: the UI's size (its own group, zoomed about its bottom centre, x 640 row 640).
+    z = 1.5 if case.endswith("-150") else 0.75 if case.endswith("-75") else 1.0
+    cols = [x for x in range(0, 1280) if any(C(x, y) == FRAME for y in range(644 - int(88 * z), 640, 6))]
+    if case.startswith(("prompt-store", "prompt-concierge")):
+        if not cols:
+            errors.append("no prompt plate")
+        else:
+            lo, hi = min(cols), max(cols)
+            if abs((lo + hi) / 2 - 640) > 12: errors.append(f"the plate not centred: {lo}..{hi}")
+            if lo < 4 or hi > 1275: errors.append(f"the plate outside the canvas: {lo}..{hi}")
+            if case.startswith("prompt-store") and not 120 * z < hi - lo < 320 * z:
+                errors.append(f"the store's plate (A Buy, the clerk) at {z}: {lo}..{hi}")
+            if case == "prompt-concierge" and hi - lo < 340: errors.append(f"no hint beside the concierge's verb: {lo}..{hi}")
+            if (255, 255, 255) not in [C(x, y) for y in range(640 - int(88 * z), 640) for x in range(lo, hi)]: errors.append("no verb")
+            # Nothing of it from row 648 to the strip, its drop shadow (7 rows, zoomed) neither:
+            # the world's own pixels there.
+            w = world_full(176)
+            for y in range(648 + (4 if z > 1 else 0), STRIP_Y):
+                bad = [x for x in range(lo - 8, hi + 9, 4) if C(x, y) != w(x, y)]
+                if bad:
+                    errors.append(f"the plate or its shadow at {bad[0]},{y}: {C(bad[0], y)} (the world {w(bad[0], y)})")
+                    break
+    elif len(cols) > 20:
+        errors.append(f"a prompt plate where none belongs ({len(cols)} columns)")
+    # (below 100 % the strip's hints zoom about its right end: the BACK pill moves)
+    strip(hints=z >= 1)
 for e in errors[:5]:
     print(f"  {case}: {e}")
 sys.exit(1 if errors else 0)

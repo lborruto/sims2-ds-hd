@@ -375,6 +375,10 @@ constexpr const char* kWords[][5] = {
      "Die Symbole und Porträts des Spiels in den Menüs. Weich: mit sanften Kanten. Pixel: die der DS.",
      "Icone e ritratti del gioco nei menu. Morbido: ridisegnati con bordi morbidi. Pixel: quelli del DS.",
      "Los iconos y retratos del juego en los menús. Suave: redibujados con bordes suaves. Píxeles: los de la DS."},
+    // The world's prompt
+    {"Hold for more", "Maintenir : plus", "Halten: mehr", "Tieni premuto: altro", "Mantén: más"},
+    {"Choose", "Choisir", "Wählen", "Scegli", "Elegir"},
+    {"Other target", "Autre cible", "Anderes Ziel", "Altro obiettivo", "Otro objetivo"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

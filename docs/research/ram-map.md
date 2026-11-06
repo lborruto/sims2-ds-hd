@@ -143,6 +143,22 @@ Read on the screen that shows them (a tab object is read only while its tab is u
 | Give Gift | `S` (overlay 6): `+0x24` recipient actor (`+0xA` Sim index), `+0x4C` slot, `+0x34+4i` slot buttons (`+0x94` = cannot be given) | title 2422 with name 323 + Sim id |
 | Note | `S` (vtable `0x0214A040`, overlay 11): `u16 +0x2C` text id | `@1` the player's name for 0x4A8, 0x509, 0x657; code only, no state reaches it |
 
+The world's current target (`port/prompt.*`, measured with `--print-town` from held-out states, the complete save's
+clock). The Interact object `T` is the world's own target picker: `E = *(T+0x300)` follows the hero in free roam
+with no menu up, chosen by proximity (`L-sit-store-none-250`: the clerk, Sim 51, "Buy"; walking Down it goes to none
+after 38 frames; `sit-hotel`: none, then after about 220 frames of walking the concierge, Sim 45, three actions, and
+none again when he walks off; `L-sit-cityhall-none-250`, `sit-hotel`, `sit-basement`: none at the start; the furnace and
+the rods were not reached from `sit-basement` in a short walk). On another tab there is no Interact object at all
+(`A-pk-town-cnt1`, Pockets up: `S+0x34` fails its vtable check, every frame, while walking too): the target is known
+only while the panel's tab is Interact, the world's default. In the world (no menu, the stylus mode `T+0x314` = 1)
+the D-pad's Left / Right switch to the strip's previous / next target (`D-cas-right2`: Left 20 frames → the cards,
+object 29, two frames later; `L-sit-casino-none-250`: Right → the Music Panel with the cards as previous); with no
+neighbour Right does not change the target. A held (`T+0x314` 0, pad mode) keeps it and Left still switches; Up /
+Down light another row (`T+0x318`); the release runs the lit row (`D-cas-right2`: A held 80 frames, Left at 50 → the
+cards, released → Hotseat, Cards 21 frames later). For one or two frames after a switch `E` is the new target while
+the actions are the old ones greyed and `prev` is `E` itself (frame 22 of the Left run): a reader wanting a steady
+target waits a few frames (the prompt waits 6).
+
 ## The hotel and the shops (`GameState::hotel` ... `::stat`)
 
 `H = G + 0x41F8` is the hotel block. `GameState::hotel` reads on any screen; each screen's part is read only on its own

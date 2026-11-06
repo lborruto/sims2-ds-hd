@@ -421,6 +421,8 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
             lastMoney_ = game->hud.money;
         }
         if (payoutFrames_ > 0 && --payoutFrames_ == 0) app.consolePayout = 0;
+        // The world's prompt (port/prompt.h): the Interact target's steadiness.
+        app.consolePrompt.Update(game && game->valid && game->screen == GScreen::Panel && game->tab == 0 ? &game->town.interact : nullptr);
         // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding); the
         // mixer's Y (its VOX): the computer's microphone when the settings choose it, else the blow.
         const bool voiceBlow = navigator.Voice() && app.settings.mic != MicMode::Real;
@@ -439,6 +441,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         app.consoleWorldOnly = 0;
         app.consolePointer = {};
         app.consolePayout = 0;
+        app.consolePrompt = {};
         payoutFrames_ = 0;
         lastMoney_ = -1;
         app.micBlow = false;

@@ -57,6 +57,7 @@
 #include "port/phone.h"
 #include "port/popup.h"
 #include "port/pockets.h"
+#include "port/prompt.h"
 #include "port/relations.h"
 #include "script.h"
 #include "shots.h"
@@ -855,10 +856,16 @@ relaunch:
         printf("cas: %d words, tallest %d (%d lines), %d shrunk, %d cut", ca.checked, ca.tallestId, ca.tallestLines, ca.shrunk, ca.cut);
         for (int id : ca.cutIds) printf(" %d", id);
         printf("\n");
+        // The world's prompt (port/prompt.*): every verb beside the A chip, every name above it, the hints.
+        BlockMeasure pr;
+        MeasurePrompt(*app.rom, pr);
+        printf("prompt: %d words, %d shrunk, %d cut, %d names cut", pr.checked, pr.shrunk, pr.cut, pr.namesCut);
+        for (int id : pr.cutIds) printf(" %d", id);
+        printf("\n");
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || mg.cut > 0 || fe.cut > 0 || fm.cut > 0 || ca.cut > 0 ||
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || mg.cut > 0 || fe.cut > 0 || fm.cut > 0 || ca.cut > 0 || pr.cut > 0 ||
                        !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
@@ -1747,6 +1754,7 @@ relaunch:
         app.hudStrings = HudStrings();
         app.game = GameState();
         app.consoleHold.Reset();
+        app.consolePrompt = {};
         app.topBig.clear();
         app.topBigW = app.topBigH = 0;
         app.screens = ScreenTracker();
