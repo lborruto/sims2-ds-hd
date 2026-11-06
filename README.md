@@ -22,6 +22,9 @@
   (Back, or E) opens the touch screen's menu big over the town; conversations are redrawn in
   HD over the whole world (the speaker's name, the game's own words in large type, their
   portrait; A turns the page); popups and the games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
+- **HD where it counts.** The status bar and the conversations are redrawn sharp, in the game's
+  own style and in the game's language (the words come from your copy of the game; with another
+  version of it, the old pictures stay). Everything else is still the game's own picture.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
   nothing to set, and it never falls back to the bare two-screen layout. Title, menus and
@@ -48,7 +51,11 @@ It is an early version: see [Good to know](#good-to-know).
 
 <p align="center">
   <img src="docs/screenshots/console-menu.webp" alt="CONSOLE: the touch screen's menu opened big over the dimmed town" width="440">
-  <img src="docs/screenshots/console-dialogue.webp" alt="CONSOLE: a conversation, the world wide with the dialogue box below" width="440">
+  <img src="docs/screenshots/console-dialogue.webp" alt="CONSOLE: a conversation in HD, the speaker's name on a plate, the words in large type, their portrait" width="440">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/console-town.webp" alt="CONSOLE: the town fills the window, the tabs' rail at the right and the HD status bar (clock, money, Sanity) below" width="700">
 </p>
 
 <p align="center">

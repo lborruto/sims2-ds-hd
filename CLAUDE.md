@@ -134,6 +134,18 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   cards' layout over black (the pixels go black before RAM leaves Cards); (2) a goal popup over
   the Options tab reads Unknown (the stick cursor, not the popup's close); (3) the frame's
   corner radius is a literal (16, `Frame()` in `console.cpp`), not derived from the piece.
+- Known limits of the HD status bar and conversations: (1) in German and Spanish the status bar's
+  Sanity label keeps the game's own abbreviation (the string table has no longer one); (2) money's
+  thousands separator is "," in every language (the game's table has none, `FormatHud`); (3) Sim
+  names are assumed to be at most 7 characters (the game's name keyboard), so the plate and the
+  bar's money column are sized for that; to check in Create-a-Sim with a full-width name.
+- UI kit traps: (1) the HD crops are taken from the DS framebuffer at fixed rows (`HudCropRows`:
+  176 of 192, the world without the status bar's rows; the HD bar is drawn in the strip below); a change to a crop's rows moves every picture and the `console_check.sh` hashes;
+  (2) the font is embedded at build time (`cmake/embed.cmake`), never read from disk: a new
+  weight means a new byte array and an `OFL` line in the releases; (3) the raster must stay
+  deterministic (premultiplied floats, one thread): `uikit_test`
+  pins a hash of the still layer, and `console_check.sh` compares composed pictures byte for
+  byte, so a rasteriser change is a deliberate re-baseline, never a side effect.
 - melonDS framebuffers are `0xAARRGGBB`, 256 × 192 each, `GPU.Framebuffer[FrontBuffer][0]` =
   top, `[1]` = bottom.
 - HUD detection uses the status bar's frame, never what lies under the Sanity bar: row 176
