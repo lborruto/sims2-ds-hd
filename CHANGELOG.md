@@ -7,6 +7,11 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+### Docs
+
+- The README is short and for players; the full manual (every control, the settings, the
+  layouts, what is still rough) moves to `docs/manual.md`.
+
 ### Added
 
 - The Steam Controller and the Steam Deck work through Steam's default Gamepad layout (added as

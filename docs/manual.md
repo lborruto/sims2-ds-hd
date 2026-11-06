@@ -1,0 +1,378 @@
+# The Sims 2 DS, one screen: the full manual
+
+Everything the [README](../README.md) leaves out: every control, every setting, every layout and
+what is still rough. If you only want to play, the README is enough.
+
+The program has several **layouts** (ways to arrange the DS's two screens in the window).
+**CONSOLE** is the default: the game played like a console game, the world big and the menus
+redrawn in HD. The older ones (AUTO, FOCUS, SIDE, STACKED) show the DS's own two screens, side by
+side or one over the other, and are chosen by hand in the settings.
+
+- [Everything it does](#everything-it-does)
+- [Install](#install)
+- [Controls](#controls)
+- [Controllers](#controllers)
+- [Settings](#settings)
+- [Layouts](#layouts)
+- [Looks](#looks)
+- [Good to know](#good-to-know)
+- [Screens it does not know yet](#screens-it-does-not-know-yet)
+
+## Everything it does
+
+- **Like a console game (CONSOLE, the default).** In town the 3D world fills the window, widescreen
+  and sharper, with the clock,
+  money and Sanity meter in a sharp HD status bar (in the game's language). One button
+  (Back, or E) opens the touch screen's menu big over the town; conversations are redrawn in
+  HD over the whole world (the speaker's name, the game's own words in large type, their
+  portrait; A turns the page); popups and the games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
+- **The whole town is HD, and played with a controller.** The status bar, the conversations,
+  the menu's five tabs (Interact, Pockets, Goals, Relationships, Options), Give Gift, the save
+  slots, the popups, the phone, the notes, the shop's catalogue, Build Rooms, the hotel's Registry and room pages, its music panel and the stat panel are redrawn sharp, in the game's own style, with
+  its own icons and in the game's language (the words come from your copy of the game; with
+  another version of it, the old pictures stay). Each has a focus the D-pad moves and buttons
+  that say what A, X and B do: do an action, use or throw away an item, give a gift, read your
+  goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend, buy
+  and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions, the Alien Autopsy, the Metal
+  Detector, painting at the Art Gallery, Moogoo Monkey, the Super Drencher, the Ratticator's Rat-A-Rang, the
+  scratch tickets, the music mixer) keep their own playfield, big, in an HD frame: the game's name,
+  its numbers (the cards' score board, the vacuum's earnings, the organs' health, the detector's charge
+  and signal, your brush and color, Moogoo's round and fruit, the Drencher's water and pressure, the ticket's
+  prize and boxes, the mixer's song, tempo and tracks) and the buttons' hints, which follow what the game asks (the cards'
+  quit question, a clogged filter, an organ to carry, the mixer's "save your song?"); the hints are our own words, translated into the
+  game's five languages. The pointing games have a pointer on the sticks. The slot machine and the
+  other animations show the world big, with what you won beside the status bar.
+  No mouse needed, though it works.
+- **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
+  social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
+  nothing to set, and it never falls back to the bare two-screen layout. The intro, the title,
+  the main menu, Settings and Load-a-Sim are redrawn for the controller too (A or Start takes the
+  intro's last screen, A begins, the D-pad and A pick Create-a-Sim, Load-a-Sim, Settings or DS
+  Wireless; in Settings LB / RB change page, Left / Right move the volume, the concept art opens
+  with A and the credits roll; in Load-a-Sim A loads a saved Sim), and so is Create-a-Sim: your
+  Sim big on the left, the game's pages on the right (more below); DS Wireless still shows the
+  top screen and the touch screen big, each in its frame; a black load shows only the backdrop.
+  This needs the European game (see [Good to know](#good-to-know)).
+- **The old layouts are still there.** AUTO, FOCUS, SIDE and STACKED: SETTINGS > DISPLAY > LAYOUT.
+- **The DS clock is your clock.** The game lives by the time of day (rooms take real hours,
+  skill points come at set hours), so it reads your computer's time, also after a save state,
+  and fast forward never runs it ahead: the game never sees its clock go back.
+- **A microphone when the game asks for one.** Blow into it with a key (M: clearing the
+  vacuum's filter, the music mixer); your real microphone is a setting.
+- **The mouse is the stylus, and the camera.** Click the touch screen wherever it is shown;
+  over the world, the wheel zooms and a right-button drag turns the camera.
+- **Your keyboard or controller is the DS.** Every button has a key and a pad button, all
+  remappable; a controller's right stick moves a cursor on the touch screen.
+- **A pause menu.** Esc: save and load state, the settings (display, graphics, sound,
+  controls), quit. Settings are kept between runs.
+- **Sound that keeps up.** When the computer falls behind, the music stretches instead of
+  crackling. Copies of your save are kept beside it, every half hour.
+
+It runs the game on the [melonDS](https://melonds.kuribo64.net/) emulator core, built in.
+It is an early version: see [Good to know](#good-to-know).
+
+<p align="center">
+  <img src="screenshots/console-menu.webp" alt="CONSOLE: the menu's Interact tab in HD over the dimmed casino: the object's actions as big rows, the tabs on top" width="440">
+  <img src="screenshots/console-pockets.webp" alt="CONSOLE: the Pockets tab in HD: the six slots, the tools, the counted items, the highlighted item's name and words, Use and Trash" width="440">
+</p>
+
+<p align="center">
+  <img src="screenshots/console-phone.webp" alt="CONSOLE: the phone in HD over the dimmed town: the game's green LCD, its Up, OK and Down buttons, the hints below" width="440">
+  <img src="screenshots/console-dialogue.webp" alt="CONSOLE: a conversation in HD, the speaker's name on a plate, the words in large type, their portrait" width="440">
+</p>
+
+<p align="center">
+  <img src="screenshots/console-shop.webp" alt="CONSOLE: the General Store's catalogue in HD: the items to buy in a grid with their icons, the chosen one's name, price and words, the buy button, the places you own at the right" width="440">
+  <img src="screenshots/console-registry.webp" alt="CONSOLE: the hotel's Registry in HD: the five rooms with their guests, the hotel score above, the concierge's portrait and the room's details at the right" width="440">
+</p>
+
+<p align="center">
+  <img src="screenshots/console-town.webp" alt="CONSOLE: the hotel lobby fills the window, the HD status bar (clock, money, Sanity) at the bottom left and the Menu chip at the right" width="700">
+</p>
+
+<p align="center">
+  <img src="screenshots/front-menu.webp" alt="CONSOLE: the main menu in HD: the game's title picture big at the left, its four buttons (Create-a-Sim, Load-a-Sim, Settings, DS Wireless) at the right with the button hints" width="700">
+</p>
+
+<p align="center">
+  <img src="screenshots/create-a-sim.webp" alt="CONSOLE in Create-a-Sim: the Sim big in a frame on the left, the HD panel on the right with the page tabs, the name in seven slots, the gender and skin buttons and the keyboard, the button hints" width="700">
+</p>
+
+## Install
+
+You need your own copy of the game, dumped from your cartridge (`.nds`). Nothing of the game
+is included here.
+
+**Download** from the [releases page](https://github.com/lborruto/sims2-ds-wide/releases):
+
+| Where you play | Download | Start it |
+|---|---|---|
+| **Windows** (64-bit) | `sims2-ds-wide-…-windows-x86_64.zip` | unzip, double-click `sims2wide.exe`; the first time, More info > Run anyway |
+| **Mac** (Apple silicon or Intel, macOS 11+) | `sims2-ds-wide-…-macos-universal.zip` | unzip, move *Sims 2 DS Wide* to Applications; the first time, right click > Open |
+| **Linux** (x86_64) | `sims2-ds-wide-…-linux-x86_64.tar.gz` | unpack, run `./sims2wide` (the file picker needs zenity or kdialog) |
+
+It asks for your `.nds` when it starts, in the folder of the last one you chose. A ROM on the command
+line (`sims2wide path/to/your-sims2.nds`) skips the question.
+
+**Or build it** (a few minutes):
+
+```bash
+git clone --recursive https://github.com/lborruto/sims2-ds-wide.git && cd sims2-ds-wide
+cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+ninja -C build sims2wide
+./build/sims2wide path/to/your-sims2.nds
+```
+
+You need CMake (3.21 or later), Ninja and a C++20 compiler (Xcode's command line tools on a
+Mac). On Linux, SDL's development packages too: [CONTRIBUTING.md](../CONTRIBUTING.md#set-up) lists
+them.
+
+## Controls
+
+Keyboard and controller do the same things. The DS's buttons are placed by position, not by
+letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
+
+| Key | Controller | Does |
+|---|---|---|
+| Arrows | D-pad or left stick | walk (town); move the highlight (menus, games) |
+| X / Z / S / A (AZERTY: X / W / S / Q) | A / B / X / Y (as labelled) | the DS's A / B / X / Y |
+| Q / W (AZERTY: A / Z) | LB / RB | L / R: turn the camera in town; switch tabs while the menu is open |
+| Enter / Right Shift | Start / left stick click | Start / Select |
+| E | Back (let go) | open the touch screen's menu (the PANEL); B closes it |
+| Esc | Start + Back | the frontend's pause menu: save states, settings, quit |
+| M (hold) | | blow into the microphone |
+| Tab | right stick click | swap which screen is big (the old layouts) |
+| Space (hold) | RT | fast forward |
+| F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
+| F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
+| 0 to 4 | | layout: AUTO / FOCUS / SIDE / STACKED / CONSOLE |
+| Mouse | right stick + LT (the cursor; A too wherever the cursor is the way to touch: DS Wireless, the furniture editor) | the touch screen, wherever it is shown |
+| Mouse wheel / right button drag, over the world | | zoom / turn the camera |
+
+Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND
+BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation and Switch
+controllers are known by their own button names, and the hints on screen show the buttons of the
+controller you used last (A / B / X / Y, ✕ ○ □ △, or the Switch's), or your keys when you last
+typed.
+
+**Before the game** (the front end) the controller does it all: on the intro's last screen
+("Touch the Touch Screen to continue.") A or Start take the touch, on the title A begins, and on
+the main menu Up / Down and A pick Create-a-Sim, Load-a-Sim, Settings or DS Wireless (the buttons
+fade in first; a press during the fade does nothing). In Settings LB / RB change page (Music,
+SFX, Concept Art, Credits), Left / Right move a volume by a tenth, A opens an unlocked concept
+picture, and B goes back to the title. In Load-a-Sim Up / Down pick a slot, A loads it and B goes back to the title. In Create-a-Sim B goes back only from the last page, as in the game. The end
+credits the game shows after the story are still the game's own picture.
+
+**In town** the buttons are the DS's. **The menu** (phone, tabs, shop, the rest of the touch
+screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes. On the
+Interact tab, A does the highlighted action and Left / Right pick the next thing or person nearby.
+In Pockets, A uses the highlighted item and X throws it away (press X twice: the first only asks,
+the bin turns green; moving away cancels). In Give Gift, A gives the highlighted item and B closes. In Goals and
+Relationships, Up / Down move the game's own selection; in Options, Left / Right turn a volume
+up or down a notch, and A on Save opens the save slots (A saves into the highlighted one: an
+empty slot at once, a used one after the game asks, A yes, B no; B closes).
+In the shop, A on an item picks it (a shop item to buy, one of yours to sell, with its price),
+A on the simoleon button buys or sells it (greyed when the game would not), Up / Down past the
+list scroll it, B closes. In Build Rooms, A on a room asks the game's question (its permit and
+the money left shown first; the focus starts on No, so a stray double press never spends), Right
+and A buy it, A on No or B goes back (B on the list closes). In the hotel's
+Registry, A on a room shows its page (who stays, their mood, when they leave, what the room earns
+a day; A on a line explains it), and when a guest checks in, A on a free room gives it to them;
+B goes back. On a music panel, A plays the highlighted song (the room keeps it), Up / Down past
+the list scroll it, B closes. On the stat panel, A opens a page, LB / RB (or Left / Right on a
+page) go to the previous / next one, B goes back to the first page, then closes.
+**In Create-a-Sim** LB / RB change page and Start goes to the next one; the right stick (or the
+mouse's right drag) turns your Sim, and so do X / Y after the first page. On the first page the D-pad and A type the name on the
+game's keyboard (seven letters at most), Y erases a letter and X changes the letters (ABC, abc,
+123!); the gender and skin buttons are above it. Hair, face and clothes are picked with the D-pad
+and A (Left / Right past the edge show more, as the game's arrows do). On the last page pick an
+aspiration, then A on the tick starts the game; B (or the cross) goes back to the title.
+The phone's Up / Down / A are the phone's own buttons (A on a row goes there and presses OK); B
+hangs up. **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or
+B; a question (Quit?) takes A for yes and B for no; when a popup opens over the menu, the menu
+comes back on the same row after it. A note closes on A or B.
+
+**The activities** are all played on the buttons, each in its own HD frame with the buttons' hints in a bar below (they follow what the game asks):
+
+| Activity | Key | Controller | Does |
+|---|---|---|---|
+| Social reaction | Left / Up / Right | D-pad or left stick | the left / top / right answer |
+| | X | A | the chosen answer again |
+| Keelhaulin' Cards | Arrows | D-pad or left stick | choose a card (or the deck, the discard pile, ? and X) |
+| | X | A | pick the card up; again: play it on the stairs |
+| | S | X | draw from the deck |
+| | A | Y | discard the chosen card |
+| | Z | B | quit (then X / A: yes, Z / B: no) |
+| | X | A | at the end of your turn: go on |
+| Vacuum | Arrows | left stick (or D-pad) | drive |
+| | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
+| | X (hold) | A (hold) | grab a find with the hand and drag it to the box |
+| | A (hold) | Y (hold) | blow: clears a clogged filter (a tap is enough; works with any microphone setting) |
+| Alien Autopsy, painting | Arrows | either stick (LT: slow), D-pad | move the pointer (the D-pad a pixel at a time, faster held) |
+| | X (hold) | A (hold) | the stylus down: cut, lift an organ, pick a parasite, paint |
+| Alien Autopsy | S / A / W | X / Y / RB | laser / hand / tweezers |
+| | Q | LB | carry the organ to the tray (the parasite to the flask) |
+| | Z twice | B twice | quit (the game pays nothing then) |
+| Metal Detector | Arrows | left stick or D-pad | walk |
+| | X / Z | A / B | dig / switch it off (the "Found" card goes by itself) |
+| | Q / W | LB / RB, right stick | depth |
+| Painting | Q / W | LB / RB | the previous / next tool |
+| | S / A | X / Y | the next color / undo |
+| | Z | B | done (then X / A: yes, Z / B: no) |
+| Moogoo Monkey | Left / Right | D-pad or left stick | on your turn: choose the monkey to bet on, the card to play, the monkey a special card goes on (a green ring shows it) |
+| | X | A | bet, play the card; otherwise go on (the rules, the banners, the number of players) |
+| | Z | B | take the bet or the special card back; else quit (then X / A: yes, Z / B: no); a bet placed or a card picked: undo |
+| | Enter | Start | quit |
+| Super Drencher | Arrows | left stick or D-pad | walk |
+| | X (hold) | A (hold) | fire |
+| | S (hold) | X (hold) | pump |
+| | A / W | Y / RB | target / refill |
+| | Q | LB | run |
+| | Z | B | put it away (if you opened the game's help with the mouse: any button closes its text, B leaves help) |
+| Rat-A-Rang | Arrows | left stick or D-pad | walk |
+| | S / A | X / Y | scare / subdue |
+| | X (hold) + arrows | A (hold) + a stick or the D-pad | aim; let go to throw |
+| | Q / Z | LB / B | run / put it away |
+| Scratch ticket | Arrows | either stick (LT: slow), D-pad | move the pointer |
+| | X (hold) | A (hold) | scratch |
+| | S | X | scratch the box under the pointer for you |
+| | X / Z / Enter | A / B / Start | close the game's message (a win is paid when you close it) |
+| | Z twice | B twice | quit (the ticket is lost) |
+| Music mixer | the mouse | either stick (LT: slow) | move the pointer |
+| | X (hold) | A (hold) | press a key, a button, a slider |
+| | Arrows (hold) | D-pad (hold) | Up / Down: an octave up / down; Right: sustain; Left: PREP |
+| | S / W / Q | X / RB / LB | PLAY, RECORD, GENRE (Z / B stops) |
+| | A (hold) | Y (hold) | record your voice (VOX): the microphone while held |
+| | Z | B | quit; in the song list: back |
+| | X / Z / S | A / B / X | "save your song?": yes / no / preview |
+| Saving a song | Arrows | D-pad or left stick | choose a letter, a page, a slot |
+| | X | A | type it, or save into the slot (a used slot asks: again to save over it) |
+| | A / Z | Y / B | erase a letter / back to the mixer |
+
+<p align="center">
+  <img src="screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big in its frame, the world small at the top right with the score board under it, the buttons' hints in a bar below" width="440">
+  <img src="screenshots/console-autopsy.webp" alt="CONSOLE: the Alien Autopsy big with its pointer, the organs' health at the right, the buttons' hints in a bar below" width="440">
+  <img src="screenshots/console-vacuum.webp" alt="CONSOLE: the hotel's vacuum big in its frame, its earnings at the right, the hints below" width="440">
+</p>
+
+The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another
+emulator or a flash cart works if you put it there. A copy is made in `backups/` beside it when
+the program starts and every half hour (the last eight are kept).
+
+## Controllers
+
+Plug in any controller, before or during the game: Xbox (and every XInput pad), PlayStation 3 / 4
+/ 5, Switch Pro and Joy-Cons, 8BitDo and the many others SDL knows, by USB or Bluetooth, on
+Windows, Mac and Linux. Several can be plugged in: whichever you touch last plays. The keyboard
+always works beside them. The pause menu is Start + Back (or Esc): the Guide / PS / Home button
+stays the system's. A controller plugged in says so at the top of the window, and the touch
+screen's cursor hint shows it too.
+
+**Steam Controller and Steam Deck:** supported through Steam, with its default *Gamepad* layout. In Steam, *Add a Game > Add a Non-Steam Game*, pick `sims2wide.exe` (or `sims2wide` on
+Linux or the Deck), and leave Steam Input on. To skip the file picker, put the ROM's path in its
+*Properties > Launch Options*, in quotes: `"C:\Games\Sims 2.nds"`. The pad shows up as an Xbox
+controller, so the buttons are labelled the Xbox way (the right pad, as a stick, moves the cursor;
+its click is SWAP SCREENS, and the Steam button stays Steam's). The Deck fills its 1280 x 800
+screen with thin bars above and below. Without Steam, the Steam Controller is read directly only if you set the environment variable
+`SDL_JOYSTICK_HIDAPI_STEAM=1` with Steam closed (a running Steam fights over the pad); its back
+grip then stands for the right pad's click (R3). The Deck's own controls work natively.
+Pause: Start + Back, as on any pad. SAVE STATE and LOAD STATE are in the pause menu; BLOW (the
+microphone, for other layouts than CONSOLE, where Y does it) has no button until you give it one
+in SETTINGS > CONTROLS.
+
+**A controller that does nothing** has no mapping yet: the program says which one on its console
+output. Make one with [SDL2 Gamepad Tool](https://generalarcade.com/gamepadtool/) or Steam's
+controller settings and put the line in `gamecontrollerdb.txt` in the settings folder (below); a
+mapping in the `SDL_GAMECONTROLLERCONFIG` environment variable (what Steam sets) wins over it.
+SETTINGS > CONTROLS also has the sticks' dead zone (raise it if the Sim walks on its own), how far
+the triggers go down to count, and rumble. A controller SDL already knows keeps SDL's own mapping;
+the built-in database only adds the others.
+
+## Settings
+
+Esc opens the pause menu; SETTINGS has four pages:
+
+| Page | Settings |
+|---|---|
+| DISPLAY | fullscreen (F11), smooth scaling, layout |
+| GRAPHICS | 3D resolution, widescreen world, 60 fps |
+| SOUND | volume, sound during fast forward (muted, or at normal pitch skipping ahead) |
+| CONTROLS | stick touch cursor, stick dead zone, trigger press point, rumble, microphone (off, the blow key, the real one), keys and buttons |
+
+<p align="center">
+  <img src="screenshots/menu.webp" alt="The pause menu's settings page over the town: DISPLAY, GRAPHICS, SOUND, CONTROLS, with a hint for the chosen page" width="700">
+</p>
+
+They are kept in `settings.ini` in your user folder (the window's size too): on Windows
+`%APPDATA%\sims2-ds-wide`, on a Mac `~/Library/Application Support/sims2-ds-wide`, on Linux
+`~/.local/share/sims2-ds-wide`. Delete it to start over.
+
+## Layouts
+
+| Layout | What you see |
+|---|---|
+| **CONSOLE** (default) | the window as a console game: the world big (widescreen, sharper, 60 fps), the touch screen's menu, conversations, popups and games laid out big, with hints; the title, Create-a-Sim and the menus redrawn big |
+| **AUTO** | FOCUS in town (the touch screen big during a social game, in the shop's catalogue or Build Rooms), SIDE everywhere else |
+| **FOCUS** | the world big, the touch screen at twice its size over the world's right edge, a little see-through (Tab makes the touch screen the big one instead) |
+| **SIDE** | both screens side by side |
+| **STACKED** | as on the DS, one above the other |
+
+Change it in SETTINGS > DISPLAY > LAYOUT or with the 0 to 4 keys; or start with one:
+`--layout focus`. Run `sims2wide --help` to see every option, including the headless mode used
+to study the game's screens ([CONTRIBUTING.md](../CONTRIBUTING.md#studying-the-screens)).
+
+## Looks
+
+Three options make the game look better without changing it. They are on by default; switch them off
+in SETTINGS > GRAPHICS. The options below turn them on for one run.
+
+| Option | What it does | On the command line |
+|---|---|---|
+| **Sharper 3D** | draws the 3D world 2, 3 or 4 times sharper | `--res3d 3` (default 2) |
+| **Widescreen** | shows more of the town left and right, 16:9 instead of 4:3; the status bar stays in the middle | `--wide` |
+| **60 fps** | adds in-between frames: the game draws its 3D at 30 frames a second | `--interp` |
+
+<p align="center">
+  <img src="screenshots/widescreen.webp" alt="Widescreen and sharper 3D: the General Store in 16:9 at twice the DS resolution, the HD status bar at the bottom" width="800">
+</p>
+
+Widescreen is a stretch for a game made for 4:3: the game is told to draw a wider view, and it
+does in town, in conversations and in Create-a-Sim, but in places not checked yet something
+the game never meant to be seen can show at the edges. Each one costs speed; all three together still run well over full speed on a recent Mac.
+
+## Good to know
+
+- **An early version.** Town, conversations, Create-a-Sim, the shop, Build Rooms, the hotel's
+  lobby, basement, Registry and music, the social games, the vacuum and the casino's card game are
+  checked; not everything the game has is yet.
+- **A few screens are still the game's own picture.** The end credits (after the story),
+  the furniture editor of a hotel room, and
+  any screen CONSOLE has no HD page for, are drawn big with the stick as a cursor (the right
+  stick moves it, A touches), and a hint box says so.
+- **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
+  world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it. (CONSOLE has no such strip.)
+- **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).
+- **Most minigames not checked yet.** The social reactions, the shop, Build Rooms and the vacuum
+  (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
+  filter clear) and the casino's cards are; the autopsy, the detector, painting, Moogoo Monkey, the Rat-A-Rang, the scratch tickets and the
+  music mixer were played from test states (not reached by walking to them yet; Moogoo opens on Monkey Day, the Rat-A-Rang with the Ratticator's
+  costume), the Super Drencher from the pockets; the slot machine, the skydive and the arcade cabinets (their animations) and the payout chip beside the status bar were not reached in play (an animation reading as None draws the front-end layout). If one shows up wrong, Tab swaps the big screen and 2 shows
+  both.
+- **No wireless play.** Trading, and Moogoo or the cards with a second DS, need two consoles: the
+  wireless screen says so and B leaves it.
+- **CONSOLE needs the European game** (code `ASJP`): it reads the game's screens from its memory,
+  and that map is the European one. With another version, CONSOLE falls back to recognising the
+  screens by their pixels (as before) and the program says so. The American one should work
+  otherwise; its automatic layout is untested. A save from the American game loads in the European one.
+- **Not signed by Apple or Microsoft.** Hence the extra click the first time. Once the project
+  is public, each download comes with a build attestation from GitHub instead
+  ([SECURITY.md](../SECURITY.md)).
+
+## Screens it does not know yet
+
+When the game shows a screen CONSOLE has no name for, it frames it as best it can and, once for
+that screen, saves a picture and a save state into a `captures` folder in your user folder (the
+one `settings.ini` is in; at most 20 a run, 200 in all, never twice the same screen). If you
+see odd screens, send the `.png` files and what you were doing in an
+[issue](https://github.com/lborruto/sims2-ds-wide/issues). Never send the `.st` files: a save
+state holds a copy of the game's memory.

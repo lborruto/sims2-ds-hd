@@ -16,8 +16,10 @@ the owner makes it public; write everything as if it were public already).
 - No personal paths, host names or work addresses in anything committed.
 - Commit as `luca.borruto@gmail.com` (set in the local git config), never the work address.
 - Never push `main` without the owner's go-ahead.
-- Keep the README short and for players; technical detail goes here and in CONTRIBUTING.md. A PR
-  that changes what README.md or this file says updates them.
+- Keep the README short and for players (a two-minute read: pitch, gallery, get started, the
+  essential controls, FAQ); the player's full manual (every control, settings, layouts, known
+  limits) is `docs/manual.md`; technical detail goes here and in CONTRIBUTING.md. A PR that
+  changes what README.md, `docs/manual.md` or this file says updates them.
 - CONSOLE stays the default layout (the owner plays it all the time; AUTO, FOCUS, SIDE and STACKED are chosen by hand). melonDS stays the upstream 1.1 tag: changes go in
   `patches/melonDS/` (applied by CMake) and only with the owner's agreement; never a fork.
 - One task = one clear commit; `ninja -C build sims2wide` and a headless run before each commit.
@@ -137,7 +139,7 @@ emptied), `F-hair-s3-40` (the Hair page, the third style), `F-face-5-40` (the fi
 cell); `s3` / `s4` are Create-a-Sim's Name page and Keep this Sim?. Pass `--clock "2026-01-01
 12:00"` to runs from the town states whose output is compared.
 
-The README's pictures (`docs/screenshots`, 1280 × 720 webp, game screenshots are allowed): from a
+The README's and the manual's pictures (`docs/screenshots`, 1280 × 720 webp, game screenshots are allowed): from a
 state, `--headless --frames 120 --layout console --compose --wide --res3d 2 --interp --shot-at 119
 --console-menu --console-focus N` (the HD menu: `sit-casino` with the complete save's copy and
 `--clock "2026-11-05 12:05"` for Interact, `A-pk-cnt3-slot1` for Pockets, `s7` for the phone without
