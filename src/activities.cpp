@@ -277,6 +277,8 @@ void MooGoo(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState&
         set(pad.b, kB);
         set(Left(pad), kLeft);
         set(Right(pad), kRight);
+        // B and Start: its X, so the controller can always leave.
+        if ((b || start) && canTap) tap(kMooGooX);
         return;
     }
     if (r.mooGooIntro)
@@ -356,6 +358,20 @@ void Drencher(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityStat
     auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
     set(pad.a, kA);    // fire (held)
     set(pad.lb, kB);   // run
+    const ActivityRam& r = st.ram;
+    // Help (opened with the mouse): a help text closes on any press (a tap on the "?"), the mode leaves with B.
+    if (r.drencherHelpText)
+    {
+        if (canTap && (Pressed(pad, st, &PadState::a) || Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::x) || Pressed(pad, st, &PadState::y) ||
+                       Pressed(pad, st, &PadState::lb) || Pressed(pad, st, &PadState::rb) || Pressed(pad, st, &PadState::start)))
+            touch.Tap(kDrencherHelp.x, kDrencherHelp.y);
+        return;
+    }
+    if (r.drencherHelp)
+    {
+        if (canTap && Pressed(pad, st, &PadState::b)) touch.Tap(kDrencherHelp.x, kDrencherHelp.y);
+        return;
+    }
     // X held: the pump, the stylus swept along its band.
     if (pad.x && (canTap || st.pumpFrames > 0))
     {

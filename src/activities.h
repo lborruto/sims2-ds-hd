@@ -122,6 +122,7 @@ struct ActivityRam
     int mooGooSelected = -1;               // the hand card the game has selected
     bool drencher = false;
     int drencherPump = 0;                  // the pump handle, 0..180
+    bool drencherHelp = false, drencherHelpText = false;   // its help mode; a help text is up (a tap closes it)
     bool crime = false;
     int crimePhase = 0;                    // the throw: 0 idle, 1 grabbed, 2 aiming, 3 released
     // The Scratch lottery: the ticket's tier (its boxes' places), a popup of the game's up over it
@@ -255,7 +256,7 @@ constexpr Rect MooGooCardRect(int i) { return {72 + 32 * i, 137, 24, 32}; }
 constexpr int kMooGooChainWait = 240;  // frames the intro's B waits for the game's X
 // The Super Drencher (strict lo < v < hi rectangles): the X (219-253, 11-45), target (137-171,
 // 46-80), refill (13-51, 159-197); the pump's band (rows 94-146, x 50-230 the handle's travel).
-constexpr Point kDrencherX {236, 28}, kDrencherTarget {154, 63}, kDrencherRefill {32, 178};
+constexpr Point kDrencherX {236, 28}, kDrencherTarget {154, 63}, kDrencherRefill {32, 178}, kDrencherHelp {88, 176};
 constexpr int kPumpY = 120, kPumpLeft = 52, kPumpRight = 228;
 constexpr float kPumpSpeed = 8.0f;     // a frame (16 a tick of the game's: past its 5)
 // The crime game: the X (209-239, 17-47), scare (94-161, 13-56), subdue (94-161, 135-178), the

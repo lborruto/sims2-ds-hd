@@ -839,6 +839,18 @@ static void moogoo_scheme()
         if (r.Touched(x, y)) { sawX = x == kMooGooX.x && y == kMooGooX.y; r.Drain(); }
     }
     CHECK(sawX);
+    // Its part unreadable: B and Start tap the X, so the controller can always leave.
+    {
+        Rig u;
+        u.nav.SetActivityRam({});
+        u.Frame(kMooGoo);
+        u.Press(kMooGoo, &PadState::b);
+        CHECK(u.Touched(x, y) && x == kMooGooX.x && y == kMooGooX.y);
+        u.Drain();
+        u.Frame(kMooGoo);
+        u.Press(kMooGoo, &PadState::start);
+        CHECK(u.Touched(x, y) && x == kMooGooX.x && y == kMooGooX.y);
+    }
     // The question.
     Rig q;
     ram.mooGooQuitAsk = true;
@@ -946,6 +958,18 @@ static void drencher_scheme()
     CHECK(tapped(&PadState::y, kDrencherTarget));
     CHECK(tapped(&PadState::rb, kDrencherRefill));
     CHECK(tapped(&PadState::b, kDrencherX));
+    // Help mode (opened with the mouse): B taps the "?" (not the X); a help text closes on any press.
+    ram.drencherHelp = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kDrencher);
+    CHECK(tapped(&PadState::b, kDrencherHelp));
+    CHECK(!tapped(&PadState::y, kDrencherTarget));
+    ram.drencherHelpText = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kDrencher);
+    CHECK(tapped(&PadState::a, kDrencherHelp));
+    CHECK(tapped(&PadState::y, kDrencherHelp));
+    CHECK(tapped(&PadState::start, kDrencherHelp));
 }
 
 // The crime game: A held grabs the centre rat (the pointer shown, the stylus down), Right aims along

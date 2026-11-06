@@ -224,6 +224,9 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     {
         const DrencherState& d = game.minigame.drencher;
         const bool low = d.valid && d.pressure < kDrencherPressureLow;
+        // Help (opened with the mouse): its text closes on any press; its mode leaves with B.
+        if (d.valid && d.helpText) return {{{C(Button::A)}, Own(rom, OwnWordId::Close)}};
+        if (d.valid && d.help) return {{{C(Button::B)}, Own(rom, OwnWordId::MixerHelp)}};
         return {{{C(Button::LStick), Sep("/"), C(Button::DPad)}, Own(rom, OwnWordId::DetectorWalk)},
                 {{C(Button::A)}, Own(rom, OwnWordId::DrencherFire)},
                 {{C(Button::X)}, Own(rom, OwnWordId::DrencherPump), low},
@@ -855,7 +858,7 @@ ActivityRam MinigameRam(const GameState* game)
         for (int i = 0; i < kMooGooHand; i++) r.mooGooCard[i] = g.players[p].hand[i] != kMooGooHandEmpty;
         r.mooGooSelected = g.players[p].selected;
     }
-    if (game->screen == GScreen::Drencher && m.drencher.valid) { r.drencher = true; r.drencherPump = m.drencher.pump; }
+    if (game->screen == GScreen::Drencher && m.drencher.valid) { r.drencher = true; r.drencherPump = m.drencher.pump; r.drencherHelp = m.drencher.help; r.drencherHelpText = m.drencher.helpText; }
     if (game->screen == GScreen::Crime && m.crime.valid) { r.crime = true; r.crimePhase = m.crime.phase; }
     if (game->screen == GScreen::Scratch && m.scratch.valid)
     {

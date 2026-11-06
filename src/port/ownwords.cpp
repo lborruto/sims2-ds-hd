@@ -145,6 +145,8 @@ constexpr const char* kWords[][5] = {
     {"Wireless play needs a second DS: not in this port.", "Le jeu sans fil demande une deuxième DS : absent de ce portage.",
      "Drahtlos-Spiel braucht eine zweite DS: nicht in dieser Portierung.", "Il gioco wireless richiede un secondo DS: non in questo port.",
      "El juego inalámbrico necesita otra DS: no está en esta versión."},
+    // A help text
+    {"Close", "Fermer", "Schließen", "Chiudi", "Cerrar"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

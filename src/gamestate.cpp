@@ -1303,7 +1303,10 @@ DetectorState ReadDetector(const Reader& m, u32 S)
     if (finds > 150) finds = 0;
     const int charge = m.S32(S + q.mdCharge);
     if (charge < 0 || charge > 2 * kDetectorFull) return DetectorState{};
-    v.state = (int)state; v.charge = charge; v.inRange = range == 1; v.slider = (int)sliderVal; v.mismatch = (int)mismatch; v.card = card == 1;
+    v.state = (int)state; v.charge = charge; v.inRange = range == 1; v.slider = (int)sliderVal; v.mismatch = (int)mismatch;
+    // The card flag stays set after the card is gone (the game clears it at the next dig): the card is up in state 5 only, which
+    // lasts about 2 s and ends by itself.
+    v.card = card == 1 && state == 5;
     v.earnings = (int)earn; v.findCount = (int)finds;
     u32 find, type;
     // The sensed find, in range; and while the "Found:" card is up, the find it shows (the record

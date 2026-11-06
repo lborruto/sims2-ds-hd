@@ -48,6 +48,8 @@ enum class OwnWordId : int
     SaveType, SaveHere, SaveOverwrite, SaveErase, SaveSlot,
     // The wireless lobby.
     TradingNote,
+    // A help text, a card: closed.
+    Close,
     Count
 };
 

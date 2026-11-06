@@ -1062,6 +1062,8 @@ static void detector()
     CHECK(v.state == 3 && v.charge == 0x99480 && !v.inRange && v.slider == 0x800 && v.mismatch == 0 && !v.card && v.findType == -1 && v.earnings == 2020 && v.findCount == 0);
     // In range: the sensed find's type is read (a stale pointer out of range is not).
     r.W8(kS + 0xD4, 1); r.W32(kS + 0x54, 128); r.W32(kS + 0x58, 0x021A0200); r.W8(0x021A0200 + 8, 7); r.W8(kS + 0x4E, 1); r.W32(kMg + 0x31C8, 12);
+    CHECK(!ReadGameState(r.View()).minigame.detector.card);   // (the flag alone, in state 3: the card is gone)
+    r.W32(kS + 0x9C, 5);
     v = ReadGameState(r.View()).minigame.detector;
     CHECK(v.valid && v.inRange && v.mismatch == 128 && v.findType == 7 && v.card && v.findCount == 12);
     r.W8(0x021A0200 + 8, 9);
