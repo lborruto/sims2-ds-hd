@@ -178,7 +178,7 @@ constexpr EUTable kEU = {
         {15, 0x0214AA18, GScreen::Dialogue}, {6, 0x0214ABA4, GScreen::Gift},
         {2, 0x0214C194, GScreen::Catalogue}, {1, 0x0214B1D0, GScreen::Build},
         {17, 0x0214C658, GScreen::Vacuum},   {3, 0x021509B0, GScreen::CreateASim},
-        {8, 0x0214B1C4, GScreen::SaveSlots}, {18, 0x0214B8BC, GScreen::ItemHand},
+        {8, 0x0214B1C4, GScreen::SaveSlots}, {18, 0x0214B8BC, GScreen::Drencher},
     },
     {
         0x02122A00, 0x12, 2, 0x3B,
@@ -1871,12 +1871,14 @@ ScreenState ToScreenState(const GameState& g)
     case GScreen::FrontEnd: return {Screen::FrontEnd};
     case GScreen::CreateASim: return {Screen::CreateASim};
     case GScreen::SaveSlots: return {Screen::SaveSlots};
-    case GScreen::Drencher: return {Screen::ItemHand};
-    // The minigames: CONSOLE has no frame for them yet, so they are the stick cursor's screens (Unknown).
+    case GScreen::Drencher: return {Screen::Drencher};
+    // The minigames with a scheme of their own; the others are the stick cursor's screens (Unknown).
     case GScreen::Autopsy: return {Screen::Autopsy};
     case GScreen::Detector: return {Screen::Detector};
     case GScreen::ArtGallery: return {Screen::Art};
-    case GScreen::MooGoo: case GScreen::Scratch: case GScreen::Crime:
+    case GScreen::MooGoo: return {Screen::MooGoo};
+    case GScreen::Crime: return {Screen::Crime};
+    case GScreen::Scratch:
     case GScreen::Mixer: case GScreen::MixerSave:
     case GScreen::Unknown: break;
     }
@@ -1891,9 +1893,9 @@ bool PixelsAgree(const GameState& g, ScreenState pixels)
     switch (r.screen)
     {
     case Screen::FrontEnd: case Screen::CreateASim: return pixels.screen == Screen::None;
-    case Screen::SaveSlots: case Screen::ItemHand: return pixels.screen == Screen::Unknown;
-    // (The pointing minigames: no HUD and no rule of their own in the pixels.)
-    case Screen::Autopsy: case Screen::Detector: case Screen::Art: return pixels.screen == Screen::Unknown || pixels.screen == Screen::None;
+    case Screen::SaveSlots: case Screen::Drencher: return pixels.screen == Screen::Unknown;
+    // (The minigames: no rule of their own in the pixels.)
+    case Screen::Autopsy: case Screen::Detector: case Screen::Art: case Screen::MooGoo: case Screen::Crime: return pixels.screen == Screen::Unknown || pixels.screen == Screen::None;
     default: return false;
     }
 }

@@ -124,6 +124,8 @@ public:
     bool PointerDown() const { return activity_.down; }
     float PointerX() const { return activity_.px; }
     float PointerY() const { return activity_.py; }
+    // MooGoo's focus on the playfield (DS pixels; w 0 none).
+    Rect Mark() const { return activity_.mark; }
     // The autopsy's quit asked once (a second B / Start quits).
     bool QuitArmed() const { return activity_.quitArmed > 0; }
 

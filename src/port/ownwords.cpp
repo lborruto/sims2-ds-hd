@@ -81,6 +81,36 @@ constexpr const char* kWords[][5] = {
     {"Answer", "Répondre", "Antworten", "Rispondi", "Responder"},
     {"The chosen answer again", "La même réponse", "Dieselbe Antwort", "La stessa risposta", "La misma respuesta"},
     {"Match the gesture", "Imite le geste", "Geste nachmachen", "Imita il gesto", "Imita el gesto"},
+    // MooGoo Monkey
+    {"Play", "Jouer", "Spielen", "Gioca", "Jugar"},
+    {"Choose a monkey", "Choisir un singe", "Affen wählen", "Scegli una scimmia", "Elegir mono"},
+    {"Bet", "Parier", "Wetten", "Punta", "Apostar"},
+    {"Play the card", "Jouer la carte", "Karte spielen", "Gioca la carta", "Jugar la carta"},
+    {"Undo the bet", "Annuler le pari", "Wette zurück", "Annulla la puntata", "Deshacer apuesta"},
+    {"Play on it", "Jouer dessus", "Darauf spielen", "Gioca qui", "Jugar aquí"},
+    {"Take it back", "Reprendre", "Zurücknehmen", "Riprendi", "Recuperar"},
+    {"Players", "Joueurs", "Spieler", "Giocatori", "Jugadores"},
+    {"OK", "OK", "OK", "OK", "Aceptar"},
+    {"Round @1 of 3", "Manche @1 sur 3", "Runde @1 von 3", "Turno @1 di 3", "Ronda @1 de 3"},
+    {"Cards left", "Cartes restantes", "Karten übrig", "Carte rimaste", "Cartas restantes"},
+    // The Super Drencher
+    {"Hold: fire", "Maintenir : tirer", "Halten: spritzen", "Tieni: spara", "Mantén: disparar"},
+    {"Hold: pump", "Maintenir : pomper", "Halten: pumpen", "Tieni: pompa", "Mantén: bombear"},
+    {"Target", "Cible", "Ziel", "Bersaglio", "Objetivo"},
+    {"Refill", "Remplir", "Auffüllen", "Ricarica", "Rellenar"},
+    {"Run", "Courir", "Rennen", "Corri", "Correr"},
+    {"Put away", "Ranger", "Wegstecken", "Metti via", "Guardar"},
+    {"Water", "Eau", "Wasser", "Acqua", "Agua"},
+    {"Pressure", "Pression", "Druck", "Pressione", "Presión"},
+    {"None", "Aucune", "Keins", "Nessuno", "Ninguno"},
+    // The crime game
+    {"Scare", "Effrayer", "Erschrecken", "Spaventa", "Asustar"},
+    {"Hold: aim", "Maintenir : viser", "Halten: zielen", "Tieni: mira", "Mantén: apuntar"},
+    {"Let go: throw", "Relâcher : lancer", "Loslassen: werfen", "Rilascia: lancia", "Suelta: lanzar"},
+    {"Subdue", "Maîtriser", "Überwältigen", "Immobilizza", "Reducir"},
+    {"Ready", "Prêt", "Bereit", "Pronto", "Listo"},
+    {"Aim", "Visée", "Ziel", "Mira", "Puntería"},
+    {"Hit!", "Touché !", "Treffer!", "Colpito!", "¡Tocado!"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

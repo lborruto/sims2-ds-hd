@@ -47,6 +47,14 @@ constexpr int kStrMgPlayer = 2022, kStrMgOpponent = 2023, kStrMgQuit = 61, kStrM
 // resource 6028 (16 pages of 16 BGR555 colours, the swatch i the page's colour i + 1).
 constexpr int kStrMgAutopsy = 1885, kStrMgDetector = 1970, kStrMgArtGallery = 68, kStrMgMoney = 28, kStrMgFound = 1160, kStrMgFind0 = 1164;
 constexpr int kMgFindTypes = 9, kResArtColours = 6028;
+// The timing games: the casino's table "Moogoo Monkey Cards" 493, the key item "Super Drencher"
+// 1969, the weapon "Rat-A-Rang" 733; MooGoo's "Score" 1749, its fruit (1750 coconuts, 1751
+// watermelons, 1752 pineapples: players 0..2) and "Player 1" 1758 (+ p); the Drencher's target's
+// name (a Sim 323 + k, an object 463 + k: GameState's record index).
+constexpr int kStrMgMooGoo = 493, kStrMgDrencher = 1969, kStrMgRatARang = 733, kStrMgMooScore = 1749, kStrMgMooFruit = 1750, kStrMgMooPlayer1 = 1758;
+constexpr int kStrMgSimName0 = 323, kStrMgObjectName0 = 463;
+constexpr int kStrMgDrencherObjectEnd = 822;   // (the objects' names end where their descriptions begin: --measure-menu measures them all)
+constexpr int kDrencherPressureMax = 125, kDrencherPressureLow = 30;   // the gauge's top; under it the pump's hint is lit
 constexpr int kStrMgMax = kStrMgOpponent;   // the largest id used
 
 // The frame's geometry (canvas pixels). The playfield stays milestone 1's kActivityBottomTo (36,68,
@@ -72,7 +80,7 @@ constexpr float kMgValueSize = 24, kMgValueMin = 16, kMgHeadSize = 18;
 constexpr Rect kMgDeckFrom {110, 6, 36, 53};
 constexpr Rect kMgAnswerFrom[3] = {{6, 169, 82, 19}, {87, 150, 82, 19}, {168, 169, 82, 19}};
 
-// Whether the HD frame draws screen s: an activity (Social, Cards, Vacuum, Autopsy, Detector, Art), the game's RAM read
+// Whether the HD frame draws screen s: an activity (Social, Cards, Vacuum, the pointing and timing games), the game's RAM read
 // (game valid) and its strings there (rom with every id above).
 bool MinigameFramed(ScreenState s, const GameState* game, const RomData* rom);
 

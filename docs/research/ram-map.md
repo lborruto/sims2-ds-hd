@@ -184,7 +184,7 @@ Checked by `tests/gamestate_test.cpp` (made-up RAM, garbage per part) and `tests
 ## The minigames (`GameState::minigame`)
 
 Each minigame is a bottom-screen object `S` with its own vtable (`GScreen::Autopsy` ... `ArtGallery`, and the Super Drencher, `GScreen::Drencher`,
-CONSOLE's ItemHand); the part of the screen the game shows is read only on that screen, valid on its own (an out-of-range field
+CONSOLE's Drencher activity); the part of the screen the game shows is read only on that screen, valid on its own (an out-of-range field
 makes only that part invalid, never partial), every list capped. The top screen stays the world. All of them leave through the
 panel (module 0xC). The game logic of the overlays ticks every other frame (30 Hz); a press / release is an event, so a stylus
 tap must last two frames or more. Fields are from `S` unless said; the values are the game's own (`kEU.mg`).

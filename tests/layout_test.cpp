@@ -135,7 +135,7 @@ static std::vector<ScreenState> AllStates()
     std::vector<ScreenState> v;
     for (Screen sc : {Screen::None, Screen::Panel, Screen::Phone, Screen::Dialogue, Screen::Popup, Screen::Gift, Screen::Social,
                       Screen::Vacuum, Screen::Cards, Screen::Catalogue, Screen::Build, Screen::FrontEnd,
-                      Screen::CreateASim, Screen::SaveSlots, Screen::ItemHand, Screen::Unknown, Screen::Loading, Screen::Autopsy,
+                      Screen::CreateASim, Screen::SaveSlots, Screen::Drencher, Screen::Unknown, Screen::Loading, Screen::Autopsy,
                       Screen::Detector, Screen::Art})
         if (sc == Screen::Panel)
             for (Tab t : {Tab::None, Tab::Interact, Tab::Pockets, Tab::Goals, Tab::Relationships, Tab::Options}) v.push_back({sc, t});
@@ -255,7 +255,8 @@ static void minigame_frame()
     RomData rom;   // no strings: the words empty, the layout the same
     static u32 bottom[SW * SH] = {};
     for (const auto& top : {std::pair<int, int> {SW, SH}, {341, 192}, {682, 384}})
-        for (Screen sc : {Screen::Cards, Screen::Vacuum, Screen::Social, Screen::Autopsy, Screen::Detector, Screen::Art})
+        for (Screen sc : {Screen::Cards, Screen::Vacuum, Screen::Social, Screen::Autopsy, Screen::Detector, Screen::Art, Screen::MooGoo, Screen::Drencher,
+                          Screen::Crime})
             for (int variant = 0; variant < 4; variant++)
             {
                 GameState g;
@@ -296,6 +297,36 @@ static void minigame_frame()
                 art.brush = 2;
                 art.swatch = 14;
                 art.page = 15;
+                // The timing games: 1 the player's bet (the Drencher's pressure low, every crime move
+                // lit), 2 the extremes (MooGoo's question, a target past the names, the aim), 3 the
+                // intro (a full tank, a hit).
+                MooGooState& mg = g.minigame.mooGoo;
+                mg.valid = variant > 0;
+                mg.intro = variant == 3;
+                mg.quitAsk = variant == 2;
+                mg.phase = 0xD;
+                mg.sub = variant == 2 ? 5 : 1;
+                mg.round = variant == 2 ? 3 : 1;
+                mg.deckSize = 54;
+                mg.deckNext = variant == 2 ? 0 : 19;
+                for (int p = 0; p < kMooGooPlayers; p++)
+                {
+                    mg.players[p].nameId = variant == 2 ? 99999 : 323 + p;
+                    mg.players[p].score = variant == 2 ? 99 : p;
+                    mg.players[p].ai = p > 0;
+                }
+                DrencherState& dr = g.minigame.drencher;
+                dr.valid = variant > 0;
+                dr.water = variant == 3 ? 100 : 0;
+                dr.pressure = variant == 1 ? 10 : 125;
+                dr.target = variant == 2 ? 99999 : -1;
+                dr.targetType = 0xB;
+                CrimeState& cr = g.minigame.crime;
+                cr.valid = variant > 0;
+                cr.canScare = cr.armed = cr.canSubdue = variant == 1;
+                cr.phase = variant == 2 ? 2 : 0;
+                cr.angle = variant == 2 ? -90 : 0;
+                cr.hit = variant == 3;
                 PopupState& pop = g.town.popup;
                 pop.valid = variant == 2 && sc == Screen::Art;
                 pop.state = 2;
@@ -307,6 +338,8 @@ static void minigame_frame()
                 pv.quitArmed = variant == 2 && sc == Screen::Autopsy;
                 pv.x = variant == 2 ? SW - 1 : 0;
                 pv.y = variant == 2 ? SH - 1 : 0;
+                if (sc == Screen::MooGoo && variant == 1) pv.mark = MooGooMonkeyRect(5);
+                const size_t overlays0 = 3;   // (the backdrop and the two pictures' frames)
                 Composition c {kConsoleW, kConsoleH, {}, {}};
                 BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom, nullptr, &pv);
                 CHECK(c.pieces.size() == 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
@@ -343,9 +376,19 @@ static void minigame_frame()
                 }
                 CHECK(prompt > 0);
                 // The clog lights the blow's hint; the cards' question has two chips (Yes, No), the message one.
-                const bool litNow = (sc == Screen::Vacuum && variant == 2) || (sc == Screen::Autopsy && variant > 0) || (sc == Screen::Detector && variant == 2);
-                CHECK(lit == (litNow ? 1 : 0));
-                CHECK(pointer == (IsPointing(sc) ? 2 : 0));   // (shown: the navigator never shows the detector's)
+                const bool litNow = (sc == Screen::Vacuum && variant == 2) || (sc == Screen::Autopsy && variant > 0) || (sc == Screen::Detector && variant == 2) ||
+                                    (sc == Screen::Drencher && variant == 1) || (sc == Screen::Crime && variant == 2);
+                CHECK(lit == (sc == Screen::Crime && variant == 1 ? 3 : litNow ? 1 : 0));
+                CHECK(pointer == (OwnScheme(sc) ? 2 : 0));   // (shown: the navigator shows it on the pointing games and the crime game's aim)
+                // MooGoo's focus: one ring over the playfield, around the monkey (an overlay).
+                CHECK(c.overlays.size() == overlays0 + (sc == Screen::MooGoo && variant == 1 ? 1 : 0));
+                if (sc == Screen::MooGoo && variant == 1)
+                {
+                    const Rect o = c.overlays.back().to;
+                    CHECK(o.x >= kActivityBottomTo.x + (56 + 32 * 5) * 3 - 8 && o.x + o.w <= kActivityBottomTo.x + (80 + 32 * 5) * 3 + 8 && o.y >= kActivityBottomTo.y + 32 * 3 - 8);
+                }
+                // MooGoo's question: two chips (Yes, No).
+                if (sc == Screen::MooGoo && variant == 2) CHECK(chips == 2);
                 // The painting's question: two chips (Yes, No).
                 if (sc == Screen::Art && variant == 2) CHECK(chips == 2);
                 if (sc == Screen::Cards) CHECK(chips == (variant == 2 ? 2 : variant == 3 ? 1 : 5));
@@ -557,8 +600,9 @@ int main()
         CHECK(!OverTopComposition(c, fit, 640, 360));
         CHECK(!CanvasFromTouch(c, 128, 96, cx, cy, sc2));
     }
-    // SaveSlots, ItemHand, Unknown (HUD up): the menu composition, framed, with the stick cursor.
-    for (Screen sc : {Screen::SaveSlots, Screen::ItemHand, Screen::Unknown})
+    // SaveSlots, Unknown (HUD up): the menu composition, framed, with the stick cursor (the Drencher,
+    // once one of them, is an activity of its own: milestone 6).
+    for (Screen sc : {Screen::SaveSlots, Screen::Unknown})
     {
         const Composition m = BuildConsole({sc, Tab::None}, false, -1, SW, SH);
         CHECK(m.pieces.size() == 2 && !m.pieces[0].touch && m.pieces[1].src == Src::Bottom && m.pieces[1].to.x == kMenuTo.x && m.pieces[1].to.y == kMenuTo.y && m.pieces[1].to.w == SW * 3);
@@ -2037,7 +2081,7 @@ int main()
             {
                 GameState h;
                 h.valid = true;
-                h.screen = on.screen == Screen::Gift ? GScreen::ItemHand : GScreen::Phone;
+                h.screen = on.screen == Screen::Gift ? GScreen::Drencher : GScreen::Phone;
                 h.town.popup = {true, 2, 0, "Text", "Title", -1, false, 56, 0, 6}; // (boxW 0: no buttons)
                 CHECK(PopupOver(on, h) && !PopupView(on, &h, &rom).valid);
                 CHECK(!ConsoleView(on, &h, &rom).valid);

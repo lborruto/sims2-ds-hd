@@ -36,12 +36,13 @@ Mode ModeOf(Screen s, bool menuOpen)
     {
     case Screen::Panel: return menuOpen ? Mode::Focus : Mode::Pass;
     case Screen::Phone: case Screen::Gift: case Screen::Catalogue: case Screen::Build: return Mode::Focus;
-    case Screen::Social: case Screen::Cards: case Screen::Vacuum: case Screen::Autopsy: case Screen::Detector: case Screen::Art: return Mode::Activity;
+    case Screen::Social: case Screen::Cards: case Screen::Vacuum: case Screen::Autopsy: case Screen::Detector: case Screen::Art:
+    case Screen::Drencher: case Screen::MooGoo: case Screen::Crime: return Mode::Activity;
     case Screen::Popup: return Mode::Popup;
     case Screen::Unknown: return Mode::Cursor;
     // No table yet: as Unknown. The front end (title, main menu, Create-a-Sim, None) is
     // touch-only: the DS's buttons there change nothing, so A presses the stick cursor.
-    case Screen::ItemHand: case Screen::SaveSlots: case Screen::FrontEnd: case Screen::CreateASim: case Screen::None: return Mode::Cursor;
+    case Screen::SaveSlots: case Screen::FrontEnd: case Screen::CreateASim: case Screen::None: return Mode::Cursor;
     case Screen::Dialogue: case Screen::Loading: return Mode::Pass;
     }
     return Mode::Pass;
@@ -296,7 +297,13 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         focus_ = -1;
         closing_ = 0;
         screen_ = s;
-        activity_ = ActivityState();
+        {
+            // (MooGoo's B on its intro goes on through the black load to the game's X.)
+            const bool through = s.screen == Screen::MooGoo || s.screen == Screen::Loading || s.screen == Screen::None || s.screen == Screen::Unknown;
+            const int chain = through ? activity_.quitChain : 0;
+            activity_ = ActivityState();
+            activity_.quitChain = chain;
+        }
         held_ = nullptr; // a held press was meant for the screen that went
         running_.clear(); // (and an action running)
         pendingDir_ = -1;
@@ -371,7 +378,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     };
 
     const std::vector<Hotspot>& h = HotspotsFor(s);
-    cursorScreen_ = h.empty() && !useView && !IsPointing(s.screen); // (the HD Save slots, the pointing minigames' own pointer: no cursor)
+    cursorScreen_ = h.empty() && !useView && !OwnScheme(s.screen); // (the HD Save slots, the minigames with a scheme of their own: no cursor)
     cursorPress_ = blow_ = false;
     handDx_ = handDy_ = 0;
     // A tap only when nothing else touches: a press while a tap or a drag runs is dropped.

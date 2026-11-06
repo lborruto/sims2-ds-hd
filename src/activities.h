@@ -32,6 +32,26 @@
 //   Art Gallery: LB / RB the previous / next tool (the game's ten buttons in their order), X the
 //     next colour of the page, Y undo, B the game's X ("Are you done painting?"); while that
 //     question is up A taps its tick, B its cross (the other buttons wait).
+//   The timing minigames (milestone 6; tuned in game: console_check.sh's mg-moogoo-*, mg-drencher-*,
+//   mg-crime-*):
+//   MooGoo Monkey: its intro's play arrow on A. The game reads A (the players prompt, its banners),
+//     Left / Right (the players' count) and B (a bet undone, a special card put back) itself: they
+//     are passed on there. On the player's turn the focus (a ring on the playfield) picks what the
+//     game wants touched: a monkey to bet on (sub-state 1: those alive with a free slot), a card of
+//     the hand (3), a monkey's pile for a special card (5); Left / Right move it, A taps it. Start,
+//     and B where the game has no use for it, tap the game's X: its "Are you sure you want to quit?"
+//     (A its Yes, B its No). From the intro (the game has no way out of it) B taps the arrow, then
+//     the game's X once it is up: the question again.
+//   The Super Drencher (a tool screen over the world): the left stick and the D-pad walk (the
+//     game's D-pad), A held fires (the game's A), X held pumps (the stylus held on the pump's band,
+//     row kPumpY, swept from side to side at kPumpSpeed a frame between kPumpLeft and kPumpRight:
+//     the game counts a stroke's every tick past 5 pixels), Y the target button, RB refill, LB the
+//     game's run (its B), B the game's X (the way out).
+//   The Ratticator's crime game: the left stick and the D-pad walk, LB runs (the game's B); X
+//     scares, Y subdues (their buttons tapped); A held grabs the Rat-A-Rang (the stylus on the
+//     centre rat, kCrimeRat), a stick or the D-pad aims (the rat slides along its row, kCrimeAimMin
+//     to kCrimeAimMax: 1.125 degrees a pixel, at most kCrimeAimSpeed a frame), letting A go throws;
+//     B the game's X (the way out).
 // The other DS buttons stay the DS's where the game may use them (Start, Select; the vacuum's
 // B, L, R). Presses are edges against ActivityState::prev (the navigator's previous PadState);
 // a tap or drag is queued only when the touch script does not own the stylus.
@@ -39,6 +59,7 @@
 #include <vector>
 
 #include "common.h"
+#include "layout.h"
 #include "padstate.h"
 #include "screens.h"
 #include "touchscript.h"
@@ -68,6 +89,20 @@ struct ActivityRam
     int detectorSlider = 0;                // the depth slider, 0..4096
     bool art = false;
     int artButton = 0, artSwatch = 0;      // the tool button 0..9, the swatch 0..14
+    // The timing minigames.
+    bool mooGoo = false, mooGooIntro = false;
+    int mooGooPhase = 0, mooGooSub = 0;   // GameState's MooGooState::phase / sub
+    bool mooGooHuman = false;              // the current player is a human (not the game's AI)
+    bool mooGooQuitAsk = false;            // the game's quit question is up
+    bool mooGooBet[6] = {};                // a monkey takes a bet (alive, a free slot)
+    bool mooGooAlive[6] = {};              // a monkey is not out
+    bool mooGooPile[6] = {};               // a card lies under the monkey
+    bool mooGooCard[5] = {};               // the current player's hand holds a card there
+    int mooGooSelected = -1;               // the hand card the game has selected
+    bool drencher = false;
+    int drencherPump = 0;                  // the pump handle, 0..180
+    bool crime = false;
+    int crimePhase = 0;                    // the throw: 0 idle, 1 grabbed, 2 aiming, 3 released
     // A question of the game's popup is up over the minigame (kind 2 shown): its tick and cross.
     bool ask = false;
     Point askYes {0, 0}, askNo {0, 0};
@@ -102,6 +137,13 @@ struct ActivityState
     int quitArmed = 0;                // the autopsy: frames left for the second B / Start
     int quitKeys = 0;                 // the autopsy: frames B is still held for the game
     int sliderFrames = 0;             // the detector: frames the knob has been held
+    // The timing minigames.
+    Rect mark {0, 0, 0, 0};           // out: what the focus picks on the playfield (DS pixels; w 0 none)
+    int quitChain = 0;                // MooGoo: B on the intro (1 the arrow tapped, 2 waiting for the X)
+    int chainFrames = 0;
+    int pumpFrames = 0, pumpDir = 1;  // the Drencher: frames the pump is held, the stroke's way
+    int aimFrames = 0;                // the crime game: frames A has held the rat
+    int lastSub = -1;                 // MooGoo: the turn's sub-state last frame (a new one: the focus starts again)
 };
 
 // What CONSOLE draws of a pointing minigame's pointer (App::consolePointer, from the navigator):
@@ -110,6 +152,7 @@ struct PointerView
 {
     bool shown = false, down = false, quitArmed = false;
     float x = 0, y = 0;
+    Rect mark {0, 0, 0, 0};           // MooGoo's focus on the playfield (DS pixels; w 0 none)
 };
 
 // The screens ActivityInput plays.
@@ -139,6 +182,10 @@ constexpr float kNudgeSpeed = 3.0f;
 void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad);
 // The pointing minigames.
 bool IsPointing(Screen s);
+// The timing minigames (MooGoo, the Drencher, the crime game).
+bool IsTiming(Screen s);
+// A minigame with a scheme of its own (pointing or timing): no stick cursor there.
+bool OwnScheme(Screen s);
 
 // Alien Autopsy's buttons (the game's own rectangles: the tools x 0-31, the tray and flask at the
 // right): laser, hand, tweezers; where an organ is dropped (the tray) and a parasite (the flask).
@@ -157,4 +204,23 @@ Point ArtTool(int button);
 Point ArtSwatch(int swatch);
 constexpr Point kArtDone {241, 14}, kArtUndo {241, 40}, kArtPagePrev {17, 182}, kArtPageNext {241, 182};
 constexpr int kArtTools = 10, kArtSwatches = 15;
+
+// MooGoo Monkey (the game's rectangles, research/m6 code-B 1.3): the intro's play arrow; monkey m
+// (56 + 32 m, 32, 24 x 32), its pile (y 88), hand card i (72 + 32 i, 137); the X (241,177, radius 10)
+// and its question's Yes (80,80, 32 x 32) and No (144,80).
+constexpr Point kMooGooArrow {238, 174}, kMooGooX {241, 177}, kMooGooYes {96, 96}, kMooGooNo {160, 96};
+constexpr Rect MooGooMonkeyRect(int m) { return {56 + 32 * m, 32, 24, 32}; }
+constexpr Rect MooGooPileRect(int m) { return {56 + 32 * m, 88, 24, 32}; }
+constexpr Rect MooGooCardRect(int i) { return {72 + 32 * i, 137, 24, 32}; }
+constexpr int kMooGooChainWait = 240;  // frames the intro's B waits for the game's X
+// The Super Drencher (strict lo < v < hi rectangles): the X (219-253, 11-45), target (137-171,
+// 46-80), refill (13-51, 159-197); the pump's band (rows 94-146, x 50-230 the handle's travel).
+constexpr Point kDrencherX {236, 28}, kDrencherTarget {154, 63}, kDrencherRefill {32, 178};
+constexpr int kPumpY = 120, kPumpLeft = 52, kPumpRight = 228;
+constexpr float kPumpSpeed = 8.0f;     // a frame (16 a tick of the game's: past its 5)
+// The crime game: the X (209-239, 17-47), scare (94-161, 13-56), subdue (94-161, 135-178), the
+// centre rat (the aim slider, x 47-207 on row 96, 128 at rest).
+constexpr Point kCrimeX {224, 32}, kCrimeScare {128, 35}, kCrimeSubdue {128, 156}, kCrimeRat {128, 96};
+constexpr int kCrimeAimMin = 47, kCrimeAimMax = 207;
+constexpr float kCrimeAimSpeed = 3.0f;
 }

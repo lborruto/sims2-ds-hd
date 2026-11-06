@@ -252,6 +252,157 @@ void Art(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap
     else if (Pressed(pad, st, &PadState::y)) touch.Tap(kArtUndo.x, kArtUndo.y);
     else if (Pressed(pad, st, &PadState::b)) touch.Tap(kArtDone.x, kArtDone.y);
 }
+
+void Walk(const PadState& pad, u32& dsKeys)
+{
+    auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
+    set(pad.up || pad.ly < -kStick, kUp);
+    set(pad.down || pad.ly > kStick, kDown);
+    set(pad.left || pad.lx < -kStick, kLeft);
+    set(pad.right || pad.lx > kStick, kRight);
+}
+
+Point Centre(Rect r) { return {r.x + r.w / 2, r.y + r.h / 2}; }
+
+void MooGoo(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
+{
+    const ActivityRam& r = st.ram;
+    auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
+    auto tap = [&](Point p) { touch.Tap(p.x, p.y); };
+    const bool a = Pressed(pad, st, &PadState::a), b = Pressed(pad, st, &PadState::b), start = Pressed(pad, st, &PadState::start);
+    if (!r.mooGoo)
+    {
+        // Nothing known: the DS's own buttons (the game reads A, B, Left and Right).
+        set(pad.a, kA);
+        set(pad.b, kB);
+        set(Left(pad), kLeft);
+        set(Right(pad), kRight);
+        return;
+    }
+    if (r.mooGooIntro)
+    {
+        // The rules page: its play arrow is the only way on (B goes on too, then asks to quit).
+        if (st.quitChain == 0 && canTap && (a || b || start))
+        {
+            tap(kMooGooArrow);
+            if (!a) { st.quitChain = 1; st.chainFrames = 0; }
+        }
+        return;
+    }
+    if (st.quitChain)
+    {
+        // The intro's B: once the game is up, its X (the question comes).
+        st.chainFrames++;
+        if (r.mooGooQuitAsk || st.chainFrames > kMooGooChainWait) st.quitChain = 0;
+        else if (st.quitChain == 1 && st.chainFrames >= 20 && canTap) { tap(kMooGooX); st.quitChain = 2; }
+        return;
+    }
+    if (r.mooGooQuitAsk)
+    {
+        // "Are you sure you want to quit?": A its Yes, B its No; the rest waits.
+        if (!canTap) return;
+        if (a) tap(kMooGooYes);
+        else if (b) tap(kMooGooNo);
+        return;
+    }
+    const int sub = r.mooGooSub;
+    const bool turn = r.mooGooHuman && (r.mooGooPhase == 6 || r.mooGooPhase == 0xD) && (sub == 1 || sub == 3 || sub == 5);
+    if (!turn)
+    {
+        // The players' prompt, the banners, the AI's turns: the game's own A, Left and Right; B and
+        // Start its X.
+        st.lastSub = -1;
+        set(pad.a, kA);
+        set(Left(pad), kLeft);
+        set(Right(pad), kRight);
+        if ((b || start) && canTap) tap(kMooGooX);
+        return;
+    }
+    // The player's turn: the focus over what the game wants touched.
+    const int n = sub == 3 ? 5 : 6;
+    auto ok = [&](int i) { return i >= 0 && i < n && (sub == 1 ? r.mooGooBet[i] : sub == 3 ? r.mooGooCard[i] : r.mooGooAlive[i]); };
+    auto rect = [&](int i) { return sub == 1 ? MooGooMonkeyRect(i) : sub == 3 ? MooGooCardRect(i) : MooGooPileRect(i); };
+    if (sub != st.lastSub)
+    {
+        // A new step: the hand from the game's selected card, a monkey from the one it was on.
+        if (sub == 3 && ok(r.mooGooSelected)) st.focus = r.mooGooSelected;
+        // A special card's target: a monkey with cards under it first (King Gorilla's needs one).
+        if (sub == 5 && !(ok(st.focus) && r.mooGooPile[st.focus]))
+            for (int i = 0; i < n; i++)
+                if (ok(i) && r.mooGooPile[i]) { st.focus = i; break; }
+        st.lastSub = sub;
+    }
+    if (!ok(st.focus))
+    {
+        st.focus = -1;
+        for (int i = 0; i < n && st.focus < 0; i++)
+            if (ok(i)) st.focus = i;
+    }
+    const int step = Left(pad) && !Left(st.prev) ? -1 : Right(pad) && !Right(st.prev) ? 1 : 0;
+    if (step && st.focus >= 0)
+        for (int i = st.focus + step; i >= 0 && i < n; i += step)
+            if (ok(i)) { st.focus = i; break; }
+    if (st.focus >= 0) st.mark = rect(st.focus);
+    // B: the game's own in a card's step (the bet undone) and a target's (the card put back).
+    if (sub != 1) set(pad.b, kB);
+    if (!canTap) return;
+    if (a && st.focus >= 0) tap(Centre(rect(st.focus)));
+    else if (start || (b && sub == 1)) tap(kMooGooX);
+}
+
+void Drencher(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
+{
+    Walk(pad, dsKeys);
+    auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
+    set(pad.a, kA);    // fire (held)
+    set(pad.lb, kB);   // run
+    // X held: the pump, the stylus swept along its band.
+    if (pad.x && (canTap || st.pumpFrames > 0))
+    {
+        if (st.pumpFrames == 0)
+        {
+            st.px = (float)std::clamp(50 + st.ram.drencherPump, kPumpLeft, kPumpRight);
+            st.py = (float)kPumpY;
+            st.pumpDir = st.px < (kPumpLeft + kPumpRight) / 2 ? 1 : -1;
+        }
+        else if (st.pumpFrames >= 2) // (the press lands first)
+        {
+            st.px += st.pumpDir * kPumpSpeed;
+            if (st.px >= kPumpRight) { st.px = (float)kPumpRight; st.pumpDir = -1; }
+            if (st.px <= kPumpLeft) { st.px = (float)kPumpLeft; st.pumpDir = 1; }
+        }
+        st.pumpFrames++;
+        st.down = true;
+        return;
+    }
+    st.pumpFrames = 0;
+    if (!canTap) return;
+    if (Pressed(pad, st, &PadState::y)) touch.Tap(kDrencherTarget.x, kDrencherTarget.y);
+    else if (Pressed(pad, st, &PadState::rb)) touch.Tap(kDrencherRefill.x, kDrencherRefill.y);
+    else if (Pressed(pad, st, &PadState::b)) touch.Tap(kDrencherX.x, kDrencherX.y);
+}
+
+void Crime(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
+{
+    // A held: the Rat-A-Rang grabbed (the stylus on the centre rat), aimed, thrown when let go.
+    if (pad.a && (canTap || st.aimFrames > 0))
+    {
+        if (st.aimFrames == 0) { st.px = (float)kCrimeRat.x; st.py = (float)kCrimeRat.y; }
+        else if (st.aimFrames >= 2) MovePointer(pad, st, kCrimeAimSpeed, true);
+        st.px = std::clamp(st.px, (float)kCrimeAimMin, (float)kCrimeAimMax);
+        st.py = (float)kCrimeRat.y;
+        st.aimFrames++;
+        st.down = st.pointer = true;
+        return;
+    }
+    st.aimFrames = 0;
+    Walk(pad, dsKeys);
+    if (pad.lb) dsKeys |= 1u << kB;   // run
+    if (!canTap) return;
+    if (Pressed(pad, st, &PadState::x)) touch.Tap(kCrimeScare.x, kCrimeScare.y);
+    else if (Pressed(pad, st, &PadState::y)) touch.Tap(kCrimeSubdue.x, kCrimeSubdue.y);
+    else if (Pressed(pad, st, &PadState::b)) touch.Tap(kCrimeX.x, kCrimeX.y);
+}
 }
 
 Point ArtTool(int b)
@@ -267,6 +418,8 @@ Point ArtSwatch(int i)
 }
 
 bool IsPointing(Screen s) { return s == Screen::Autopsy || s == Screen::Detector || s == Screen::Art; }
+bool IsTiming(Screen s) { return s == Screen::MooGoo || s == Screen::Drencher || s == Screen::Crime; }
+bool OwnScheme(Screen s) { return IsPointing(s) || IsTiming(s); }
 
 void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
 {
@@ -297,15 +450,17 @@ void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
     st.py = std::clamp(st.py, 0.0f, (float)(SH - 1));
 }
 
-bool IsActivity(Screen s) { return s == Screen::Social || s == Screen::Cards || s == Screen::Vacuum || IsPointing(s); }
+bool IsActivity(Screen s) { return s == Screen::Social || s == Screen::Cards || s == Screen::Vacuum || OwnScheme(s); }
 
 void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st)
 {
     st.blow = st.grab = false;
     st.handDx = st.handDy = 0;
     st.pointer = st.down = false;
-    // (The autopsy quits on Start at once: its Start asks first, ActivityInput's Autopsy.)
-    if (pad.start && s != Screen::Autopsy) dsKeys |= 1u << kStart;
+    st.mark = {0, 0, 0, 0};
+    // (The autopsy quits on Start at once: its Start asks first, ActivityInput's Autopsy; MooGoo's
+    // Start is its X.)
+    if (pad.start && s != Screen::Autopsy && s != Screen::MooGoo) dsKeys |= 1u << kStart;
     if (pad.select) dsKeys |= 1u << kSelect;
     const bool canTap = !touch.Owns();
     switch (s)
@@ -316,6 +471,9 @@ void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKey
     case Screen::Autopsy: Autopsy(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     case Screen::Detector: Detector(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     case Screen::Art: Art(pad, touch, st, canTap); st.focus = -1; break;
+    case Screen::MooGoo: MooGoo(pad, touch, dsKeys, st, canTap); break;
+    case Screen::Drencher: Drencher(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
+    case Screen::Crime: Crime(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     default: break;
     }
 }
@@ -339,6 +497,14 @@ std::vector<Hint> ActivityHints(Screen s)
     case Screen::Art:
         return {{"STICK", "POINT (LT SLOW)"}, {"A", "HOLD: PAINT"}, {"LB RB", "TOOL"}, {"X", "COLOR"},
                 {"Y", "UNDO"}, {"B", "DONE"}};
+    case Screen::MooGoo:
+        return {{"LEFT RIGHT", "CHOOSE"}, {"A", "BET, PLAY,\nGO ON"}, {"B", "UNDO / QUIT"}, {"START", "QUIT"}};
+    case Screen::Drencher:
+        return {{"L-STICK", "WALK"}, {"A", "HOLD: FIRE"}, {"X", "HOLD: PUMP"}, {"Y", "TARGET"}, {"RB", "REFILL"},
+                {"LB", "RUN"}, {"B", "PUT AWAY"}};
+    case Screen::Crime:
+        return {{"L-STICK", "WALK"}, {"X", "SCARE"}, {"A", "HOLD: AIM,\nLET GO: THROW"}, {"Y", "SUBDUE"},
+                {"LB", "RUN"}, {"B", "PUT AWAY"}};
     default: return {};
     }
 }

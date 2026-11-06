@@ -1,0 +1,3 @@
+# From G-B-mg-r1-full (the player's bet): B asks the game's question, A its Yes.
+20 2 pad b
+60 2 pad a

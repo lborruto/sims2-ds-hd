@@ -11,13 +11,15 @@ namespace sims2wide
 // None: no HUD and no known screen (title, Create-a-Sim, loading): both screens matter alike.
 // Unknown: the HUD is up but the touch screen is none of the others (fades, slides, screens not
 // measured yet).
-// FrontEnd (title, main menu), CreateASim, SaveSlots (Options > Save), ItemHand (Pockets > the
+// FrontEnd (title, main menu), CreateASim, SaveSlots (Options > Save), Drencher (Pockets > the
 // item in hand): only from the game's RAM (gamestate.h, ToScreenState), never from pixels.
 // Loading comes only from RAM and the pixels together (ConsoleScreenOf: a black load).
 enum class Screen { None, Panel, Phone, Dialogue, Popup, Gift, Social, Vacuum, Cards, Catalogue, Build,
-                    FrontEnd, CreateASim, SaveSlots, ItemHand, Unknown, Loading,
-                    // The pointing minigames (milestone 6, from RAM only: GScreen::Autopsy, Detector, ArtGallery).
-                    Autopsy, Detector, Art };
+                    FrontEnd, CreateASim, SaveSlots, Drencher, Unknown, Loading,
+                    // The minigames with a scheme of their own (milestone 6, from RAM only): the pointing games
+                    // (GScreen::Autopsy, Detector, ArtGallery) and the timing games (GScreen::MooGoo, Crime; the
+                    // Super Drencher is Drencher above, GScreen::Drencher, Pockets > the item in hand).
+                    Autopsy, Detector, Art, MooGoo, Crime };
 // The panel's tab (only with Screen::Panel).
 enum class Tab { None, Interact, Pockets, Goals, Relationships, Options };
 

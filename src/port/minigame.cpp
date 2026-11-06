@@ -24,6 +24,8 @@ constexpr u32 kHeadColour = 0xFFD2D6F4;    // the board's column heads: a dim la
 constexpr u32 kValueColour = 0xFFFFE9A0;   // a warm white (the money's, room info's values)
 constexpr u32 kLitFill = 0xFFB8323A;       // a hint the game asks for now (the vacuum's clog): the game's red, deepened
 constexpr u32 kRowFill = 0xFF6A72B8;       // the board's rows (Interact's)
+constexpr u32 kNowFill = 0xFF8C5FB8;       // MooGoo: the row of the player whose turn it is
+constexpr u32 kMarkColour = 0xFF309A41;    // MooGoo's focus: the game's selection green
 
 // One hint of the prompt bar: its chips (a separator between two: "/" or "+"), then its label.
 // lit: the game asks for it now (a red plate behind it).
@@ -143,6 +145,50 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         return {PointHint(rom), SlowHint(rom), {{C(Button::A)}, w.paint}, {{C(Button::LB), C(Button::RB)}, w.tool},
                 {{C(Button::X)}, w.colour}, {{C(Button::Y)}, w.undo}, {{C(Button::B)}, w.done}};
     }
+    case Screen::MooGoo:
+    {
+        const MooGooState& g = game.minigame.mooGoo;
+        const HdHint quit {{C(Button::B)}, Words(rom, kStrMgQuit)}, startQuit {{C(Button::Start)}, Words(rom, kStrMgQuit)};
+        const HdHint choose {{C(Button::DPadH)}, Own(rom, OwnWordId::MooGooChooseMonkey)};
+        if (!g.valid) return {{{C(Button::A)}, Own(rom, OwnWordId::CardsContinue)}, quit};
+        if (g.intro) return {{{C(Button::A)}, Own(rom, OwnWordId::MooGooPlay)}, quit};
+        if (g.quitAsk) return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
+        const bool human = !g.players[std::clamp(g.current, 0, kMooGooPlayers - 1)].ai;
+        if (human && (g.phase == 6 || g.phase == 0xD))
+        {
+            if (g.sub == 1) return {choose, {{C(Button::A)}, Own(rom, OwnWordId::MooGooBet)}, quit};
+            if (g.sub == 3)
+                return {{{C(Button::DPadH)}, Own(rom, OwnWordId::CardsChoose)}, {{C(Button::A)}, Own(rom, OwnWordId::MooGooPlayCard)},
+                        {{C(Button::B)}, Own(rom, OwnWordId::MooGooUndoBet)}, startQuit};
+            if (g.sub == 5) return {choose, {{C(Button::A)}, Own(rom, OwnWordId::MooGooPlayOn)}, {{C(Button::B)}, Own(rom, OwnWordId::MooGooTakeBack)}, startQuit};
+        }
+        if (g.phase == 0) return {{{C(Button::DPadH)}, Own(rom, OwnWordId::MooGooPlayers)}, {{C(Button::A)}, Own(rom, OwnWordId::MooGooConfirm)}, quit};
+        return {{{C(Button::A)}, Own(rom, OwnWordId::CardsContinue)}, quit};
+    }
+    case Screen::Drencher:
+    {
+        const DrencherState& d = game.minigame.drencher;
+        const bool low = d.valid && d.pressure < kDrencherPressureLow;
+        return {{{C(Button::LStick), Sep("/"), C(Button::DPad)}, Own(rom, OwnWordId::DetectorWalk)},
+                {{C(Button::A)}, Own(rom, OwnWordId::DrencherFire)},
+                {{C(Button::X)}, Own(rom, OwnWordId::DrencherPump), low},
+                {{C(Button::Y)}, Own(rom, OwnWordId::DrencherTarget)},
+                {{C(Button::RB)}, Own(rom, OwnWordId::DrencherRefill)},
+                {{C(Button::LB)}, Own(rom, OwnWordId::DrencherRun)},
+                {{C(Button::B)}, Own(rom, OwnWordId::DrencherPutAway)}};
+    }
+    case Screen::Crime:
+    {
+        const CrimeState& k = game.minigame.crime;
+        if (k.valid && (k.phase == 1 || k.phase == 2))
+            return {{{C(Button::LStick), Sep("/"), C(Button::DPadH)}, Own(rom, OwnWordId::CrimeAimLabel)}, {{C(Button::A)}, Own(rom, OwnWordId::CrimeThrow), true}};
+        return {{{C(Button::LStick), Sep("/"), C(Button::DPad)}, Own(rom, OwnWordId::DetectorWalk)},
+                {{C(Button::X)}, Own(rom, OwnWordId::CrimeScare), k.valid && k.canScare},
+                {{C(Button::A)}, Own(rom, OwnWordId::CrimeAim), k.valid && k.armed},
+                {{C(Button::Y)}, Own(rom, OwnWordId::CrimeSubdue), k.valid && k.canSubdue},
+                {{C(Button::LB)}, Own(rom, OwnWordId::DrencherRun)},
+                {{C(Button::B)}, Own(rom, OwnWordId::DrencherPutAway)}};
+    }
     case Screen::Cards:
     {
         const CardsState& k = game.minigame.cards;
@@ -170,6 +216,9 @@ std::string Title(Screen s, const RomData& rom)
     if (s == Screen::Autopsy) return Words(rom, kStrMgAutopsy);
     if (s == Screen::Detector) return Words(rom, kStrMgDetector);
     if (s == Screen::Art) return Words(rom, kStrMgArtGallery);
+    if (s == Screen::MooGoo) return Words(rom, kStrMgMooGoo);
+    if (s == Screen::Drencher) return Words(rom, kStrMgDrencher);
+    if (s == Screen::Crime) return Words(rom, kStrMgRatARang);
     return "";
 }
 
@@ -383,6 +432,113 @@ int ArtValues(Composition& c, int y, const ArtState& a, const RomData& rom)
     return h;
 }
 
+// A string of the game's when the table holds it (an id from RAM: a name), else empty.
+std::string SafeWords(const RomData& rom, int id) { return id >= 0 && id < rom.StringCount() ? Words(rom, id) : std::string(); }
+
+// The Drencher's locked target as the game names it (a Sim 323 + k, an object 463 + k), or empty.
+std::string DrencherTargetName(const RomData& rom, const DrencherState& d)
+{
+    if (d.target < 0) return "";
+    if (d.targetType == 2) return SafeWords(rom, kStrMgSimName0 + d.target);
+    if (d.targetType == 0xB) return SafeWords(rom, kStrMgObjectName0 + d.target);
+    return "";
+}
+
+// MooGoo's values: the round, the players (name, their fruit on the monkeys still in: the score
+// the game shows; the player whose turn it is raised), the cards left in the deck.
+int MooGooValues(Composition& c, int y, const MooGooState& g, const RomData& rom)
+{
+    if (g.intro) return 0;
+    const int x = kMgInnerX, wd = kMgInnerW, ix = x + 12, iw = wd - 24, head = 24, row = 34;
+    const int h = 10 + kMgRow + head + kMooGooPlayers * row + 6 + kMgRow + 10;
+    c.ui.push_back(WellItem({x, y, wd, h}));
+    int yy = y + 10;
+    const std::string round = g.round >= 1 && g.round <= 3 ? With(Own(rom, OwnWordId::MooGooRound), g.round) : Words(rom, kStrMgMooGoo);
+    PanelText(c, {ix, yy, iw, kMgRow}, round, kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+    yy += kMgRow;
+    const int scoreW = 150;
+    PanelText(c, {ix + iw - scoreW, yy, scoreW - 8, head}, Words(rom, kStrMgMooScore), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
+    yy += head;
+    for (int p = 0; p < kMooGooPlayers; p++, yy += row)
+    {
+        const MooGooPlayer& pl = g.players[p];
+        const bool now = p == g.current && g.phase >= 4 && g.phase != 0x12 && g.phase != 0x13;
+        UiItem bar = PanelItem({ix - 4, yy + 2, iw + 8, row - 4});
+        bar.plain = true;
+        bar.fill = now ? kNowFill : kRowFill;
+        bar.radius = 8;
+        bar.layer = 0;
+        c.ui.push_back(bar);
+        const std::string name = SafeWords(rom, pl.nameId);
+        PanelText(c, {ix + 6, yy, iw - scoreW - 12, row}, name.empty() ? Words(rom, kStrMgMooPlayer1 + p) : name, kMgValueSize - 2, kMgValueMin, Align::Left,
+             Weight::ExtraBold, 0xFFFFFFFF);
+        // The score and its fruit (the game's words: coconuts, watermelons, pineapples).
+        PanelText(c, {ix + iw - scoreW, yy, scoreW - 8, row}, std::to_string(pl.score) + " " + Words(rom, kStrMgMooFruit + p), kMgValueSize - 4,
+             kMgValueMin - 2, Align::Right, Weight::ExtraBold, kValueColour);
+    }
+    yy += 6;
+    PanelText(c, {ix, yy, iw - 80, kMgRow}, Own(rom, OwnWordId::MooGooCardsLeft), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelText(c, {ix + iw - 80, yy, 80, kMgRow}, std::to_string(std::max(0, g.deckSize - g.deckNext)), kMgValueSize - 2, kMgValueMin, Align::Right,
+         Weight::ExtraBold, 0xFFFFFFFF);
+    return h;
+}
+
+// The Drencher's values: the water and the pressure (the game's gauges), the target locked.
+int DrencherValues(Composition& c, int y, const DrencherState& d, const RomData& rom)
+{
+    const int x = kMgInnerX, wd = kMgInnerW, ix = x + 12, iw = wd - 24, h = 10 + 4 * kMgRow + 10;
+    c.ui.push_back(WellItem({x, y, wd, h}));
+    int yy = y + 10;
+    const float water = std::clamp(d.water, 0, 100) / 100.0f, pressure = std::clamp(d.pressure, 0, kDrencherPressureMax) / (float)kDrencherPressureMax;
+    MeterRow(c, ix, yy, iw, Own(rom, OwnWordId::DrencherWater), water, 0xFF4FA8E8, Percent(d.water, 100), 0xFFFFFFFF);
+    yy += kMgRow;
+    MeterRow(c, ix, yy, iw, Own(rom, OwnWordId::DrencherPressure), pressure, Health(pressure), Percent(d.pressure, kDrencherPressureMax),
+             d.pressure < kDrencherPressureLow ? kBadColour : 0xFFFFFFFF);
+    yy += kMgRow;
+    const std::string target = DrencherTargetName(rom, d);
+    // (The target's name on a line of its own: objects' names are long.)
+    PanelText(c, {ix, yy, iw, kMgRow}, Own(rom, OwnWordId::DrencherTarget), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    yy += kMgRow;
+    PanelText(c, {ix, yy, iw, kMgRow}, target.empty() ? Own(rom, OwnWordId::DrencherNone) : target, kMgValueSize - 2, kMgValueMin,
+         Align::Right, Weight::ExtraBold, target.empty() ? kHeadColour : kValueColour);
+    return h;
+}
+
+// The crime game's values: which of the three moves the game lights now (scare, the Rat-A-Rang,
+// subdue), the aim's angle and the last throw.
+int CrimeValues(Composition& c, int y, const CrimeState& k, const RomData& rom)
+{
+    const int x = kMgInnerX, wd = kMgInnerW, ix = x + 12, iw = wd - 24, h = 10 + 4 * kMgRow + 10;
+    c.ui.push_back(WellItem({x, y, wd, h}));
+    int yy = y + 10;
+    const std::string ready = Own(rom, OwnWordId::CrimeReady), dash = "\xE2\x80\x94";
+    const std::string labels[3] = {Own(rom, OwnWordId::CrimeScare), Words(rom, kStrMgRatARang), Own(rom, OwnWordId::CrimeSubdue)};
+    const bool on[3] = {k.canScare, k.armed, k.canSubdue};
+    for (int i = 0; i < 3; i++, yy += kMgRow)
+    {
+        PanelText(c, {ix, yy, iw - 110, kMgRow}, labels[i], kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+        PanelText(c, {ix + iw - 110, yy, 110, kMgRow}, on[i] ? ready : dash, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
+             on[i] ? kGoodColour : kHeadColour);
+    }
+    const bool aiming = k.phase == 1 || k.phase == 2;
+    PanelText(c, {ix, yy, iw - 110, kMgRow}, Own(rom, OwnWordId::CrimeAimLabel), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    const std::string aim = aiming ? std::to_string(std::clamp(k.angle, -90, 90)) + "\xC2\xB0" : k.hit ? std::string(Own(rom, OwnWordId::CrimeHit)) : dash;
+    PanelText(c, {ix + iw - 110, yy, 110, kMgRow}, aim, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
+         aiming ? kValueColour : k.hit ? kGoodColour : kHeadColour);
+    return h;
+}
+
+// MooGoo's focus: a ring in the game's selection green around what A touches (DS pixels, over the
+// playfield), as the cards' focus ring (an overlay over the pieces).
+void AddMark(Composition& c, Rect m)
+{
+    if (m.w <= 0) return;
+    const Rect to = kActivityBottomTo;
+    const int x0 = to.x + m.x * to.w / SW, y0 = to.y + m.y * to.h / SH, x1 = to.x + (m.x + m.w) * to.w / SW, y1 = to.y + (m.y + m.h) * to.h / SH;
+    constexpr int t = 5;
+    c.overlays.push_back({{x0 - t, y0 - t, x1 - x0 + 2 * t, y1 - y0 + 2 * t}, 0, 10, t, kMarkColour, -1});
+}
+
 // The pointer over the playfield: a ring with a dot at its point, gold while the stylus is down.
 void AddPointer(Composition& c, const PointerView& p)
 {
@@ -499,6 +655,27 @@ ActivityRam MinigameRam(const GameState* game)
     if (game->screen == GScreen::Autopsy && m.autopsy.valid) { r.autopsy = true; r.autopsyTool = m.autopsy.tool; r.autopsySub = m.autopsy.sub; }
     if (game->screen == GScreen::Detector && m.detector.valid) { r.detector = true; r.detectorSlider = m.detector.slider; }
     if (game->screen == GScreen::ArtGallery && m.art.valid) { r.art = true; r.artButton = m.art.button; r.artSwatch = m.art.swatch; }
+    if (game->screen == GScreen::MooGoo && m.mooGoo.valid)
+    {
+        const MooGooState& g = m.mooGoo;
+        r.mooGoo = true;
+        r.mooGooIntro = g.intro;
+        r.mooGooPhase = g.phase;
+        r.mooGooSub = g.sub;
+        r.mooGooQuitAsk = g.quitAsk;
+        const int p = std::clamp(g.current, 0, kMooGooPlayers - 1);
+        r.mooGooHuman = !g.players[p].ai;
+        for (int i = 0; i < kMooGooMonkeys; i++)
+        {
+            r.mooGooAlive[i] = !g.monkeys[i].eliminated;
+            r.mooGooBet[i] = r.mooGooAlive[i] && g.monkeys[i].slots < 4;
+            r.mooGooPile[i] = g.monkeys[i].count > 0;
+        }
+        for (int i = 0; i < kMooGooHand; i++) r.mooGooCard[i] = g.players[p].hand[i] != kMooGooHandEmpty;
+        r.mooGooSelected = g.players[p].selected;
+    }
+    if (game->screen == GScreen::Drencher && m.drencher.valid) { r.drencher = true; r.drencherPump = m.drencher.pump; }
+    if (game->screen == GScreen::Crime && m.crime.valid) { r.crime = true; r.crimePhase = m.crime.phase; }
     const PopupState& p = game->town.popup;
     if (p.valid && p.state == 2 && p.kind == 2 && PopupButton(p, 1, r.askYes.x, r.askYes.y) && PopupButton(p, 0, r.askNo.x, r.askNo.y))
         r.ask = true;
@@ -553,11 +730,15 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
     else if (s.screen == Screen::Autopsy && game.minigame.autopsy.valid) content = AutopsyValues(c, y + kMgPad, game.minigame.autopsy, rom);
     else if (s.screen == Screen::Detector && game.minigame.detector.valid) content = DetectorValues(c, y + kMgPad, game.minigame.detector, rom);
     else if (s.screen == Screen::Art && game.minigame.art.valid) content = ArtValues(c, y + kMgPad, game.minigame.art, rom);
+    else if (s.screen == Screen::MooGoo && game.minigame.mooGoo.valid) content = MooGooValues(c, y + kMgPad, game.minigame.mooGoo, rom);
+    else if (s.screen == Screen::Drencher && game.minigame.drencher.valid) content = DrencherValues(c, y + kMgPad, game.minigame.drencher, rom);
+    else if (s.screen == Screen::Crime && game.minigame.crime.valid) content = CrimeValues(c, y + kMgPad, game.minigame.crime, rom);
     if (content > 0) c.ui[panel].to.h = std::min(content + 2 * kMgPad, kMgSideBottom - y);
     else c.ui.erase(c.ui.begin() + (long)panel);
     // The prompt bar: the controller's hints.
     AddPrompts(c, Hints(s.screen, game, rom, pointer && pointer->quitArmed));
-    if (pointer && pointer->shown && IsPointing(s.screen)) AddPointer(c, *pointer);
+    if (pointer && pointer->shown && OwnScheme(s.screen)) AddPointer(c, *pointer);
+    if (pointer && s.screen == Screen::MooGoo) AddMark(c, pointer->mark);
     SortUi(c.ui);
 }
 
@@ -599,6 +780,16 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     add(Screen::Detector, [](GameState& g) { g.minigame.detector.valid = g.minigame.detector.inRange = true; });
     add(Screen::Art, [](GameState& g) { g.minigame.art.valid = true; });
     add(Screen::Art, [](GameState& g) { g.town.popup.valid = true; g.town.popup.state = 2; g.town.popup.kind = 2; });
+    add(Screen::MooGoo, [](GameState&) {});
+    add(Screen::MooGoo, [](GameState& g) { g.minigame.mooGoo.valid = g.minigame.mooGoo.intro = true; });
+    add(Screen::MooGoo, [](GameState& g) { g.minigame.mooGoo.valid = g.minigame.mooGoo.quitAsk = true; });
+    add(Screen::MooGoo, [](GameState& g) { g.minigame.mooGoo.valid = true; });   // the players' prompt
+    add(Screen::MooGoo, [](GameState& g) { g.minigame.mooGoo.valid = true; g.minigame.mooGoo.phase = 9; });
+    for (int sub : {1, 3, 5})
+        add(Screen::MooGoo, [sub](GameState& g) { g.minigame.mooGoo.valid = true; g.minigame.mooGoo.phase = 0xD; g.minigame.mooGoo.sub = sub; });
+    add(Screen::Drencher, [](GameState& g) { g.minigame.drencher.valid = true; });
+    add(Screen::Crime, [](GameState& g) { g.minigame.crime.valid = g.minigame.crime.canScare = g.minigame.crime.armed = g.minigame.crime.canSubdue = true; });
+    add(Screen::Crime, [](GameState& g) { g.minigame.crime.valid = true; g.minigame.crime.phase = 2; });
     std::vector<std::vector<HdHint>> bars;
     for (const auto& [sc, g] : states) bars.push_back(Hints(sc, g, rom));
     bars.push_back(Hints(Screen::Autopsy, states.back().second, rom, true));   // the autopsy's quit asked
@@ -624,12 +815,40 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     me.Line(id(OwnWordId::ArtColourOf), With(Own(rom, OwnWordId::ArtColourOf), 15), vs, kMgValueMin, iw - 52);
     me.Line(id(OwnWordId::ArtPage), With(Own(rom, OwnWordId::ArtPage), 16), vs, kMgValueMin, iw);
     me.Line(id(OwnWordId::SocialMatch), Own(rom, OwnWordId::SocialMatch), kMgValueSize, kMgValueMin, kMgInnerW - 8);
+    // The timing games' panels: MooGoo's round, the players' names (the AI's are Sims' names) and
+    // their fruit, the deck; the Drencher's labels and every name a target can have; the crime
+    // game's moves and their state.
+    me.Line(id(OwnWordId::MooGooRound), With(Own(rom, OwnWordId::MooGooRound), 3), kMgValueSize, kMgValueMin, iw);
+    for (int n = kStrMgSimName0; n < kStrMgSimName0 + 56; n++) me.Line(n, Words(rom, n), vs, kMgValueMin, iw - 150 - 12);
+    for (int p = 0; p < kMooGooPlayers; p++)
+    {
+        me.Line(kStrMgMooPlayer1 + p, Words(rom, kStrMgMooPlayer1 + p), vs, kMgValueMin, iw - 150 - 12);
+        me.Line(kStrMgMooFruit + p, "99 " + Words(rom, kStrMgMooFruit + p), kMgValueSize - 4, kMgValueMin - 2, 150 - 8);
+    }
+    me.Line(kStrMgMooScore, Words(rom, kStrMgMooScore), kMgHeadSize, 13, 150 - 8, Weight::Bold);
+    me.Line(id(OwnWordId::MooGooCardsLeft), Own(rom, OwnWordId::MooGooCardsLeft), vs, kMgValueMin, iw - 80, Weight::Bold);
+    for (OwnWordId w : {OwnWordId::DrencherWater, OwnWordId::DrencherPressure})
+        me.Line(id(w), Own(rom, w), vs, kMgValueMin, kMgLabelW - 8, Weight::Bold);
+    for (OwnWordId w : {OwnWordId::DrencherTarget, OwnWordId::DrencherNone}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, iw);
+    // (An object's name may end in an ellipsis, as in Pockets: the Italian table has a sentence at
+    // the first one, 463; counted apart.)
+    for (int n = kStrMgObjectName0; n < kStrMgDrencherObjectEnd; n++)
+    {
+        const FittedText f = FitLine(Words(rom, n), vs, kMgValueMin, iw, Weight::ExtraBold);
+        m.checked++;
+        if (f.size < vs) m.shrunk++;
+        if (!f.fits) { m.namesCut++; if (std::find(m.cutIds.begin(), m.cutIds.end(), n) == m.cutIds.end()) m.cutIds.push_back(n); }
+    }
+    for (const std::string& w : {std::string(Own(rom, OwnWordId::CrimeScare)), Words(rom, kStrMgRatARang), std::string(Own(rom, OwnWordId::CrimeSubdue)),
+                                 std::string(Own(rom, OwnWordId::CrimeAimLabel))})
+        me.Line(id(OwnWordId::CrimeScare), w, vs, kMgValueMin, iw - 110, Weight::Bold);
+    for (OwnWordId w : {OwnWordId::CrimeReady, OwnWordId::CrimeHit}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, 110);
 }
 
 void MeasureMinigames(const RomData& rom, BlockMeasure& m)
 {
     const Measurer me {m};
-    for (int id : {kStrMgCards, kStrMgVacuum, kStrMgAutopsy, kStrMgDetector, kStrMgArtGallery})
+    for (int id : {kStrMgCards, kStrMgVacuum, kStrMgAutopsy, kStrMgDetector, kStrMgArtGallery, kStrMgMooGoo, kStrMgDrencher, kStrMgRatARang})
         me.Line(id, Words(rom, id), kMgTitleSize, kMgTitleMin, kMgTitleMaxW - 48);
     // The pointing games: the autopsy's money (the reader's widest), the detector's "Found:" and
     // every find's name beside it, its earnings' line; every prompt bar fitting at its smallest.

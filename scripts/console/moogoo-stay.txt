@@ -1,0 +1,3 @@
+# From G-B-mg-r1-full: B asks the game's question, B its No.
+20 2 pad b
+60 2 pad b

@@ -1,0 +1,3 @@
+# From G-X-moogoo-intro: B goes on and asks the game's question, A its Yes.
+20 2 pad b
+150 2 pad a

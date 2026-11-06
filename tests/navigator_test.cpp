@@ -589,6 +589,9 @@ static void vacuum_blows_drives_and_grabs()
 static const ScreenState kAutopsy {Screen::Autopsy, Tab::None};
 static const ScreenState kDetector {Screen::Detector, Tab::None};
 static const ScreenState kArt {Screen::Art, Tab::None};
+static const ScreenState kMooGoo {Screen::MooGoo, Tab::None};
+static const ScreenState kDrencher {Screen::Drencher, Tab::None};
+static const ScreenState kCrime {Screen::Crime, Tab::None};
 
 // The pointer (the pointing minigames, activities.h): the D-pad nudges it a pixel a press and
 // reaches every pixel; held, it waits, then a pixel a frame, then faster; a stick moves it faster
@@ -798,6 +801,181 @@ static void detector_scheme()
     r.Frame(kDetector, lb);
     r.Frame(kDetector, lb);
     CHECK(r.nav.PointerY() == kDetectorKnobTop + kDetectorKnobSpan / 2 - kKnobStep);
+}
+
+// MooGoo Monkey: the intro's arrow on A, B the arrow then the game's X once the game is up (through
+// the black load); the player's bet: the focus on the first monkey that takes one, Right skipping
+// the full and the eliminated, A its tap, B the game's X; the card step: the game's selected card,
+// A its tap, B the game's own; the target step: a monkey with cards first; the question: A Yes, B No;
+// a banner or the AI's turn: A, Left / Right the game's, Start its X; no stick cursor.
+static void moogoo_scheme()
+{
+    Rig r;
+    int x, y;
+    auto tapped = [&](bool PadState::*b, Point p) {
+        r.Press(kMooGoo, b);
+        const bool ok = r.Touched(x, y) && x == p.x && y == p.y;
+        r.Drain();
+        return ok;
+    };
+    ActivityRam ram;
+    ram.mooGoo = ram.mooGooIntro = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kMooGoo);
+    CHECK(!r.nav.CursorScreen());
+    CHECK(tapped(&PadState::a, kMooGooArrow));
+    // B: the arrow, then (after the load) the game's X.
+    CHECK(tapped(&PadState::b, kMooGooArrow));
+    r.Frame({Screen::Loading, Tab::None});
+    ram.mooGooIntro = false;
+    r.nav.SetActivityRam(ram);
+    bool sawX = false;
+    for (int i = 0; i < 40 && !sawX; i++)
+    {
+        r.Frame(kMooGoo);
+        if (r.Touched(x, y)) { sawX = x == kMooGooX.x && y == kMooGooX.y; r.Drain(); }
+    }
+    CHECK(sawX);
+    // The question.
+    Rig q;
+    ram.mooGooQuitAsk = true;
+    q.nav.SetActivityRam(ram);
+    q.Frame(kMooGoo);
+    q.Press(kMooGoo, &PadState::a);
+    CHECK(q.Touched(x, y) && x == kMooGooYes.x && y == kMooGooYes.y);
+    q.Drain();
+    q.Press(kMooGoo, &PadState::b);
+    CHECK(q.Touched(x, y) && x == kMooGooNo.x && y == kMooGooNo.y);
+    // The bet: monkeys 0 out, 1 full; the focus on 2, Right skips 3 (full) to 4.
+    Rig b;
+    ram = {};
+    ram.mooGoo = ram.mooGooHuman = true;
+    ram.mooGooPhase = 0xD;
+    ram.mooGooSub = 1;
+    for (int m = 0; m < 6; m++) ram.mooGooAlive[m] = ram.mooGooBet[m] = m >= 2 && m != 3;
+    ram.mooGooAlive[1] = ram.mooGooAlive[3] = true;
+    b.nav.SetActivityRam(ram);
+    b.Frame(kMooGoo);
+    CHECK(b.nav.Mark().x == MooGooMonkeyRect(2).x);
+    PadState right;
+    right.right = true;
+    b.Frame(kMooGoo, right);
+    b.Frame(kMooGoo);
+    CHECK(b.nav.Mark().x == MooGooMonkeyRect(4).x);
+    b.Press(kMooGoo, &PadState::a);
+    CHECK(b.Touched(x, y) && x == 68 + 32 * 4 && y == 48);
+    b.Drain();
+    b.Press(kMooGoo, &PadState::b);
+    CHECK(b.Touched(x, y) && x == kMooGooX.x && y == kMooGooX.y);
+    b.Drain();
+    // The cards: the game's selected one; B is the game's (undo the bet), no tap.
+    ram.mooGooSub = 3;
+    for (int i = 0; i < 5; i++) ram.mooGooCard[i] = i != 1;
+    ram.mooGooSelected = 3;
+    b.nav.SetActivityRam(ram);
+    b.Frame(kMooGoo);
+    CHECK(b.nav.Mark().x == MooGooCardRect(3).x && b.nav.Mark().y == 137);
+    PadState bb;
+    bb.b = true;
+    CHECK(b.Frame(kMooGoo, bb) & (1u << kB));
+    b.Frame(kMooGoo);
+    CHECK(!b.touch.Owns());
+    b.Press(kMooGoo, &PadState::a);
+    CHECK(b.Touched(x, y) && x == 84 + 32 * 3 && y == 153);
+    b.Drain();
+    // The target: a monkey with cards first.
+    ram.mooGooSub = 5;
+    ram.mooGooPile[4] = true;
+    b.nav.SetActivityRam(ram);
+    b.Frame(kMooGoo);
+    CHECK(b.nav.Mark().x == MooGooPileRect(4).x && b.nav.Mark().y == 88);
+    // A banner: A and Left / Right the game's own; Start its X.
+    ram.mooGooPhase = 9;
+    b.nav.SetActivityRam(ram);
+    PadState a;
+    a.a = a.left = true;
+    const u32 k = b.Frame(kMooGoo, a);
+    CHECK((k & (1u << kA)) && (k & (1u << kLeft)) && b.nav.Mark().w == 0);
+    b.Frame(kMooGoo);
+    b.Press(kMooGoo, &PadState::start);
+    CHECK(b.Touched(x, y) && x == kMooGooX.x && y == kMooGooX.y);
+}
+
+// The Super Drencher: walk on the stick / D-pad, A held fires, LB runs (the game's B); X held pumps
+// (the stylus on the band, the press landing first, then swept at kPumpSpeed between the ends);
+// Y the target, RB refill, B the X.
+static void drencher_scheme()
+{
+    Rig r;
+    ActivityRam ram;
+    ram.drencher = true;
+    ram.drencherPump = 20;
+    r.nav.SetActivityRam(ram);
+    PadState p;
+    p.a = p.lb = p.left = true;
+    const u32 k = r.Frame(kDrencher, p);
+    CHECK((k & (1u << kA)) && (k & (1u << kB)) && (k & (1u << kLeft)));
+    CHECK(!r.nav.PointerShown() && !r.nav.CursorScreen());
+    PadState x;
+    x.x = true;
+    r.Frame(kDrencher, x);
+    CHECK(r.nav.PointerDown() && r.nav.PointerX() == 70 && r.nav.PointerY() == kPumpY);
+    r.Frame(kDrencher, x);
+    CHECK(r.nav.PointerX() == 70);
+    float lo = 1e9f, hi = -1e9f;
+    for (int i = 0; i < 100; i++)
+    {
+        r.Frame(kDrencher, x);
+        lo = std::min(lo, r.nav.PointerX());
+        hi = std::max(hi, r.nav.PointerX());
+        CHECK(r.nav.PointerDown() && r.nav.PointerY() == kPumpY);
+    }
+    CHECK(lo == kPumpLeft && hi == kPumpRight);
+    r.Frame(kDrencher);
+    CHECK(!r.nav.PointerDown());
+    int tx, ty;
+    auto tapped = [&](bool PadState::*b, Point q) {
+        r.Press(kDrencher, b);
+        const bool ok = r.Touched(tx, ty) && tx == q.x && ty == q.y;
+        r.Drain();
+        return ok;
+    };
+    CHECK(tapped(&PadState::y, kDrencherTarget));
+    CHECK(tapped(&PadState::rb, kDrencherRefill));
+    CHECK(tapped(&PadState::b, kDrencherX));
+}
+
+// The crime game: A held grabs the centre rat (the pointer shown, the stylus down), Right aims along
+// its row up to its end, letting A go lets the stylus up; X scares, Y subdues, B the X; LB runs.
+static void crime_scheme()
+{
+    Rig r;
+    PadState a;
+    a.a = true;
+    r.Frame(kCrime, a);
+    CHECK(r.nav.PointerDown() && r.nav.PointerShown() && r.nav.PointerX() == kCrimeRat.x && r.nav.PointerY() == kCrimeRat.y);
+    a.right = true;
+    const u32 k = r.Frame(kCrime, a);
+    CHECK(!(k & (1u << kRight)));   // (aiming: the D-pad does not walk)
+    for (int i = 0; i < 200; i++) r.Frame(kCrime, a);
+    CHECK(r.nav.PointerDown() && r.nav.PointerX() == kCrimeAimMax && r.nav.PointerY() == kCrimeRat.y);
+    r.Frame(kCrime);
+    CHECK(!r.nav.PointerDown() && !r.nav.PointerShown());
+    PadState w;
+    w.right = w.lb = true;
+    const u32 k2 = r.Frame(kCrime, w);
+    CHECK((k2 & (1u << kRight)) && (k2 & (1u << kB)));
+    r.Frame(kCrime);
+    int x, y;
+    auto tapped = [&](bool PadState::*b, Point q) {
+        r.Press(kCrime, b);
+        const bool ok = r.Touched(x, y) && x == q.x && y == q.y;
+        r.Drain();
+        return ok;
+    };
+    CHECK(tapped(&PadState::x, kCrimeScare));
+    CHECK(tapped(&PadState::y, kCrimeSubdue));
+    CHECK(tapped(&PadState::b, kCrimeX));
 }
 
 // The Art Gallery: LB / RB the previous / next tool in the ring of ten, X the next swatch, Y undo,
@@ -2104,6 +2282,9 @@ int main()
     autopsy_scheme();
     detector_scheme();
     art_scheme();
+    moogoo_scheme();
+    drencher_scheme();
+    crime_scheme();
     unsettled_press_waits();
     unsettled_press_dropped_after_90();
     unsettled_ds_buttons_pass();

@@ -30,9 +30,9 @@
   that say what A, X and B do: do an action, use or throw away an item, give a gift, read your
   goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend, buy
   and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions, the Alien Autopsy, the Metal
-  Detector, painting at the Art Gallery) keep their own playfield, big, in an HD frame: the game's name,
+  Detector, painting at the Art Gallery, Moogoo Monkey, the Super Drencher, the Ratticator's Rat-A-Rang) keep their own playfield, big, in an HD frame: the game's name,
   its numbers (the cards' score board, the vacuum's earnings, the organs' health, the detector's charge
-  and signal, your brush and color) and the buttons' hints, which follow what the game asks (the cards'
+  and signal, your brush and color, Moogoo's round and fruit, the Drencher's water and pressure) and the buttons' hints, which follow what the game asks (the cards'
   quit question, a clogged filter, an organ to carry); the hints are our own words, translated into the
   game's five languages. The pointing games have a pointer on the sticks.
   No mouse needed, though it works.
@@ -188,6 +188,20 @@ comes back on the same row after it. A note closes on A or B.
 | Painting | Q / W | LB / RB | the previous / next tool |
 | | S / A | X / Y | the next color / undo |
 | | Z | B | done (then X / A: yes, Z / B: no) |
+| Moogoo Monkey | Left / Right | D-pad or left stick | on your turn: choose the monkey to bet on, the card to play, the monkey a special card goes on (a green ring shows it) |
+| | X | A | bet, play the card; otherwise go on (the rules, the banners, the number of players) |
+| | Z | B | take the bet or the special card back; else quit (then X / A: yes, Z / B: no) |
+| | Enter | Start | quit |
+| Super Drencher | Arrows | left stick or D-pad | walk |
+| | X (hold) | A (hold) | fire |
+| | S (hold) | X (hold) | pump |
+| | A / W | Y / RB | target / refill |
+| | Q | LB | run |
+| | Z | B | put it away |
+| Rat-A-Rang | Arrows | left stick or D-pad | walk |
+| | S / A | X / Y | scare / subdue |
+| | X (hold) + arrows | A (hold) + a stick or the D-pad | aim; let go to throw |
+| | Q / Z | LB / B | run / put it away |
 
 <p align="center">
   <img src="docs/screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big at the left, the world small at the top right, the buttons' hints below it" width="440">
@@ -263,8 +277,8 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
 - **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).
 - **Most minigames not checked yet.** The social reactions, the shop, Build Rooms and the vacuum
   (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
-  filter clear) and the casino's cards are; the autopsy, the detector and painting were played from test states
-  (not reached by walking to them yet); the music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows
+  filter clear) and the casino's cards are; the autopsy, the detector, painting, Moogoo Monkey and the Rat-A-Rang were played from test states
+  (not reached by walking to them yet; Moogoo opens on Monkey Day, the Rat-A-Rang with the Ratticator's costume), the Super Drencher from the pockets; the music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows
   both.
 - **CONSOLE needs the European game** (code `ASJP`): it reads the game's screens from its memory,
   and that map is the European one. With another version, CONSOLE falls back to recognising the

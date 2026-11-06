@@ -32,6 +32,14 @@ enum class OwnWordId : int
     VacuumDrive, VacuumHand, VacuumGrab, VacuumBlow, VacuumBlowNow,
     // The social reaction games.
     SocialAnswer, SocialAgain, SocialMatch,
+    // MooGoo Monkey: the hints, the round and the deck.
+    MooGooPlay, MooGooChooseMonkey, MooGooBet, MooGooPlayCard, MooGooUndoBet, MooGooPlayOn, MooGooTakeBack,
+    MooGooPlayers, MooGooConfirm, MooGooRound, MooGooCardsLeft,
+    // The Super Drencher.
+    DrencherFire, DrencherPump, DrencherTarget, DrencherRefill, DrencherRun, DrencherPutAway, DrencherWater, DrencherPressure,
+    DrencherNone,
+    // The Ratticator's crime game (its run and put away: the Drencher's words).
+    CrimeScare, CrimeAim, CrimeThrow, CrimeSubdue, CrimeReady, CrimeAimLabel, CrimeHit,
     Count
 };
 

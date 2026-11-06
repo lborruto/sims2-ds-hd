@@ -145,6 +145,15 @@ wait
 run art G-D-art-stroke "${late[@]}" &
 run art-ask G-D-art-x "${late[@]}" &
 wait
+# The timing minigames: MooGoo's player's turn (the focus on the first monkey that takes a bet), the
+# Drencher (its gauges), the crime game.
+run moogoo G-B-mg-r1-full "${late[@]}" &
+run moogoo-2x G-B-mg-r1-full "${late[@]}" --compose-scale 2 &
+run drencher G-C-wg-pump "${late[@]}" &
+run drencher-wide G-C-wg-pump "${late[@]}" --wide &
+wait
+run crime G-X-crime "${late[@]}" &
+wait
 run s2 s2 "${town[@]}" &
 run s4 s4 "${town[@]}" &
 run slots sit-store "${town[@]}" --input "$repo/scripts/hotspots/options-save.txt" &
@@ -215,6 +224,7 @@ wait
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
     cards-m1 cards-ask cards-wide vacuum-clog vacuum-2x social-wide autopsy autopsy-2x detector detector-wide art art-ask \
+    moogoo moogoo-2x drencher drencher-wide crime \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
@@ -253,12 +263,16 @@ def expect(what, got, want):
 
 # Canvas points the pointing minigames' pointer covers (its ring, 15 around its point): not compared.
 SKIP = [(421, 356)] if case.split("-")[0] in ("autopsy", "art") else []
+# DS rectangles a ring is drawn around (MooGoo's focus: the first monkey, 56,32 24 x 32): not compared.
+SKIP_DS = [(50, 26, 86, 70)] if case.split("-")[0] == "moogoo" else []
 
 def piece(what, fx, fy, fw, fh, tx, ty, scale, step=5):
     """A piece of the bottom screen drawn whole-number times bigger: each DS pixel's block."""
     for y in range(0, fh, step):
         for x in range(0, fw, step):
             if any(abs(tx + x * scale - sx) < 20 and abs(ty + y * scale - sy) < 20 for sx, sy in SKIP):
+                continue
+            if any(x0 <= fx + x <= x1 and y0 <= fy + y <= y1 for x0, y0, x1, y1 in SKIP_DS):
                 continue
             expect(f"{what} DS {fx + x},{fy + y}", C(tx + x * scale + scale // 2, ty + y * scale + scale // 2), bottom(fx + x, fy + y))
             if len(errors) > 4:
@@ -410,7 +424,7 @@ def minigame_frame(side_top):
     expect("prompt bar fill", C(40, 686), FRAME)
     bar = white_text("prompt bar", 40, 664, 1240, 708)
     if case in ("cards", "cards-ask", "cards-wide", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "detector-wide",
-                "art", "art-ask"):
+                "art", "art-ask", "moogoo", "moogoo-2x", "drencher", "drencher-wide", "crime"):
         white_text("title plate", 40, 12, 400, 52)
     else:
         for y in range(10, 54, 4):
@@ -435,6 +449,11 @@ def minigame_frame(side_top):
     # The painting's question: A and B alone.
     if case == "art-ask" and (not has(green) or not has(red) or has(blue)):
         errors.append("the painting's question's prompts are not A and B alone")
+    if case.split("-")[0] == "moogoo":
+        # The focus: the game's selection green around the first monkey (DS 56,32: canvas 204,164).
+        ring = [C(x, y) for y in range(150, 270) for x in range(190, 290)]
+        if RING not in ring:
+            errors.append("no focus ring around the first monkey")
     if case.split("-")[0] in ("autopsy", "art"):
         # The pointer: its ring's white (or gold) around the playfield's middle (DS 128,96).
         ring = [C(x, y) for y in range(338, 376) for x in range(402, 442)]
@@ -836,13 +855,14 @@ elif case in ("s5-hd", "s5-hd-wide"):
         h = round(1280 * rows / tw)
         for cx, cy in ((2, 100), (1277, 100), (640, 300), (40, 440)):
             expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * tw // 1280, cy * rows // h)))
-elif case in ("social", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask"):
+elif case in ("social", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",
+              "moogoo", "moogoo-2x", "drencher", "crime"):
     activity(176)
 elif case in ("cards", "cards-ask", "cards-m1"):
     # The card game has no HUD: its world whole, no status bar.
     expect("canvas", comp.size, (1280, 720))
     activity(hd=case != "cards-m1")
-elif case in ("cards-wide", "social-wide", "detector-wide"):
+elif case in ("cards-wide", "social-wide", "detector-wide", "drencher-wide"):
     # The widescreen top screen: the secondary panel shorter, the side panel under it.
     expect("background", C(10, 10), PANEL)
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
@@ -1447,11 +1467,11 @@ done
 # The minigames (milestone 6) CONSOLE does not play yet (`GScreen::MooGoo` ... `MixerSave`): each is the
 # stick cursor's Unknown screen as before the kinds existed: the game's kind is printed, the pixels
 # agree (no "pixels disagree"), and the run (a stick move, A) ends well.
-for st in G-X-moogoo-game:MooGoo G-X-scratch:Scratch G-X-crime:Crime G-X-music:Mixer G-D-mus-save:MixerSave; do
+for st in G-X-scratch:Scratch G-X-music:Mixer G-D-mus-save:MixerSave; do
     pad "pad-mg-${st%%:*}" "${st%%:*}" minigame 120 &
 done
 wait
-for st in G-X-moogoo-game:MooGoo G-X-scratch:Scratch G-X-crime:Crime G-X-music:Mixer G-D-mus-save:MixerSave; do
+for st in G-X-scratch:Scratch G-X-music:Mixer G-D-mus-save:MixerSave; do
     mg_cursor() { in_order "pad-mg-${st%%:*}" "game ${st#*:}"; }
     check_pad "pad-mg-${st%%:*}" mg_cursor
 done
@@ -1526,5 +1546,89 @@ art_done() {
         'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=1,1' 'popup none'
 }
 check_pad mg-art-done art_done
+# The timing minigames on the controller (the research's held-out states on copies of the complete
+# save). MooGoo: from its intro, A every 30 frames (scripts/console/moogoo-round.txt) plays a whole
+# round at the game's pace: the arrow, the players' prompt (one player), the hint and the banners,
+# the player's opening bet (sub 2 on the player's turn: the focus's first monkey that takes one),
+# the shuffle and deal, the player's cards picked (sub 4) and played, the AI's turns, a monkey out
+# (the lowest card) and round 2 begun. A King Gorilla played on the pile the focus starts on (a
+# monkey with cards: G-B-mg-r1-king2): its card destroyed, the player plays again (sub 3). B on the
+# player's bet asks the game's question, A its Yes: the panel; B then B: the question closed, still
+# MooGoo; B on the intro goes on to the game and asks there, A: the panel.
+pad_mg mg-moogoo-round G-X-moogoo-intro moogoo-round 5500 &
+pad_mg mg-moogoo-target G-B-mg-r1-king2 moogoo-target 300 &
+pad_mg mg-moogoo-quit G-B-mg-r1-full moogoo-quit 120 &
+pad_mg mg-moogoo-stay G-B-mg-r1-full moogoo-stay 160 &
+wait
+pad_mg mg-moogoo-intro-quit G-X-moogoo-intro moogoo-intro-quit 220 &
+pad_mg mg-drencher G-C-wg-pump drencher-play 880 &
+pad_mg mg-crime G-X-crime crime-throw 260 &
+wait
+moogoo_round() {
+    in_order mg-moogoo-round 'minigame moogoo intro' 'minigame moogoo phase=0 ' 'minigame moogoo phase=6 sub=2 timer=-?[0-9]+ current=0 ' \
+        'minigame moogoo phase=7 ' 'minigame moogoo phase=13 sub=4 timer=-?[0-9]+ current=0 ' 'minigame moogoo phase=13 sub=9 ' \
+        'minigame moogoo phase=14 .*monkeys=[^ ]*out:' 'minigame moogoo phase=9 .*round=2 '
+}
+check_pad mg-moogoo-round moogoo_round
+moogoo_target() {
+    in_order mg-moogoo-target 'minigame moogoo phase=13 sub=5 .*monkeys=[^ ]*,33:' 'minigame moogoo phase=13 sub=6 ' \
+        'minigame moogoo phase=13 sub=3 .*monkeys=-:001:1,-:010:1,-:200:2,-:000:0,-:000:0,'
+}
+check_pad mg-moogoo-target moogoo_target
+moogoo_quit() { in_order mg-moogoo-quit 'game MooGoo' 'minigame moogoo .*quit=01 ' 'minigame moogoo .*quit=10 ' 'game Panel/Interact'; }
+check_pad mg-moogoo-quit moogoo_quit
+moogoo_stay() {
+    if grep -q 'game Panel' "$tmp/mg-moogoo-stay.log"; then echo "  mg-moogoo-stay: quit on B, B"; return 1; fi
+    in_order mg-moogoo-stay 'minigame moogoo .*quit=01 ' 'minigame moogoo phase=13 sub=1 .*quit=00 '
+}
+check_pad mg-moogoo-stay moogoo_stay
+moogoo_intro_quit() { in_order mg-moogoo-intro-quit 'minigame moogoo intro' 'minigame moogoo phase=0 ' 'minigame moogoo .*quit=01 ' 'game Panel/Interact'; }
+check_pad mg-moogoo-intro-quit moogoo_intro_quit
+# The Drencher: A held fires (the pressure and the water go down: under 30 after 400 frames), X held
+# pumps (the stylus swept along the band: back to 125 in under 150 frames), Y locks the nearest
+# target (the casino's cards table, object 29), B puts it away: the panel.
+drencher_play() {
+    in_order mg-drencher 'minigame drencher .*firing=1 ' 'minigame drencher .*firing=0 .*pressure=2[0-9]$' 'pointer down at' \
+        'minigame drencher .*pumping=1 .*pressure=125$' 'pointer up' 'minigame drencher .*target=29/11 ' 'game Panel/Interact' &&
+        "$python" -I - "$tmp/mg-drencher.log" <<'EOF'
+import re, sys
+lines = [l for l in open(sys.argv[1]) if "minigame drencher" in l]
+up = [int(re.match(r"frame (\d+)", l).group(1)) for l in lines if "pumping=1" in l]
+full = [int(re.match(r"frame (\d+)", l).group(1)) for l in lines if "pumping=1" in l and l.rstrip().endswith("pressure=125")]
+if not up or not full or full[0] - up[0] > 150:
+    print(f"  mg-drencher: the pump took {full[0] - up[0] if up and full else '?'} frames to fill")
+    sys.exit(1)
+EOF
+}
+check_pad mg-drencher drencher_play
+# The crime game: A grabs the centre rat (the stylus at 128,96: grabbed, then aiming), Right held
+# turns the aim to +90 (1.125 degrees a pixel), letting A go throws (phase 3); A again, Left: the
+# aim below 0; B puts it away: the panel. (No goon in any state: a hit is the game's own.)
+crime_throw() {
+    # (A frame's minigame line comes before its pointer line.)
+    in_order mg-crime 'minigame crime .*phase=1 ' 'pointer down at 128,96' 'minigame crime .*phase=2 angle=90 ' 'minigame crime .*phase=3 ' \
+        'pointer up at 207,96' 'minigame crime .*phase=1 ' 'pointer down at 128,96' 'minigame crime .*phase=2 angle=-[1-9]' 'pointer up' \
+        'game Panel/Interact'
+}
+check_pad mg-crime crime_throw
+# Its scare and subdue buttons (X, Y): the game's own fail animation where the stylus touched (no
+# goon near), against the same run without them.
+for v in crime-buttons crime-none; do
+    cp "$complete_save" "$tmp/$v.sav"
+    "$bin" "$rom" --headless --frames 50 --state-load "$shots/G-X-crime.st" --save "$tmp/$v.sav" --layout console "${late[@]}" \
+        --input "$repo/scripts/console/$v.txt" --shot-at 20 --shot-at 40 --shot-dir "$tmp/$v" > "$tmp/$v.log" 2>&1 &
+done
+wait
+if "$python" -I - "$tmp/crime-buttons" "$tmp/crime-none" <<'EOF'
+import sys
+from PIL import Image, ImageChops
+a, b = sys.argv[1:3]
+for f, (y0, y1) in (("f000020.png", (13, 56)), ("f000040.png", (135, 178))):
+    box = ImageChops.difference(Image.open(f"{a}/{f}").convert("RGB"), Image.open(f"{b}/{f}").convert("RGB")).getbbox()
+    if not box or box[1] > 192 + y1 or box[3] < 192 + y0 or box[0] > 161 or box[2] < 94:
+        print(f"  {f}: no change on the button ({box})")
+        sys.exit(1)
+EOF
+then echo "ok   mg-crime-buttons"; else echo "FAIL mg-crime-buttons"; fails=$((fails + 1)); fi
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

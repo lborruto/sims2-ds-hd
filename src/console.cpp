@@ -131,7 +131,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     const int worldRows = bar ? HudCropRows(topH) : topH;
     // A black load (both screens black, RAM between screens): the bare backdrop.
     if (s.screen == Screen::Loading) return c;
-    const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::ItemHand || s.screen == Screen::Unknown;
+    const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::Unknown;
     if (s.screen == Screen::None || s.screen == Screen::FrontEnd || s.screen == Screen::CreateASim)
     {
         // No HUD (title, main menu, Create-a-Sim, an unmapped front-end screen; None from the pixels
@@ -250,6 +250,14 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kActivityBottomTo));
         c.pieces.push_back({Src::Top, {0, 0, topW, rows}, topTo});
         AddHints(c, ActivityHints(s.screen));
+        if (pointer && pointer->mark.w > 0)
+        {
+            // MooGoo's focus (activities.h): a ring around what A touches.
+            const Rect m = pointer->mark, to = kActivityBottomTo;
+            const int x0 = to.x + m.x * to.w / SW, y0 = to.y + m.y * to.h / SH, x1 = to.x + (m.x + m.w) * to.w / SW, y1 = to.y + (m.y + m.h) * to.h / SH;
+            constexpr int t = 4;
+            c.overlays.push_back({{x0 - t, y0 - t, x1 - x0 + 2 * t, y1 - y0 + 2 * t}, 0, 8, t, kRingArgb, -1});
+        }
         if (hudHere) AddStatusBar(c, *hud, *strings, topTo.x - 6, topTo.y + topTo.h + kActivityBarGap, topTo.w + 12);
     }
     AddRing(c, s, focus);

@@ -222,10 +222,10 @@ static void to_screen_state()
         CHECK(ToScreenState(g) == (ScreenState{sc}));
         CHECK(std::string(ScreenName(sc)) == GScreenName(gs));
     }
-    // The Drencher is CONSOLE's ItemHand; the pointing games are their own screens (no pixel rule: the
+    // The Drencher is CONSOLE's Drencher (an activity, once the stick cursor's ItemHand); the pointing games are their own screens (no pixel rule: the
     // pixels' Unknown or None agree); the other minigames are the stick cursor's Unknown.
     g.screen = GScreen::Drencher;
-    CHECK(ToScreenState(g) == (ScreenState{Screen::ItemHand}));
+    CHECK(ToScreenState(g) == (ScreenState{Screen::Drencher}));
     for (auto [m, sc] : {std::pair{GScreen::Autopsy, Screen::Autopsy}, {GScreen::Detector, Screen::Detector}, {GScreen::ArtGallery, Screen::Art}})
     {
         g.screen = m;
@@ -233,7 +233,14 @@ static void to_screen_state()
         CHECK(PixelsAgree(g, {Screen::Unknown}) && PixelsAgree(g, {Screen::None}) && !PixelsAgree(g, {Screen::Panel, Tab::Interact}));
         CHECK(ConsoleScreenOf(g, {Screen::None}, false, false) == (ScreenState{sc}));
     }
-    for (GScreen m : {GScreen::MooGoo, GScreen::Scratch, GScreen::Crime, GScreen::Mixer, GScreen::MixerSave})
+    // The timing games too (MooGoo, Crime: the Drencher above); the others the stick cursor's Unknown.
+    for (auto [m, sc] : {std::pair{GScreen::MooGoo, Screen::MooGoo}, {GScreen::Crime, Screen::Crime}})
+    {
+        g.screen = m;
+        CHECK(ToScreenState(g) == (ScreenState{sc}));
+        CHECK(PixelsAgree(g, {Screen::Unknown}) && PixelsAgree(g, {Screen::None}) && !PixelsAgree(g, {Screen::Panel, Tab::Interact}));
+    }
+    for (GScreen m : {GScreen::Scratch, GScreen::Mixer, GScreen::MixerSave})
     {
         g.screen = m;
         CHECK(ToScreenState(g) == (ScreenState{Screen::Unknown}));
@@ -974,16 +981,17 @@ static void minigame_screens()
         const GameState g = ReadGameState(mg_ram(c.vt, c.ov).View());
         CHECK(g.valid && g.screen == c.s);
         CHECK(std::string(GScreenName(c.s)) == GameStateName(g));
-        // CONSOLE's: the pointing games their own screens, the Drencher ItemHand (a cursor screen), the others the stick cursor's Unknown.
-        const Screen want = c.s == GScreen::Drencher ? Screen::ItemHand : c.s == GScreen::Autopsy ? Screen::Autopsy
-                          : c.s == GScreen::Detector ? Screen::Detector : c.s == GScreen::ArtGallery ? Screen::Art : Screen::Unknown;
+        // CONSOLE's: the pointing and timing games their own screens, the others the stick cursor's Unknown.
+        const Screen want = c.s == GScreen::Drencher ? Screen::Drencher : c.s == GScreen::Autopsy ? Screen::Autopsy
+                          : c.s == GScreen::Detector ? Screen::Detector : c.s == GScreen::ArtGallery ? Screen::Art
+                          : c.s == GScreen::MooGoo ? Screen::MooGoo : c.s == GScreen::Crime ? Screen::Crime : Screen::Unknown;
         CHECK(ToScreenState(g) == (ScreenState{want}));
     }
     // The overlay's classes need their overlay; the arm9 classes do not care.
     CHECK(ReadGameState(mg_ram(0x0214EBC4, 1).View()).screen == GScreen::Unknown);
     CHECK(ReadGameState(mg_ram(0x02152E0C, 11).View()).screen == GScreen::Unknown);
     CHECK(ReadGameState(mg_ram(0x02134EC8, 15).View()).screen == GScreen::Crime);
-    CHECK(GScreen::ItemHand == GScreen::Drencher && std::string(GScreenName(GScreen::ItemHand)) == "Drencher");
+    CHECK(GScreen::ItemHand == GScreen::Drencher && std::string(GScreenName(GScreen::Drencher)) == "Drencher");
     // A part is read only on its own screen: the autopsy's bytes under the cards' vtable read nothing.
     Ram r = mg_ram(0x0214EBC4, 0);
     const GameState a = ReadGameState(r.View());
