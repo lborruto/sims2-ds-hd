@@ -11,26 +11,51 @@
 
 namespace sims2wide
 {
-static void MakeScreenTextures(SDL_Renderer* ren, SDL_Texture* tex[2], bool smooth)
+// The screens' textures: raw pixels drawn nearest (Sharp and Nearest) or bilinear (Smooth).
+static void ScreenScaleMode(SDL_Texture* t, Scaling c)
 {
-    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, smooth ? "linear" : "nearest");
+    if (t) SDL_SetTextureScaleMode(t, c == Scaling::Smooth ? SDL_ScaleModeLinear : SDL_ScaleModeNearest);
+}
+
+static void MakeScreenTextures(SDL_Renderer* ren, SDL_Texture* tex[2], Scaling c)
+{
     for (int i = 0; i < 2; i++)
     {
         if (tex[i]) SDL_DestroyTexture(tex[i]);
         tex[i] = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SW, SH);
         SDL_SetTextureBlendMode(tex[i], SDL_BLENDMODE_BLEND);
+        ScreenScaleMode(tex[i], c);
     }
 }
 
 bool Video::Open(const Settings& s)
 {
-    win = SDL_CreateWindow("The Sims 2 DS - one screen", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-                           s.windowW, s.windowH, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    // The size: the remembered one, or (a first start) one from the screen's usable area; never
+    // larger than that area (a size remembered on a larger screen). The place: the remembered one
+    // when it still lies on a screen, else centred.
+    int w = s.windowW, h = s.windowH, x = SDL_WINDOWPOS_CENTERED, y = SDL_WINDOWPOS_CENTERED;
+    SDL_Rect usable;
+    int display = 0;
+    const int n = SDL_GetNumVideoDisplays();
+    if (s.windowX != -1 || s.windowY != -1)
+        for (int d = 0; d < n; d++)
+        {
+            SDL_Rect b;
+            if (SDL_GetDisplayUsableBounds(d, &b) == 0 && s.windowX >= b.x && s.windowY >= b.y && s.windowX < b.x + b.w - 64 && s.windowY < b.y + b.h - 64)
+            {
+                display = d;
+                x = s.windowX;
+                y = s.windowY;
+            }
+        }
+    if (SDL_GetDisplayUsableBounds(display, &usable) == 0) FitWindow(usable.w, usable.h, s.windowKnown, w, h);
+    win = SDL_CreateWindow("The Sims 2 DS - one screen", x, y, w, h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!win) { fprintf(stderr, "SDL window: %s\n", SDL_GetError()); return false; }
-    ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE);
+    if (!ren) ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
     if (!ren) { fprintf(stderr, "SDL renderer: %s\n", SDL_GetError()); return false; }
-    smooth = s.smoothScaling;
-    MakeScreenTextures(ren, tex, smooth);
+    scaling = s.scaling;
+    MakeScreenTextures(ren, tex, scaling);
     if (s.fullscreen) SetFullscreen(true);
     return true;
 }
@@ -41,17 +66,19 @@ void Video::SetFullscreen(bool on)
     SDL_SetWindowFullscreen(win, on ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
 }
 
-void Video::SetSmooth(bool on)
+void Video::SetScaling(Scaling c)
 {
-    if (on == smooth) return;
-    smooth = on;
-    MakeScreenTextures(ren, tex, smooth);
+    if (c == scaling) return;
+    scaling = c;
+    for (SDL_Texture* t : tex) ScreenScaleMode(t, scaling);
 }
 
 void Video::RememberSize(Settings& s) const
 {
-    if (!win || (SDL_GetWindowFlags(win) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MINIMIZED))) return;
+    if (!win || (SDL_GetWindowFlags(win) & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MINIMIZED | SDL_WINDOW_MAXIMIZED))) return;
     SDL_GetWindowSize(win, &s.windowW, &s.windowH);
+    SDL_GetWindowPosition(win, &s.windowX, &s.windowY);
+    s.windowKnown = true;
 }
 
 void Video::OutputSize(int& ow, int& oh) const { SDL_GetRendererOutputSize(ren, &ow, &oh); }
@@ -76,9 +103,9 @@ void Video::Present(const App& app, const Marks& marks, const std::vector<ui::Ui
         if (cw != tw || ch != th)
         {
             SDL_DestroyTexture(tex[0]);
-            SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, smooth ? "linear" : "nearest");
             tex[0] = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, tw, th);
             SDL_SetTextureBlendMode(tex[0], SDL_BLENDMODE_BLEND);
+            ScreenScaleMode(tex[0], scaling);
         }
         SDL_UpdateTexture(tex[0], nullptr, top, tw * 4);
     }
@@ -141,6 +168,26 @@ void Video::Present(const App& app, const Marks& marks, const std::vector<ui::Ui
         comp.ui.push_back(p);
         comp.ui.push_back(t);
     }
+    // Paused while the window is not in front: two bars on a plate at the top right.
+    if (marks.paused)
+    {
+        const Rect r {comp.cw - 88, 16, 72, 48};
+        ui::UiItem p = ui::PanelItem(r);
+        p.plain = true;
+        p.fill = 0xB0202436;
+        p.radius = 24;
+        p.layer = 8;
+        comp.ui.push_back(p);
+        for (int b = 0; b < 2; b++)
+        {
+            ui::UiItem bar = ui::PanelItem({r.x + 25 + b * 14, r.y + 13, 8, 22});
+            bar.plain = true;
+            bar.fill = 0xFFFFFFFF;
+            bar.radius = 2;
+            bar.layer = 8;
+            comp.ui.push_back(bar);
+        }
+    }
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, ow, oh);
@@ -157,13 +204,56 @@ void Video::Present(const App& app, const Marks& marks, const std::vector<ui::Ui
             if (SDL_Texture* t = OverlayTexture(o, d.w, d.h)) SDL_RenderCopy(ren, t, nullptr, &d);
         }
     };
+    // Sharp: each screen nearest into a target a whole factor larger (the factor the largest piece
+    // showing it needs, at most 6), drawn smooth from there; a factor of 1: the screen itself.
+    int k[2] = {1, 1};
+    if (scaling == Scaling::Sharp && SDL_RenderTargetSupported(ren))
+    {
+        for (const Piece& q : comp.pieces)
+        {
+            if (q.from.w <= 0 || q.from.h <= 0) continue;
+            SDL_Rect d;
+            fit.ToOutput(q.to, d.x, d.y, d.w, d.h);
+            const int i = q.src == Src::Top ? 0 : 1;
+            const int need = (int)std::ceil(std::min((double)d.w / q.from.w, (double)d.h / q.from.h) - 0.01);
+            k[i] = std::clamp(std::max(k[i], need), 1, 6);
+        }
+        for (int i = 0; i < 2; i++)
+        {
+            if (k[i] < 2) continue;
+            int sw, sh;
+            SDL_QueryTexture(tex[i], nullptr, nullptr, &sw, &sh);
+            while (k[i] > 1 && (sw * k[i] > 8192 || sh * k[i] > 8192)) k[i]--;
+            if (k[i] < 2) continue;
+            if (!sharpTex[i] || sharpW[i] != sw * k[i] || sharpH[i] != sh * k[i])
+            {
+                if (sharpTex[i]) SDL_DestroyTexture(sharpTex[i]);
+                sharpTex[i] = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, sw * k[i], sh * k[i]);
+                sharpW[i] = sw * k[i];
+                sharpH[i] = sh * k[i];
+                if (sharpTex[i])
+                {
+                    SDL_SetTextureBlendMode(sharpTex[i], SDL_BLENDMODE_BLEND);
+                    SDL_SetTextureScaleMode(sharpTex[i], SDL_ScaleModeLinear);
+                }
+            }
+            if (!sharpTex[i] || SDL_SetRenderTarget(ren, sharpTex[i]) != 0) { k[i] = 1; continue; }
+            // (A plain copy: the screens are opaque, their pieces' opacity is the target's.)
+            SDL_SetTextureBlendMode(tex[i], SDL_BLENDMODE_NONE);
+            SDL_SetTextureAlphaMod(tex[i], 255);
+            SDL_RenderCopy(ren, tex[i], nullptr, nullptr);
+            SDL_SetTextureBlendMode(tex[i], SDL_BLENDMODE_BLEND);
+            SDL_SetRenderTarget(ren, nullptr);
+        }
+    }
     for (int pi = 0; pi < (int)comp.pieces.size(); pi++)
     {
         overlaysBefore(pi);
         const Piece& q = comp.pieces[pi];
-        SDL_Rect d, f {q.from.x, q.from.y, q.from.w, q.from.h};
+        const int i = q.src == Src::Top ? 0 : 1;
+        SDL_Rect d, f {q.from.x * k[i], q.from.y * k[i], q.from.w * k[i], q.from.h * k[i]};
         fit.ToOutput(q.to, d.x, d.y, d.w, d.h);
-        SDL_Texture* t = tex[q.src == Src::Top ? 0 : 1];
+        SDL_Texture* t = k[i] > 1 ? sharpTex[i] : tex[i];
         SDL_SetTextureAlphaMod(t, q.alpha);
         SDL_RenderCopy(ren, t, &f, &d);
     }
@@ -225,10 +315,12 @@ void Video::DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, s
     auto texture = [&](SDL_Texture*& t, int& tw, int& th, int w, int h) {
         if (t && tw == w && th == h) return t;
         if (t) SDL_DestroyTexture(t);
-        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
         t = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
-        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, smooth ? "linear" : "nearest");
-        if (t) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+        if (t)
+        {
+            SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+            SDL_SetTextureScaleMode(t, SDL_ScaleModeNearest); // (drawn at its own size)
+        }
         tw = w;
         th = h;
         return t;

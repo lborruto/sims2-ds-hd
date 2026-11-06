@@ -82,6 +82,17 @@ struct Input
     // The window was asked to close (the shell asks first); a file was dropped on it.
     bool wantQuit = false;
     std::string droppedFile;
+    // The window is in front (keyboard focus): off, the game pauses unless it runs in the background.
+    bool focused = true;
+    Uint32 mouseMovedAt = 0;      // SDL ticks of the mouse's last move or click (the pointer's auto-hide)
+    // Create-a-Sim's name typed on the keyboard (port/cas.h, CasTypeAction): the characters still to
+    // type ("\b" the backspace), one at a time through the game's own keyboard; the frames to wait
+    // before the next (the game reads a tap within a few), and the tries at its page.
+    std::vector<std::string> typed;
+    int typeWait = 0, typeTries = 0;
+    // The Name page of Create-a-Sim is up in CONSOLE: printable keys type there (their bindings
+    // rest; arrows, Enter, Esc and Backspace stay what they are).
+    static bool TypingName(const App& app);
 
     // An input script's window events for this turn of the loop (script.h), pushed as SDL events.
     void PushScript(const std::vector<InputEvent>& script, long iter, const Video& video) const;
@@ -108,6 +119,8 @@ struct Input
     // id (the navigator ran on the frame before's view: the old index would show for one frame,
     // on the wrong item). Within one view (a list scrolled) the index stays as the navigator left it.
     void FocusForDrawing(App& app, bool screenChanged);
+    // One typed character's taps when the game can take them (Steer, after the navigator).
+    void TypeName(App& app);
     // The touch script's touch this frame, over any other while it owns the stylus.
     void ScriptTouch(bool& touching, int& tx, int& ty);
     // A pointing minigame's stylus at its pointer (the navigator's; CONSOLE), before ScriptTouch.

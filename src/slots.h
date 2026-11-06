@@ -59,6 +59,10 @@ struct DataDir
     std::string Suspend(const std::string& code) const;           // written on quitting
     std::string SuspendThumb(const std::string& code) const;
     std::string SuspendMeta(const std::string& code) const;       // its StateMeta: the ROM it belongs to, the save's hash
+    // The folders of the game's save when the ROM's folder cannot be written (saves/) and of the
+    // window's screenshots (screenshots/), made the first time they are asked for ("" none).
+    std::string Saves() const;
+    std::string Screenshots() const;
 
     // The recent ROMs, newest first (only files that still exist), at most kRecents.
     static constexpr int kRecents = 5;
@@ -70,6 +74,15 @@ private:
 };
 
 bool FileExists(const std::string& path);
+// Whether the program can write this file: an existing one opened for update, else one made and
+// removed again (nothing is left behind, nothing is changed).
+bool CanWrite(const std::string& path);
+// The game's save when its own place cannot be written: saves/ in the data folder, the same file
+// name ("" without a data folder).
+std::string SaveFallback(const DataDir& d, const std::string& savePath);
+// A window screenshot's file name: "sims2-YYYYMMDD-HHMMSS.png" in the local time of t, "-2", "-3"…
+// before ".png" for n > 1 (two in one second).
+std::string ShotName(long long t, int n = 1);
 // A path's file name (after the last / or \).
 std::string BaseName(const std::string& path);
 

@@ -56,6 +56,14 @@ std::vector<InputEvent> LoadScript(const std::string& path)
         else if (what == "click") { e.click = true; ss >> e.tx >> e.ty; }
         else if (what == "wheel") ss >> e.wheel;
         else if (what == "winshot") e.winShot = true;
+        else if (what == "type")
+        {
+            // Text typed on the keyboard (Create-a-Sim's name): the rest of the line, "<bs>" a backspace.
+            ss >> std::ws;
+            std::getline(ss, e.text);
+            for (size_t at; (at = e.text.find("<bs>")) != std::string::npos;) e.text.replace(at, 4, "\b");
+            if (e.text.empty()) { fprintf(stderr, "type: no text\n"); exit(1); }
+        }
         else if (what == "layout")
         {
             std::string name;
@@ -90,7 +98,7 @@ std::vector<InputEvent> LoadScript(const std::string& path)
 void ApplyScript(const std::vector<InputEvent>& script, long frame, u32& keys, bool& blow, bool& touching, int& tx, int& ty)
 {
     for (const auto& e : script)
-        if (frame >= e.frame && frame < e.frame + e.len && e.press.empty() && e.pad.empty() && e.layout < 0 && !e.move && !e.click && !e.wheel && !e.winShot)
+        if (frame >= e.frame && frame < e.frame + e.len && e.press.empty() && e.pad.empty() && e.layout < 0 && !e.move && !e.click && !e.wheel && !e.winShot && e.text.empty())
         {
             keys |= e.keys;
             if (e.blow) blow = true;
@@ -118,5 +126,16 @@ bool ScriptWindowShot(const std::vector<InputEvent>& script, long iter)
     for (const auto& e : script)
         if (e.winShot && e.frame == iter) return true;
     return false;
+}
+}
+
+namespace sims2wide
+{
+std::string ScriptText(const std::vector<InputEvent>& script, long frame)
+{
+    std::string t;
+    for (const InputEvent& e : script)
+        if (!e.text.empty() && e.frame == frame) t += e.text;
+    return t;
 }
 }

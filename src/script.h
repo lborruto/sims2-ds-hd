@@ -8,7 +8,8 @@
 // w<frame>.png). CONSOLE's navigator (headless runs and the window alike): "pad <action>", the
 // action held as on a controller: a, b, x, y, l (or lb), r (or rb), start, select, menu (the
 // touch menu's action, PANEL), up, down, left, right, rsleft / rsright (the right stick pushed
-// fully that way); "layout <auto|focus|side|stacked|console>"
+// fully that way); "type <text>" (text typed on the keyboard at that frame: Create-a-Sim's name,
+// "<bs>" a backspace); "layout <auto|focus|side|stacked|console>"
 // switches the layout at that frame (as the 0-3 keys and the pause menu do).
 #pragma once
 #include <string>
@@ -29,6 +30,7 @@ struct InputEvent
     std::string press; // a key name, or "" (window events: see above)
     std::string pad;   // a navigator action, or ""
     int layout = -1;   // a Layout, or -1
+    std::string text;  // "type": the text typed (UTF-8; "\b" a backspace)
 
     bool move = false, click = false, winShot = false;
     int wheel = 0;
@@ -44,6 +46,8 @@ void ApplyScript(const std::vector<InputEvent>& script, long frame, u32& keys, b
 void ScriptPad(const std::vector<InputEvent>& script, long frame, PadState& pad);
 // The layout the script switches to at this frame, or -1.
 int ScriptLayout(const std::vector<InputEvent>& script, long frame);
+// The text the script types at this frame ("" none).
+std::string ScriptText(const std::vector<InputEvent>& script, long frame);
 // Whether the script asks for the window's picture at this turn of the loop.
 bool ScriptWindowShot(const std::vector<InputEvent>& script, long iter);
 }

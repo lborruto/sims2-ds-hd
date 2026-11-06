@@ -712,6 +712,8 @@ std::vector<Point> ScratchRub(int tier, int i)
 void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
 {
     const float ox = st.px, oy = st.py;
+    // (The player's cursor speed lifts the free move's cap with it, never a drag's or the laser's.)
+    cap = cap >= kPtrMax ? cap * pad.speed : cap;
     // The stick over further: either one, the one further over.
     float sx = pad.lx, sy = pad.ly;
     if (pad.rx * pad.rx + pad.ry * pad.ry > sx * sx + sy * sy) { sx = pad.rx; sy = pad.ry; }
@@ -719,7 +721,7 @@ void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
     if (mag > kPtrDead)
     {
         const float m = std::min(1.0f, (mag - kPtrDead) / (1.0f - kPtrDead));
-        float speed = kPtrMax * m * m;
+        float speed = kPtrMax * m * m * pad.speed;
         if (pad.lt > 0.5f) speed *= kPtrSlow;
         speed = std::min(speed, cap);
         st.px += sx / mag * speed;

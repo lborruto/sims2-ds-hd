@@ -111,6 +111,59 @@ std::string DataDir::GameDir(const std::string& code) const
     return dir;
 }
 
+static std::string MadeDir(const std::string& root, const char* name)
+{
+    if (root.empty()) return "";
+    const std::string dir = root + name + "/";
+    std::error_code ec;
+    fs::create_directories(fs::path(dir), ec);
+    return dir;
+}
+std::string DataDir::Saves() const { return MadeDir(root, "saves"); }
+std::string DataDir::Screenshots() const { return MadeDir(root, "screenshots"); }
+
+bool CanWrite(const std::string& path)
+{
+    if (path.empty()) return false;
+    if (FILE* f = fopen(path.c_str(), "rb"))
+    {
+        fclose(f);
+        FILE* u = fopen(path.c_str(), "r+b");
+        if (!u) return false;
+        fclose(u);
+        return true;
+    }
+    FILE* f = fopen(path.c_str(), "wb");
+    if (!f) return false;
+    fclose(f);
+    std::error_code ec;
+    fs::remove(fs::path(path), ec);
+    return true;
+}
+
+std::string SaveFallback(const DataDir& d, const std::string& savePath)
+{
+    const std::string dir = d.Saves();
+    const std::string name = BaseName(savePath);
+    return dir.empty() || name.empty() ? "" : dir + name;
+}
+
+std::string ShotName(long long t, int n)
+{
+    const time_t tt = (time_t)t;
+    struct tm lt {};
+#ifdef _WIN32
+    localtime_s(&lt, &tt);
+#else
+    localtime_r(&tt, &lt);
+#endif
+    char buf[48];
+    strftime(buf, sizeof buf, "sims2-%Y%m%d-%H%M%S", &lt);
+    std::string s = buf;
+    if (n > 1) s += "-" + std::to_string(n);
+    return s + ".png";
+}
+
 // (A file in the game's folder; "" without one.)
 static std::string In(const std::string& dir, const std::string& name) { return dir.empty() ? "" : dir + name; }
 std::string DataDir::Slot(const std::string& code, int i) const { return In(GameDir(code), "slot" + std::to_string(i + 1) + ".st"); }

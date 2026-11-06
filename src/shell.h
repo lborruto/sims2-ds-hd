@@ -65,7 +65,15 @@ struct Result
 };
 
 // The settings' rows, in order.
-enum class Row { Layout, Fullscreen, Smooth, Res3D, Wide, Fps60, Volume, FastSound, StickCursor, DeadZone, Trigger, Rumble, Mic, Language, Count };
+// (Grouped: the picture, the sound, the speed, the mouse and the controller, the game.)
+enum class Row
+{
+    Layout, Fullscreen, Scaling, Res3D, Wide, Fps60, Battery,
+    Volume, Mute, FastSound, Background,
+    FastSpeed, FastKey, FastBoot,
+    HidePointer, StickCursor, CursorSpeed, DeadZone, LeftHanded, Trigger, Rumble,
+    Mic, Language, Count
+};
 constexpr int kRows = (int)Row::Count;
 
 struct Model
@@ -91,6 +99,8 @@ struct Model
     Thumb suspend;
     // A message over the page until A ("" none).
     std::string message;
+    // A line kept on the pause menu's main page ("" none): the save written elsewhere than beside the ROM.
+    std::string banner;
 };
 
 class Shell
@@ -127,8 +137,8 @@ private:
 void ChangeRow(Row r, int dir, Settings& s);
 std::string RowLabel(Row r, int language);
 std::string RowValue(Row r, const Settings& s, int language);
-// The language a locale names ("fr_FR", "de"…): 1-5, else 1.
-int LanguageOfLocale(const std::string& locale);
+// The row's note under the list while it has the focus (W::Count: none).
+int RowNote(Row r);
 // The language the shell's words use: the setting's, else the given automatic one.
 inline int WordsLanguage(const Settings& s, int automatic) { return s.language >= 1 && s.language <= 5 ? s.language : automatic; }
 // The launch panel's entries, in order (Continue only with a recent ROM).

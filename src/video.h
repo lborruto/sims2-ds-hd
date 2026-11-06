@@ -33,21 +33,29 @@ struct Video
     std::vector<StillTex> shellStill;
     std::vector<ImageTex> shellImages;
     void DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, std::vector<StillTex>& still, std::vector<ImageTex>& images);
-    bool smooth = false;
+    // The DS pictures' scaling (Settings::scaling). Sharp: each screen drawn nearest into a target
+    // a whole factor larger (sharpTex: the factor the largest piece showing it needs), then that
+    // drawn smooth to the piece's size.
+    Scaling scaling = Scaling::Sharp;
+    SDL_Texture* sharpTex[2] = {};
+    int sharpW[2] = {}, sharpH[2] = {};
     // A short HD message over the picture (a controller connected: how to pause), at the top of
     // the canvas in the kit's panel and Nunito, until toastUntil (SDL ticks).
     std::string toast;
     Uint32 toastUntil = 0;
     void Toast(const std::string& text, Uint32 ms) { toast = text; toastUntil = SDL_GetTicks() + ms; }
 
-    bool Open(const Settings& s); // after SDL_Init(SDL_INIT_VIDEO): the remembered size, fullscreen as set
+    // After SDL_Init(SDL_INIT_VIDEO): the remembered size and place (or a size from the screen's
+    // usable area on a first start; never larger than it), fullscreen as set.
+    bool Open(const Settings& s);
     void SetFullscreen(bool on);  // borderless, the desktop's size
-    void SetSmooth(bool on);      // linear instead of nearest scaling (the textures are made again)
+    void SetScaling(Scaling c);
+    // The window's size and place into the settings, when it is a window.
     // What lies over the game besides its composition: the stick cursor (a DS touch point, drawn
     // where the piece showing it draws it), the fast forward mark.
     struct Marks
     {
-        bool cursor = false, press = false, fast = false;
+        bool cursor = false, press = false, fast = false, paused = false; // paused: the window is not in front
         float x = 0, y = 0;
     };
     // shell: the HD shell's items on its own 1280 x 720 canvas (null: none). With shotPath set,
@@ -57,7 +65,6 @@ struct Video
     // The shell alone (the launch panel: no DS yet).
     void PresentUi(const std::vector<ui::UiItem>& shell);
     void Finish(int ow, int oh); // (the window shot, then the picture shown)
-    // The window's size into the settings, when it is a window.
     void RememberSize(Settings& s) const;
 
     // What the window shows now: the shown layout's pieces, for the top picture's current size

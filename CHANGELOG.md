@@ -26,8 +26,24 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   can be undone), Change game, the saves folder, and Quit asks first. The quick save state (F5 / F7) moved from beside the ROM to
   the settings folder.
 - DS Wireless is greyed on the main menu: it needs a second DS.
+- The pictures are scaled "sharp" by default (crisp, evenly sized pixels at any window size);
+  Smooth and Pixels are in Settings > Picture filter. F12 now saves the window as you see it, in
+  full resolution, named by the date and time, in the saves folder's `screenshots/`.
+- The language setting is now the game's own language too (the DS's language, from your
+  computer's by default); a change applies the next time the game starts.
+- The game pauses and goes quiet when its window is not in front (Settings > Run in background).
+- The volume moves by 5 %.
 
 ### Added
+
+- The Sim's name in Create-a-Sim can be typed on the keyboard.
+- Fast boot: the boot's splashes, which wait for no button, go by at full speed.
+- Settings: Mute, Battery saver, fast forward speed (2×, 3×, 4× or maximum) and a press-on /
+  press-off fast forward key, cursor speed, swap the sticks (left-handed), hide the idle mouse
+  pointer. The window comes back where it was; its first size fits the screen.
+- When the ROM's folder cannot be written, the game saves to the saves folder instead, and the
+  pause menu says where.
+- Windows: the window is sharp on high-DPI screens (per-monitor DPI awareness).
 
 - A launch panel before the game: Continue (where you quit, with its picture), choose a file or
   drop a `.nds` on the window, your recent ROMs, the language of the HD screens, the controls.

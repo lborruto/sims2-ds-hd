@@ -1,0 +1,8 @@
+# From s3 (Create-a-Sim's Name page, "Sim", the ABC keyboard), the name typed on the computer's
+# keyboard (Input::TypeName: the game's own keys, never RAM): a backspace → "Si", "aB1" → "Sia" (the
+# abc page turned first), "SiaB" (back to ABC), "SiaB1" (123!), then "xyz" → "SiaB1x" "SiaB1xy" and
+# the eighth refused, Start → the Hair page with the name committed.
+10 1 type <bs>
+30 1 type aB1
+100 1 type xyz
+200 2 pad start

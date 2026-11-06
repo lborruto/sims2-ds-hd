@@ -463,8 +463,61 @@ static void minigame_frame()
     CHECK(!MinigameFramed({Screen::Cards, Tab::None}, &g, &rom));
 }
 
+// Task 5: Create-a-Sim's name typed on the keyboard (CasTypeAction; the key matching needs the
+// game's strings: console_check's pad-cas-type) and fast boot's rule (BootPassesBy).
+static void platform()
+{
+    RomData rom; // no strings: no key matches
+    CasState c;
+    c.valid = true;
+    c.page = 0;
+    c.nameKnown = true;
+    c.name = "Sim";
+    c.nameLength = 3;
+    c.keyboard = 0;
+    CasType t = CasTypeAction(c, rom, "\b");
+    CHECK(t.done && t.taps.size() == 1 && t.taps[0].x == kCasBackX && t.taps[0].y == kCasBackY);
+    t = CasTypeAction(c, rom, "a");   // (no key: dropped, nothing tapped)
+    CHECK(t.done && t.taps.empty());
+    CasState e = c;
+    e.name.clear();
+    e.nameLength = 0;
+    CHECK(CasTypeAction(e, rom, "\b").taps.empty());   // nothing to erase
+    CasState full = c;
+    full.nameLength = kCasName;
+    CHECK(CasTypeAction(full, rom, "a").taps.empty() && CasTypeAction(full, rom, "a").done);
+    for (int page = 1; page <= 4; page++)
+    {
+        CasState o = c;
+        o.page = page;
+        CHECK(CasTypeAction(o, rom, "\b").taps.empty());   // only on the Name page
+    }
+    CasState sw = c;
+    sw.nameKnown = false;
+    CHECK(CasTypeAction(sw, rom, "\b").taps.empty());
+    // Fast boot: nothing up yet, the video, the legal / EA / Maxis splashes, the zoom and the blank
+    // go by; the last splash, a popup splash, the title or any other screen stop it.
+    GameState g;
+    CHECK(BootPassesBy(g));
+    g.front.kind = FrontKind::Video;
+    CHECK(BootPassesBy(g));
+    g.front.boot.valid = true;
+    for (int mode = 0; mode <= 6; mode++)
+    {
+        g.front.boot.mode = mode;
+        CHECK(BootPassesBy(g) == (mode != 0 && mode != 4));
+    }
+    g.front.boot.valid = false;
+    for (FrontKind k : {FrontKind::Title, FrontKind::MainMenu, FrontKind::Settings, FrontKind::Load, FrontKind::CreateASim, FrontKind::KeepSim})
+    {
+        g.front.kind = k;
+        CHECK(!BootPassesBy(g));
+    }
+}
+
 int main()
 {
+    platform();
     minigame_frame();
     // CONSOLE's compositions.
     for (ScreenState s : AllStates())

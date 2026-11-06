@@ -14,5 +14,7 @@ struct PadState
     // A stick cursor exists (a controller and the setting on): Unknown gives A to it. Without one
     // A stays the DS's there (the keyboard alone must still answer a Save or a Quit question).
     bool cursor = false;
+    // The pointer's speed (Settings::cursorSpeed: 1 the port's own); never the stylus's drags' cap.
+    float speed = 1.0f;
 };
 }

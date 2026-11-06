@@ -19,13 +19,36 @@ std::string Settings::DefaultPath()
 }
 
 static const char* MicKey(MicMode m) { return m == MicMode::Off ? "off" : m == MicMode::Real ? "real" : "blow"; }
+static const char* ScalingKey(Scaling c) { return c == Scaling::Smooth ? "smooth" : c == Scaling::Nearest ? "nearest" : "sharp"; }
+
+int LanguageOfLocale(const std::string& l)
+{
+    const std::string p = l.substr(0, 2);
+    return p == "fr" ? 2 : p == "de" ? 3 : p == "it" ? 4 : p == "es" ? 5 : 1;
+}
+
+void FitWindow(int usableW, int usableH, bool known, int& w, int& h)
+{
+    if (usableW <= 0 || usableH <= 0) return;
+    const int maxW = usableW * 85 / 100, maxH = usableH * 85 / 100;
+    if (!known)
+    {
+        // 16:9: 1280 x 720 when it fits, else as large as 85 % of the screen holds.
+        w = 1280;
+        h = 720;
+    }
+    if (w <= maxW && h <= maxH) return;
+    const double k = std::min((double)maxW / w, (double)maxH / h);
+    w = std::max(320, (int)(w * k) & ~1);
+    h = std::max(240, (int)(h * k) & ~1);
+}
 
 bool Settings::Load(const std::string& path)
 {
     std::ifstream in(path);
     if (!in) return false;
     std::string line;
-    bool hasLayout = false;
+    bool hasLayout = false, hasScaling = false;
     int version = 0; // no settings_version line: a file from before 2
     while (std::getline(in, line))
     {
@@ -48,7 +71,31 @@ bool Settings::Load(const std::string& path)
         else if (k == "widescreen") widescreen = on;
         else if (k == "interpolate_60") interpolate60 = on;
         else if (k == "fullscreen") fullscreen = on;
-        else if (k == "smooth_scaling") smoothScaling = on;
+        // (Before the scaling setting: on was smooth; off, the old default, gets the new one.)
+        else if (k == "smooth_scaling") { if (on && !hasScaling) scaling = Scaling::Smooth; }
+        else if (k == "scaling")
+        {
+            hasScaling = true;
+            scaling = v == "smooth" ? Scaling::Smooth : v == "nearest" ? Scaling::Nearest : Scaling::Sharp;
+        }
+        else if (k == "battery_saver") batterySaver = on;
+        else if (k == "mute") mute = on;
+        else if (k == "run_in_background") runInBackground = on;
+        else if (k == "fast_forward_speed") { const int n = atoi(v.c_str()); fastSpeed = n >= 2 ? std::min(n, 4) : 0; }
+        else if (k == "fast_forward_toggle") fastToggle = on;
+        else if (k == "fast_boot") fastBoot = on;
+        else if (k == "hide_pointer") hidePointer = on;
+        else if (k == "cursor_speed") cursorSpeed = std::clamp(atoi(v.c_str()), 50, 200);
+        else if (k == "left_handed") leftHanded = on;
+        else if (k == "window_position")
+        {
+            const size_t c = v.find(',');
+            if (c != std::string::npos)
+            {
+                windowX = std::clamp(atoi(v.c_str()), -16384, 16384);
+                windowY = std::clamp(atoi(v.c_str() + c + 1), -16384, 16384);
+            }
+        }
         else if (k == "volume") volume = std::clamp(atoi(v.c_str()), 0, 100);
         else if (k == "fast_forward_sound") fastSound = on;
         else if (k == "stick_cursor") stickCursor = on;
@@ -63,6 +110,7 @@ bool Settings::Load(const std::string& path)
             {
                 windowW = std::clamp(atoi(v.c_str()), 320, 16384);
                 windowH = std::clamp(atoi(v.c_str() + x + 1), 240, 16384);
+                windowKnown = true;
             }
         }
         else fprintf(stderr, "settings: unknown key %s\n", k.c_str());
@@ -97,12 +145,22 @@ bool Settings::Save(const std::string& path) const
         << "widescreen=" << (widescreen ? 1 : 0) << "\n"
         << "interpolate_60=" << (interpolate60 ? 1 : 0) << "\n"
         << "fullscreen=" << (fullscreen ? 1 : 0) << "\n"
-        << "smooth_scaling=" << (smoothScaling ? 1 : 0) << "\n"
+        << "scaling=" << ScalingKey(scaling) << "\n"
+        << "battery_saver=" << (batterySaver ? 1 : 0) << "\n"
         << "window=" << windowW << "x" << windowH << "\n"
+        << "window_position=" << windowX << "," << windowY << "\n"
         << "volume=" << volume << "\n"
+        << "mute=" << (mute ? 1 : 0) << "\n"
         << "fast_forward_sound=" << (fastSound ? 1 : 0) << "\n"
+        << "run_in_background=" << (runInBackground ? 1 : 0) << "\n"
+        << "fast_forward_speed=" << fastSpeed << "\n"
+        << "fast_forward_toggle=" << (fastToggle ? 1 : 0) << "\n"
+        << "fast_boot=" << (fastBoot ? 1 : 0) << "\n"
+        << "hide_pointer=" << (hidePointer ? 1 : 0) << "\n"
         << "stick_cursor=" << (stickCursor ? 1 : 0) << "\n"
+        << "cursor_speed=" << cursorSpeed << "\n"
         << "stick_dead_zone=" << stickDeadZone << "\n"
+        << "left_handed=" << (leftHanded ? 1 : 0) << "\n"
         << "trigger_threshold=" << triggerThreshold << "\n"
         << "rumble=" << (rumble ? 1 : 0) << "\n"
         << "language=" << language << "\n"

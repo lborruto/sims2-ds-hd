@@ -170,6 +170,7 @@ void AddThumb(Items& it, std::vector<UiItem>& images, const Thumb& t, Rect r)
 void ChangeRow(Row r, int dir, Settings& s)
 {
     const int d = dir < 0 ? -1 : 1;
+    auto cycle = [&](int v, int n) { return (v + n + d) % n; };
     switch (r)
     {
     case Row::Layout:
@@ -181,27 +182,60 @@ void ChangeRow(Row r, int dir, Settings& s)
         break;
     }
     case Row::Fullscreen: s.fullscreen = !s.fullscreen; break;
-    case Row::Smooth: s.smoothScaling = !s.smoothScaling; break;
+    case Row::Scaling: s.scaling = (Scaling)cycle((int)s.scaling, 3); break;
     case Row::Res3D: s.resolution3D = std::clamp(s.resolution3D + d, 1, 4); break;
     case Row::Wide: s.widescreen = !s.widescreen; break;
     case Row::Fps60: s.interpolate60 = !s.interpolate60; break;
-    case Row::Volume: s.volume = std::clamp(s.volume + 10 * d, 0, 100); break;
+    case Row::Battery: s.batterySaver = !s.batterySaver; break;
+    case Row::Volume: s.volume = std::clamp(s.volume + 5 * d, 0, 100); break;
+    case Row::Mute: s.mute = !s.mute; break;
     case Row::FastSound: s.fastSound = !s.fastSound; break;
+    case Row::Background: s.runInBackground = !s.runInBackground; break;
+    case Row::FastSpeed:
+    {
+        // Maximum (0), then 2, 3, 4 times.
+        static const int speeds[] = {0, 2, 3, 4};
+        int i = 0;
+        while (i < 4 && speeds[i] != s.fastSpeed) i++;
+        s.fastSpeed = speeds[cycle(i == 4 ? 0 : i, 4)];
+        break;
+    }
+    case Row::FastKey: s.fastToggle = !s.fastToggle; break;
+    case Row::FastBoot: s.fastBoot = !s.fastBoot; break;
+    case Row::HidePointer: s.hidePointer = !s.hidePointer; break;
     case Row::StickCursor: s.stickCursor = !s.stickCursor; break;
+    case Row::CursorSpeed: s.cursorSpeed = std::clamp(s.cursorSpeed + 25 * d, 50, 200); break;
     case Row::DeadZone: s.stickDeadZone = std::clamp(s.stickDeadZone + 5 * d, 5, 60); break;
+    case Row::LeftHanded: s.leftHanded = !s.leftHanded; break;
     case Row::Trigger: s.triggerThreshold = std::clamp(s.triggerThreshold + 10 * d, 10, 90); break;
     case Row::Rumble: s.rumble = !s.rumble; break;
-    case Row::Mic: s.mic = (MicMode)(((int)s.mic + 3 + d) % 3); break;
-    case Row::Language: s.language = (s.language + 6 + d) % 6; break;
+    case Row::Mic: s.mic = (MicMode)cycle((int)s.mic, 3); break;
+    case Row::Language: s.language = cycle(s.language, 6); break;
     case Row::Count: break;
     }
 }
 
 std::string RowLabel(Row r, int lang)
 {
-    static const W words[kRows] = {W::SetLayout, W::SetFullscreen, W::SetSmooth, W::SetRes3D, W::SetWide, W::SetFps60, W::SetVolume,
-                                   W::SetFastSound, W::SetStickCursor, W::SetDeadZone, W::SetTrigger, W::SetRumble, W::SetMic, W::SetLanguage};
+    static const W words[kRows] = {W::SetLayout, W::SetFullscreen, W::SetScaling, W::SetRes3D, W::SetWide, W::SetFps60, W::SetBattery,
+                                   W::SetVolume, W::SetMute, W::SetFastSound, W::SetBackground,
+                                   W::SetFastSpeed, W::SetFastKey, W::SetFastBoot,
+                                   W::SetHidePointer, W::SetStickCursor, W::SetCursorSpeed, W::SetDeadZone, W::SetLeftHanded, W::SetTrigger, W::SetRumble,
+                                   W::SetMic, W::SetLanguage};
     return (int)r >= 0 && (int)r < kRows ? Wd(lang, words[(int)r]) : "";
+}
+
+int RowNote(Row r)
+{
+    switch (r)
+    {
+    case Row::Scaling: return (int)W::ScalingNote;
+    case Row::Battery: return (int)W::BatteryNote;
+    case Row::Background: return (int)W::BackgroundNote;
+    case Row::FastBoot: return (int)W::FastBootNote;
+    case Row::Language: return (int)W::LangNote;
+    default: return (int)W::Count;
+    }
 }
 
 std::string RowValue(Row r, const Settings& s, int lang)
@@ -217,14 +251,23 @@ std::string RowValue(Row r, const Settings& s, int lang)
         return "";
     }
     case Row::Fullscreen: return onOff(s.fullscreen);
-    case Row::Smooth: return onOff(s.smoothScaling);
+    case Row::Scaling: return Wd(lang, s.scaling == Scaling::Smooth ? W::ScaleSmooth : s.scaling == Scaling::Nearest ? W::ScaleNearest : W::ScaleSharp);
     case Row::Res3D: return std::to_string(s.resolution3D) + "\xC3\x97"; // "2×"
     case Row::Wide: return onOff(s.widescreen);
     case Row::Fps60: return onOff(s.interpolate60);
+    case Row::Battery: return onOff(s.batterySaver);
     case Row::Volume: return std::to_string(s.volume) + " %";
+    case Row::Mute: return onOff(s.mute);
     case Row::FastSound: return onOff(s.fastSound);
+    case Row::Background: return onOff(s.runInBackground);
+    case Row::FastSpeed: return s.fastSpeed >= 2 ? std::to_string(s.fastSpeed) + "\xC3\x97" : Wd(lang, W::FastMax);
+    case Row::FastKey: return Wd(lang, s.fastToggle ? W::FastPress : W::FastHold);
+    case Row::FastBoot: return onOff(s.fastBoot);
+    case Row::HidePointer: return onOff(s.hidePointer);
     case Row::StickCursor: return onOff(s.stickCursor);
+    case Row::CursorSpeed: return std::to_string(s.cursorSpeed) + " %";
     case Row::DeadZone: return std::to_string(s.stickDeadZone) + " %";
+    case Row::LeftHanded: return onOff(s.leftHanded);
     case Row::Trigger: return std::to_string(s.triggerThreshold) + " %";
     case Row::Rumble: return onOff(s.rumble);
     case Row::Mic: return s.mic == MicMode::Off ? Wd(lang, W::ShellOff) : s.mic == MicMode::Real ? Wd(lang, W::SetMic) : Wd(lang, W::MicBlowKey);
@@ -237,12 +280,6 @@ std::string RowValue(Row r, const Settings& s, int lang)
     case Row::Count: break;
     }
     return "";
-}
-
-int LanguageOfLocale(const std::string& l)
-{
-    const std::string p = l.substr(0, 2);
-    return p == "fr" ? 2 : p == "de" ? 3 : p == "it" ? 4 : p == "es" ? 5 : 1;
 }
 
 std::string ActionLabel(int a, int lang)
@@ -676,7 +713,16 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         {
             static const W words[] = {W::ShellResume, W::ShellSettings, W::ShellControls, W::ShellStates, W::ShellChangeGame, W::ShellOpenFolder, W::ShellQuit};
             const std::vector<MainItem> e = MainEntries(m);
-            const int n = (int)e.size(), step = 64, top = c.y + (c.h - (n * step - 8)) / 2;
+            // The banner (the save written elsewhere) over the buttons, warm, kept while it lasts.
+            const int bannerH = m.banner.empty() ? 0 : 48;
+            if (bannerH)
+            {
+                UiItem b = TextItem({c.x + 8, c.y - 6, c.w - 16, bannerH + 4}, m.banner, 18, Align::Centre);
+                b.middle = true;
+                b.colour = kWarm;
+                it.Add(1, b);
+            }
+            const int n = (int)e.size(), step = bannerH ? 58 : 64, top = c.y + bannerH + (c.h - bannerH - (n * step - 8)) / 2;
             for (int i = 0; i < n; i++)
             {
                 const Rect r {c.x + 120, top + i * step, c.w - 240, step - 8};
@@ -755,9 +801,9 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             }
             if (page == Page::Settings)
             {
-                if (focus == (int)Row::Language)
+                if (const int nw = focus >= 0 && focus < kRows ? RowNote((Row)focus) : (int)W::Count; nw != (int)W::Count)
                 {
-                    UiItem note = TextItem({c.x + 8, top + kListRows * kRowStep, c.w - 16, 40}, Wd(lang, W::LangNote), 19);
+                    UiItem note = TextItem({c.x + 8, top + kListRows * kRowStep - 4, c.w - 16, 52}, Wd(lang, (W)nw), 18);
                     note.middle = true;
                     note.colour = kDim;
                     it.Add(1, note);

@@ -36,6 +36,7 @@ struct ShellHost
     unsigned captureUntil = 0; // SDL ticks
     long frame = 0;            // (for the log)
     int autoLanguage = 1;      // the words without the game's strings (the launch panel): the computer's
+    std::string saveElsewhere; // the game's save is not beside the ROM (its folder is read-only): where it is (the main page's banner)
 
     bool Open() const { return shell.open; }
     // The pause menu opens on page p (the game stands still meanwhile).

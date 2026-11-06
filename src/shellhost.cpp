@@ -96,6 +96,7 @@ void ShellHost::Refresh(const App& app, const Input& input)
     model.statesOk = data.Ok();
     model.canUndo = canUndo; // (no file look-up a frame: kept as the writes leave it)
     model.canOpenFolder = !headless && data.Ok();
+    model.banner = saveElsewhere.empty() ? "" : Fill(OwnWordIn(model.language, W::SaveElsewhere), saveElsewhere);
 }
 
 void ShellHost::LoadSlots()
@@ -156,16 +157,9 @@ void ShellHost::ApplySetting(App& app, Video& video, int row)
     {
     case shell::Row::Layout: app.layout = s.layout; break;
     case shell::Row::Fullscreen: if (video.win) video.SetFullscreen(s.fullscreen); break;
-    case shell::Row::Smooth: if (video.win) video.SetSmooth(s.smoothScaling); break;
-    case shell::Row::Language:
-        // The HD screens' words at once (the game's strings and the port's own); the game's
-        // own text keeps the DS's language.
-        if (app.rom && app.nds)
-        {
-            const int lang = s.language >= 1 && s.language <= 5 ? s.language : GameLanguage(*app.nds);
-            if (app.rom->LoadStrings(lang)) app.hudStrings = HudStringsFrom(app.rom.get());
-        }
-        break;
+    case shell::Row::Scaling: if (video.win) video.SetScaling(s.scaling); break;
+    // (The language: the DS's firmware and the strings are chosen when the game starts; the row's
+    // note says so. The battery saver, the volume, mute and the rest are read where they are used.)
     default: break; // (read where they are used, every frame)
     }
     SaveSettings(app);

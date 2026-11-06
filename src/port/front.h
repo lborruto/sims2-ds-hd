@@ -75,6 +75,11 @@ constexpr Rect FrontButtonRect(int i) { return {kFrButtonX, kFrButtonY0 + i * kF
 // Whether the front end shows one of this file's screens, and its view (valid false otherwise:
 // milestone 1's front-end picture): the boot (a splash 0-3, 5, 6), the title, the main menu, read
 // from RAM, with the game's strings. Built every frame by the navigator's caller and CONSOLE.
+// The boot goes by on its own: nothing up yet, the intro video, or a splash that takes no touch
+// (the legal, EA and Maxis ones, modes 1-3, and the zoom and blank between, 5-6). False from the
+// last splash (mode 0, "Touch the Touch Screen"), a popup splash (4) or any other screen: fast
+// boot (main.cpp) runs only while this holds, and never presses anything.
+bool BootPassesBy(const GameState& g);
 MenuView FrontView(ScreenState s, const GameState* game, const RomData* rom);
 // The same without the strings' check (tests): rom null leaves the words empty.
 MenuView FrontViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);

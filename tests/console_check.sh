@@ -1911,6 +1911,7 @@ pad_cas pad-cas-looks s3 cas-looks 640 &
 pad_cas pad-cas-keep s4 cas-keep 400 &
 wait
 pad_cas pad-cas-cross s4 cas-cross 200 &
+pad_cas pad-cas-type s3 cas-type 260 &
 pad_cas pad-cas-turn s3 cas-turn 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-turn" &
 pad_cas pad-cas-still s3 cas-cross 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-still" &
 wait
@@ -1920,6 +1921,13 @@ cas_name() {
     ! grep -q -E 'len=[89]' "$tmp/pad-cas-name.log" || { echo "  pad-cas-name: past seven"; return 1; }
 }
 cas_empty() { in_order pad-cas-empty 'name= len=0' 'name=A len=1'; }
+# The name typed on the keyboard (Input::TypeName, scripts/console/cas-type.txt): the game's own keys
+# and page labels tapped, never more than seven, committed by Start.
+cas_type() {
+    in_order pad-cas-type 'name=Si len=2 keyboard=0' 'name=Si len=2 keyboard=1' 'name=Sia len=3' 'name=Sia len=3 keyboard=0' 'name=SiaB len=4' \
+        'keyboard=2' 'name=SiaB1 len=5' 'name=SiaB1x len=6' 'name=SiaB1xy len=7' 'cas page=1 .* switching' 'simname=SiaB1xy ' || return 1
+    ! grep -q -E 'len=[89]' "$tmp/pad-cas-type.log" || { echo "  pad-cas-type: past seven"; return 1; }
+}
 cas_looks() {
     in_order pad-cas-looks 'cas page=0 gender=1 ' 'gender=1 .*skin=1 ' 'cas page=1 ' 'haircolour=4 hair=0 ' 'haircolour=4 hair=1 scroll=0' 'scroll=1' 'scroll=2' 'scroll=3' \
         'scroll=2' 'scroll=1' 'scroll=0' 'cas page=2 ' 'face=4' 'cas page=3 ' 'item=15' 'clothespage=1 item=15'
@@ -1940,6 +1948,7 @@ sys.exit(0 if ImageChops.difference(a, b).getbbox() else 1)' "$tmp/pad-cas-turn/
 }
 check_pad pad-cas-name cas_name
 check_pad pad-cas-empty cas_empty
+check_pad pad-cas-type cas_type
 check_pad pad-cas-looks cas_looks
 check_pad pad-cas-keep cas_keep
 check_pad pad-cas-cross cas_cross
@@ -2575,5 +2584,59 @@ sys.exit(1 if bad else 0)
 PYEOF
 then echo "ok   shell pictures: the pause menu's pages and the launch panel"
 else echo "FAIL shell pictures"; fails=$((fails + 1)); fi
+# Platform (task 5). The game's language: --game-language 2 sets the DS firmware's, so the boot's
+# last splash (frame 900, a fresh boot) says the game's French words: its touch screen differs from
+# English's and the strings load in French; fast boot (--fast-boot, the window's rule, logged) ends
+# at that splash and never before it, pressed nothing (the title still waits: an A then opens it);
+# a press during the splashes ends it at once. A save that cannot be written beside the ROM (a
+# read-only file in a read-only folder) goes to the data folder's saves/, a copy first, and the
+# game's own save (Options > Save > slot 2) lands there, the original untouched.
+for l in 1 2; do
+    cp "$complete_save" "$tmp/lang$l.sav"
+    "$bin" "$rom" --headless --frames 902 --save "$tmp/lang$l.sav" --game-language $l --shot-at 900 --shot-dir "$tmp/lang$l" \
+        > "$tmp/lang$l.log" 2>&1 && grep -q '^clock: ' "$tmp/lang$l.log" && touch "$tmp/lang$l.ok" &
+done
+wait
+if [ -f "$tmp/lang1.ok" ] && [ -f "$tmp/lang2.ok" ] && grep -q 'firmware language: 2' "$tmp/lang2.log" &&
+   "$python" -I -c '
+import sys
+from PIL import Image, ImageChops
+a, b = (Image.open(p).convert("RGB").crop((0, 192, 256, 384)) for p in sys.argv[1:3])
+sys.exit(0 if ImageChops.difference(a, b).getbbox() else 1)' "$tmp/lang1/f000900.png" "$tmp/lang2/f000900.png"
+then echo "ok   game-language: the firmware's French reaches the game (the last splash differs from English's)"
+else echo "FAIL game-language"; fails=$((fails + 1)); fi
+printf '900 2 pad a\n' > "$tmp/fastboot-a.txt"
+printf '100 2 pad a\n' > "$tmp/fastboot-early.txt"
+cp "$complete_save" "$tmp/fastboot.sav"
+"$bin" "$rom" --headless --frames 1000 --save "$tmp/fastboot.sav" --fast-boot --layout console --print-front --input "$tmp/fastboot-a.txt" \
+    > "$tmp/fastboot.log" 2>&1 && grep -q '^clock: ' "$tmp/fastboot.log" && touch "$tmp/fastboot.ok" &
+cp "$complete_save" "$tmp/fastboot-early.sav"
+"$bin" "$rom" --headless --frames 200 --save "$tmp/fastboot-early.sav" --fast-boot --layout console --input "$tmp/fastboot-early.txt" \
+    > "$tmp/fastboot-early.log" 2>&1 && grep -q '^clock: ' "$tmp/fastboot-early.log" && touch "$tmp/fastboot-early.ok" &
+wait
+fastboot() {
+    in_order fastboot 'fast boot: on' 'fast boot: done \(the boot waits for a touch\)' 'front Title' || return 1
+    [ "$(first_frame fastboot 'fast boot: done')" = "$(first_frame fastboot 'boot mode=0 ')" ] || { echo "  fastboot: not done on the last splash's first frame"; return 1; }
+    local f; f=$(first_frame fastboot 'fast boot: done')
+    [ -n "$f" ] && [ "$f" -ge 800 ] && [ "$f" -le 900 ] || { echo "  fastboot: done at frame $f, not at the last splash"; return 1; }
+    [ "$(first_frame fastboot 'front Title')" -ge 900 ] || { echo "  fastboot: the title before the A"; return 1; }
+    grep -q '^frame 100: fast boot: done (a press)' "$tmp/fastboot-early.log" || { echo "  fastboot: a press did not end it"; return 1; }
+    [ -f "$tmp/fastboot-early.ok" ]
+}
+check_pad fastboot fastboot
+mkdir -p "$tmp/ro" "$tmp/ro-data"
+"$bin" "$rom" --headless --frames 1 --state-load "$shots/B-st-opt-save.st" --save "$tmp/ro/game.sav" > /dev/null 2>&1
+chmod 444 "$tmp/ro/game.sav"; chmod 555 "$tmp/ro"
+ro_before=$(cksum < "$tmp/ro/game.sav")
+"$bin" "$rom" --headless --frames 300 --state-load "$shots/B-st-opt-save.st" --save "$tmp/ro/game.sav" --data-dir "$tmp/ro-data" \
+    --layout console --print-town "${town[@]}" --input "$repo/scripts/console/saveslots-save.txt" > "$tmp/save-elsewhere.log" 2>&1 &&
+    grep -q '^clock: ' "$tmp/save-elsewhere.log" && touch "$tmp/save-elsewhere.ok"
+chmod 755 "$tmp/ro"; chmod 644 "$tmp/ro/game.sav"
+save_elsewhere() {
+    in_order save-elsewhere 'cannot be written: the game saves to .*/ro-data/saves/game.sav' 'saves current=1 0=empty 1=Sim' || return 1
+    [ "$(cksum < "$tmp/ro/game.sav")" = "$ro_before" ] || { echo "  save-elsewhere: the read-only save changed"; return 1; }
+    [ -f "$tmp/ro-data/saves/game.sav" ] && [ "$(cksum < "$tmp/ro-data/saves/game.sav")" != "$ro_before" ] || { echo "  save-elsewhere: the game's save not in saves/"; return 1; }
+}
+check_pad save-elsewhere save_elsewhere
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

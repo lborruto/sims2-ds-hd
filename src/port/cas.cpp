@@ -97,6 +97,41 @@ std::string CasNameText(const std::string& name)
     return o;
 }
 
+CasType CasTypeAction(const CasState& cs, const RomData& rom, const std::string& typed)
+{
+    CasType t;
+    if (!cs.valid || cs.page != 0 || !cs.nameKnown || typed.empty()) return t;
+    if (typed == "\b")
+    {
+        if (!cs.name.empty()) t.taps = {Tap(kCasBackX, kCasBackY)};
+        return t;
+    }
+    if (cs.nameLength >= kCasName) return t;
+    const std::string ch = typed == "$" ? "\xC2\xA7" : typed;
+    auto lower = [](std::string s) { for (char& c : s) if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a'); return s; };
+    const int kb = std::clamp(cs.keyboard, 0, 2);
+    // The page shown first, then the others; the exact character, then a letter's other case
+    // (the game's keyboards have both).
+    for (int pass = 0; pass < 2; pass++)
+        for (int n = 0; n < 3; n++)
+        {
+            const int page = (kb + n) % 3;
+            for (int i = 0; i < kCasKeyCount[page]; i++)
+            {
+                const std::string key = CasKeyText(rom, page, i);
+                if (key.empty() || (pass == 0 ? key != ch : lower(key) != lower(ch))) continue;
+                if (page == kb) t.taps = {Tap(kCasKeyX0 + kCasKeyDx * (i % 9), kCasKeyY0 + kCasKeyDy * (i / 9))};
+                else
+                {
+                    t.taps = {Tap(kCasKbX, kCasKbY[page])};
+                    t.done = false;
+                }
+                return t;
+            }
+        }
+    return t;
+}
+
 MenuView CasView(ScreenState s, const GameState* game, const RomData* rom)
 {
     if (!game || !rom || rom->StringCount() <= kStrCasKeep) return {};

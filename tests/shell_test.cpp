@@ -11,6 +11,7 @@
 
 #include <cstdio>
 #include <filesystem>
+#include <fstream>
 #include <set>
 #include <string>
 
@@ -176,6 +177,19 @@ static void settings_page()
         for (int k = 0; k < 20; k++) sh.Update(Press("right"), f.m);
         CHECK(f.s.volume >= 0 && f.s.volume <= 100 && f.s.resolution3D >= 1 && f.s.resolution3D <= 4 && f.s.stickDeadZone >= 5 &&
               f.s.stickDeadZone <= 60 && f.s.triggerThreshold >= 10 && f.s.triggerThreshold <= 90 && f.s.language >= 0 && f.s.language <= 5);
+        CHECK(f.s.cursorSpeed >= 50 && f.s.cursorSpeed <= 200 && (f.s.fastSpeed == 0 || (f.s.fastSpeed >= 2 && f.s.fastSpeed <= 4)) &&
+              (int)f.s.scaling >= 0 && (int)f.s.scaling <= 2);
+        // Every row's value changed by Right, and back by Left (cycles and toggles; a range from its middle).
+        {
+            Settings a;
+            a.volume = 50; a.cursorSpeed = 100; a.resolution3D = 2; a.stickDeadZone = 25; a.triggerThreshold = 50;
+            Settings b = a;
+            ChangeRow((Row)r, 1, b);
+            CHECK(RowValue((Row)r, a, 1) != RowValue((Row)r, b, 1));
+            ChangeRow((Row)r, -1, b);
+            CHECK(RowValue((Row)r, a, 1) == RowValue((Row)r, b, 1));
+            CHECK(!RowLabel((Row)r, 1).empty());
+        }
         for (int k = 0; k < 40; k++) sh.Update(Press("left"), f.m);
         CHECK(f.s.volume >= 0 && f.s.resolution3D >= 1);
         (void)before;
@@ -199,8 +213,14 @@ static void settings_page()
             sh.scroll = std::max(0, r - 7);
             CheckBuild(sh, f.m, "settings");
         }
-        sh.focus = (int)Row::Language;
-        CheckBuild(sh, f.m, "settings language");
+        // Each row with a note: the note shown under the list, inside the canvas.
+        for (int r = 0; r < kRows; r++)
+            if (RowNote((Row)r) != (int)OwnWordId::Count)
+            {
+                sh.focus = r;
+                sh.scroll = std::max(0, r - 7);
+                CheckBuild(sh, f.m, "settings note");
+            }
     }
     CHECK(sh.Update(Press("b"), f.m).act == Act::None && sh.page == Page::Main);
 }
@@ -422,7 +442,7 @@ static void mouse()
     f.s.volume = 50;
     in.mx = v.x + 10.0f;
     in.my = v.y + v.h / 2.0f;
-    CHECK(sh.Update(in, f.m).act == Act::Setting && f.s.volume == 40);
+    CHECK(sh.Update(in, f.m).act == Act::Setting && f.s.volume == 45);
     in.mx = v.x + v.w - 10.0f;
     sh.Update(in, f.m);
     CHECK(f.s.volume == 50);
@@ -496,6 +516,87 @@ static void files()
     fs::remove_all(dir);
 }
 
+// Task 5's pure parts: the window's first size, a screenshot's name, the save's writability and
+// its fallback, the settings file's new keys, the main page's banner.
+static void platform()
+{
+    // The window: 1280 x 720 on a large screen, 16:9 within 85 % on a small one, a remembered
+    // size kept when it fits, shrunk (its shape kept) when it does not.
+    int w = 0, h = 0;
+    FitWindow(2560, 1400, false, w, h);
+    CHECK(w == 1280 && h == 720);
+    FitWindow(1366, 728, false, w, h);
+    CHECK(w <= 1366 * 85 / 100 && h <= 728 * 85 / 100 && std::abs(w * 9 - h * 16) <= 32);
+    w = 1000, h = 900;
+    FitWindow(2560, 1400, true, w, h);
+    CHECK(w == 1000 && h == 900);
+    w = 3000, h = 1500;
+    FitWindow(1920, 1040, true, w, h);
+    CHECK(w <= 1632 && h <= 884 && std::abs(w - 2 * h) <= 4);
+    w = 640, h = 480;
+    FitWindow(0, 0, false, w, h);
+    CHECK(w == 640 && h == 480);
+    // A screenshot's name: the date and time, a number for a second one in the same second.
+    const std::string n1 = ShotName(1762430000), n2 = ShotName(1762430000, 2);
+    CHECK(n1.rfind("sims2-", 0) == 0 && n1.size() == std::string("sims2-20251106-120000.png").size() && n1.substr(n1.size() - 4) == ".png");
+    CHECK(n2 == n1.substr(0, n1.size() - 4) + "-2.png");
+    // The locale's language.
+    CHECK(LanguageOfLocale("fr_FR") == 2 && LanguageOfLocale("de") == 3 && LanguageOfLocale("it_CH") == 4 && LanguageOfLocale("es") == 5 &&
+          LanguageOfLocale("en_GB") == 1 && LanguageOfLocale("ja") == 1 && LanguageOfLocale("") == 1);
+    // Writability: a file made in a folder and removed again; a read-only file refused; the fallback.
+    namespace fs = std::filesystem;
+    const fs::path dir = fs::temp_directory_path() / ("sims2wide-shell-test-" + std::to_string((long long)SDL_GetTicks64()));
+    fs::create_directories(dir);
+    const std::string fresh = (dir / "new.sav").string();
+    CHECK(CanWrite(fresh) && !FileExists(fresh));
+    { std::ofstream(dir / "ro.sav") << "x"; }
+    fs::permissions(dir / "ro.sav", fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read, fs::perm_options::replace);
+    {
+        // (Refused, unless the system lets this user write a read-only file anyway: root.)
+        FILE* u = fopen((dir / "ro.sav").string().c_str(), "r+b");
+        CHECK(CanWrite((dir / "ro.sav").string()) == (u != nullptr));
+        if (u) fclose(u);
+        else CHECK(!CanWrite((dir / "ro.sav").string()));
+    }
+    fs::permissions(dir / "ro.sav", fs::perms::owner_write, fs::perm_options::add);
+    CHECK(CanWrite((dir / "ro.sav").string()));
+    CHECK(!CanWrite((dir / "no-such-folder" / "x.sav").string()));
+    DataDir d;
+    CHECK(SaveFallback(d, "/roms/game.sav").empty());
+    d.root = (dir / "data").string() + "/";
+    CHECK(SaveFallback(d, "/roms/game.sav") == d.root + "saves/game.sav" && fs::is_directory(d.root + "saves"));
+    CHECK(fs::is_directory(d.Screenshots()));
+    // The settings file: every new key round-trips; the old smooth_scaling on reads as Smooth, off as the default.
+    {
+        Settings a;
+        a.scaling = Scaling::Nearest; a.batterySaver = true; a.mute = true; a.runInBackground = true; a.fastSpeed = 3; a.fastToggle = true;
+        a.fastBoot = false; a.hidePointer = false; a.cursorSpeed = 175; a.leftHanded = true; a.volume = 35; a.windowX = 40; a.windowY = 60;
+        const std::string path = (dir / "settings.ini").string();
+        CHECK(a.Save(path));
+        Settings b;
+        CHECK(b.Load(path));
+        CHECK(b.scaling == Scaling::Nearest && b.batterySaver && b.mute && b.runInBackground && b.fastSpeed == 3 && b.fastToggle && !b.fastBoot &&
+              !b.hidePointer && b.cursorSpeed == 175 && b.leftHanded && b.volume == 35 && b.windowX == 40 && b.windowY == 60 && b.windowKnown);
+        CHECK(b.Res3D() == 1 && !b.Interpolate60());
+        { std::ofstream(path) << "smooth_scaling=1\n"; }
+        Settings c;
+        c.Load(path);
+        CHECK(c.scaling == Scaling::Smooth && !c.windowKnown);
+        { std::ofstream(path) << "smooth_scaling=0\nfast_forward_speed=9\ncursor_speed=5\n"; }
+        Settings e;
+        e.Load(path);
+        CHECK(e.scaling == Scaling::Sharp && e.fastSpeed == 4 && e.cursorSpeed == 50);
+    }
+    fs::remove_all(dir);
+    // The main page's banner: shown, the buttons still inside the panel and reachable.
+    Fixture f;
+    f.m.banner = "The ROM's folder is read-only: the game saves to /a/very/long/path/to/the/settings/folder/saves/sims2-eu.sav";
+    Shell sh;
+    sh.Open(Page::Main);
+    CheckBuild(sh, f.m, "main banner");
+    CheckReach(sh, f.m, "main banner");
+}
+
 int main(int, char**)
 {
     main_page();
@@ -507,6 +608,7 @@ int main(int, char**)
     pad_fallback();
     other_rom();
     files();
+    platform();
     if (failures) { fprintf(stderr, "shell_test: %d failure(s)\n", failures); return 1; }
     printf("shell_test: ok\n");
     return 0;

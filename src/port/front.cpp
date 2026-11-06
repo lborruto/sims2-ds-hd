@@ -65,6 +65,13 @@ Rect FrontFit(Rect box, int w, int h)
 Rect FrontTopFrom(int topW, int topH) { return TopFrom(topW, topH); }
 void FrontFramed(Composition& c, Piece p) { FramedPiece(c, p); }
 
+bool BootPassesBy(const GameState& g)
+{
+    const FrontState& f = g.front;
+    if (f.boot.valid) return (f.boot.mode >= 1 && f.boot.mode <= 3) || f.boot.mode == 5 || f.boot.mode == 6;
+    return f.kind == FrontKind::None || f.kind == FrontKind::Video || f.kind == FrontKind::Boot;
+}
+
 MenuView FrontView(ScreenState s, const GameState* game, const RomData* rom)
 {
     if (!game || !rom || rom->StringCount() <= kStrFrMenu[2]) return {};

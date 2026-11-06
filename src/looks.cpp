@@ -40,9 +40,9 @@ void Looks::Apply(App& app)
 {
     const Settings& s = app.settings;
     melonDS::NDS& nds = *app.nds;
-    const int n = std::clamp(s.resolution3D, 1, 8);
+    const int n = std::clamp(s.Res3D(), 1, 8);
     const bool on = n > 1 || s.widescreen;
-    melonDS::Looks3D.InterpolationEnabled = s.interpolate60;
+    melonDS::Looks3D.InterpolationEnabled = s.Interpolate60();
     if (!on)
     {
         if (wasOn)

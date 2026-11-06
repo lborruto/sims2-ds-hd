@@ -16,6 +16,15 @@ bool Audio::Open()
     return dev != 0;
 }
 
+void Audio::Pause(bool on)
+{
+    if (on == paused || !dev) return;
+    paused = on;
+    if (on) SDL_ClearQueuedAudio(dev);
+    SDL_PauseAudioDevice(dev, on ? 1 : 0);
+    lastTick = 0;
+}
+
 void Audio::Frame(melonDS::NDS& nds, bool fast, const Settings& s)
 {
     const int n = nds.SPU.ReadOutput(buf.data(), 4096);
@@ -32,7 +41,7 @@ void Audio::Frame(melonDS::NDS& nds, bool fast, const Settings& s)
         if (dt < 0.25) slow += (std::min(dt / kFrameTime, 4.0) - slow) * 0.03;
     }
     lastTick = t;
-    if (fast && !s.fastSound) return; // muted: the frame's sound is dropped
+    if ((fast && !s.fastSound) || s.mute || s.volume == 0) return; // muted: the frame's sound is dropped
     double slowdown = fast ? 1.0 : slow;
     if (stretch.Stretching() && !fast) slowdown *= 1.0 + 0.5 * (4800 - queued) / 4800.0;
     out.clear();

@@ -11,6 +11,9 @@
 namespace sims2wide
 {
 enum class MicMode { Off, BlowKey, Real }; // Real: the computer's microphone (asks permission)
+// How the window scales the DS's pictures: Sharp (nearest to the next whole factor, then smooth to
+// the size: crisp pixels without uneven ones), Smooth (bilinear) or Nearest (raw pixels).
+enum class Scaling { Sharp, Smooth, Nearest };
 
 struct Settings
 {
@@ -26,21 +29,45 @@ struct Settings
 
     // Comfort
     bool fullscreen = false;    // borderless, the desktop's size (F11)
-    bool smoothScaling = false; // linear instead of nearest when scaling the screens
+    Scaling scaling = Scaling::Sharp;
+    bool batterySaver = false;  // the looks at their lightest (3D 1x, 30 fps) without changing their settings
     int windowW = 1280, windowH = 720; // the window's size when it last closed
-    int volume = 100;           // 0 to 100
+    bool windowKnown = false;   // (not saved) the file gave window=: else the size comes from the screen
+    int windowX = -1, windowY = -1;    // its place when it last closed (-1: centred)
+    int volume = 100;           // 0 to 100, by 5
+    bool mute = false;
     bool fastSound = false;     // sound during fast forward (at normal pitch, skipping); off: muted
+    bool runInBackground = false; // off: the game pauses (and is silent) while the window is not in front
+    int fastSpeed = 0;          // fast forward: 0 as fast as the computer goes, else 2..4 times
+    bool fastToggle = false;    // the fast forward key: held (off) or pressed once on, once off
+    bool fastBoot = true;       // the boot's splashes (which take no touch) run at full speed
+    bool hidePointer = true;    // the mouse pointer hidden after a few seconds still
     bool stickCursor = true;    // a controller's right stick moves a cursor on the touch screen
+    int cursorSpeed = 100;      // the stick cursor's and the minigames' pointer's speed, percent (50 to 200)
     int stickDeadZone = 25;     // percent of a stick's travel read as centred (5 to 60)
+    bool leftHanded = false;    // the two sticks swapped
     int triggerThreshold = 50;  // percent of a trigger's travel past which it is pressed (10 to 90)
     bool rumble = true;         // a short buzz when a controller connects (pads with a motor)
-    int language = 0;           // the HD words' language: 0 automatic (the DS's), 1 English .. 5 Spanish
+    // The game's language (the DS firmware's, which the game reads when it starts, and the strings
+    // the HD screens read) and the HD words': 0 automatic (the computer's), 1 English .. 5 Spanish.
+    // A change applies the next time the game starts.
+    int language = 0;
     Controls::Bindings controls;
 
     // settings.ini in SDL's per-user folder ("" when SDL has none).
     static std::string DefaultPath();
+    // The looks with the battery saver: what the window shows (the settings keep the player's).
+    int Res3D() const { return batterySaver ? 1 : resolution3D; }
+    bool Interpolate60() const { return batterySaver ? false : interpolate60; }
     // false: no file yet (the defaults stay) or cannot write.
     bool Load(const std::string& path);
     bool Save(const std::string& path) const;
 };
+
+// The window's first size on a screen whose usable area (without the task bar or the menu bar) is
+// usableW x usableH: 16:9, at most 85 % of it, 1280 x 720 when that fits, never past it; a size
+// remembered from another screen made to fit the same way (w, h in and out; aspect kept).
+void FitWindow(int usableW, int usableH, bool known, int& w, int& h);
+// The language a locale names ("fr_FR", "de"…): 1-5, else 1 (English).
+int LanguageOfLocale(const std::string& locale);
 }

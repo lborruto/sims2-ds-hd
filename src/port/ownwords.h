@@ -68,7 +68,7 @@ enum class OwnWordId : int
     // values, the controls card, the bindings, the save states, the toasts, the launch panel.
     ShellPaused, ShellResume, ShellSettings, ShellControls, ShellStates, ShellQuit, ShellBack, ShellChange, ShellOpen,
     ShellYes, ShellNo, ShellOk, ShellOn, ShellOff, ShellPauseMenu,
-    SetLayout, SetFullscreen, SetSmooth, SetRes3D, SetWide, SetFps60, SetVolume, SetFastSound, SetStickCursor, SetDeadZone,
+    SetLayout, SetFullscreen, SetScaling, SetRes3D, SetWide, SetFps60, SetVolume, SetFastSound, SetStickCursor, SetDeadZone,
     SetTrigger, SetRumble, SetMic, SetLanguage, MicBlowKey, LangAuto, LangNote,
     LayoutConsole, LayoutAuto, LayoutFocus, LayoutSide, LayoutStacked,
     CtlWalk, CtlTouch, CtlBack, CtlZoom, CtlCamera, CtlFast, CtlKeys, CtlBlow,
@@ -82,6 +82,11 @@ enum class OwnWordId : int
     // The review's round: change game, open the saves' folder, a stale place, a state from another
     // file, a place that did not load.
     ShellChangeGame, ShellOpenFolder, LaunchSaveNewer, StOtherRom, LaunchContinueFailed,
+    // Platform (task 5): the settings' new rows and values, their notes, the save moved to the
+    // settings folder (the pause menu's banner), a window screenshot's toast.
+    SetBattery, SetMute, SetBackground, SetFastSpeed, FastMax, SetFastKey, FastHold, FastPress, SetFastBoot, SetHidePointer,
+    SetCursorSpeed, SetLeftHanded, ScaleSharp, ScaleSmooth, ScaleNearest,
+    BatteryNote, BackgroundNote, FastBootNote, ScalingNote, SaveElsewhere, ToastShotAt,
     Count
 };
 

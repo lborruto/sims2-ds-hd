@@ -15,6 +15,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -124,6 +125,10 @@ static void Usage()
         "  --language N                  the text's language for those and the HD interface's words: 0 Japanese (the\n"
         "                                English file), 1 English, 2 French, 3 German, 4 Italian, 5 Spanish (default:\n"
         "                                the firmware's; the game itself keeps the firmware's)\n"
+        "  --game-language N             the game's own language (the DS firmware's: 1 English .. 5 Spanish; the HD\n"
+        "                                words follow it); default: the settings' (automatic: the computer's) in the\n"
+        "                                window, the built-in firmware's (English) headless\n"
+        "  --fast-boot                   (checks) the boot's splashes at full speed, as the window does (logged)\n"
         "  --no-romdata                  (checks) do not read the game's text: milestone 1's CONSOLE\n"
         "  --launch                      the launch panel first (shown anyway in the window without a ROM)\n"
         "  --data-dir DIR                where the save states, the suspend state and the recent ROMs go (default: the\n"
@@ -136,7 +141,8 @@ static void Usage()
         "      Esc (a controller: Start + Back) the pause menu (settings, controls, save states, quit),\n"
         "      Space fast forward, Tab swaps the big screen\n"
         "      CONSOLE: E opens the touch screen's menu (arrows move, A taps, L/R tabs, B closes)\n"
-        "      0 auto, 1/2/3/4 focus/side/stacked/console, F5/F7 save/load state, F11 fullscreen, F12 screenshot\n"
+        "      0 auto, 1/2/3/4 focus/side/stacked/console, F5/F7 save/load state, F11 fullscreen, F12 screenshot (the window's)\n"
+        "      Create-a-Sim's name: type it\n"
         "      mouse: the touch screen; over the world, wheel zooms and a right-button drag turns\n");
 }
 
@@ -174,6 +180,8 @@ int main(int argc, char** argv)
     int res3d = 0;
     bool wide = false, interp = false;
     int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
+    int gameLanguage = -1;              // the DS firmware's language (--game-language)
+    bool fastBootFlag = false;
     bool stringsCount = false, noRomData = false;
     int dumpResource = -1, dumpSprite = -1, dumpFrame = -1; // the archive's data (--dump-resource, --dump-sprite)
     std::string dumpFile;
@@ -228,6 +236,13 @@ int main(int argc, char** argv)
             if (a == "--language" && number > 5) { Usage(); return 1; }
             (a == "--language" ? language : dumpString) = (int)number;
         }
+        else if (a == "--game-language")
+        {
+            long number;
+            if (!WholeNumber(next(), 5, number) || number < 1) { Usage(); return 1; }
+            gameLanguage = (int)number;
+        }
+        else if (a == "--fast-boot") fastBootFlag = true;
         else if (a == "--strings-count") stringsCount = true;
         else if (a == "--no-romdata") noRomData = true;
         // The archive's data to a file (tests/romdata_check.sh): whole numbers, else the usage.
@@ -319,6 +334,13 @@ int main(int argc, char** argv)
         // Controllers: SDL's hints first (pads.h), then the joystick and game controller parts
         // (SDL_GAMECONTROLLERCONFIG, which Steam sets for a non-Steam game, is read here).
         Pads::Hints();
+#ifdef _WIN32
+        // Windows: the window in real pixels on every screen (per-monitor DPI, v2), sized in
+        // points as on a Mac (SDL scales the window's size by the screen's scale): never a blurry
+        // picture stretched by the system.
+        SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+        SDL_SetHint(SDL_HINT_WINDOWS_DPI_SCALING, "1");
+#endif
         if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
         // Haptics (DirectInput pads' rumble) only if the system has them: never a reason not to start.
         if (SDL_InitSubSystem(SDL_INIT_HAPTIC) != 0) fprintf(stderr, "SDL haptic: %s\n", SDL_GetError());
@@ -331,7 +353,7 @@ int main(int argc, char** argv)
         // The words before the game's strings are read: the computer's language.
         if (SDL_Locale* loc = SDL_GetPreferredLocales())
         {
-            if (loc[0].language) host.autoLanguage = shell::LanguageOfLocale(loc[0].language);
+            if (loc[0].language) host.autoLanguage = LanguageOfLocale(loc[0].language);
             SDL_free(loc);
         }
     }
@@ -368,6 +390,13 @@ int main(int argc, char** argv)
             CanvasFit::For(shell::kW, shell::kH, ow, oh).ToCanvas(in.mx, in.my, in.mx, in.my);
         }
         return in;
+    };
+    // Where a ROM's game save is: beside it (or --save), else, when that cannot be written (a
+    // read-only folder), in the data folder's saves/ (Host::SaveFallback).
+    auto SaveOf = [&](const std::string& rom) {
+        const std::string beside = savePath.empty() ? rom.substr(0, rom.rfind('.')) + ".sav" : savePath;
+        const std::string fallback = SaveFallback(host.data, beside);
+        return CanWrite(beside) || fallback.empty() ? beside : fallback;
     };
     auto launch = [&](const std::string& message) -> bool {
         host.model = shell::Model();
@@ -418,7 +447,7 @@ int main(int argc, char** argv)
                 {
                     // The game saved since the place was kept (its save is not the one the place
                     // left): loading the place would put the older save back. Said, and the place dropped.
-                    const std::string sav = savePath.empty() ? paths[0].substr(0, paths[0].rfind('.')) + ".sav" : savePath;
+                    const std::string sav = SaveOf(paths[0]);
                     if (suspendMeta.save != HashFile(sav))
                     {
                         std::error_code ec;
@@ -518,6 +547,27 @@ relaunch:
     // Explorer has no useful current folder.
     const std::string romBase = romPath.substr(0, romPath.rfind('.'));
     Host::SavePath = savePath.empty() ? romBase + ".sav" : savePath;
+    // A save that cannot be written there (a read-only folder: a write-protected card, a shared
+    // folder, Program Files): in the data folder's saves/ instead, the one beside the ROM copied
+    // there first (once: after that the copy leads), said in the window and on the pause menu.
+    Host::SaveMoved = false;
+    Host::SaveFallback = SaveFallback(host.data, Host::SavePath);
+    host.saveElsewhere.clear();
+    if (!Host::SaveFallback.empty() && !CanWrite(Host::SavePath))
+    {
+        std::error_code ec;
+        if (FileExists(Host::SavePath) && !FileExists(Host::SaveFallback))
+        {
+            std::filesystem::copy_file(Host::SavePath, Host::SaveFallback, ec);
+            // (The copy keeps the original's mode: a read-only file would stay read-only.)
+            std::error_code pe;
+            if (!ec) std::filesystem::permissions(Host::SaveFallback, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
+                                                  std::filesystem::perm_options::add, pe);
+        }
+        fprintf(stderr, "save: %s cannot be written: the game saves to %s%s\n", Host::SavePath.c_str(), Host::SaveFallback.c_str(),
+                ec ? " (the save beside it could not be copied)" : "");
+        Host::SavePath = host.saveElsewhere = Host::SaveFallback;
+    }
     std::string quickState = romBase + ".quick.st";
     const std::string shotFile = romBase + "-shot.png";
 
@@ -565,6 +615,20 @@ relaunch:
     app.portSupported = app.romCode == "ASJP";
     melonDS::NDSArgs args;
     args.JIT = std::nullopt;
+    // The game's language: the DS firmware's user language, which the game reads when it starts
+    // (--game-language; the window: the settings', automatic being the computer's). Headless runs
+    // keep the built-in firmware's, English (every check's output depends on it).
+    {
+        int firm = gameLanguage;
+        if (firm < 0 && window) firm = app.settings.language >= 1 && app.settings.language <= 5 ? app.settings.language : host.autoLanguage;
+        if (firm >= 1 && firm <= 5)
+        {
+            for (melonDS::Firmware::UserData& u : args.Firmware.GetUserData())
+                u.Settings = (u16)((u.Settings & ~melonDS::Firmware::Language::Reserved) | firm);
+            args.Firmware.UpdateChecksums();
+            fprintf(stderr, "firmware language: %d\n", firm);
+        }
+    }
     app.nds = std::make_unique<NDS>(std::move(args), nullptr);
     NDS& nds = *app.nds;
     nds.SetNDSCart(std::move(cart));
@@ -631,7 +695,7 @@ relaunch:
     if (!noRomData)
     {
         auto data = std::make_unique<RomData>();
-        if (data->Open(rom) && data->LoadStrings(language >= 0 ? language : window && app.settings.language >= 1 ? app.settings.language : GameLanguage(nds)))
+        if (data->Open(rom) && data->LoadStrings(language >= 0 ? language : GameLanguage(nds)))
         {
             app.hudStrings = HudStringsFrom(data.get());
             app.rom = std::move(data);
@@ -805,6 +869,12 @@ relaunch:
     host.code = app.romCode;
     host.canUndo = FileExists(host.data.Undo(app.romCode)); // (a load from an earlier run can be undone too)
     host.Refresh(app, input); // (the toasts in the game's language before the menu is ever opened)
+    if (window && !host.saveElsewhere.empty())
+    {
+        std::string msg = OwnWordIn(host.model.language, OwnWordId::SaveElsewhere);
+        if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, host.saveElsewhere);
+        video.Toast(msg, 10000);
+    }
     // The quick save state (F5 / F7) in the settings folder with the slots, not beside the ROM.
     if (host.data.Ok()) quickState = host.data.GameDir(app.romCode) + "quick.st";
     Backups backups;
@@ -859,11 +929,23 @@ relaunch:
     int disagree = 0; // frames the game's settled screen and the pixels' answer have disagreed
     int lastTouchX = -1, lastTouchY = -1; // the stylus's last point down (room info's hint: which line)
     bool wasTouching = false;
+    // Fast boot (Settings::fastBoot; --fast-boot headless, logged only): from a fresh start, the
+    // boot's splashes, which take no touch (port/front.h, BootPassesBy), run unpaced, silent and
+    // seldom drawn, until the last splash ("Touch the Touch Screen"), the player's first press, or
+    // kFastBootFrames. Nothing is pressed for the player.
+    constexpr long kFastBootFrames = 1500;
+    bool fastBoot = (window ? app.settings.fastBoot : fastBootFlag) && stateLoad.empty() && !continueSuspend && app.portSupported;
+    if (fastBoot) fprintf(stderr, "fast boot: on\n");
+    std::string pendingShot;      // a window screenshot asked for: said once the picture is written
+    bool pointerHidden = false;   // the mouse pointer hidden (still for a while: Settings::hidePointer)
     auto keepPace = [&]() {
-        if (headless || app.fast) { nextFrameAt = 0; return; }
+        // Fast forward at its speed (Settings::fastSpeed; 0: as fast as it goes), fast boot unpaced.
+        const int speed = app.fast ? app.settings.fastSpeed : 1;
+        if (headless || fastBoot || speed < 1) { nextFrameAt = 0; return; }
+        const double step = dsFrame / speed;
         double now = SDL_GetPerformanceCounter() / perfFreq;
-        if (nextFrameAt == 0 || now - nextFrameAt > 4 * dsFrame) nextFrameAt = now; // start, or fell behind
-        nextFrameAt += dsFrame;
+        if (nextFrameAt == 0 || now - nextFrameAt > 4 * step) nextFrameAt = now; // start, or fell behind
+        nextFrameAt += step;
         double wait = nextFrameAt - now;
         if (wait > 0.002) SDL_Delay((Uint32)((wait - 0.001) * 1000)); // sleep most of it
         while (SDL_GetPerformanceCounter() / perfFreq < nextFrameAt) {} // then the last moment
@@ -916,6 +998,15 @@ relaunch:
         ApplyScript(script, frame, keys, blow, touching, tx, ty);
         ScriptPad(script, frame, input.scriptPad);
         if (const int l = ScriptLayout(script, frame); l >= 0) app.layout = (Layout)l;
+        // (A script's typed text: Create-a-Sim's name, as from the keyboard.)
+        if (const std::string t = ScriptText(script, frame); !t.empty() && Input::TypingName(app))
+            for (size_t i = 0; i < t.size();)
+            {
+                size_t j = i + 1;
+                while (j < t.size() && ((unsigned char)t[j] & 0xC0) == 0x80) j++;
+                input.typed.push_back(t.substr(i, j - i));
+                i = j;
+            }
         if (headless)
         {
             // The pause menu: Start + Back held in the script (or --shell at its frame); while it
@@ -971,6 +1062,13 @@ relaunch:
             if (app.quit) break;
             host.frame = frame;
             input.Poll(app, host.Open());
+            // The mouse pointer hidden after three seconds still over the game (never over a menu).
+            {
+                const bool hide = app.settings.hidePointer && !host.Open() && !input.mouseDown && !input.rightDown &&
+                                  SDL_GetTicks() - input.mouseMovedAt > 3000;
+                if (hide != pointerHidden) SDL_ShowCursor(hide ? SDL_DISABLE : SDL_ENABLE);
+                pointerHidden = hide;
+            }
             if (host.Open())
             {
                 // The pause buttons again (Start + Back, the MENU key): back to the game.
@@ -993,10 +1091,34 @@ relaunch:
                 wasPaused = true;
                 continue;
             }
+            // The window not in front: the game stands still and is silent (unless it runs in the
+            // background), the last picture shown with a pause mark; the computer waits for an event.
+            if (!input.focused && !app.settings.runInBackground)
+            {
+                audio.Pause(true);
+                input.EndFrame();
+                Video::Marks pm;
+                pm.paused = true;
+                video.Present(app, pm, nullptr);
+                SDL_WaitEventTimeout(nullptr, 100);
+                nextFrameAt = 0;
+                wasPaused = true;
+                continue;
+            }
+            audio.Pause(false);
             const int lang = host.model.language;
             if (input.wantSave) host.Say(video, OwnWordIn(lang, SaveState(nds, quickState) ? OwnWordId::ToastStateSaved : OwnWordId::StFailed));
             if (input.wantLoad) host.Say(video, OwnWordIn(lang, host.Load(app, quickState) ? OwnWordId::ToastStateLoaded : OwnWordId::ToastNoState));
-            if (input.wantShot) { WriteShot(shotFile, app.Top(), app.Bottom()); host.Say(video, OwnWordIn(lang, OwnWordId::ToastShot)); }
+            if (input.wantShot && pendingShot.empty())
+            {
+                // The window's picture as it is drawn (its own size: HD), in the data folder's
+                // screenshots/ (else beside the ROM), named by the time; said once written.
+                const std::string dir = host.data.Ok() ? host.data.Screenshots() : shotFile.substr(0, shotFile.find_last_of("/\\") + 1);
+                const long long now = (long long)time(nullptr);
+                int n = 1;
+                while (FileExists(dir + ShotName(now, n)) && n < 100) n++;
+                pendingShot = video.shotPath = dir + ShotName(now, n);
+            }
             if (input.wantLayout >= 0) app.settings.layout = app.layout = (Layout)input.wantLayout;
             if (input.wantFullscreen)
             {
@@ -1016,6 +1138,15 @@ relaunch:
                 video.Toast(msg, 8000);
             }
             saveFailed = Host::SaveFailed;
+            // The save moved to the data folder mid-game (its folder became read-only): said, and
+            // kept on the pause menu's main page.
+            if (Host::SaveMoved && host.saveElsewhere != Host::SavePath)
+            {
+                host.saveElsewhere = Host::SavePath;
+                std::string msg = OwnWordIn(lang, OwnWordId::SaveElsewhere);
+                if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, Host::SavePath);
+                video.Toast(msg, 10000);
+            }
         }
 
         // Playable: what the DS hears this frame (the setting, the blow key or the script's
@@ -1023,7 +1154,7 @@ relaunch:
         Host::MicMode = app.settings.mic;
         Host::MicBlow = app.micBlow || blow;
         Host::MicForce = app.micForce;
-        if (!headless || app.fast) clock::Frame(nds, app.fast);
+        if (!headless || app.fast) clock::Frame(nds, app.fast || (fastBoot && !headless));
 
         nds.SetKeyMask(~keys & 0xFFF);
         if (touching) nds.TouchScreen((melonDS::u16)tx, (melonDS::u16)ty); else nds.ReleaseScreen();
@@ -1085,6 +1216,11 @@ relaunch:
                 fill(mg.mixer.valid && mg.mixer.phase == 9, before.minigame.mixer.valid && before.minigame.mixer.phase == 9, before.minigame.mixer.helpId, mg.mixer.helpId);
             }
             if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
+            if (fastBoot && (frame >= kFastBootFrames || keys || touching || !BootPassesBy(app.game)))
+            {
+                fastBoot = false;
+                fprintf(stderr, "frame %ld: fast boot: done (%s)\n", frame, keys || touching ? "a press" : frame >= kFastBootFrames ? "its time" : "the boot waits for a touch");
+            }
             if (app.portSupported && printHud)
             {
                 const HudState& h = app.game.hud;
@@ -1452,16 +1588,25 @@ relaunch:
         frame++;
 
         if (headless) continue;
-        audio.Frame(nds, app.fast, app.settings);
-        if (app.fast && frame % 4) continue; // fast forward: one picture in four
+        audio.Frame(nds, app.fast || fastBoot, app.settings);
+        // Fast forward: one picture in four (as fast as it goes) or in its speed; fast boot one in eight.
+        const int every = fastBoot ? 8 : app.fast ? (app.settings.fastSpeed >= 2 ? app.settings.fastSpeed : 4) : 1;
+        if (frame % every == 0)
         {
             Video::Marks marks;
             marks.cursor = frame < input.cursorShownUntil;
             marks.x = input.cursorX;
             marks.y = input.cursorY;
             marks.press = input.cursorPress;
-            marks.fast = app.fast;
+            marks.fast = app.fast || fastBoot;
             video.Present(app, marks, nullptr);
+            if (!pendingShot.empty() && video.shotPath.empty())
+            {
+                std::string msg = OwnWordIn(host.model.language, FileExists(pendingShot) ? OwnWordId::ToastShotAt : OwnWordId::StFailed);
+                if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, BaseName(pendingShot));
+                host.Say(video, msg);
+                pendingShot.clear();
+            }
         }
         keepPace();
     }

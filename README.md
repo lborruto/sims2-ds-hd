@@ -63,7 +63,8 @@
   first, and can be undone), Change game, the saves folder, Quit (asked first: next time
   *Continue* picks up right there, unless the game saved since). Before
   the game, a launch panel: Continue, choose a file (or drop a `.nds` on the window), your recent
-  ROMs, the language. All of it in five languages, with the buttons of the controller you hold.
+  ROMs, the language (the game's own too: it follows your computer's, or the one you pick). All of
+  it in five languages, with the buttons of the controller you hold.
 - **Sound that keeps up.** When the computer falls behind, the music stretches instead of
   crackling. Copies of your save are kept beside it, every half hour.
 
@@ -145,7 +146,7 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 | Tab | right stick click | swap which screen is big (the old layouts) |
 | Space (hold) | RT | fast forward |
 | F5 / F7 | | quick save state / load it (in the settings folder, beside the pause menu's four) |
-| F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
+| F11 / F12 | | fullscreen / screenshot of the window (in the saves folder's `screenshots/`) |
 | 0 to 4 | | layout: AUTO / FOCUS / SIDE / STACKED / CONSOLE |
 | Mouse | right stick + LT (the cursor; A too wherever the cursor is the way to touch: DS Wireless, the furniture editor, where B leaves) | the touch screen, wherever it is shown |
 | Mouse wheel / right button drag, over the world | | zoom / turn the camera |
@@ -268,7 +269,8 @@ comes back on the same row after it. A note closes on A or B.
 
 The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another
 emulator or a flash cart works if you put it there. A copy is made in `backups/` beside it when
-the program starts and every half hour (the last eight are kept).
+the program starts and every half hour (the last eight are kept). When the ROM's folder cannot be
+written, the save goes to the saves folder's `saves/` instead, and the pause menu says where.
 
 ## Controllers
 
