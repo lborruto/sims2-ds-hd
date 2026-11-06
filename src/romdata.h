@@ -45,6 +45,9 @@ private:
     int stringsFile = -1;
 };
 
+// The game's raw text bytes (a RAM buffer, e.g. a popup's) as UTF-8, as RomData::String decodes them.
+std::string GameTextToUtf8(const std::string& raw);
+
 // The language the game shows: the firmware's user language (0 Japanese to 5 Spanish), which
 // the game reads at start; any other value (Chinese, reserved) is taken as English.
 // (romdata_nds.cpp: the only part that needs melonDS.)

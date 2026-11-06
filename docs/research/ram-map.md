@@ -104,6 +104,25 @@ range-checked (else `valid` false); `--print-hud` logs changes. Offsets are in `
 
 Not mapped: motives and the mood meter; the progressive text reveal (the page is complete as soon as its counter shows).
 
+## The town's records (`TownState`, `RecordRow`, `SimRecord`)
+
+Read by `ReadGameState` into `GameState::town` (any screen; each part valid on its own, left out of
+`GameState ==`, logged by `--print-town`) and by `ReadSimRow` / `ReadItemRow` / `ReadSimRecord`. Offsets in `kEU.town`.
+`P` = `*(0x02139FA4)`, `G` = `*(0x0213E434)`.
+
+| Part | Address | Meaning |
+| --- | --- | --- |
+| Record table | `0x02122A00 + 0x12 * row` (static) | rows of 9 u16: Sim k = row 2 + k (k < 46), item id = row 0x3B + id; +0/+2/+4 sprite tiles / descriptor / palette resources, +8 name string id (Sims 323 + k, items 463 + id), +0xA portrait / second resource, +0xE price (items) |
+| Sim record | `G + 0x21DC + 0x2C * k` | u16 +0x18 Sim id, u32 +0x14 flags (bit 0 met, bit 1 secret info), u8 +0x1A mood (0..6), u8 +0x1B relationship level |
+| Pocket slots | `G + 0x215C` s32 count (0..6), `G + 0x28 + 2i` u16 item ids | name = the row's +8 (must equal 463 + id, else the inventory is invalid), description 822 + id, icon = the row's descriptor |
+| Counted items | `G + 0x24 + i` u8 (4) | names 1154 + i, descriptions 845 + i |
+| Key items | bits 1..3 of the u32 at `G` | Vacuum, Super Drencher, Metal Detector: names 1968 + k, descriptions 1972 + k |
+| Options | `G + 0x2F70` music, `G + 0x2F74` SFX | u32 20.12, 0..0x1000 |
+| Popup | `P + 0x8` state (1 opening, 2 shown, 3 closing), `P + 0x10` kind (0 one X, 2 cross + tick, 3 none) | text `P + 0x34` (0x400 bytes), title `P + 0x434` (0x100), both NUL-terminated game text bytes (`GameTextToUtf8` in `romdata.h` decodes them); `P + 0xD88` pressed button, `P + 0xD8C` stylus down |
+| Save slots | used `0x0213D848 + i` u8, current `0x0213D84C` s32 (-1 none) | headers `0x0213D7B8 + 0x30 * i`: +0x14 time word, +0x18 money s32, +0x1C name char[16], +0x2C place (string 0x43 + place) |
+
+Held-out states for the checks are listed in `CLAUDE.md`; the full field map is in the research notes (milestone 3, town).
+
 ## Backup signal
 
 Sub-engine BG layer records at 0x02139618, 0x0213968C, 0x02139700 and 0x02139774 (stride 0x74)

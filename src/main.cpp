@@ -70,6 +70,7 @@ static void Usage()
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
+        "  --print-town                  print the town's inventory, options, popup and save slots, read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
         "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
         "  --record-dir DIR              where unmapped screens are recorded (a state + a picture each; default: the\n"
@@ -122,7 +123,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
     bool uiDemo = false;
@@ -158,6 +159,7 @@ int main(int argc, char** argv)
         else if (a == "--print-screen") printScreen = true;
         else if (a == "--print-game") printGame = true;
         else if (a == "--print-hud") printHud = true;
+        else if (a == "--print-town") printTown = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -516,6 +518,46 @@ int main(int argc, char** argv)
                         }
                     }
                     else fprintf(stderr, "frame %ld: dialogue none\n", frame);
+                }
+            }
+            if (app.portSupported && printTown)
+            {
+                const TownState& t = app.game.town;
+                const TownState& b = before.town;
+                if (!(t.inventory == b.inventory) || frame == 0)
+                {
+                    if (!t.inventory.valid) fprintf(stderr, "frame %ld: inventory none\n", frame);
+                    else
+                    {
+                        std::string s;
+                        for (const ItemRec& i : t.inventory.slots) s += (s.empty() ? "" : ",") + std::to_string(i.id) + ":" + std::to_string(i.nameId) + "/" + std::to_string(i.descId) + "/" + std::to_string(i.iconRes);
+                        fprintf(stderr, "frame %ld: inventory slots=%s counted=%d,%d,%d,%d keys=%d%d%d\n", frame, s.empty() ? "-" : s.c_str(),
+                                t.inventory.counted[0].count, t.inventory.counted[1].count, t.inventory.counted[2].count, t.inventory.counted[3].count,
+                                t.inventory.keys[0].count, t.inventory.keys[1].count, t.inventory.keys[2].count);
+                    }
+                }
+                if (!(t.options == b.options) || frame == 0)
+                {
+                    if (t.options.valid) fprintf(stderr, "frame %ld: options music=%d sfx=%d\n", frame, t.options.music, t.options.sfx);
+                    else fprintf(stderr, "frame %ld: options none\n", frame);
+                }
+                if (!(t.popup == b.popup) || frame == 0)
+                {
+                    if (t.popup.valid)
+                        fprintf(stderr, "frame %ld: popup state=%d kind=%d pressed=%d,%d title=\"%s\" text=\"%s\"\n", frame, t.popup.state, t.popup.kind, t.popup.pressed, t.popup.pressing ? 1 : 0,
+                                GameTextToUtf8(t.popup.title).c_str(), GameTextToUtf8(t.popup.text).c_str());
+                    else fprintf(stderr, "frame %ld: popup none\n", frame);
+                }
+                if (!(t.saves == b.saves) || frame == 0)
+                {
+                    if (!t.saves.valid) fprintf(stderr, "frame %ld: saves none\n", frame);
+                    else
+                    {
+                        std::string s;
+                        for (int i = 0; i < kSaveSlotCount; i++)
+                            s += std::string(" ") + std::to_string(i) + "=" + (t.saves.used[i] ? t.saves.slot[i].simName + "/" + std::to_string(t.saves.slot[i].money) + "/" + std::to_string(t.saves.slot[i].place) : "empty");
+                        fprintf(stderr, "frame %ld: saves current=%d%s\n", frame, t.saves.current, s.c_str());
+                    }
                 }
             }
             if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());

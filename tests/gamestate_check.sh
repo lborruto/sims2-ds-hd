@@ -169,4 +169,41 @@ if [ -f "$shots/s6.st" ] && [ -f "$tmp/other.nds" ]; then
     if [ "$(count "$tmp/rec-other" st)" = 0 ] && grep -q '^clock: ' "$tmp/rec-other.log"; then echo "ok   rom gate: another game code records nothing"
     else echo "FAIL rom gate: recorded on another game code"; fail=1; fi
 else echo "FAIL rom gate: no $shots/s6.st or no copy"; fail=1; fi
+
+# The town's records read from RAM (--print-town): inventory, options, popup, save slots, from
+# the held-out states A-gift2-base (two items, key items not owned), A-pk-cnt3-slot1 (the complete
+# save's pockets), B-st-opt-music, B-ch-opt-quit / B-pause / s6 (popups; their texts must equal
+# the ROM's strings 65, 22 / 23 and 2448) and B-cas-opt-save (three save slots). Copies of these
+# states from research/ram/gen go in shots/ (git-ignored, listed in CLAUDE.md).
+town_run() { # NAME STATE: the last town lines in NAME.town
+    local name=$1 file=$shots/$2.st
+    if [ ! -f "$file" ]; then echo "no save state $2.st" > "$tmp/$name.town"; return; fi
+    "$bin" "$rom" --headless --frames 60 --state-load "$file" --save "$tmp/$name.sav" --print-town "${late[@]}" > "$tmp/$name.townlog" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.townlog" && touch "$tmp/$name.townok"
+    grep -E '^frame [0-9]+: (inventory|options|popup|saves) ' "$tmp/$name.townlog" | sed 's/^frame [0-9]*: //' > "$tmp/$name.town"
+}
+town_want() { # NAME KIND PATTERN LABEL: the last line of that kind matches (grep -E)
+    if [ -f "$tmp/$1.townok" ] && grep "^$2 " "$tmp/$1.town" | tail -n 1 | grep -q -E "$3"; then echo "ok   $4"
+    else echo "FAIL $4: got '$(grep "^$2 " "$tmp/$1.town" 2>/dev/null | tail -n 1)'"; fail=1; fi
+}
+town_text() { # NAME TEXT_ID TITLE_ID LABEL: the popup's text (and title, -1 none) is the ROM's string
+    local want got
+    want="title=\"$([ "$3" = -1 ] || "$bin" "$rom" --dump-string "$3" 2>/dev/null)\" text=\"$("$bin" "$rom" --dump-string "$2" 2>/dev/null)\""
+    got=$(grep '^popup ' "$tmp/$1.town" | tail -n 1 | sed -E 's/^popup state=[0-9]+ kind=[0-9]+ pressed=-?[0-9]+,[01] //')
+    if [ -n "$got" ] && [ "$got" = "$want" ]; then echo "ok   $4"; else echo "FAIL $4: want '$want', got '$got'"; fail=1; fi
+}
+town_run t-gift A-gift2-base; town_run t-pk A-pk-cnt3-slot1; town_run t-music B-st-opt-music
+town_run t-quit B-ch-opt-quit; town_run t-pause B-pause; town_run t-goal s6; town_run t-save B-cas-opt-save
+town_want t-gift inventory '^inventory slots=171:634/993/321,106:569/928/1991 counted=0,0,0,0 keys=000$' "town: two pocket items with names, descriptions, icons"
+town_want t-pk inventory '^inventory slots=171:634/993/321 counted=27,0,2,0 keys=111$' "town: counted items 27 0 2 0, the three tools owned"
+town_want t-music options '^options music=1229 sfx=4096$' "town: music volume 30 %"
+town_want t-gift options '^options music=4096 sfx=4096$' "town: volumes at 100 %"
+town_want t-gift popup '^popup none$' "town: no popup"
+town_want t-quit popup 'kind=2 ' "town: the quit question is a yes / no popup"
+town_text t-quit 65 -1 "town: the quit popup's text is string 65, no title"
+town_want t-pause popup 'kind=0 ' "town: Game Paused has one button"
+town_text t-pause 23 22 "town: Game Paused's text and title are strings 23 and 22"
+town_text t-goal 2448 -1 "town: the goal popup's text is string 2448"
+town_want t-save saves '^saves current=2 0=[^ ]+/3226/3 1=[^ ]+/1055/19 2=[^ ]+/9150/20$' "town: three save slots, the third current"
+town_want t-gift saves '^saves current=-1 0=empty 1=empty 2=empty$' "town: no save slots used"
 exit $fail

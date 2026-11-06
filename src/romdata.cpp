@@ -264,6 +264,8 @@ bool RomData::LoadStrings(int language)
     return true;
 }
 
+std::string GameTextToUtf8(const std::string& raw) { return ToUtf8(raw); }
+
 std::string RomData::String(int id) const
 {
     if (id < 0 || id >= StringCount()) return "";

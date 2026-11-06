@@ -26,6 +26,21 @@ struct EUTable
     u32 simNameMax;                                         // name field bytes incl. the NUL (assumed)
     VtScreen plain[5];
     OvScreen overlays[8];
+    struct Town
+    {
+        u32 recTable, recSize, simRow0, itemRow0;           // rows of 0x12 bytes: Sim k = row 2 + k, item id = row 0x3B + id
+        u32 recTiles, recDesc, recPal, recName, recIcon, recPrice;   // offsets in a row
+        u32 maxSims, maxItems;                              // bounds on k / item id
+        u32 simFlags, simMood, simLevel;                    // Sim record (from G + simRecords + k * simRecordSize)
+        u32 invCount, invIds, invCounted, keyBits;          // from G: s32 count, u16[6], u8[4], u32 bit array
+        u32 maxSlots, countedN, keyN;
+        u32 itemName, itemDesc, countedName, countedDesc, keyName, keyDesc;   // string ids: base + index
+        u32 optMusic, optSfx;                               // from G, 20.12
+        u32 popKind, popParam, popText, popTitle, popPressed, popPressing;   // from P
+        u32 popTextMax, popTitleMax;
+        u32 saveUsed, saveCurrent, saveHeader, saveHeaderSize;              // absolute: u8[3], s32, headers
+        u32 saveMoney, saveTime, saveName, saveNameMax, savePlace;
+    } town;
 };
 constexpr EUTable kEU = {
     0x02000000, 0x02139FA4,
@@ -49,6 +64,20 @@ constexpr EUTable kEU = {
         {2, 0x0214C194, GScreen::Catalogue}, {1, 0x0214B1D0, GScreen::Build},
         {17, 0x0214C658, GScreen::Vacuum},   {3, 0x021509B0, GScreen::CreateASim},
         {8, 0x0214B1C4, GScreen::SaveSlots}, {18, 0x0214B8BC, GScreen::ItemHand},
+    },
+    {
+        0x02122A00, 0x12, 2, 0x3B,
+        0, 2, 4, 8, 0xA, 0xE,
+        46, 0x200,
+        0x14, 0x1A, 0x1B,
+        0x215C, 0x28, 0x24, 0,
+        6, 4, 3,
+        463, 822, 1154, 845, 1968, 1972,
+        0x2F70, 0x2F74,
+        0x10, 0x14, 0x34, 0x434, 0xD88, 0xD8C,
+        0x400, 0x100,
+        0x0213D848, 0x0213D84C, 0x0213D7B8, 0x30,
+        0x18, 0x14, 0x1C, 16, 0x2C,
     },
 };
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
@@ -146,6 +175,141 @@ DialogueState ReadDialogue(const Reader& m, u32 S)
 }
 }
 
+namespace
+{
+RecordRow ReadRow(const Reader& m, u32 row)
+{
+    const auto& t = kEU.town;
+    RecordRow r;
+    const u32 a = t.recTable + t.recSize * row;
+    u32 tiles, desc, pal, name, icon, price;
+    if (!m.R16(a + t.recTiles, tiles) || !m.R16(a + t.recDesc, desc) || !m.R16(a + t.recPal, pal) || !m.R16(a + t.recName, name) ||
+        !m.R16(a + t.recIcon, icon) || !m.R16(a + t.recPrice, price))
+        return r;
+    r.valid = true;
+    r.tilesRes = (int)tiles; r.descRes = (int)desc; r.palRes = (int)pal;
+    r.nameId = (int)name; r.iconRes = (int)icon; r.price = (int)price;
+    return r;
+}
+
+SimRecord ReadSim(const Reader& m, int k)
+{
+    const auto& t = kEU.town;
+    SimRecord s;
+    u32 G, id, flags, mood, level;
+    if (k < 0 || (u32)k >= t.maxSims || !m.R32(kEU.gameBlock, G)) return s;
+    const u32 R = G + kEU.simRecords + kEU.simRecordSize * (u32)k;
+    if (!m.R16(R + kEU.simRecordName, id) || !m.R32(R + t.simFlags, flags) || !m.R8(R + t.simMood, mood) || !m.R8(R + t.simLevel, level)) return s;
+    if (mood > 6 || level > 6 || id >= t.maxSims) return s;
+    s.valid = true;
+    s.simId = (int)id; s.mood = (int)mood; s.level = (int)level;
+    s.met = flags & 1; s.secret = flags & 2;
+    return s;
+}
+
+// A NUL-terminated byte string of at most max - 1 bytes at a; false when it does not end in max or leaves RAM.
+bool ReadCString(const Reader& m, u32 a, u32 max, std::string& out)
+{
+    out.clear();
+    for (u32 i = 0; i < max; i++)
+    {
+        u32 ch;
+        if (!m.R8(a + i, ch)) return false;
+        if (ch == 0) return true;
+        out += (char)ch;
+    }
+    return false;
+}
+
+InventoryState ReadInventory(const Reader& m)
+{
+    const auto& t = kEU.town;
+    InventoryState v;
+    u32 G, n, keys;
+    if (!m.R32(kEU.gameBlock, G) || !m.R32(G + t.invCount, n) || n > t.maxSlots || !m.R32(G + t.keyBits, keys)) return v;
+    for (u32 i = 0; i < n; i++)
+    {
+        u32 id;
+        if (!m.R16(G + t.invIds + 2 * i, id) || id >= t.maxItems) return InventoryState{};
+        RecordRow row = ReadRow(m, t.itemRow0 + id);
+        if (!row.valid || row.nameId != (int)(t.itemName + id)) return InventoryState{};   // the row names its own item
+        v.slots.push_back({(int)id, row.nameId, (int)(t.itemDesc + id), row.descRes, 1});
+    }
+    for (u32 i = 0; i < t.countedN; i++)
+    {
+        u32 c;
+        if (!m.R8(G + t.invCounted + i, c)) return InventoryState{};
+        v.counted[i] = {(int)i, (int)(t.countedName + i), (int)(t.countedDesc + i), -1, (int)c};
+    }
+    for (u32 k = 0; k < t.keyN; k++)
+        v.keys[k] = {(int)k, (int)(t.keyName + k), (int)(t.keyDesc + k), -1, (int)((keys >> (k + 1)) & 1)};
+    v.valid = true;
+    return v;
+}
+
+OptionsState ReadOptions(const Reader& m)
+{
+    const auto& t = kEU.town;
+    OptionsState o;
+    u32 G, mu, sf;
+    if (!m.R32(kEU.gameBlock, G) || !m.R32(G + t.optMusic, mu) || !m.R32(G + t.optSfx, sf) || mu > 0x1000 || sf > 0x1000) return o;
+    o.valid = true; o.music = (int)mu; o.sfx = (int)sf;
+    return o;
+}
+
+PopupState ReadPopup(const Reader& m, u32 P)
+{
+    const auto& t = kEU.town;
+    PopupState p;
+    u32 st, kind, pressed, pressing;
+    if (!m.R8(P + kEU.popup, st) || st < 1 || st > 3 || !m.R32(P + t.popKind, kind) || (kind != 0 && kind != 2 && kind != 3)) return p;
+    if (!m.R32(P + t.popPressed, pressed) || !m.R8(P + t.popPressing, pressing) || pressing > 1) return p;
+    if (!ReadCString(m, P + t.popText, t.popTextMax, p.text) || !ReadCString(m, P + t.popTitle, t.popTitleMax, p.title)) return PopupState{};
+    p.valid = true;
+    p.state = (int)st; p.kind = (int)kind;
+    p.pressed = (int)pressed; p.pressing = pressing != 0;
+    return p;
+}
+
+SaveSlots ReadSaves(const Reader& m)
+{
+    const auto& t = kEU.town;
+    SaveSlots s;
+    u32 cur;
+    if (!m.R32(t.saveCurrent, cur) || (int)cur < -1 || (int)cur >= kSaveSlotCount) return s;
+    for (int i = 0; i < kSaveSlotCount; i++)
+    {
+        u32 used;
+        if (!m.R8(t.saveUsed + i, used) || used > 1) return SaveSlots{};
+        s.used[i] = s.slot[i].used = used == 1;
+        if (!s.used[i]) continue;
+        const u32 h = t.saveHeader + t.saveHeaderSize * (u32)i;
+        u32 money, time, place;
+        if (!m.R32(h + t.saveMoney, money) || !m.R32(h + t.saveTime, time) || !m.R8(h + t.savePlace, place)) return SaveSlots{};
+        s.slot[i].money = (int)money; s.slot[i].time = time; s.slot[i].place = (int)place;
+        std::string name;
+        bool ok = ReadCString(m, h + t.saveName, t.saveNameMax, name);
+        for (char ch : name) if (ch < 0x20 || ch > 0x7E) ok = false;
+        s.slot[i].simName = ok ? name : std::string();
+    }
+    s.current = (int)cur;
+    s.valid = true;
+    return s;
+}
+}
+
+RecordRow ReadSimRow(RamView ram, int k)
+{
+    if (!ram.ram || k < 0 || (u32)k >= kEU.town.maxSims) return {};
+    return ReadRow(Reader{ram}, kEU.town.simRow0 + (u32)k);
+}
+RecordRow ReadItemRow(RamView ram, int id)
+{
+    if (!ram.ram || id < 0 || (u32)id >= kEU.town.maxItems) return {};
+    return ReadRow(Reader{ram}, kEU.town.itemRow0 + (u32)id);
+}
+SimRecord ReadSimRecord(RamView ram, int k) { return ram.ram ? ReadSim(Reader{ram}, k) : SimRecord{}; }
+
 std::vector<int> SpeechStringIds(RamView ram)
 {
     const Reader m {ram};
@@ -176,6 +340,10 @@ GameState ReadGameState(RamView ram)
     if (!m.R32(S, vt) || !m.R32(P + kEU.overlay, ovRaw) || !m.R8(P + kEU.popup, pop)) return g;
     g.valid = true;
     g.hud = ReadHud(m);
+    g.town.inventory = ReadInventory(m);
+    g.town.options = ReadOptions(m);
+    g.town.saves = ReadSaves(m);
+    g.town.popup = ReadPopup(m, P);
     g.vtable = vt;
     g.overlay = (int)ovRaw;   // 0xFFFFFFFF is -1
     g.popup = (u8)pop;

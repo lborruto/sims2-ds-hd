@@ -358,8 +358,169 @@ static void dialogue()
     CHECK(!ReadGameState(o.View()).dialogue.valid);
 }
 
+// The town's shared records, inventory, options, popup and save slots on a synthetic RAM.
+constexpr u32 kRec = 0x02122A00;
+static void put_item_row(Ram& r, int id, u32 desc)
+{
+    const u32 a = kRec + 0x12 * (id + 0x3B);
+    r.W16(a, desc - 1); r.W16(a + 2, desc); r.W16(a + 4, desc + 1); r.W16(a + 8, 463 + id); r.W16(a + 0xA, 7); r.W16(a + 0xE, 80);
+}
+
+static void records()
+{
+    Ram r = Make(0x0213203C, -1);
+    CHECK(ReadItemRow(r.View(), 5).valid);   // an all-zero row reads; only the bounds matter
+    put_item_row(r, 106, 1991);
+    RecordRow row = ReadItemRow(r.View(), 106);
+    CHECK(row.valid && row.nameId == 569 && row.descRes == 1991 && row.tilesRes == 1990 && row.palRes == 1992 && row.iconRes == 7 && row.price == 80);
+    const u32 s = kRec + 0x12 * (2 + 22);
+    r.W16(s + 8, 345); r.W16(s + 0xA, 4359);
+    row = ReadSimRow(r.View(), 22);
+    CHECK(row.valid && row.nameId == 345 && row.iconRes == 4359);
+    CHECK(!ReadSimRow(r.View(), 46).valid && !ReadSimRow(r.View(), -1).valid);
+    CHECK(!ReadItemRow(r.View(), 0x200).valid && !ReadItemRow(r.View(), -1).valid);
+    CHECK(!ReadSimRow(RamView{nullptr, 0}, 0).valid);
+    // Sim records
+    put_hud(r);
+    const u32 R = kG + 0x21DC + 0x2C * 4;
+    r.W16(R + 0x18, 4); r.W8(R + 0x1A, 2); r.W8(R + 0x1B, 5); r.W32(R + 0x14, 3);
+    SimRecord sim = ReadSimRecord(r.View(), 4);
+    CHECK(sim.valid && sim.simId == 4 && sim.mood == 2 && sim.level == 5 && sim.met && sim.secret);
+    r.W8(R + 0x1A, 7);
+    CHECK(!ReadSimRecord(r.View(), 4).valid);
+    CHECK(!ReadSimRecord(r.View(), 46).valid);
+}
+
+static Ram town_ram()
+{
+    Ram r = Make(0x0213203C, -1);
+    put_hud(r);
+    put_item_row(r, 171, 321); put_item_row(r, 106, 1991);
+    r.W32(kG + 0x215C, 2);
+    r.W16(kG + 0x28, 171); r.W16(kG + 0x2A, 106);
+    r.W8(kG + 0x24, 27); r.W8(kG + 0x26, 2);
+    r.W32(kG, 0x0E);   // bits 1..3
+    r.W32(kG + 0x2F70, 0x4CD); r.W32(kG + 0x2F74, 0x1000);
+    return r;
+}
+
+static void inventory()
+{
+    Ram r = town_ram();
+    InventoryState v = ReadGameState(r.View()).town.inventory;
+    CHECK(v.valid && v.slots.size() == 2);
+    CHECK(v.slots[0].id == 171 && v.slots[0].nameId == 634 && v.slots[0].descId == 993 && v.slots[0].iconRes == 321 && v.slots[0].count == 1);
+    CHECK(v.slots[1].id == 106 && v.slots[1].nameId == 569 && v.slots[1].descId == 928 && v.slots[1].iconRes == 1991);
+    CHECK(v.counted[0].count == 27 && v.counted[1].count == 0 && v.counted[2].count == 2 && v.counted[3].count == 0);
+    CHECK(v.counted[0].nameId == 1154 && v.counted[3].descId == 848);
+    CHECK(v.keys[0].count == 1 && v.keys[1].count == 1 && v.keys[2].count == 1 && v.keys[2].nameId == 1970 && v.keys[2].descId == 1974);
+    r.W32(kG, 0x04);
+    v = ReadGameState(r.View()).town.inventory;
+    CHECK(v.keys[0].count == 0 && v.keys[1].count == 1 && v.keys[2].count == 0);
+    r.W32(kG + 0x215C, 0);
+    v = ReadGameState(r.View()).town.inventory;
+    CHECK(v.valid && v.slots.empty());
+    // garbage: the inventory only
+    auto bad = [&](auto f) { Ram q = town_ram(); f(q); GameState g = ReadGameState(q.View()); return !g.town.inventory.valid && g.hud.valid && g.town.options.valid; };
+    CHECK(bad([](Ram& q) { q.W32(kG + 0x215C, 7); }));
+    CHECK(bad([](Ram& q) { q.W32(kG + 0x215C, (u32)-1); }));
+    CHECK(bad([](Ram& q) { q.W16(kG + 0x28, 0x200); }));
+    CHECK(bad([](Ram& q) { q.W16(kG + 0x28, 5); }));            // the row does not name item 5
+    CHECK(bad([](Ram& q) { q.W16(kRec + 0x12 * (171 + 0x3B) + 8, 1); }));
+    { Ram q = town_ram(); q.W32(0x0213E434, 0xFFFFFFF0); CHECK(!ReadGameState(q.View()).town.inventory.valid); }
+    { Ram q = town_ram(); CHECK(ReadGameState(q.View()) == ReadGameState(q.View())); q.W8(kG + 0x24, 3); CHECK(ReadGameState(q.View()) == ReadGameState(town_ram().View())); }   // town is not screen identity
+}
+
+static void options()
+{
+    Ram r = town_ram();
+    OptionsState o = ReadGameState(r.View()).town.options;
+    CHECK(o.valid && o.music == 0x4CD && o.sfx == 0x1000);
+    r.W32(kG + 0x2F70, 0); r.W32(kG + 0x2F74, 0);
+    o = ReadGameState(r.View()).town.options;
+    CHECK(o.valid && o.music == 0 && o.sfx == 0);
+    auto bad = [&](u32 off, u32 v) { Ram q = town_ram(); q.W32(kG + off, v); GameState g = ReadGameState(q.View()); return !g.town.options.valid && g.town.inventory.valid; };
+    CHECK(bad(0x2F70, 0x1001) && bad(0x2F74, 0x1001) && bad(0x2F74, 0xFFFFFFFF));
+}
+
+static void put_text(Ram& r, u32 a, const char* s) { for (; *s; s++) r.W8(a++, (u8)*s); r.W8(a, 0); }
+
+static void popup()
+{
+    Ram r = town_ram();
+    CHECK(!ReadGameState(r.View()).town.popup.valid);   // none
+    r.W8(kP + 0x8, 2); r.W32(kP + 0x10, 2);
+    put_text(r, kP + 0x34, "Quit?"); put_text(r, kP + 0x434, "");
+    r.W32(kP + 0xD88, 1); r.W8(kP + 0xD8C, 1);
+    PopupState p = ReadGameState(r.View()).town.popup;
+    CHECK(p.valid && p.state == 2 && p.kind == 2 && p.text == "Quit?" && p.title.empty() && p.pressed == 1 && p.pressing);
+    put_text(r, kP + 0x434, "T"); r.W8(kP + 0x8, 1); r.W32(kP + 0x10, 3);
+    p = ReadGameState(r.View()).town.popup;
+    CHECK(p.valid && p.state == 1 && p.kind == 3 && p.title == "T");
+    // raw bytes are kept as they are (decoded by GameTextToUtf8)
+    r.W8(kP + 0x34, 0x7B); r.W8(kP + 0x35, 0);
+    CHECK(ReadGameState(r.View()).town.popup.text == std::string("\x7B"));
+    // the popup over the panel is still Popup; the screen's identity is unchanged by the text
+    auto bad = [&](auto f) { Ram q = town_ram(); q.W8(kP + 0x8, 2); q.W32(kP + 0x10, 0); put_text(q, kP + 0x34, "A"); f(q); GameState g = ReadGameState(q.View()); return !g.town.popup.valid && g.hud.valid; };
+    CHECK(!bad([](Ram&) {}));
+    CHECK(bad([](Ram& q) { q.W32(kP + 0x10, 1); }));
+    CHECK(bad([](Ram& q) { q.W32(kP + 0x10, 4); }));
+    CHECK(bad([](Ram& q) { q.W8(kP + 0x8, 4); }));
+    CHECK(bad([](Ram& q) { q.W8(kP + 0x8, 0xFF); }));
+    CHECK(bad([](Ram& q) { for (int i = 0; i < 0x400; i++) q.W8(kP + 0x34 + i, 'x'); }));     // no NUL in the text
+    CHECK(bad([](Ram& q) { for (int i = 0; i < 0x100; i++) q.W8(kP + 0x434 + i, 'x'); }));    // no NUL in the title
+    CHECK(bad([](Ram& q) { q.W8(kP + 0xD8C, 2); }));
+}
+
+static void saves()
+{
+    Ram r = town_ram();
+    SaveSlots s = ReadGameState(r.View()).town.saves;
+    CHECK(s.valid && s.current == 0 && !s.used[0] && !s.used[1] && !s.used[2]);   // zeros: current slot 0
+    r.W32(0x0213D84C, (u32)-1);
+    s = ReadGameState(r.View()).town.saves;
+    CHECK(s.valid && s.current == -1);
+    r.W8(0x0213D848 + 1, 1);
+    const u32 h = 0x0213D7B8 + 0x30;
+    r.W32(h + 0x18, 1055); r.W32(h + 0x14, 0x1234); put_text(r, h + 0x1C, "Clare"); r.W8(h + 0x2C, 19);
+    r.W32(0x0213D84C, 1);
+    s = ReadGameState(r.View()).town.saves;
+    CHECK(s.valid && s.current == 1 && s.used[1] && s.slot[1].money == 1055 && s.slot[1].simName == "Clare" && s.slot[1].place == 19 && s.slot[1].time == 0x1234);
+    r.W8(h + 0x1C, 1);   // a bad name blanks the name only
+    s = ReadGameState(r.View()).town.saves;
+    CHECK(s.valid && s.slot[1].simName.empty() && s.slot[1].money == 1055);
+    auto bad = [&](auto f) { Ram q = r; f(q); GameState g = ReadGameState(q.View()); return !g.town.saves.valid && g.hud.valid; };
+    CHECK(bad([](Ram& q) { q.W32(0x0213D84C, 3); }));
+    CHECK(bad([](Ram& q) { q.W32(0x0213D84C, (u32)-2); }));
+    CHECK(bad([](Ram& q) { q.W8(0x0213D848 + 2, 2); }));
+}
+
+static void town_random()
+{
+    std::mt19937 rng(7);
+    for (int round = 0; round < 200; round++)
+    {
+        Ram r = town_ram();
+        r.W8(kP + 0x8, 2); r.W32(kP + 0x10, 0);
+        for (int i = 0; i < 300; i++)
+        {
+            const u32 areas[] = {kG, kP, 0x0213D7B8, kRec};
+            const u32 a = areas[rng() % 4] + rng() % 0x4900;
+            r.W8(a, (u32)rng());
+        }
+        GameState g = ReadGameState(r.View());
+        CHECK(g.town.inventory.slots.size() <= 6);
+    }
+}
+
 int main()
 {
+    records();
+    inventory();
+    options();
+    popup();
+    saves();
+    town_random();
     hud();
     dialogue();
     between_screens();
