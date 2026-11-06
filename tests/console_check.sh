@@ -264,6 +264,12 @@ run cas-hair F-hair-s3-40 "${town[@]}" --console-focus 10 &
 run cas-face F-face-5-40 "${town[@]}" --console-focus 4 &
 run cas-clothes F-thr-6-40 "${town[@]}" --console-focus 11 &
 wait
+# The UI's size (task 10, --ui-scale): the conversation and the panel's menu at 75 % and 150 %.
+run s5-hd-75 s5 "${town[@]}" --ui-scale 75 &
+run s5-hd-150 s5 "${town[@]}" --ui-scale 150 &
+run casino-menu-75 sit-casino "${late[@]}" --console-menu --console-focus 1 --print-hud --ui-scale 75 &
+run casino-menu-150 sit-casino "${late[@]}" --console-menu --console-focus 1 --print-hud --ui-scale 150 &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3-m1 slots load casino casino-2x \
@@ -276,7 +282,8 @@ for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
     registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint \
-    music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats; do
+    music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats \
+    s5-hd-75 s5-hd-150 casino-menu-75 casino-menu-150; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -285,7 +292,7 @@ for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-
     if "$python" -I - "$tmp/$name/c/f000119.png" "$tmp/$name/r/f000119.png" "$name" "$tmp/$name.log" <<'EOF'
 import re
 import sys
-from PIL import Image
+from PIL import Image, ImageChops
 
 comp_path, raw_path, case, log_path = sys.argv[1:5]
 comp = Image.open(comp_path).convert("RGB")
@@ -1146,6 +1153,48 @@ elif case in ("s5-hd", "s5-hd-wide"):
         h = round(1280 * rows / tw)
         for cx, cy in ((2, 100), (1277, 100), (640, 300), (40, 440)):
             expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * tw // 1280, cy * rows // h)))
+elif case in ("s5-hd-75", "s5-hd-150", "casino-menu-75", "casino-menu-150"):
+    # The UI's size: the same picture as at 100 % (the case without the suffix, run beside it), its
+    # HD group zoomed about its anchor (the conversation about the canvas's bottom centre, 75 % or as
+    # wide as the canvas holds, 120 %; the menu about 640,338, 75 % or never larger), the world
+    # unchanged where the group no longer lies; the strip's status at its own size (75 %, or the
+    # strip's 108 %) at the strip's left.
+    from PIL import ImageStat
+    base_name = case.rsplit("-", 1)[0]
+    base = Image.open(comp_path.replace(f"/{case}/", f"/{base_name}/")).convert("RGB")
+    z = 0.75 if case.endswith("-75") else 1.0
+    dialogue = case.startswith("s5")
+    if dialogue and case.endswith("-150"): z = 636 / 530
+    ax, ay = (640, 720) if dialogue else (640, 338)
+    box = (110, 426, 1170, 706) if dialogue else (176, 30, 1104, 646)
+    T = lambda x, y: (ax + z * (x - ax), ay + z * (y - ay))
+    if z == 1:
+        # (the menu at 150 %: as at 100 %, the strip apart)
+        diff = sum(1 for y in range(0, 655, 3) for x in range(0, 1280, 3) if C(x, y) != base.getpixel((x, y)))
+        if diff: errors.append(f"the menu at 150 % differs from 100 % at {diff} samples")
+    else:
+        # The group: the 100 % picture's box made z times smaller / larger, nearly the same pixels.
+        x0, y0 = T(box[0], box[1])
+        x1, y1 = T(box[2], box[3])
+        want = base.crop(box).resize((round(x1 - x0), round(y1 - y0)), Image.BILINEAR)
+        got = comp.crop((round(x0), round(y0), round(x0) + want.size[0], round(y0) + want.size[1]))
+        mean = sum(ImageStat.Stat(ImageChops.difference(want, got)).mean) / 3
+        if mean > 14: errors.append(f"the zoomed group differs from 100 % (mean {mean:.1f})")
+        if z < 1:
+            # Where the group was and no longer is: the world (the conversation's) or the dimmed world (the menu's).
+            for px, py in ((box[0] + 70, (box[1] + box[3]) // 2), (box[2] - 70, box[1] + 12)):
+                if dialogue:
+                    expect(f"world at {px},{py}", C(px, py), world_full(176)(px, py))
+                elif not all(v < 80 for v in C(px, py)):
+                    errors.append(f"no dimmed world at {px},{py}: {C(px, py)}")
+    if not dialogue:
+        # The strip: the status's white words end further left at 75 %, further right at 150 %.
+        def right_end(im):
+            xs = [x for y in range(668, 716, 2) for x in range(0, 900) if min(im.getpixel((x, y))) > 235]
+            return max(xs) if xs else 0
+        a, b = right_end(base), right_end(comp)
+        if not (b < a - 20 if case.endswith("-75") else b > a + 10):
+            errors.append(f"the status's words end at {b} (at 100 %: {a})")
 elif case == "social":
     activity(176, skip=16)
 elif case in ("vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",
@@ -1631,7 +1680,7 @@ wait
 pixels() {
     "$python" -I - "$tmp/$1" "$2" <<'EOF'
 import sys
-from PIL import Image
+from PIL import Image, ImageChops
 
 d, case = sys.argv[1:3]
 shot = lambda f: Image.open(f"{d}/f{f:06d}.png").convert("RGB")
@@ -1724,7 +1773,7 @@ pages() {
     done
     "$python" -I - "$tmp/dlg-pages" <<'EOF'
 import sys
-from PIL import Image
+from PIL import Image, ImageChops
 
 d = sys.argv[1]
 shot = lambda f: Image.open(f"{d}/f{f:06d}.png").convert("RGB")
@@ -1778,7 +1827,7 @@ for lang in 1 2 3 4 5; do
     # name plate (above the well's top edge); the portrait's column left out.
     if "$python" -I - "$tmp/$name/f000030.png" <<'EOF'
 import sys
-from PIL import Image
+from PIL import Image, ImageChops
 
 im = Image.open(sys.argv[1]).convert("RGB")
 # The well's top edge: the first row of the well's colour at x 600, from y 380 down.
@@ -2358,7 +2407,7 @@ cas_arrive() {
     # Every frame: an HD panel drawn (its fill at the right) never over black tab crops.
     "$python" -I - "$tmp/t2-cas-arrive" <<'PYEOF'
 import glob, sys
-from PIL import Image
+from PIL import Image, ImageChops
 bad = []
 for f in sorted(glob.glob(sys.argv[1] + "/f*.png")):
     im = Image.open(f).convert("RGB")
@@ -2422,7 +2471,7 @@ wait
 t3_pic() {
     "$python" -I - "$@" <<'PYEOF'
 import sys
-from PIL import Image
+from PIL import Image, ImageChops
 path, what = sys.argv[1], sys.argv[2]
 im = Image.open(path).convert("RGB")
 px = lambda x, y: im.getpixel((x, y))
@@ -2481,7 +2530,7 @@ t3_detector_off() {
     # (From the first frame on the panel, its tab read or not: the town's world, never a black rail.)
     "$python" -I - "$tmp/t3-detector-off" "$(first_frame t3-detector-off 'game Panel')" <<'PYEOF'
 import glob, sys
-from PIL import Image
+from PIL import Image, ImageChops
 bad = []
 for f in sorted(glob.glob(sys.argv[1] + "/f*.png")):
     if int(f.rsplit("/f", 1)[1][:-4]) < int(sys.argv[2]):

@@ -5,6 +5,7 @@
 #define SDL_MAIN_HANDLED // (a plain main, on Windows too)
 #include <SDL.h>
 
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <iterator>
@@ -252,8 +253,63 @@ static void world_camera_bindings()
     CHECK(none.Pad(L) == kNone && none.PadOwn(L));
 }
 
+// Input::Actions' turnL / turnR (Bindings::CameraTurns): the keyboard's L / R keys always turn; a
+// pad's L / R only on an input of the player's own (the default LB / RB, or an older file naming
+// them, never: they are the menus' pages); held both, both.
+static void camera_turns()
+{
+    bool l = true, r = true;
+    Bindings d;
+    d.CameraTurns(false, false, false, false, l, r);
+    CHECK(!l && !r);
+    d.CameraTurns(true, false, false, false, l, r);
+    CHECK(l && !r);
+    d.CameraTurns(false, true, false, false, l, r);
+    CHECK(!l && r);
+    d.CameraTurns(false, false, true, true, l, r); // (LB / RB by default: no turn)
+    CHECK(!l && !r);
+    Bindings old;
+    old.Apply("pad_l", "lb");
+    old.Apply("pad_r", "rb");
+    old.CameraTurns(false, false, true, true, l, r);
+    CHECK(!l && !r);
+    Bindings own;
+    own.Apply("pad_l", "lt");
+    own.CameraTurns(false, false, true, true, l, r); // (L the player's own, R still the default)
+    CHECK(l && !r);
+    own.CameraTurns(true, true, false, false, l, r);
+    CHECK(l && r);
+    Bindings swapped;
+    swapped.Apply("pad_l", "rb");
+    swapped.CameraTurns(false, false, false, true, l, r);
+    CHECK(!l && r);
+}
+
+// The UI's Auto size (settings.h's AutoUiScale): the canvas pixel's millimetres and the display's
+// diagonal for the displays the rule was chosen on (fullscreen unless said), as printed in the
+// task's report; nonsense or nothing known: 100 %.
+static void auto_ui_scale()
+{
+    auto at = [](float widthMm, float heightMm, float canvasMm) {
+        return std::lround(AutoUiScale(canvasMm / 1280, std::hypot(widthMm, heightMm)) * 100);
+    };
+    CHECK(at(708.4f, 398.5f, 708.4f) == 75);    // 32" 4K (16:9): 63 % wanted, the floor
+    CHECK(at(708.4f, 398.5f, 354.2f) == 125);   // the same, a 1280 x 720 window at "looks like 2560 x 1440"
+    CHECK(at(531.4f, 298.9f, 531.4f) == 75);    // 24" 1080p
+    CHECK(at(597.7f, 336.2f, 597.7f) == 75);    // 27" 1440p
+    CHECK(at(286.5f, 179.1f, 286.5f) == 100);   // 13.3" 2560 x 1600 laptop (16:10: the canvas as wide as the screen)
+    CHECK(at(286.5f, 179.1f, 254.7f) == 110);   // the same, a 1280 x 720 window at "looks like 1440 x 900"
+    CHECK(at(344.2f, 193.6f, 344.2f) == 90);    // 15.6" 1080p laptop
+    CHECK(at(150.8f, 94.2f, 150.8f) == 130);    // 7" 1280 x 800 handheld (the Steam Deck)
+    CHECK(at(1209.6f, 680.4f, 1209.6f) == 115); // 55" TV
+    CHECK(AutoUiScale(0, 0) == 1 && AutoUiScale(0.5f, 0) == 1 && AutoUiScale(0.5f, 5000) == 1 && AutoUiScale(10, 500) == 1);
+    CHECK(UiZoomOf(0, 0.8f) == 0.8f && UiZoomOf(125, 0.8f) == 1.25f);
+}
+
 int main(int, char**)
 {
+    auto_ui_scale();
+    camera_turns();
     world_camera_bindings();
     controller_settings();
     upgrade_looks();

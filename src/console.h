@@ -127,6 +127,21 @@ constexpr int kWorldOnlyMax = 10;
 // payout (above): the money's last change (App::consolePayout: the slot machine's coin and its
 // payout, a ticket's prize, ...), shown on the panel's world beside the HD status bar while not 0.
 
+// The town's hints at the strip's right (unzoomed; console.cpp zooms them about kTownHintsRight):
+// the camera's (the right stick; the keyboard's own L / R keys when it was used last: its two
+// keycaps) and the TOUCH MENU's, "Menu". w: their width together.
+constexpr float kTownHintSize = 24;
+constexpr int kTownHintsRight = kConsoleW - 30, kTownHintsBetween = 22, kTownKeysGap = 6;
+struct TownHints
+{
+    const char* menu = "";
+    const char* camera = "";
+    bool keys = false;
+    int w = 0, menuW = 0;
+};
+TownHints TownHintsFor(const RomData* rom, const ui::ChipLook& look);
+void AddTownHints(Composition& c, const TownHints& h);
+
 // The world (the top picture's first `rows` rows, topW wide) as CONSOLE draws it: 720 high,
 // centred when narrower than the canvas; keepSides: never cut at its sides (fitted to the
 // canvas's width, top-aligned, when wider), else cropped to 16:9.

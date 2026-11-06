@@ -361,6 +361,14 @@ constexpr const char* kWords[][5] = {
     {"The game saves beside the ROM again: @1", "Le jeu sauvegarde de nouveau à côté de la ROM : @1",
      "Das Spiel speichert wieder neben dem ROM: @1", "Il gioco salva di nuovo accanto alla ROM: @1",
      "El juego vuelve a guardar junto a la ROM: @1"},
+    // The interface's size
+    {"Interface size", "Taille de l'interface", "Größe der Oberfläche", "Dimensione interfaccia", "Tamaño de la interfaz"},
+    {"Auto", "Auto", "Auto", "Auto", "Auto"},
+    {"Auto follows your screen's size and the window's. The game's world keeps its size.",
+     "Auto suit la taille de l'écran et de la fenêtre. Le monde du jeu garde sa taille.",
+     "Auto folgt der Größe von Bildschirm und Fenster. Die Spielwelt behält ihre Größe.",
+     "Auto segue le dimensioni dello schermo e della finestra. Il mondo del gioco resta com'è.",
+     "Auto sigue el tamaño de la pantalla y de la ventana. El mundo del juego no cambia."},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

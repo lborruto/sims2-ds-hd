@@ -306,13 +306,17 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     FrontFramed(c, {Src::Top, {0, 0, topW, topH}, top});
     {
         // What turns it: the right stick (RStick); off the Name page X (left) and Y (right) too, either side of it.
+        // The keyboard (the device used last) has no stick: its X / Y keys alone, off the Name page (on
+        // it, the mouse's right drag; its L / R keys are the pages here).
+        const bool keys = ui::ChipLookNow().face == Face::Keyboard;
         const Rect rs = ChipRect(0, 0, Button::RStick, "", 28), xr = ChipRect(0, 0, Button::X, "", 28);
         const int y = top.y + top.h + 22, cx = top.x + top.w / 2;
-        c.ui.push_back(ChipItem(cx - rs.w / 2, y, Button::RStick, "", 28));
+        const int half = keys ? 0 : rs.w / 2;
+        if (!keys) c.ui.push_back(ChipItem(cx - rs.w / 2, y, Button::RStick, "", 28));
         if (v.xyTurns)
         {
-            c.ui.push_back(ChipItem(cx - rs.w / 2 - 16 - xr.w, y + (rs.h - xr.h) / 2, Button::X, "", 28));
-            c.ui.push_back(ChipItem(cx + rs.w / 2 + 16, y + (rs.h - xr.h) / 2, Button::Y, "", 28));
+            c.ui.push_back(ChipItem(cx - half - (keys ? 8 : 16) - xr.w, y + (rs.h - xr.h) / 2, Button::X, "", 28));
+            c.ui.push_back(ChipItem(cx + half + (keys ? 8 : 16), y + (rs.h - xr.h) / 2, Button::Y, "", 28));
         }
         // The game's own "L" / "R" pills on its arrows (the DS's shoulder buttons: LB / RB are the
         // pages here) covered by the pad's turn chips: X / Y off the Name page, else the right stick.
@@ -331,6 +335,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             plate.radius = r.h / 2.0f;
             c.ui.push_back(plate);
             const Button b = v.xyTurns ? (k == 0 ? Button::X : Button::Y) : Button::RStick;
+            if (keys && !v.xyTurns) continue; // (the keyboard on the Name page: the plate alone)
             const Rect cr = ChipRect(0, 0, b, "", 26);
             c.ui.push_back(ChipItem(r.x + (r.w - cr.w) / 2, r.y + (r.h - cr.h) / 2, b, "", 26));
         }

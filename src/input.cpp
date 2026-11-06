@@ -344,8 +344,10 @@ PadState Input::Actions(const Settings& s) const
     p.lb |= on(L);
     p.rb |= on(R);
     // The world's camera: the keyboard's L / R keys, a pad's only when the player gave them one.
-    p.turnL |= held[L] || (s.controls.PadOwn(L) && PadOn(s, L));
-    p.turnR |= held[R] || (s.controls.PadOwn(R) && PadOn(s, R));
+    bool turnL, turnR;
+    s.controls.CameraTurns(held[L], held[R], PadOn(s, L), PadOn(s, R), turnL, turnR);
+    p.turnL |= turnL;
+    p.turnR |= turnR;
     p.start |= on(START);
     p.select |= on(SELECT);
     // The keyboard's on the press; the pad's on release (Poll: Start + Back is the pause menu).

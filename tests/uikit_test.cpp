@@ -387,6 +387,7 @@ struct Rng
     u32 Next() { v ^= v << 13; v ^= v >> 7; v ^= v << 17; return (u32)v; }
     int In(int a, int b) { return a + (int)(Next() % (u32)(b - a + 1)); }
 };
+static bool gZoomed = false; // (raster_ways' second pass: items zoomed by the UI's size)
 static UiItem RandomItem(Rng& g, const u32* pic, const u32* icon)
 {
     static const char* words[] = {"Hello", "Crème brûlée", "Talk about the weather", "§1,200", "A", "Pneumonoultramicroscopicsilicovolcanoconiosis and more to wrap"};
@@ -403,6 +404,11 @@ static UiItem RandomItem(Rng& g, const u32* pic, const u32* icon)
     default: it = ImageItem({r.x, r.y, 24 * g.In(1, 4), 24 * g.In(1, 4)}, icon, 24, 24, {0, 0, 24, 24}); break;
     }
     it.layer = g.In(0, 2);
+    if (gZoomed)
+    {
+        static const float zooms[] = {0.75f, 0.8f, 0.85f, 1.05f, 1.35f, 1.5f};
+        if (g.In(0, 2)) ZoomItem(it, zooms[g.In(0, 5)], (float)g.In(0, 1280), (float)g.In(0, 720));
+    }
     return it;
 }
 static void SortLayers(std::vector<UiItem>& items)
@@ -414,9 +420,11 @@ static void SortLayers(std::vector<UiItem>& items)
 // rectangle drawn again over a raster of other items gives the whole raster's bytes there, a text
 // mask kept or drawn anew the same; and the window's cache (LayerCache), item changes after item
 // changes, holds exactly what a whole raster of each layer gives.
-static void raster_ways()
+static void raster_ways(bool zoomed)
 {
+    gZoomed = zoomed;
     Rng g;
+    if (zoomed) g.v ^= 0x9E3779B97F4A7C15ull;
     std::vector<u32> pic(256 * 192), icon(24 * 24);
     for (size_t i = 0; i < pic.size(); i++) pic[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
     for (size_t i = 0; i < icon.size(); i++) icon[i] = i % 5 == 0 ? 0 : g.Next();
@@ -498,6 +506,8 @@ static void raster_ways()
         }
     }
     SetChipLook({});
+    gZoomed = false;
+    if (zoomed) return;
     // A focus ring moving inside a big layer: only the old and the new ring's pixels are drawn
     // again; nothing at all when nothing changed.
     std::vector<UiItem> menu = {PanelItem({100, 100, 900, 500}), TextItem({140, 140, 500, 60}, "Title", 30)};
@@ -546,6 +556,54 @@ static void raster_ways()
     CHECK(!WholeFactorCrop(crop2[0], LayersAt(crop2, 3, 0, 0)[0], 3));
 }
 
+// The UI's size (UiItem::zoom, dx, dy): an item zoomed is that item drawn at a larger or smaller
+// scale (byte for byte the raster of the unzoomed items at scale × zoom), placed and bounded where
+// the zoom puts it, hashed as before at 1; FitZoom keeps a group inside its limit; a zoomed
+// picture is never the GPU's.
+static void ui_scale()
+{
+    // Placed, ZoomItem (composed), FitZoom.
+    UiItem p = PanelItem({110, 456, 1060, 250});
+    const u64 h0 = Hash({p});
+    ZoomItem(p, 1, 640, 720);
+    CHECK(Hash({p}) == h0 && Placed(p).x == 110 && Placed(p).w == 1060);
+    ZoomItem(p, 0.75f, 640, 720);
+    const Rect q = Placed(p);
+    CHECK(q.x == 242 && q.x + q.w == 1038 && q.y == 522 && q.y + q.h == 710);
+    CHECK(Hash({p}) != h0);
+    ZoomItem(p, 1 / 0.75f, 640, 720);
+    CHECK(std::abs(p.zoom - 1) < 1e-5f && std::abs(p.dx) < 1e-3f && std::abs(p.dy) < 1e-3f);
+    CHECK(std::abs(FitZoom({110, 426, 1060, 280}, 1.5f, 640, 720, {4, 4, 1272, 712}) - 636.0f / 530) < 1e-4f);
+    CHECK(FitZoom({110, 426, 1060, 280}, 0.75f, 640, 720, {4, 4, 1272, 712}) == 0.75f);
+    CHECK(FitZoom({16, 667, 400, 48}, 1.5f, 16, 691, {0, 665, 1280, 55}) < 1.09f);
+    {
+        std::vector<u32> px(64 * 64, 0xFF336699u);
+        UiItem crop = ImageItem({0, 0, 64, 64}, px.data(), 64, 64, {0, 0, 32, 32});
+        CHECK(WholeFactorCrop(crop, LayersAt({crop}, 1, 0, 0)[0], 1));
+        ZoomItem(crop, 0.5f, 0, 0);
+        CHECK(!WholeFactorCrop(crop, LayersAt({crop}, 2, 0, 0)[0], 2));
+    }
+
+    // Zoomed by z about the origin at scale s: the raster of the items as they are at s × z.
+    std::vector<u32> pic(256 * 192);
+    for (size_t i = 0; i < pic.size(); i++) pic[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    std::vector<UiItem> items = {PanelItem({20, 20, 300, 160}), WellItem({40, 60, 120, 80}),
+                                 TextItem({40, 30, 260, 30}, "Crème brûlée, twice", 22), ChipItem(180, 70, Button::A, "Talk", 20),
+                                 ImageItem({190, 110, 60, 45}, pic.data(), 256, 192, {10, 10, 20, 15})};
+    for (float z : {0.75f, 1.5f})
+    {
+        std::vector<UiItem> zoomed = items;
+        for (UiItem& it : zoomed) ZoomItem(it, z, 0, 0);
+        const int w = 520, h = 300;
+        std::vector<u32> a(w * h), b(w * h);
+        Rasterise(zoomed, 1.0f, a.data(), w, h);
+        Rasterise(items, z, b.data(), w, h);
+        CHECK(a == b);
+        const Rect bz = Bounds(zoomed), bi = Bounds(items);
+        CHECK(bz.x <= (int)std::floor(bi.x * z) && bz.x + bz.w >= (int)std::ceil((bi.x + bi.w) * z) - 1);
+    }
+}
+
 int main()
 {
     wrap_cases();
@@ -556,7 +614,9 @@ int main()
     image_scaler();
     edges();
     still_layers();
-    raster_ways();
+    raster_ways(false);
+    raster_ways(true);
+    ui_scale();
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("uikit_test: all passed\n");
     return 0;

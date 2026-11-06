@@ -68,9 +68,10 @@ static void CheckBuild(const Shell& sh, const Model& m, const char* what)
         if (images) { fprintf(stderr, "%s: a still item after an image\n", what); failures++; }
         if (it.layer < layer) { fprintf(stderr, "%s: layers not ascending\n", what); failures++; }
         layer = it.layer;
-        if (it.to.x < 0 || it.to.y < 0 || it.to.x + it.to.w > kW || it.to.y + it.to.h > kH)
+        const Rect p = ui::Placed(it); // (as drawn: the UI's size)
+        if (p.x < 0 || p.y < 0 || p.x + p.w > kW || p.y + p.h > kH)
         {
-            fprintf(stderr, "%s: item outside the canvas (%d,%d %dx%d) '%s'\n", what, it.to.x, it.to.y, it.to.w, it.to.h, it.text.c_str());
+            fprintf(stderr, "%s: item outside the canvas (%d,%d %dx%d) '%s' at %d %%\n", what, p.x, p.y, p.w, p.h, it.text.c_str(), (int)(ui::UiScale() * 100));
             failures++;
         }
     }
@@ -511,14 +512,15 @@ static void mouse()
     CHECK(sh.Update(in, f.m).act == Act::None && sh.page == Page::Settings);
     sh.Build(f.m);
     // A click on a value row's left third: Left; elsewhere Right.
-    const Rect v = sh.Rects()[(int)Row::Volume];
-    f.s.volume = 50;
+    // (the interface's size: a value row among the first eight shown)
+    const Rect v = sh.Rects()[(int)Row::UiSize];
+    f.s.uiScale = 100;
     in.mx = v.x + 10.0f;
     in.my = v.y + v.h / 2.0f;
-    CHECK(sh.Update(in, f.m).act == Act::Setting && f.s.volume == 45);
+    CHECK(sh.Update(in, f.m).act == Act::Setting && f.s.uiScale == 95);
     in.mx = v.x + v.w - 10.0f;
     sh.Update(in, f.m);
-    CHECK(f.s.volume == 50);
+    CHECK(f.s.uiScale == 100);
     in.mx = 5;
     in.my = 5;
     sh.Update(in, f.m);
@@ -679,6 +681,27 @@ static void platform()
         Settings e;
         e.Load(path);
         CHECK(e.scaling == Scaling::Sharp && e.fastSpeed == 4 && e.cursorSpeed == 50);
+        // Task 10: the interface's size (auto or 75-150 by 5).
+        Settings u;
+        CHECK(u.uiScale == 0);
+        u.uiScale = 135;
+        CHECK(u.Save(path));
+        Settings v;
+        CHECK(v.Load(path) && v.uiScale == 135);
+        { std::ofstream(path) << "ui_scale=auto\n"; }
+        Settings w;
+        w.uiScale = 90;
+        w.Load(path);
+        CHECK(w.uiScale == 0);
+        { std::ofstream(path) << "ui_scale=500\n"; }
+        w.Load(path);
+        CHECK(w.uiScale == 150);
+        { std::ofstream(path) << "ui_scale=12\n"; }
+        w.Load(path);
+        CHECK(w.uiScale == 75);
+        { std::ofstream(path) << "ui_scale=93\n"; }
+        w.Load(path);
+        CHECK(w.uiScale == 95);
     }
     fs::remove_all(dir);
     // The main page's banner: shown, the buttons still inside the panel and reachable.
@@ -775,12 +798,19 @@ static void SaveRules(const std::filesystem::path& dir)
 
 int main(int, char**)
 {
-    main_page();
-    settings_page();
-    keys_page();
-    states_page();
-    launch_panel();
-    mouse();
+    // The pages at the UI's sizes (shell.cpp's Zoom: about the canvas's centre, the mouse's
+    // rectangles with it): every item inside the canvas, the mouse's clicks and hovers on them.
+    for (float z : {1.0f, 0.75f, 1.5f})
+    {
+        ui::SetUiScale(z);
+        main_page();
+        settings_page();
+        keys_page();
+        states_page();
+        launch_panel();
+        mouse();
+    }
+    ui::SetUiScale(1);
     pad_fallback();
     other_rom();
     files();

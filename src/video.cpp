@@ -5,7 +5,12 @@
 #include <cstdio>
 #include <vector>
 
+#ifdef __APPLE__
+#include <ApplicationServices/ApplicationServices.h>
+#endif
+
 #include "port/cas.h"
+#include "settings.h"
 #include "shots.h"
 #include "ui/font.h"
 #include "ui/kit.h"
@@ -176,13 +181,17 @@ void Video::Present(const App& app, const Marks& marks, const std::vector<ui::Ui
         constexpr int kLayer = 9;
         std::vector<ui::UiItem>& to = shell ? over : comp.ui;
         const int cw = shell ? 1280 : comp.cw;
-        const int tw = (int)std::ceil(ui::TextWidth(toast, kSize)), w = std::min(tw + 48, cw - 32), h = 56;
+        // (The UI's size: about its top centre, no wider than the canvas.)
+        const float z = ui::UiScale();
+        const int tw = (int)std::ceil(ui::TextWidth(toast, kSize)), w = std::min(tw + 48, (int)((cw - 32) / z)), h = 56;
         const Rect box {(cw - w) / 2, shell ? 4 : 24, w, h};
         ui::UiItem panel = ui::PanelItem(box);
         ui::UiItem text = ui::TextItem({box.x + 24, box.y, box.w - 48, box.h}, toast, kSize, ui::Align::Centre);
         text.wrap = false;
         text.middle = true;
         panel.layer = text.layer = kLayer;
+        ui::ZoomItem(panel, z, cw / 2.0f, (float)box.y);
+        ui::ZoomItem(text, z, cw / 2.0f, (float)box.y);
         to.push_back(panel);
         to.push_back(text);
     }
@@ -206,7 +215,8 @@ void Video::Present(const App& app, const Marks& marks, const std::vector<ui::Ui
                 comp.ui.push_back(bar);
             }
     }
-    // Fast forward: a small » plate at the top right.
+    // Fast forward: a small » plate at the top right (the UI's size: about that corner).
+    const size_t marksFirst = comp.ui.size();
     if (marks.fast)
     {
         const Rect r {comp.cw - 88, 16, 72, 48};
@@ -242,6 +252,7 @@ void Video::Present(const App& app, const Marks& marks, const std::vector<ui::Ui
             comp.ui.push_back(bar);
         }
     }
+    for (size_t i = marksFirst; i < comp.ui.size(); i++) ui::ZoomItem(comp.ui[i], ui::UiScale(), comp.cw - 16.0f, 16.0f);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, ow, oh);
@@ -524,4 +535,60 @@ bool Video::OverTop(const App& app, int wx, int wy) const
     return OverTopComposition(c, CanvasFit::For(c.cw, c.ch, ow, oh), px, py);
 }
 
+
+bool Video::DisplayMetrics(float& mm, float& diag) const
+{
+    mm = diag = 0;
+    if (!win || !ren) return false;
+    const int d = SDL_GetWindowDisplayIndex(win);
+    int ww, wh, ow, oh;
+    SDL_GetWindowSize(win, &ww, &wh);
+    SDL_GetRendererOutputSize(ren, &ow, &oh);
+    if (d < 0 || ww <= 0 || ow <= 0) return false;
+#ifdef __APPLE__
+    // The display's physical size (millimetres, from its EDID) over its size in points: the
+    // window's points are its own (a scaled Retina mode included), its output pixels ow / ww of them.
+    SDL_Rect b;
+    if (SDL_GetDisplayBounds(d, &b) != 0) return false;
+    CGDirectDisplayID ids[16];
+    uint32_t n = 0;
+    if (CGGetActiveDisplayList(16, ids, &n) != kCGErrorSuccess) return false;
+    for (uint32_t i = 0; i < n; i++)
+    {
+        const CGRect r = CGDisplayBounds(ids[i]);
+        if ((int)r.origin.x != b.x || (int)r.origin.y != b.y || (int)r.size.width != b.w || (int)r.size.height != b.h) continue;
+        const CGSize size = CGDisplayScreenSize(ids[i]);
+        if (!(size.width > 0) || !(size.height > 0) || b.w <= 0) return false;
+        mm = (float)(size.width / b.w) * ww / ow;
+        diag = (float)std::hypot(size.width, size.height);
+        return true;
+    }
+    return false;
+#else
+    // Pixels per inch in output pixels (Windows: its scaling DPI, 96 × the display's scale; X11:
+    // the physical one); the display's bounds are in window units.
+    float ddpi = 0, hdpi = 0, vdpi = 0;
+    SDL_Rect b;
+    if (SDL_GetDisplayDPI(d, &ddpi, &hdpi, &vdpi) != 0 || !(hdpi > 0) || SDL_GetDisplayBounds(d, &b) != 0) return false;
+    mm = 25.4f / hdpi;
+    const float k = (float)ow / ww;
+    diag = std::hypot(b.w * k, b.h * k) * mm;
+    return true;
+#endif
+}
+
+float Video::AutoUiScale() const
+{
+    if (!win || !ren) return 1;
+    int ww, wh, ow, oh;
+    SDL_GetWindowSize(win, &ww, &wh);
+    SDL_GetRendererOutputSize(ren, &ow, &oh);
+    const int key[5] = {SDL_GetWindowDisplayIndex(win), ww, wh, ow, oh};
+    if (std::equal(key, key + 5, autoKey)) return autoScale;
+    std::copy(key, key + 5, autoKey);
+    float mm, diag;
+    // (the canvas as the window fits it: millimetres a canvas pixel)
+    autoScale = DisplayMetrics(mm, diag) ? sims2wide::AutoUiScale(mm * CanvasFit::For(1280, 720, ow, oh).scale, diag) : 1;
+    return autoScale;
+}
 }

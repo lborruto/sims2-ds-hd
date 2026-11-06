@@ -242,7 +242,7 @@ void AddStatusBar(Composition& c, const HudState& hud, const RomData* rom)
     AddStatusBar(c, hud, HudStringsFrom(rom));
 }
 
-Rect AddStatusStrip(Composition& c, const HudState* hud, const HudStrings& s, int rightW)
+Rect AddStatusStrip(Composition& c, const HudState* hud, const HudStrings& s, int rightW, float zoom)
 {
     // The kit panel's look across the canvas, held inside it (a window wider or taller than 16:9
     // shows nothing past the canvas): the dark outline, the frame band, the fill to the foot.
@@ -254,7 +254,12 @@ Rect AddStatusStrip(Composition& c, const HudState* hud, const HudStrings& s, in
     for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
     const Rect none {16, kStripContentY, 0, kStatusBarH};
     if (!hud) return none;
-    const Rect bar = AddStatusBar(c, *hud, s, 16, kStripContentY, c.cw - 32 - (rightW > 0 ? rightW + 24 : 0), false);
+    const size_t items = c.ui.size();
+    const int room = c.cw - 32 - (rightW > 0 ? rightW + 24 : 0);
+    const Rect bar = AddStatusBar(c, *hud, s, 16, kStripContentY, zoom > 0 ? (int)std::floor(room / zoom) : room, false);
+    if (zoom != 1)
+        ZoomUi(c, items, c.pieces.size(), zoom, 16, kStripContentY + kStatusBarH / 2.0f,
+               {0, kStripY + 1 + kStripBand, c.cw, c.ch - kStripY - 1 - kStripBand});
     return bar.w > 0 ? bar : none;
 }
 }

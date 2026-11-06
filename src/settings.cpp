@@ -3,6 +3,7 @@
 #include <SDL.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -86,6 +87,7 @@ bool Settings::Load(const std::string& path)
             scaling = v == "smooth" ? Scaling::Smooth : v == "nearest" ? Scaling::Nearest : Scaling::Sharp;
         }
         else if (k == "battery_saver") batterySaver = on;
+        else if (k == "ui_scale") uiScale = v == "auto" ? 0 : std::clamp((atoi(v.c_str()) + 2) / 5 * 5, 75, 150);
         else if (k == "mute") mute = on;
         else if (k == "run_in_background") runInBackground = on;
         else if (k == "fast_forward_speed") { const int n = atoi(v.c_str()); fastSpeed = n >= 2 ? std::min(n, 4) : 0; }
@@ -154,6 +156,7 @@ bool Settings::Save(const std::string& path) const
         << "fullscreen=" << (fullscreen ? 1 : 0) << "\n"
         << "scaling=" << ScalingKey(scaling) << "\n"
         << "battery_saver=" << (batterySaver ? 1 : 0) << "\n"
+        << "ui_scale=" << (uiScale == 0 ? std::string("auto") : std::to_string(uiScale)) << "\n"
         << "window=" << windowW << "x" << windowH << "\n"
         << "window_position=" << windowX << "," << windowY << "\n"
         << "volume=" << volume << "\n"
@@ -173,5 +176,30 @@ bool Settings::Save(const std::string& path) const
         << "language=" << language << "\n"
         << controls.Lines();
     return out.good();
+}
+
+float AutoViewMm(float d)
+{
+    // (diagonal in inches, distance in mm)
+    static const float kTable[][2] = {{7, 350}, {13, 500}, {24, 700}, {32, 800}, {43, 2000}, {55, 2500}};
+    const float in = d / 25.4f;
+    if (in <= kTable[0][0]) return kTable[0][1];
+    for (size_t i = 1; i < sizeof kTable / sizeof kTable[0]; i++)
+        if (in <= kTable[i][0])
+        {
+            const float t = (in - kTable[i - 1][0]) / (kTable[i][0] - kTable[i - 1][0]);
+            return kTable[i - 1][1] + t * (kTable[i][1] - kTable[i - 1][1]);
+        }
+    return kTable[5][1];
+}
+
+float AutoUiScale(float mmPerPixel, float diagonalMm)
+{
+    // Unknown, or not a display's (a projector's or a TV's made-up sizes: under 4" or over 120").
+    if (!(mmPerPixel > 0.02f && mmPerPixel < 3.0f) || !(diagonalMm > 100 && diagonalMm < 3050)) return 1;
+    const float cap = 30 * 0.705f * mmPerPixel;                     // the dialogue's capitals at 100 %, mm
+    const float want = AutoViewMm(diagonalMm) * std::tan(0.53f * 3.14159265f / 180); // 0.53 degrees there
+    const float z = std::round(want / cap * 20) / 20;
+    return std::clamp(z, 0.75f, 1.5f);
 }
 }

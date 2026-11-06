@@ -87,6 +87,7 @@ static void Usage()
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
         "  --compose-scale N             --compose pictures N times the canvas (1 to 4; the UI drawn at that size)\n"
         "  --ui-demo                     (checks) the HD interface kit's demonstration over the picture\n"
+        "  --ui-scale N                  the HD interface's size, 75 to 150 percent by 5 (default: the settings', Auto; 100 headless)\n"
         "  --res3d N                     3D drawn N times sharper (1 = the DS's own; default 2 in the window, 1 headless)\n"
         "  --wide                        widescreen 16:9 world\n"
         "  --interp                      60 fps in-between frames for the 3D\n"
@@ -177,6 +178,7 @@ int main(int argc, char** argv)
     bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, printConsole = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
+    int uiScaleArg = 0;     // --ui-scale N (75-150): the HD interface's size for this run; 0 the settings' (headless 100)
     bool uiDemo = false;
     int res3d = 0;
     bool wide = false, interp = false;
@@ -202,6 +204,12 @@ int main(int argc, char** argv)
         else if (a == "--compose") compose = true;
         else if (a == "--compose-scale") composeScale = std::clamp(atoi(next().c_str()), 1, 4);
         else if (a == "--ui-demo") uiDemo = true;
+        else if (a == "--ui-scale")
+        {
+            long n = 0;
+            if (!WholeNumber(next(), 1000, n) || n < 75 || n > 150 || n % 5) { Usage(); return 1; }
+            uiScaleArg = (int)n;
+        }
         else if (a == "--res3d") res3d = std::clamp(atoi(next().c_str()), 1, 8);
         else if (a == "--wide") wide = true;
         else if (a == "--interp") interp = true;
@@ -313,6 +321,10 @@ int main(int argc, char** argv)
     // The settings file (not headless: those runs stay the same on every machine).
     const std::string settingsPath = headless ? "" : Settings::DefaultPath();
     if (!settingsPath.empty() && app.settings.Load(settingsPath)) fprintf(stderr, "settings: %s\n", settingsPath.c_str());
+    // The HD interface's size (ui/kit.h): headless 100 % unless the flag says (every check's picture
+    // as it was); the window the settings' (Auto from the window's physical size, AutoUiScale), the
+    // flag over them. Set again every frame (applyUi, below).
+    ui::SetUiScale(uiScaleArg ? uiScaleArg / 100.0f : 1.0f);
 
     // The HD shell (shell.h): its files in the settings folder (--data-dir: a check's; none
     // headless without it).
@@ -329,6 +341,24 @@ int main(int argc, char** argv)
 
     // Window, sound, controllers: up before the launch panel.
     Video video;
+    float lastAuto = 0;
+    auto applyUi = [&]() {
+        if (!window || !video.win) return;
+        float z = uiScaleArg / 100.0f;
+        if (!uiScaleArg)
+        {
+            const float a = app.settings.uiScale == 0 ? video.AutoUiScale() : 1;
+            if (app.settings.uiScale == 0 && a != lastAuto)
+            {
+                float mm = 0, diag = 0;
+                video.DisplayMetrics(mm, diag);
+                fprintf(stderr, "ui: auto size %d %% (%.3f mm an output pixel, a %.1f\" display)\n", (int)std::lround(a * 100), mm, diag / 25.4f);
+                lastAuto = a;
+            }
+            z = UiZoomOf(app.settings.uiScale, a);
+        }
+        ui::SetUiScale(z);
+    };
     Audio audio;
     Input input;
     if (window)
@@ -417,6 +447,7 @@ int main(int argc, char** argv)
         if (launchFrames > 0) ScriptPad(script, launchFrames - 1, prev); // (Change game: a button still held is no press)
         for (long iter = 0;; iter++)
         {
+            applyUi();
             shell::Input in;
             std::string tryPath;
             if (headless)
@@ -1011,6 +1042,7 @@ relaunch:
     };
     for (long iter = 0; (frames < 0 || iter < frames) && !app.quit; iter++)
     {
+        applyUi();
         u32 keys = 0;
         bool blow = false, touching = false;
         int tx = 0, ty = 0;

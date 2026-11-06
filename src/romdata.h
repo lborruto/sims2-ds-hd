@@ -79,6 +79,9 @@ public:
     // strings loaded: for a program that wants the words alone. The running program keeps the
     // archive (App::rom): the icons are decoded from it as the menus need them (port/icons.h).
     void DropArchive() { archive.clear(); archive.shrink_to_fit(); offsets.clear(); offsets.shrink_to_fit(); }
+    // A made-up string table (the checks' own words, never the game's) in `lang` (1-5), as
+    // LoadStrings would leave it: what tests build the HD screens' compositions with.
+    void SetStringsForTest(std::vector<std::string> made, int lang) { strings = std::move(made); language = lang; }
 
     // The game's sprites (below): how many frames the descriptor resource `desc` holds (0: not
     // a descriptor, or not in the archive), and frame `frame` of the sprite {tiles, desc, pal}

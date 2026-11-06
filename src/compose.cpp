@@ -152,4 +152,47 @@ bool CanvasFromTouch(const Composition& c, float tx, float ty, float& cx, float&
     }
     return false;
 }
+
+Rect ZoomRect(Rect r, float z, float ax, float ay)
+{
+    const int x0 = (int)std::lround(ax + z * (r.x - ax)), y0 = (int)std::lround(ay + z * (r.y - ay));
+    const int x1 = (int)std::lround(ax + z * (r.x + r.w - ax)), y1 = (int)std::lround(ay + z * (r.y + r.h - ay));
+    return {x0, y0, x1 - x0, y1 - y0};
+}
+
+namespace
+{
+bool Fixed(const ui::UiItem& it, int cw)
+{
+    return it.to.x <= 0 && it.to.x + it.to.w >= cw;
+}
+bool Zoomed(const ui::UiItem& it) { return it.zoom != 1 || it.dx != 0 || it.dy != 0; }
+bool MousePiece(const Piece& p) { return p.src == Src::Bottom && p.alpha == 0 && p.touch; }
+}
+
+float ZoomUi(Composition& c, size_t item0, size_t piece0, float z, float ax, float ay, Rect limit)
+{
+    if (z == 1) return 1;
+    // The group's box: its items' rectangles (and its mouse pieces').
+    int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    bool any = false;
+    auto add = [&](Rect r) {
+        if (r.w <= 0 || r.h <= 0) return;
+        if (!any) { x0 = r.x; y0 = r.y; x1 = r.x + r.w; y1 = r.y + r.h; any = true; return; }
+        x0 = std::min(x0, r.x); y0 = std::min(y0, r.y); x1 = std::max(x1, r.x + r.w); y1 = std::max(y1, r.y + r.h);
+    };
+    for (size_t i = item0; i < c.ui.size(); i++)
+        if (!Fixed(c.ui[i], c.cw) && !Zoomed(c.ui[i])) add(c.ui[i].to);
+    for (size_t i = piece0; i < c.pieces.size(); i++)
+        if (MousePiece(c.pieces[i])) add(c.pieces[i].to);
+    if (!any) return 1;
+    float f = ui::FitZoom({x0, y0, x1 - x0, y1 - y0}, z, ax, ay, limit);
+    if (z > 1) f = std::max(f, 1.0f); // (larger only as far as it fits; never smaller for it)
+    if (f == 1) return 1;
+    for (size_t i = item0; i < c.ui.size(); i++)
+        if (!Fixed(c.ui[i], c.cw) && !Zoomed(c.ui[i])) ui::ZoomItem(c.ui[i], f, ax, ay);
+    for (size_t i = piece0; i < c.pieces.size(); i++)
+        if (MousePiece(c.pieces[i])) c.pieces[i].to = ZoomRect(c.pieces[i].to, f, ax, ay);
+    return f;
+}
 }

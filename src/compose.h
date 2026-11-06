@@ -63,6 +63,16 @@ struct Composition
     std::vector<ui::UiItem> ui;
 };
 
+// The UI's size (ui::UiScale) on a group of a composition's HD items: the items from item0 on and
+// the mouse's invisible pieces (alpha 0, touchable, Src::Bottom) from piece0 on, zoomed by z about
+// the canvas point (ax, ay), z first lowered so the group stays inside `limit` (z itself when it
+// fits; below 1 only when it must). Items covering the canvas's whole width (a veil, the strip's
+// band) and items already zoomed (an earlier group's) are left as they are; so are the world and
+// the DS pictures. Returns the zoom used (1: nothing changed).
+float ZoomUi(Composition& c, size_t item0, size_t piece0, float z, float ax, float ay, Rect limit);
+// A rectangle zoomed by z about (ax, ay), rounded to whole canvas pixels (edge by edge).
+Rect ZoomRect(Rect r, float z, float ax, float ay);
+
 // A two-screen placement as pieces, in drawing order (FOCUS's panel keeps its opacity).
 // topW x topH: the top picture's size.
 Composition FromPlacement(const Placement& p, int topW, int topH);

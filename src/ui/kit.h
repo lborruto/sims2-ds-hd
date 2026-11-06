@@ -96,6 +96,12 @@ struct UiItem
     const u32* src = nullptr;
     int srcW = 0, srcH = 0; // the picture's size (srcW is its stride)
     Rect from {};
+    // The UI's size (SetUiScale; console.cpp, the shell and the window's marks set it per group of
+    // items about the group's anchor): every canvas point p of the item is drawn at
+    // zoom * p + (dx, dy), its sizes (text, radius, border, shadows, a chip's) zoom times; the
+    // items' own layout (wrapping, fitting) is the one at 1, so a zoomed item is that item made
+    // larger or smaller, never laid out again. 1, 0, 0: as always (the hash too).
+    float zoom = 1, dx = 0, dy = 0;
 };
 
 UiItem PanelItem(Rect to, const Theme& t = GameTheme());          // the light panel (fill, frame)
@@ -112,6 +118,21 @@ Rect ChipRect(int x, int y, Button b, const std::string& label, float size, floa
 UiItem ChipItemAs(int x, int y, Face face, const std::string& glyph, const std::string& label, float size, Weight w = Weight::Bold);
 UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from);
 
+// The UI's size (the player's setting, Auto or 75-150 %, the window's; 1 headless unless
+// --ui-scale): what the HD screens' builders zoom their groups of items by (console.cpp, the
+// shell, the window's toast and marks).
+void SetUiScale(float scale);
+float UiScale();
+// The chips' look now (SetChipLook's): a builder that prints another button for another device
+// (the keyboard's turn keys rather than the right stick).
+const ChipLook& ChipLookNow();
+// An item's `to` as drawn (its zoom and shift applied), rounded outward to whole canvas pixels.
+Rect Placed(const UiItem& it);
+// The item zoomed by z about the canvas point (ax, ay) (on top of the zoom it already has).
+void ZoomItem(UiItem& it, float z, float ax, float ay);
+// The largest zoom up to z at which `box` zoomed about (ax, ay) does not reach past `limit` on any
+// side it grows towards (z itself when it fits; never below 0).
+float FitZoom(Rect box, float z, float ax, float ay, Rect limit);
 // The items' bounds on the canvas (shadows included), empty when none draws anything.
 Rect Bounds(const std::vector<UiItem>& items);
 // A hash of everything that changes the still items' raster (images are left out: they are

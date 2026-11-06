@@ -183,6 +183,12 @@ void ChangeRow(Row r, int dir, Settings& s)
     }
     case Row::Fullscreen: s.fullscreen = !s.fullscreen; break;
     case Row::Scaling: s.scaling = (Scaling)cycle((int)s.scaling, 3); break;
+    case Row::UiSize:
+        // Auto (0), then 75 .. 150 % by 5; Left from Auto to 150, Right from 150 to Auto.
+        if (s.uiScale == 0) s.uiScale = d > 0 ? 75 : 150;
+        else if ((d > 0 && s.uiScale >= 150) || (d < 0 && s.uiScale <= 75)) s.uiScale = 0;
+        else s.uiScale = std::clamp(s.uiScale + 5 * d, 75, 150);
+        break;
     case Row::Res3D: s.resolution3D = std::clamp(s.resolution3D + d, 1, 4); break;
     case Row::Wide: s.widescreen = !s.widescreen; break;
     case Row::Fps60: s.interpolate60 = !s.interpolate60; break;
@@ -217,7 +223,7 @@ void ChangeRow(Row r, int dir, Settings& s)
 
 std::string RowLabel(Row r, int lang)
 {
-    static const W words[kRows] = {W::SetLayout, W::SetFullscreen, W::SetScaling, W::SetRes3D, W::SetWide, W::SetFps60, W::SetBattery,
+    static const W words[kRows] = {W::SetLayout, W::SetFullscreen, W::SetScaling, W::SetUiSize, W::SetRes3D, W::SetWide, W::SetFps60, W::SetBattery,
                                    W::SetVolume, W::SetMute, W::SetFastSound, W::SetBackground,
                                    W::SetFastSpeed, W::SetFastKey, W::SetFastBoot,
                                    W::SetHidePointer, W::SetStickCursor, W::SetCursorSpeed, W::SetDeadZone, W::SetLeftHanded, W::SetTrigger, W::SetRumble,
@@ -230,6 +236,7 @@ int RowNote(Row r)
     switch (r)
     {
     case Row::Scaling: return (int)W::ScalingNote;
+    case Row::UiSize: return (int)W::UiSizeNote;
     case Row::Battery: return (int)W::BatteryNote;
     case Row::Background: return (int)W::BackgroundNote;
     case Row::FastBoot: return (int)W::FastBootNote;
@@ -252,6 +259,7 @@ std::string RowValue(Row r, const Settings& s, int lang)
     }
     case Row::Fullscreen: return onOff(s.fullscreen);
     case Row::Scaling: return Wd(lang, s.scaling == Scaling::Smooth ? W::ScaleSmooth : s.scaling == Scaling::Nearest ? W::ScaleNearest : W::ScaleSharp);
+    case Row::UiSize: return s.uiScale == 0 ? std::string(Wd(lang, W::UiAuto)) : std::to_string(s.uiScale) + " %";
     case Row::Res3D: return std::to_string(s.resolution3D) + "\xC3\x97"; // "2×"
     case Row::Wide: return onOff(s.widescreen);
     case Row::Fps60: return onOff(s.interpolate60);
@@ -999,6 +1007,42 @@ std::vector<UiItem> Shell::Build(const Model& m) const
     }
     std::vector<UiItem> out = it.All();
     out.insert(out.end(), images.begin(), images.end());
+    Zoom(out);
     return out;
+}
+
+void Shell::Zoom(std::vector<UiItem>& items) const
+{
+    // The UI's size (ui::UiScale): everything but what covers the canvas's width (the backdrop, the
+    // veils) about the canvas's centre, no larger than the canvas holds; the mouse's rectangles
+    // with it.
+    const float z = ui::UiScale();
+    if (z == 1) return;
+    auto fixed = [](const UiItem& u) { return u.to.x <= 0 && u.to.x + u.to.w >= kW; };
+    int x0 = kW, y0 = kH, x1 = 0, y1 = 0;
+    for (const UiItem& u : items)
+        if (!fixed(u) && u.to.w > 0 && u.to.h > 0)
+        {
+            x0 = std::min(x0, u.to.x);
+            y0 = std::min(y0, u.to.y);
+            x1 = std::max(x1, u.to.x + u.to.w);
+            y1 = std::max(y1, u.to.y + u.to.h);
+        }
+    if (x1 <= x0) return;
+    constexpr float ax = kW / 2.0f, ay = kH / 2.0f;
+    float f = ui::FitZoom({x0, y0, x1 - x0, y1 - y0}, z, ax, ay, {8, 8, kW - 16, kH - 16});
+    if (z > 1) f = std::max(f, 1.0f);
+    if (f == 1) return;
+    for (UiItem& u : items)
+        if (!fixed(u)) ui::ZoomItem(u, f, ax, ay);
+    auto zoom = [&](Rect& r) {
+        if (r.w <= 0 || r.h <= 0 || (r.x <= 0 && r.x + r.w >= kW)) return;
+        const int a = (int)std::lround(ax + f * (r.x - ax)), b = (int)std::lround(ay + f * (r.y - ay));
+        const int c = (int)std::lround(ax + f * (r.x + r.w - ax)), d = (int)std::lround(ay + f * (r.y + r.h - ay));
+        r = {a, b, c - a, d - b};
+    };
+    for (Rect& r : rects_) zoom(r);
+    for (Rect& r : askRects_) zoom(r);
+    zoom(panel_);
 }
 }

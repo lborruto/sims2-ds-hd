@@ -302,7 +302,8 @@ the built-in database only adds the others.
 ## Settings
 
 Start + Back (or Esc) opens the pause menu; its Settings: layout, fullscreen (F11), smooth
-scaling, 3D resolution, widescreen world, 60 fps, volume, sound during fast forward (muted, or at
+scaling, the interface's size (Auto follows your screen's size and the window's, so the
+conversations and menus are not huge on a big monitor; or 75 to 150 % by hand), 3D resolution, widescreen world, 60 fps, volume, sound during fast forward (muted, or at
 normal pitch skipping ahead), the stick's cursor, its dead zone, how far a trigger goes down,
 rumble, the microphone (off, the blow key, the real one) and the language of the HD screens.
 Left / Right (or A) change the focused row.

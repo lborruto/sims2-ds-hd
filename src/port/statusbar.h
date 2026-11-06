@@ -61,7 +61,11 @@ void AddStatusBar(Composition& c, const HudState& hud, const RomData* rom);
 // right (the town's hints), kept clear. Returns the status's rectangle ({16, y, 0, 48} when it is
 // not drawn), its items' box: the caller's own items go right of it.
 constexpr int kStripY = 661, kStripBand = 3;
-Rect AddStatusStrip(Composition& c, const HudState* hud, const HudStrings& s, int rightW = 0);
+// zoom: the UI's size for the status (console.cpp's StripZoom: no larger than the strip holds):
+// its items zoomed about the strip's content row at its left (16), laid out to leave rightW (the
+// hints' width as drawn, zoomed) clear; the returned rectangle is the status as laid out, before
+// its zoom.
+Rect AddStatusStrip(Composition& c, const HudState* hud, const HudStrings& s, int rightW = 0, float zoom = 1);
 // The strip's content row (the status bar's and the hints' box): kStatusBarH high, centred.
 constexpr int kStripContentY = kStripY + (720 - kStripY - kStatusBarH + 1) / 2;
 }

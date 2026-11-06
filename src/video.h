@@ -100,6 +100,16 @@ struct Video
         return c;
     }
     void OutputSize(int& ow, int& oh) const;
+    // What Auto's UI size reads (settings.h's AutoUiScale): the millimetres one output pixel spans on
+    // the window's display and that display's diagonal, from the system's physical size (macOS:
+    // CGDisplayScreenSize; elsewhere SDL_GetDisplayDPI: Windows' scaling DPI, which Windows picks
+    // from the panel's size, X11's physical one); false when the system does not say.
+    bool DisplayMetrics(float& mmPerOutputPixel, float& diagonalMm) const;
+    // The UI's size Auto gives for the window now (1 when the system does not say); asked of the
+    // system again only when the window's display or size changes.
+    float AutoUiScale() const;
+    mutable int autoKey[5] = {-1, 0, 0, 0, 0};
+    mutable float autoScale = 1;
     // Window points -> output pixels (they differ on HiDPI screens).
     void ToOutput(int wx, int wy, float& px, float& py) const;
     // A window position on the touch screen, as a DS touch position.

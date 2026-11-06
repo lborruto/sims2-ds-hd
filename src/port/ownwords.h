@@ -89,6 +89,8 @@ enum class OwnWordId : int
     BatteryNote, BackgroundNote, FastBootNote, ScalingNote, SaveElsewhere, ToastShotAt,
     // The save back beside the ROM (its folder writable again) from the settings folder's copy.
     SaveMovedBack,
+    // The interface's size (task 10): its row, Auto, its note.
+    SetUiSize, UiAuto, UiSizeNote,
     Count
 };
 

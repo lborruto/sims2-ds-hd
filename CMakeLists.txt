@@ -150,6 +150,10 @@ add_executable(sims2wide
     src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
 target_link_libraries(sims2wide PRIVATE core pads)
+if(APPLE)
+    # (The display's physical size for the UI's Auto size: CGDisplayScreenSize, video.cpp.)
+    target_link_libraries(sims2wide PRIVATE "-framework ApplicationServices")
+endif()
 target_compile_definitions(sims2wide PRIVATE SIMS2WIDE_VERSION="${PROJECT_VERSION}")
 
 # macOS: an app to double-click (the release builds it, for Apple silicon and Intel at once with
@@ -239,7 +243,7 @@ add_executable(gamestate_test EXCLUDE_FROM_ALL tests/gamestate_test.cpp src/game
 target_include_directories(gamestate_test PRIVATE melonDS/src src)
 
 # Checks of the ROM's archive, string tables, compression, sprites and the icon cache on synthetic data (not built by default): ninja -C build romdata_test && ./build/romdata_test
-add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp src/port/icons.cpp src/port/statusbar.cpp)
+add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp src/port/icons.cpp src/port/statusbar.cpp src/compose.cpp src/ui.cpp src/layout.cpp)
 target_include_directories(romdata_test PRIVATE melonDS/src src)
 target_link_libraries(romdata_test PRIVATE uikit)
 

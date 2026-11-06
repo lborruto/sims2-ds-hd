@@ -68,7 +68,7 @@ struct Result
 // (Grouped: the picture, the sound, the speed, the mouse and the controller, the game.)
 enum class Row
 {
-    Layout, Fullscreen, Scaling, Res3D, Wide, Fps60, Battery,
+    Layout, Fullscreen, Scaling, UiSize, Res3D, Wide, Fps60, Battery,
     Volume, Mute, FastSound, Background,
     FastSpeed, FastKey, FastBoot,
     HidePointer, StickCursor, CursorSpeed, DeadZone, LeftHanded, Trigger, Rumble,
@@ -128,6 +128,7 @@ public:
 private:
     mutable std::vector<Rect> rects_, askRects_;
     mutable Rect panel_ {};
+    void Zoom(std::vector<ui::UiItem>& items) const; // the UI's size (Build's last step)
     int hover_ = -2;
     void Go(Page p, int f);
     void Move(const Model& m, int dir);

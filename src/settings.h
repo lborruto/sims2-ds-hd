@@ -30,6 +30,9 @@ struct Settings
     // Comfort
     bool fullscreen = false;    // borderless, the desktop's size (F11)
     Scaling scaling = Scaling::Sharp;
+    // The HD interface's size: 0 Auto (from the window's physical size, AutoUiScale), else 75 to
+    // 150 percent by 5. Headless: 100 % unless --ui-scale (settings are not loaded there).
+    int uiScale = 0;
     bool batterySaver = false;  // the looks at their lightest (3D 1x, 30 fps) without changing their settings
     int windowW = 1280, windowH = 720; // the window's size when it last closed
     bool windowKnown = false;   // (not saved) the file gave window=: else the size comes from the screen
@@ -71,6 +74,17 @@ void FitWindow(int usableW, int usableH, bool known, int& w, int& h);
 // A remembered place (x, y in and out) moved so that a w x h window lies within the usable area
 // (bx, by, bw, bh) when it can: a size made at this start, or shrunk, never runs off the screen.
 void FitPlace(int bx, int by, int bw, int bh, int w, int h, int& x, int& y);
+// The UI's size Auto picks (0.75 to 1.5 by 0.05) for a canvas mmPerPixel millimetres a canvas
+// pixel wide on a display diagonalMm across: the dialogue's capitals (30 px, Nunito's cap height
+// 0.705 em) as large as 0.53 degrees of sight at the distance a display that size is seen from
+// (AutoViewMm); 1 when either is unknown (0) or not believable.
+float AutoUiScale(float mmPerPixel, float diagonalMm);
+// The distance (mm) a display diagonalMm across is seen from: 35 cm at 7", 50 at 13", 70 at 24",
+// 80 at 32", 2 m at 43", 2.5 m from 55"; straight lines between.
+float AutoViewMm(float diagonalMm);
+// A UI size setting to its zoom: 0 (Auto) gives `autoScale`, else percent / 100.
+inline float UiZoomOf(int setting, float autoScale) { return setting == 0 ? autoScale : setting / 100.0f; }
+
 // The language a locale names ("fr_FR", "de"…): 1-5, else 1 (English).
 int LanguageOfLocale(const std::string& locale);
 }

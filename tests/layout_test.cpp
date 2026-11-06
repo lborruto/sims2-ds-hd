@@ -522,8 +522,144 @@ static void platform()
     }
 }
 
+// The UI's size (ui::UiScale, console.cpp's groups) at 75, 100 and 150 %, in five languages, on
+// made-up states drawn by BuildConsole with a made-up string table: the town's strip (the status
+// at its left, the hints at its right, a payout; the pad's look and the keyboard's, whose camera
+// hint is its own L / R keys), the panel's HD menu, a popup over it, the conversation, the stick
+// cursor's screen. Every item (as drawn: ui::Placed) inside the canvas; the strip's inside the
+// strip below its band, the status clear of the hints; the menus above the strip, never larger than
+// at 100 %; the mouse's pieces round trip at every window size; at 100 % the items as they always
+// were (no zoom). The whole-canvas screens (the front end, Create-a-Sim) keep their layout.
+static void ui_scale()
+{
+    std::vector<u32> face(SW * SH);
+    for (size_t i = 0; i < face.size(); i++) face[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    const HudStrings strings = TestStrings();
+    HudState hud = TestHud();
+    hud.money = 99999999; // (the widest the bar shows)
+    for (int lang = 1; lang <= 5; lang++)
+    {
+        RomData rom;
+        std::vector<std::string> words(3127);
+        for (size_t i = 0; i < words.size(); i++) words[i] = "Word " + std::to_string(i) + (i % 7 == 0 ? " longer than the others" : "");
+        rom.SetStringsForTest(words, lang);
+        for (bool keys : {false, true})
+        {
+            ui::ChipLook look;
+            if (keys)
+            {
+                look.face = ui::Face::Keyboard;
+                look.glyph[(int)ui::Button::LB] = "Q";
+                look.glyph[(int)ui::Button::RB] = "W";
+                look.glyph[(int)ui::Button::Back] = "E";
+                look.glyph[(int)ui::Button::A] = "Return";
+                look.glyph[(int)ui::Button::B] = "Backspace";
+                look.glyph[(int)ui::Button::Pause] = "Escape";
+            }
+            ui::SetChipLook(look);
+            for (float z : {0.75f, 1.0f, 1.5f})
+            {
+                ui::SetUiScale(z);
+                auto inCanvas = [&](const Composition& c, const char* what) {
+                    for (const ui::UiItem& it : c.ui)
+                    {
+                        const Rect r = ui::Placed(it);
+                        if (r.x < 0 || r.y < 0 || r.x + r.w > kConsoleW || r.y + r.h > kConsoleH)
+                        {
+                            fprintf(stderr, "ui %d%% lang %d keys %d: %s item at %d,%d %dx%d off the canvas\n", (int)(z * 100), lang, keys, what, r.x, r.y, r.w, r.h);
+                            failures++;
+                            return;
+                        }
+                        if (z == 1) CHECK(it.zoom == 1 && it.dx == 0 && it.dy == 0);
+                    }
+                };
+                // The town: the strip, the status (and a payout) left, the hints right.
+                GameState g;
+                g.valid = true;
+                g.screen = GScreen::Panel;
+                g.hud = hud;
+                for (int payout : {0, -1234567})
+                {
+                    const Composition town = BuildConsole({Screen::Panel, Tab::Interact}, false, -1, 341, 192, &hud, &strings, &g, &rom, face.data(),
+                                                          nullptr, 0, nullptr, payout);
+                    inCanvas(town, "town");
+                    int statusRight = 0, hintsLeft = kConsoleW, chips = 0, keycaps = 0;
+                    for (const ui::UiItem& it : town.ui)
+                    {
+                        if (it.to.x <= 0 && it.to.x + it.to.w >= kConsoleW) continue; // (the strip itself)
+                        const Rect r = ui::Placed(it);
+                        CHECK(r.y >= kStripY + 1 + kStripBand && r.y + r.h <= kConsoleH);
+                        if (it.kind == ui::UiItem::Chip)
+                        {
+                            hintsLeft = std::min(hintsLeft, r.x);
+                            chips++;
+                            keycaps += it.face == ui::Face::Keyboard;
+                        }
+                        else statusRight = std::max(statusRight, r.x + r.w);
+                    }
+                    CHECK(chips == (keys ? 3 : 2) && keycaps == (keys ? 3 : 0));
+                    if (statusRight + 12 > hintsLeft)
+                    {
+                        fprintf(stderr, "ui %d%% lang %d keys %d payout %d: the status (to %d) meets the hints (from %d)\n", (int)(z * 100), lang, keys,
+                                payout, statusRight, hintsLeft);
+                        failures++;
+                    }
+                }
+                // The panel's HD menu (Interact) and a popup over it; the cursor's screen.
+                GameState m = g;
+                InteractState& in = m.town.interact;
+                in.valid = true;
+                in.target = {TargetRef::Object, 29, 492, 6638, false};
+                in.prev = {TargetRef::Sim, 3, 326, 1, false};
+                in.next = {TargetRef::Object, 15, 478, 5744, false};
+                for (int i = 0; i < 4; i++) in.actions.push_back({i, 1845 + i, i == 2});
+                GameState p = m;
+                p.screen = GScreen::Popup;
+                p.town.popup = {true, 2, 2, std::string(300, 'w'), "stale", -1, false, 56, 160, 6};
+                p.town.options = {true, 4096, 2048};
+                const ScreenState pan {Screen::Panel, Tab::Interact}, pop {Screen::Popup, Tab::None};
+                const Composition menu = BuildConsole(pan, true, 1, 341, 192, &hud, &strings, &m, &rom, face.data());
+                const Composition popup = BuildConsole(pop, true, 0, 341, 192, &hud, &strings, &p, &rom, face.data());
+                const Composition cursor = BuildConsole({Screen::Unknown, Tab::None}, false, -1, SW, SH, &hud, &strings);
+                for (const auto* c : {&menu, &popup})
+                {
+                    inCanvas(*c, c == &menu ? "menu" : "popup");
+                    bool zoomed = false;
+                    for (const ui::UiItem& it : c->ui)
+                    {
+                        if (it.to.x <= 0 && it.to.x + it.to.w >= kConsoleW) continue;
+                        const Rect r = ui::Placed(it);
+                        if (it.layer != kStatusBarLayer && it.layer != kPopLayer + 1) CHECK(r.y + r.h <= kStripY);
+                        CHECK(it.zoom <= 1.0f + 1e-6f || it.layer == kStatusBarLayer || it.layer == kPopLayer + 1);
+                        if (it.layer != kStatusBarLayer && it.layer != kPopLayer + 1) zoomed |= it.zoom != 1; // (the menu's, not the strip's)
+                    }
+                    CHECK(zoomed == (z < 1));
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(c == &menu ? pan : pop, true, 341, 192, o.first, o.second, true, c);
+                }
+                inCanvas(cursor, "cursor");
+                // The conversation: about the canvas's bottom centre, 75 % of its width at 75 %.
+                GameState d = g;
+                d.screen = GScreen::Dialogue;
+                d.dialogue.valid = true; d.dialogue.page = 1; d.dialogue.pages = 2; d.dialogue.stringId = 7; d.dialogue.speaker = 0x40;
+                const Composition dlg = BuildConsole({Screen::Dialogue, Tab::None}, false, -1, 341, 192, &hud, &strings, &d, &rom, face.data());
+                inCanvas(dlg, "dialogue");
+                int x0 = kConsoleW, x1 = 0;
+                for (const ui::UiItem& it : dlg.ui) { x0 = std::min(x0, ui::Placed(it).x); x1 = std::max(x1, ui::Placed(it).x + ui::Placed(it).w); }
+                const float want = z < 1 ? 1060 * z : z == 1 ? 1060 : 1060 * (636.0f / 530);
+                CHECK(std::abs((x1 - x0) - want) < 40 && std::abs((x0 + x1) / 2.0f - 640) < 4);
+                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                    TestConsoleRoundtrip({Screen::Dialogue, Tab::None}, false, 341, 192, o.first, o.second, true, &dlg);
+            }
+        }
+    }
+    ui::SetChipLook({});
+    ui::SetUiScale(1);
+}
+
 int main()
 {
+    ui_scale();
     platform();
     minigame_frame();
     // CONSOLE's compositions.

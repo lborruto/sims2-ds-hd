@@ -458,10 +458,22 @@ struct Prepared
     float chipW = 0;
     PlacedMask glyph, label;
 };
+
+// An item's own raster transform: its zoom and shift folded into the raster's scale and origin
+// (output = (zoom * p + d - o) * s = zoom * s * (p - (o - d) / zoom)), so every size the drawing
+// takes from the scale (shadows, outlines, a text's shadow) follows the zoom too.
+struct Xf { float s, ox, oy; };
+inline Xf Eff(const UiItem& it, float s, float ox, float oy)
+{
+    if (it.zoom == 1 && it.dx == 0 && it.dy == 0) return {s, ox, oy};
+    return {s * it.zoom, (ox - it.dx) / it.zoom, (oy - it.dy) / it.zoom};
+}
 bool PsMarkOf(Mark m) { return m == Mark::PsCross || m == Mark::PsCircle || m == Mark::PsSquare || m == Mark::PsTriangle; }
 
-Prepared Prepare(const UiItem& it, float s, float ox, float oy, int W, int H)
+Prepared Prepare(const UiItem& it, float s0, float ox0, float oy0, int W, int H)
 {
+    const Xf e = Eff(it, s0, ox0, oy0);
+    const float s = e.s, ox = e.ox, oy = e.oy;
     Prepared p;
     if (it.kind == UiItem::Text)
     {
@@ -503,8 +515,10 @@ Prepared Prepare(const UiItem& it, float s, float ox, float oy, int W, int H)
     return p;
 }
 
-void DrawPanel(Layer& L, const UiItem& it, float s, float ox, float oy)
+void DrawPanel(Layer& L, const UiItem& it, float s0, float ox0, float oy0)
 {
+    const Xf e = Eff(it, s0, ox0, oy0);
+    const float s = e.s, ox = e.ox, oy = e.oy;
     const Theme& t = GameTheme();
     const float x0 = (it.to.x - ox) * s, y0 = (it.to.y - oy) * s, x1 = x0 + it.to.w * s, y1 = y0 + it.to.h * s;
     const float r = it.radius * s, line = std::max(1.0f, std::round(s));
@@ -603,8 +617,10 @@ void DrawPsMark(Layer& L, Mark m, float cx, float cy, float hs, u32 c)
     }
 }
 
-void DrawChip(Layer& L, const UiItem& it, float s, float ox, float oy, const Prepared& p)
+void DrawChip(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const Prepared& p)
 {
+    const Xf e = Eff(it, s0, ox0, oy0);
+    const float s = e.s, ox = e.ox, oy = e.oy;
     const Resolved rv = Resolve(it);
     const float size = it.size, h = ChipHeight(size), cw = p.chipW;
     // In a column (labelAt), the chip is centred in the room before its label.
@@ -666,8 +682,10 @@ u32 Texel(const UiItem& it, int k, int i, int j)
     return it.src[(size_t)Y * it.srcW + X];
 }
 
-void DrawImage(Layer& L, const UiItem& it, float s, float ox, float oy)
+void DrawImage(Layer& L, const UiItem& it, float s0, float ox0, float oy0)
 {
+    const Xf e = Eff(it, s0, ox0, oy0);
+    const float s = e.s, ox = e.ox, oy = e.oy;
     if (!it.src || it.from.w <= 0 || it.from.h <= 0 || it.srcW <= 0 || it.srcH <= 0) return;
     const float x0 = (it.to.x - ox) * s, y0 = (it.to.y - oy) * s, tw = it.to.w * s, th = it.to.h * s;
     if (tw <= 0 || th <= 0) return;
@@ -766,6 +784,7 @@ void LookOf(Button b, Face& face, std::string& glyph)
 }
 
 void SetChipLook(const ChipLook& look) { gLook = look; }
+const ChipLook& ChipLookNow() { return gLook; }
 
 Rect ChipRect(int x, int y, Button b, const std::string& label, float size, float labelAt, Weight wt)
 {
@@ -806,6 +825,44 @@ UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, fl
     return it;
 }
 
+namespace
+{
+std::atomic<float> gUiScale {1.0f};
+}
+void SetUiScale(float scale) { gUiScale.store(scale > 0 ? scale : 1.0f); }
+float UiScale() { return gUiScale.load(); }
+
+Rect Placed(const UiItem& it)
+{
+    if (it.zoom == 1 && it.dx == 0 && it.dy == 0) return it.to;
+    const int x0 = (int)std::floor(it.zoom * it.to.x + it.dx + 1e-3f), y0 = (int)std::floor(it.zoom * it.to.y + it.dy + 1e-3f);
+    const int x1 = (int)std::ceil(it.zoom * (it.to.x + it.to.w) + it.dx - 1e-3f), y1 = (int)std::ceil(it.zoom * (it.to.y + it.to.h) + it.dy - 1e-3f);
+    return {x0, y0, x1 - x0, y1 - y0};
+}
+
+void ZoomItem(UiItem& it, float z, float ax, float ay)
+{
+    // p -> z * (zoom * p + d) + a * (1 - z)
+    it.zoom *= z;
+    it.dx = z * it.dx + ax * (1 - z);
+    it.dy = z * it.dy + ay * (1 - z);
+}
+
+float FitZoom(Rect box, float z, float ax, float ay, Rect limit)
+{
+    // Each edge zoomed, a + f * (b - a), on its side of the limit: a bound on f where the edge
+    // moves outwards as f grows (an edge that moves inwards only gains room).
+    float fit = z;
+    auto lower = [&](float b, float a, float l) { if (b < a) fit = std::min(fit, (a - l) / (a - b)); }; // (a + f (b - a) >= l)
+    auto upper = [&](float b, float a, float l) { if (b > a) fit = std::min(fit, (l - a) / (b - a)); }; // (a + f (b - a) <= l)
+    if (box.w <= 0 || box.h <= 0) return z;
+    lower((float)box.x, ax, (float)limit.x);
+    upper((float)(box.x + box.w), ax, (float)(limit.x + limit.w));
+    lower((float)box.y, ay, (float)limit.y);
+    upper((float)(box.y + box.h), ay, (float)(limit.y + limit.h));
+    return std::max(fit, 0.0f);
+}
+
 UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from)
 {
     UiItem it;
@@ -828,7 +885,14 @@ Rect Bounds(const std::vector<UiItem>& items)
         if (it.kind == UiItem::Image && (!it.src || it.from.w <= 0 || it.from.h <= 0 || it.srcW <= 0 || it.srcH <= 0)) continue;
         // Room for the drop shadows (a panel's reaches 3 + 4 canvas pixels down).
         const int m = it.kind == UiItem::Panel ? 8 : it.kind == UiItem::Chip ? 4 : 0;
-        const int a = it.to.x - m, b = it.to.y - m, c = it.to.x + it.to.w + m, d = it.to.y + it.to.h + m + 3;
+        int a = it.to.x - m, b = it.to.y - m, c = it.to.x + it.to.w + m, d = it.to.y + it.to.h + m + 3;
+        if (it.zoom != 1 || it.dx != 0 || it.dy != 0)
+        {   // (zoomed: its place as drawn, rounded outward)
+            a = (int)std::floor(it.zoom * a + it.dx);
+            b = (int)std::floor(it.zoom * b + it.dy);
+            c = (int)std::ceil(it.zoom * c + it.dx);
+            d = (int)std::ceil(it.zoom * d + it.dy);
+        }
         if (!any) { x0 = a; y0 = b; x1 = c; y1 = d; any = true; }
         else { x0 = std::min(x0, a); y0 = std::min(y0, b); x1 = std::max(x1, c); y1 = std::max(y1, d); }
     }
@@ -857,6 +921,11 @@ void MixItem(u64& h, const UiItem& it)
         Mix(h, 0x46414345ull ^ (u64)it.face);
         for (char c : it.glyph) Mix(h, (u8)c);
     }
+    if (it.zoom != 1 || it.dx != 0 || it.dy != 0)
+    {   // (an item at the UI's own size hashes as before)
+        Mix(h, 0x5A4F4F4Dull ^ FloatBits(it.zoom));
+        Mix(h, (FloatBits(it.dx) << 32) | FloatBits(it.dy));
+    }
 }
 }
 
@@ -877,6 +946,11 @@ u64 HashImage(const UiItem& it)
     Mix(h, ((u64)(u32)it.from.w << 32) | (u32)it.from.h);
     Mix(h, ((u64)(u32)it.srcW << 32) | (u32)it.srcH);
     Mix(h, it.fill);
+    if (it.zoom != 1 || it.dx != 0 || it.dy != 0)
+    {
+        Mix(h, 0x5A4F4F4Dull ^ FloatBits(it.zoom));
+        Mix(h, (FloatBits(it.dx) << 32) | FloatBits(it.dy));
+    }
     if (it.src && it.srcW > 0 && it.srcH > 0)
         for (int y = 0; y < it.from.h; y++)
             for (int x = 0; x < it.from.w; x++)
@@ -1008,8 +1082,10 @@ std::atomic<int> gRasterThreads {0};
 // which keeps its own width and height whatever `to`'s (a `to` cut shorter than the chip: the
 // shell's Keys page); a text inside its box; a picture inside `to`.
 // A still item with no size: everything.
-Rect Footprint(const UiItem& it, float s, float ox, float oy, int w, int h)
+Rect Footprint(const UiItem& it, float s0, float ox0, float oy0, int w, int h)
 {
+    const Xf e = Eff(it, s0, ox0, oy0);
+    const float s = e.s, ox = e.ox, oy = e.oy;
     if (it.to.w <= 0 || it.to.h <= 0) return {0, 0, w, h};
     float l = 2, r = 2, t = 2, b = 2; // canvas pixels around `to`
     if (it.kind == UiItem::Panel) l = r = t = b = 12;
@@ -1271,6 +1347,8 @@ void LayerCache::Update(const std::vector<UiItem>& items, float scale, float ori
 bool WholeFactorCrop(const UiItem& im, const LayerAt& at, float scale)
 {
     if (im.kind != UiItem::Image || !im.src || im.srcW <= 0 || im.srcH <= 0) return false;
+    // (Zoomed: the kit's raster, whatever the factor.)
+    if (im.zoom != 1 || im.dx != 0 || im.dy != 0) return false;
     const Rect f = im.from;
     if (f.w <= 0 || f.h <= 0 || f.x < 0 || f.y < 0 || f.x + f.w > im.srcW || f.y + f.h > im.srcH) return false;
     const float tw = im.to.w * scale, th = im.to.h * scale;
