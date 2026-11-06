@@ -1,0 +1,4 @@
+# From G-X-music: Y held 60 frames records the microphone (VOX; the blow's signal headless), its
+# release stops it (instrument 4, the voice); B quits: the panel.
+10 60 pad y
+120 2 pad b

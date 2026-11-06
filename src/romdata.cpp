@@ -190,6 +190,7 @@ bool RomData::Open(const std::vector<u8>& rom)
     offsets.clear();
     strings.clear();
     stringsFile = -1;
+    language = -1;
     u32 start = 0, end = 0;
     if (!RootFile(rom, "rom.bin", start, end)) return false;
     // The archive: a u32 offset table (its first entry is its own size, so the offset of
@@ -219,6 +220,7 @@ bool RomData::LoadStrings(int language)
 {
     strings.clear();
     stringsFile = -1;
+    this->language = -1;
     if (language < 0 || language >= (int)std::size(kStringFiles) || !IsOpen()) return false;
     const std::vector<u8> d = Resource(kStringFiles[language]);
     // The table (no compression header: the file begins with the tree's end): u32 N; the
@@ -261,6 +263,7 @@ bool RomData::LoadStrings(int language)
         strings.push_back(ToUtf8(raw));
     }
     stringsFile = kStringFiles[language];
+    this->language = language == 0 ? 1 : language;
     return true;
 }
 

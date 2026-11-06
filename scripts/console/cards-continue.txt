@@ -1,0 +1,5 @@
+# From act-cards, CONSOLE: X draws, Y discards (the end of the turn: the game's message),
+# A goes on (a touch in the message's box): the opponent's turn.
+20 2 pad x
+100 2 pad y
+200 2 pad a

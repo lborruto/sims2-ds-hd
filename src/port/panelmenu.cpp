@@ -316,14 +316,14 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     SortUi(c.ui, first);
 }
 
-void PanelText(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour)
+void PanelText(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour, int layer)
 {
     const FittedText f = FitLine(s, size, minSize, r.w, w);
     ui::UiItem t = ui::TextItem(r, f.text, f.size, a, w);
     t.wrap = false;
     t.middle = true;
     if (colour) t.colour = colour;
-    t.layer = 1;
+    t.layer = layer;
     c.ui.push_back(t);
 }
 

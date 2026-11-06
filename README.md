@@ -29,8 +29,16 @@
   another version of it, the old pictures stay). Each has a focus the D-pad moves and buttons
   that say what A, X and B do: do an action, use or throw away an item, give a gift, read your
   goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend, buy
-  and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions) are still the game's own picture,
-  laid out big. No mouse needed, though it works.
+  and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions, the Alien Autopsy, the Metal
+  Detector, painting at the Art Gallery, Moogoo Monkey, the Super Drencher, the Ratticator's Rat-A-Rang, the
+  scratch tickets, the music mixer) keep their own playfield, big, in an HD frame: the game's name,
+  its numbers (the cards' score board, the vacuum's earnings, the organs' health, the detector's charge
+  and signal, your brush and color, Moogoo's round and fruit, the Drencher's water and pressure, the ticket's
+  prize and boxes, the mixer's song, tempo and tracks) and the buttons' hints, which follow what the game asks (the cards'
+  quit question, a clogged filter, an organ to carry, the mixer's "save your song?"); the hints are our own words, translated into the
+  game's five languages. The pointing games have a pointer on the sticks. The slot machine and the
+  other animations show the world big, with what you won beside the status bar.
+  No mouse needed, though it works.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
   nothing to set, and it never falls back to the bare two-screen layout. The intro, the title,
@@ -178,7 +186,7 @@ hangs up. **A conversation** goes on with A. **Popups** (tips, goals, Game Pause
 B; a question (Quit?) takes A for yes and B for no; when a popup opens over the menu, the menu
 comes back on the same row after it. A note closes on A or B.
 
-**The activities** are played on the buttons too, with a box of hints beside them:
+**The activities** are all played on the buttons, each in its own HD frame with the buttons' hints in a bar below (they follow what the game asks):
 
 | Activity | Key | Controller | Does |
 |---|---|---|---|
@@ -189,14 +197,56 @@ comes back on the same row after it. A note closes on A or B.
 | | S | X | draw from the deck |
 | | A | Y | discard the chosen card |
 | | Z | B | quit (then X / A: yes, Z / B: no) |
+| | X | A | at the end of your turn: go on |
 | Vacuum | Arrows | left stick (or D-pad) | drive |
 | | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
 | | X (hold) | A (hold) | grab a find with the hand and drag it to the box |
 | | A (hold) | Y (hold) | blow: clears a clogged filter (a tap is enough; works with any microphone setting) |
+| Alien Autopsy, painting | Arrows | either stick (LT: slow), D-pad | move the pointer (the D-pad a pixel at a time, faster held) |
+| | X (hold) | A (hold) | the stylus down: cut, lift an organ, pick a parasite, paint |
+| Alien Autopsy | S / A / W | X / Y / RB | laser / hand / tweezers |
+| | Q | LB | carry the organ to the tray (the parasite to the flask) |
+| | Z twice | B twice | quit (the game pays nothing then) |
+| Metal Detector | Arrows | left stick or D-pad | walk |
+| | X / Z | A / B | dig / switch it off (the "Found" card goes by itself) |
+| | Q / W | LB / RB, right stick | depth |
+| Painting | Q / W | LB / RB | the previous / next tool |
+| | S / A | X / Y | the next color / undo |
+| | Z | B | done (then X / A: yes, Z / B: no) |
+| Moogoo Monkey | Left / Right | D-pad or left stick | on your turn: choose the monkey to bet on, the card to play, the monkey a special card goes on (a green ring shows it) |
+| | X | A | bet, play the card; otherwise go on (the rules, the banners, the number of players) |
+| | Z | B | take the bet or the special card back; else quit (then X / A: yes, Z / B: no); a bet placed or a card picked: undo |
+| | Enter | Start | quit |
+| Super Drencher | Arrows | left stick or D-pad | walk |
+| | X (hold) | A (hold) | fire |
+| | S (hold) | X (hold) | pump |
+| | A / W | Y / RB | target / refill |
+| | Q | LB | run |
+| | Z | B | put it away (if you opened the game's help with the mouse: any button closes its text, B leaves help) |
+| Rat-A-Rang | Arrows | left stick or D-pad | walk |
+| | S / A | X / Y | scare / subdue |
+| | X (hold) + arrows | A (hold) + a stick or the D-pad | aim; let go to throw |
+| | Q / Z | LB / B | run / put it away |
+| Scratch ticket | Arrows | either stick (LT: slow), D-pad | move the pointer |
+| | X (hold) | A (hold) | scratch |
+| | S | X | scratch the box under the pointer for you |
+| | X / Z / Enter | A / B / Start | close the game's message (a win is paid when you close it) |
+| | Z twice | B twice | quit (the ticket is lost) |
+| Music mixer | the mouse | either stick (LT: slow) | move the pointer |
+| | X (hold) | A (hold) | press a key, a button, a slider |
+| | Arrows (hold) | D-pad (hold) | Up / Down: an octave up / down; Right: sustain; Left: PREP |
+| | S / W / Q | X / RB / LB | PLAY, RECORD, GENRE (Z / B stops) |
+| | A (hold) | Y (hold) | record your voice (VOX): the microphone while held |
+| | Z | B | quit; in the song list: back |
+| | X / Z / S | A / B / X | "save your song?": yes / no / preview |
+| Saving a song | Arrows | D-pad or left stick | choose a letter, a page, a slot |
+| | X | A | type it, or save into the slot (a used slot asks: again to save over it) |
+| | A / Z | Y / B | erase a letter / back to the mixer |
 
 <p align="center">
-  <img src="docs/screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big at the left, the world small at the top right, the buttons' hints below it" width="440">
-  <img src="docs/screenshots/console-vacuum.webp" alt="CONSOLE: the hotel's vacuum big, with its hints" width="440">
+  <img src="docs/screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big in its frame, the world small at the top right with the score board under it, the buttons' hints in a bar below" width="440">
+  <img src="docs/screenshots/console-autopsy.webp" alt="CONSOLE: the Alien Autopsy big with its pointer, the organs' health at the right, the buttons' hints in a bar below" width="440">
+  <img src="docs/screenshots/console-vacuum.webp" alt="CONSOLE: the hotel's vacuum big in its frame, its earnings at the right, the hints below" width="440">
 </p>
 
 The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another
@@ -269,8 +319,12 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
 - **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).
 - **Most minigames not checked yet.** The social reactions, the shop, Build Rooms and the vacuum
   (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
-  filter clear) and the casino's cards are; painting, the music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows
+  filter clear) and the casino's cards are; the autopsy, the detector, painting, Moogoo Monkey, the Rat-A-Rang, the scratch tickets and the
+  music mixer were played from test states (not reached by walking to them yet; Moogoo opens on Monkey Day, the Rat-A-Rang with the Ratticator's
+  costume), the Super Drencher from the pockets; the slot machine, the skydive and the arcade cabinets (their animations) and the payout chip beside the status bar were not reached in play (an animation reading as None draws the front-end layout). If one shows up wrong, Tab swaps the big screen and 2 shows
   both.
+- **No wireless play.** Trading, and Moogoo or the cards with a second DS, need two consoles: the
+  wireless screen says so and B leaves it.
 - **CONSOLE needs the European game** (code `ASJP`): it reads the game's screens from its memory,
   and that map is the European one. With another version, CONSOLE falls back to recognising the
   screens by their pixels (as before) and the program says so. The American one should work

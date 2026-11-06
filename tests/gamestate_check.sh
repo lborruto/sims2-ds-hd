@@ -74,6 +74,8 @@ cases=(
     "sit-store:Panel/Interact" "sit-storebuy:Catalogue" "sit-pause:Popup" "act-social:Social"
     "sit-hotel:Panel/Interact" "sit-concierge:Dialogue" "sit-basement:Panel/Interact"
     "act-vacuum:Vacuum" "act-vacuum-clog:Vacuum"
+    "G-X-autopsy:Autopsy" "G-X-metal:Detector" "G-X-moogoo-intro:MooGoo" "G-X-moogoo-game:MooGoo" "G-X-scratch:Scratch"
+    "G-C-wg-pump:Drencher" "G-X-crime:Crime" "G-X-music:Mixer" "G-D-mus-save:MixerSave" "G-X-artgal:ArtGallery" "G-X-pirate:Cards"
     "sit-casino:Panel/Interact" "sit-hotel-late:Panel/Interact" "act-cards:Cards"
 )
 for c in "${cases[@]}"; do
@@ -303,6 +305,55 @@ hotel_want h-stat stat '^stat page=0 transition=0 aspiration=0 level=2 points=29
 hotel_want h-statp stat '^stat page=3 ' "hotel: the Skills page"
 hotel_want h-town hotel '^hotel built=' "hotel: the block reads in the town too"
 hotel_want h-town checkin '^checkin none$' "hotel: no registry on the town's screen"
+# The minigames (--print-minigame): each minigame's screen from the research's held-out G-* states
+# (copies in shots/, listed in CLAUDE.md), the first line each prints (the state's own frame 0). The
+# part is read on its screen only and is `none` on another (a Panel, the cards).
+mg_run() { # NAME STATE
+    local name=$1 file=$shots/$2.st
+    if [ ! -f "$file" ]; then echo "no save state $2.st" > "$tmp/$name.mg"; return; fi
+    "$bin" "$rom" --headless --frames 30 --state-load "$file" --save "$tmp/$name.sav" --print-minigame "${town[@]}" > "$tmp/$name.mglog" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.mglog" && touch "$tmp/$name.mgok"
+    grep -E '^frame [0-9]+: minigame ' "$tmp/$name.mglog" | sed 's/^frame [0-9]*: minigame //' > "$tmp/$name.mg"
+}
+mg_want() { # NAME PATTERN LABEL: the first line matches (grep -E)
+    if [ -f "$tmp/$1.mgok" ] && head -n 1 "$tmp/$1.mg" | grep -q -E "$2"; then echo "ok   $3"
+    else echo "FAIL $3: got '$(head -n 1 "$tmp/$1.mg" 2>/dev/null | cut -c1-300)'"; fail=1; fi
+}
+for st in G-X-autopsy G-A-para G-A-trace2 G-A-done0 G-A-tear G-X-metal G-A-md-walk G-X-moogoo-intro G-X-moogoo-game G-B-mg-r1-full G-B-mg-r1-king2 G-B-mg-end-5245 G-B-mg-x \
+          G-X-scratch G-B-sc-two-p10 G-B-sc-win-pop G-B-sc-lose-pop G-B-sc-x G-C-wg-pump G-C-wg-target G-C-wg-help-pump G-C-cr-grab G-C-cr-help G-D-mus-rec G-D-mus-pick G-D-mus-vox \
+          G-D-mus-save G-X-musicsave G-D-art-stroke G-D-art-line G-D-art-page G-X-pirate; do mg_run "mg-$st" "$st"; done
+mg_want mg-G-X-autopsy '^autopsy phase=0 sub=0 specimen=0 tool=0 earnings=0 dragged=-1 held=-1 alert=00 tear=-1,-1 organs=0:[0-9]+,1:[0-9]+,2:[0-9]+ parasites=-$' "minigame: the autopsy's three organs, no parasite, laser selected"
+mg_want mg-G-A-para '^autopsy .* alert=01 .* parasites=([0-9]+:-?[0-9]+:-?[0-9]+:[0-9]+(:eat)?,){7}7:' "minigame: the autopsy's eight parasites, the tweezers flashing"
+mg_want mg-G-A-trace2 '^autopsy phase=1 sub=0 specimen=0 tool=1 earnings=84 .* organs=5:9[0-9][0-9]:freed,1:' "minigame: an organ cut out and banked, \$84, the hand selected"
+mg_want mg-G-A-done0 '^autopsy phase=5 sub=0 specimen=1 .* organs=3:[0-9]+,4:[0-9]+,5:20 parasites=-$' "minigame: the first specimen done, waiting for the tear, organs 3 and 4 next"
+mg_want mg-G-A-tear '^autopsy phase=6 .* tear=125,100 ' "minigame: the membrane being torn at (125, 100)"
+mg_want mg-G-X-metal '^detector state=3 charge=62[0-9]{4} range=0 slider=2048 mismatch=0 card=0 find=-1 finds=0 earnings=2020$' "minigame: the detector active, charge 60 %, half depth, no find in range"
+mg_want mg-G-A-md-walk '^detector state=3 .* range=1 slider=2048 mismatch=128 ' "minigame: a find in range, the scope's noise at its most"
+mg_want mg-G-X-moogoo-intro '^moogoo intro$' "minigame: MooGoo Monkey's intro"
+mg_want mg-G-X-moogoo-game '^moogoo phase=0 sub=0 .* humans=1 round=0 ' "minigame: MooGoo Monkey's players prompt"
+mg_want mg-G-B-mg-r1-full '^moogoo phase=13 sub=1 .* round=1 .* deck=19/54 monkeys=-:002:2,-:010:1,20/48:200:2,26:010:1,33:000:0,-:001:1 players=1758:45/35/50/9/8:sel3:score2:bet,' "minigame: MooGoo's turn, betting, the hands and the bets"
+mg_want mg-G-B-mg-r1-king2 '^moogoo phase=13 sub=5 ' "minigame: MooGoo's special card's target pick"
+mg_want mg-G-B-mg-end-5245 '^moogoo phase=19 .* round=3 .* monkeys=out:-:000:4,-:013:4,out:-:000:4,-:031:4,out:-:000:4,' "minigame: MooGoo's results, three monkeys out"
+mg_want mg-G-B-mg-x '^moogoo phase=0 .* quit=01 ' "minigame: MooGoo's quit box up"
+mg_want mg-G-X-scratch '^scratch tier=0 prize=0 state=1 revealed=0 win=4,5 active=-1 hint=1 boxes=4:0,5:0,5:0,5:0,3:0,2:0,4:0,4:0$' "minigame: a fresh ticket, nothing scratched"
+mg_want mg-G-B-sc-two-p10 '^scratch tier=0 prize=10 state=1 revealed=2 .* boxes=4:685:open,5:0,5:0,5:0,3:0,2:0,4:685:open,4:0$' "minigame: two boxes of the same picture revealed"
+mg_want mg-G-B-sc-win-pop '^scratch .* state=2 revealed=3 ' "minigame: the ticket won"
+mg_want mg-G-B-sc-lose-pop '^scratch .* state=3 revealed=5 ' "minigame: the ticket lost"
+mg_want mg-G-B-sc-x '^none$' "minigame: nothing after the ticket's X (the panel)"
+mg_want mg-G-C-wg-pump '^drencher pump=20 target=-1/-1 pumping=0 firing=0 targetmode=0 help=00 water=65 pressure=125$' "minigame: the Drencher pumped to full pressure"
+mg_want mg-G-C-wg-target '^drencher .* target=29/11 .* targetmode=1 ' "minigame: the Drencher's target locked on an object (11)"
+mg_want mg-G-C-wg-help-pump '^drencher .* help=11 ' "minigame: the Drencher's help text up"
+mg_want mg-G-C-cr-grab '^crime help=0 drag=0 phase=[0-3] angle=82 ' "minigame: the Ratarang aimed at 82 degrees"
+mg_want mg-G-C-cr-help '^crime help=1 ' "minigame: Crime's help mode"
+mg_want mg-G-D-mus-rec '^mixer mode=0 phase=2 tracks=0xff keys=-1,-1,-1 octave=0 instrument=1 sustain=0 sliders=13,0 tempo=105 variation=0 song=0 events=[0-9]+/[0-9]+ .* unlocked=0,1,2,3,4,5$' "minigame: the mixer recording, the six songs unlocked"
+mg_want mg-G-D-mus-pick '^mixer mode=0 phase=0 .* tempo=110 variation=0 song=1 ' "minigame: the mixer's second song, tempo 110"
+mg_want mg-G-D-mus-vox '^mixer mode=0 phase=5 ' "minigame: the mixer recording the voice"
+mg_want mg-G-D-mus-save '^mixersave mode=0 slot=-1 name="" slots=empty,empty,empty$' "minigame: the mixer's save menu, three empty slots"
+mg_want mg-G-X-musicsave '^none$' "minigame: the save menu patched without a context reads nothing"
+mg_want mg-G-D-art-stroke '^art stroke=0 button=0 tool=0 swatch=3 page=0 brush=0 cell=17,21 painted=15 ' "minigame: the canvas with a pencil stroke of 15 cells, the stylus on cell (17, 21)"
+mg_want mg-G-D-art-line '^art .* button=7 tool=2 swatch=3 .* painted=16 ' "minigame: the line tool, 16 cells"
+mg_want mg-G-D-art-page '^art .* swatch=3 page=1 .* painted=0 ' "minigame: the second palette page, blank canvas"
+mg_want mg-G-X-pirate '^cards deck=40/60 hand=8 opponent=8 score=0,0 treasure=0 box=0 message=0 quit=0 name="Jun"$' "minigame: the cards dealt (eight each, forty in the deck), no box"
 # The front end (--print-front; milestone 5): the title and menu, Settings, Load-a-Sim, Create-a-Sim's pages, Keep this Sim?
 # and the boot screens, from copies of the research's F-* states in shots/. The first line of each kind (the state's own frame 0).
 front_run() { # NAME STATE: the front lines in NAME.front

@@ -32,7 +32,7 @@
 //   FrontEnd, CreateASim (from RAM), None: touch-only (the DS's buttons change nothing there),
 //     no table yet: as Unknown.
 //   SaveSlots: in HD (port/options.h) whenever its view is valid, as Give Gift (A the slot's tick,
-//     B its back: the X); else, like ItemHand (from RAM; no table yet): as Unknown.
+//     B its back: the X); else, like Drencher (from RAM; no table yet): as Unknown.
 //   Loading (a black load): every button is the DS's.
 //   Unknown: the DS's buttons, but A presses the stick cursor when there is one (the fallback for
 //     unmeasured screens); without a controller A stays the DS's.
@@ -89,6 +89,9 @@ public:
     void Leave(TouchScript& touch);
     // Buttons held now are not taken as presses on the next Update (after the pause menu).
     void Resync() { fresh_ = true; }
+    // The game's RAM on the activity (activities.h), for the next Update (CONSOLE's frame loop sets
+    // it every frame; default: nothing known).
+    void SetActivityRam(const ActivityRam& r) { activityRam_ = r; }
 
     // The panel's menu is up (the touch screen 3x over the dimmed world).
     bool MenuOpen() const { return menuOpen_; }
@@ -115,6 +118,20 @@ public:
     float HandDy() const { return handDy_; }
     // The vacuum's Y: blow into the microphone this frame.
     bool Blow() const { return blow_; }
+    // The mixer's Y (activities.h): its microphone held (VOX): the blow's signal, or the computer's
+    // own microphone when the settings choose it (Input::Steer).
+    bool Voice() const { return voice_; }
+    // The pointing minigames (activities.h): their pointer, drawn (PointerShown), and the stylus
+    // down at it this frame (PointerDown: also the detector's slider knob, not drawn), DS pixels.
+    bool PointerShown() const { return activity_.pointer; }
+    bool PointerDown() const { return activity_.down; }
+    float PointerX() const { return activity_.px; }
+    float PointerY() const { return activity_.py; }
+    // MooGoo's focus on the playfield (DS pixels; w 0 none).
+    Rect Mark() const { return activity_.mark; }
+    // The autopsy's or the lottery's quit asked once (a second B / Start quits); the mixer's save
+    // page asking before it saves over a slot.
+    bool QuitArmed() const { return activity_.quitArmed > 0 || activity_.armedSlot >= 0; }
 
 private:
     void Move(ScreenState s, int dx, int dy);
@@ -137,9 +154,10 @@ private:
     PadState prev_;
     bool fresh_ = true;  // take the next pad as the previous one (no presses)
     ScreenState screen_;
-    bool menuOpen_ = false, cursorPress_ = false, cursorScreen_ = false, blow_ = false;
+    bool menuOpen_ = false, cursorPress_ = false, cursorScreen_ = false, blow_ = false, voice_ = false;
     float handDx_ = 0, handDy_ = 0;
     ActivityState activity_;
+    ActivityRam activityRam_;
     int focus_ = -1;
     int closing_ = 0;    // frames left in which A / B do nothing after a tap that closes the screen
     int repeatDir_ = -1, repeatFrames_ = 0; // the held direction (0-3) and how long, for the repeat

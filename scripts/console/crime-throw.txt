@@ -1,0 +1,6 @@
+# From G-X-crime: A held, Right: aim and throw; A held, Left; B puts it away.
+20 80 pad a
+30 60 pad right
+120 70 pad a
+130 40 pad left
+220 2 pad b

@@ -50,6 +50,10 @@ struct Input
     // CONSOLE: the touch screen's menu, focus and taps from the buttons (Steer).
     Navigator navigator;
     bool steering = false;        // the navigator ran last frame (CONSOLE was shown)
+    // The money's last change (App::consolePayout): the money last frame (-1 not known), the frames
+    // it is still shown.
+    int lastMoney_ = -1, payoutFrames_ = 0;
+    static constexpr int kPayoutFrames = 240;
     PadState scriptPad;           // this frame's "pad" events of the input script (script.h)
     // The pad's TOUCH MENU acts on release, unless Start was held meanwhile (the pause menu).
     ReleasePulse panelButton;
@@ -93,6 +97,8 @@ struct Input
     void Steer(App& app, const PadState& p, u32& keys);
     // The touch script's touch this frame, over any other while it owns the stylus.
     void ScriptTouch(bool& touching, int& tx, int& ty);
+    // A pointing minigame's stylus at its pointer (the navigator's; CONSOLE), before ScriptTouch.
+    void PointerTouch(const App& app, bool& touching, int& tx, int& ty);
     // Clears the one-frame requests and the menu's input.
     void EndFrame();
 

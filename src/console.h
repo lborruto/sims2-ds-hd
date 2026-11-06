@@ -2,7 +2,7 @@
 // of pieces of the two DS screens on a 1280 x 720 canvas, as in the approved mockup: in town (the
 // panel) the world fills the canvas with a rail of the touch screen's tab icons and phone at the
 // right; the menu, the phone, popups and Give Item are the whole touch screen 3x over the dimmed
-// world (framed for SaveSlots, ItemHand and Unknown); a black load is the bare backdrop; without a
+// world (framed for SaveSlots and Unknown); a black load is the bare backdrop; without a
 // HUD (the front end) the top screen at the left and the touch screen 2.5x at the right, each in its frame; a conversation is the world with the
 // game's dialogue redrawn in HD at the bottom (port/dialogue.h; without the game's text, its own box rebuilt wide); an activity is the touch screen 3x at the left
 // with the world small at the top right. DS pieces are drawn as the game draws them, 2x or 3x;
@@ -49,7 +49,8 @@ constexpr Rect kDialogueArrowFrom {219, 155, 31, 32}, kDialogueArrowTo {916, 634
 // its left border (DS x 9) and top border (row 33).
 constexpr Rect kDialogueTextBox {124, 516, 776, 188};
 
-// An activity: the touch screen 3x at the left, the world 384 wide at the top right (its height
+// An activity (with the game's RAM and strings: the HD minigame frame, port/minigame.h, the same two
+// pictures at the same places): the touch screen 3x at the left, the world 384 wide at the top right (its height
 // from its shape: 288 at the DS's 4:3), both framed; the hints' box (AddHints, below).
 constexpr Rect kActivityBottomTo {36, 68, SW * 3, SH * 3};
 constexpr int kActivityTopX = 858, kActivityTopY = 68, kActivityTopW = 384;
@@ -84,7 +85,7 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // dimmed world). focus: the index in HotspotsFor(s) the focus ring frames (-1: none; no ring
 // when no touchable bottom piece shows it). topW x topH: the top picture's size (App::TopImage).
 // Screen::Loading (a black load): the bare backdrop, no piece.
-// Screen::None, FrontEnd, CreateASim: the front end's view (kFront*); SaveSlots, ItemHand, Unknown:
+// Screen::None, FrontEnd, CreateASim: the front end's view (kFront*); SaveSlots, Unknown:
 // the menu composition with a frame (the stick cursor's screens); never SIDE's bare pair of screens.
 // hud, strings (both given and strings->ok: the game's RAM and text read): the HD status bar
 // (port/statusbar.h) wherever the world shows the game's HUD, the game's own bar (the top
@@ -98,10 +99,14 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // its tab's view is valid (PanelMenuView: game and rom given, the tab's data read); focus is then
 // an index in that view's items; icons (null: none drawn) gives the game's icons. Else
 // milestone 1's: the touch screen 3x over the dimmed world. armed: the view item whose X is
-// armed (the navigator's Armed(): Pockets' bin asking), 0 none.
+// armed (the navigator's Armed(): Pockets' bin asking), 0 none. pointer: a pointing minigame's
+// pointer (port/minigame.h draws it; null: none).
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
                          const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
-                         const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0);
+                         const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0, const PointerView* pointer = nullptr,
+                         int payout = 0);
+// payout (above): the money's last change (App::consolePayout: the slot machine's coin and its
+// payout, a ticket's prize, ...), shown on the panel's world beside the HD status bar while not 0.
 
 // The world (the top picture's first `rows` rows, topW wide) as CONSOLE draws it: 720 high,
 // centred when narrower than the canvas; keepSides: never cut at its sides (fitted to the

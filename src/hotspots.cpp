@@ -1,6 +1,8 @@
 #include "hotspots.h"
 
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 namespace sims2wide
 {
@@ -183,6 +185,47 @@ const List kBuild = {
     {"close", 236, 171, {221, 157, 30, 30}},
 };
 
+// The music mixer's save page (CMusicSaveMenu, the standard text entry, research/m6 code-D 1.6): the
+// keyboard's 26 keys (19 x 30 cells from 6,74, nine a row; the page's letters, digits or signs),
+// its backspace, the three pages (ABC, abc, 123), the three slots' save buttons (round, 32 x 32,
+// their middles 235, 57 / 109 / 160 as drawn) and the X (235,18: back to the mixer).
+const List kMixerSave = {
+    {"key 1", 15, 89, {6, 74, 19, 30}},
+    {"key 2", 34, 89, {25, 74, 19, 30}},
+    {"key 3", 53, 89, {44, 74, 19, 30}},
+    {"key 4", 72, 89, {63, 74, 19, 30}},
+    {"key 5", 91, 89, {82, 74, 19, 30}},
+    {"key 6", 110, 89, {101, 74, 19, 30}},
+    {"key 7", 129, 89, {120, 74, 19, 30}},
+    {"key 8", 148, 89, {139, 74, 19, 30}},
+    {"key 9", 167, 89, {158, 74, 19, 30}},
+    {"key 10", 15, 119, {6, 104, 19, 30}},
+    {"key 11", 34, 119, {25, 104, 19, 30}},
+    {"key 12", 53, 119, {44, 104, 19, 30}},
+    {"key 13", 72, 119, {63, 104, 19, 30}},
+    {"key 14", 91, 119, {82, 104, 19, 30}},
+    {"key 15", 110, 119, {101, 104, 19, 30}},
+    {"key 16", 129, 119, {120, 104, 19, 30}},
+    {"key 17", 148, 119, {139, 104, 19, 30}},
+    {"key 18", 167, 119, {158, 104, 19, 30}},
+    {"key 19", 15, 149, {6, 134, 19, 30}},
+    {"key 20", 34, 149, {25, 134, 19, 30}},
+    {"key 21", 53, 149, {44, 134, 19, 30}},
+    {"key 22", 72, 149, {63, 134, 19, 30}},
+    {"key 23", 91, 149, {82, 134, 19, 30}},
+    {"key 24", 110, 149, {101, 134, 19, 30}},
+    {"key 25", 129, 149, {120, 134, 19, 30}},
+    {"key 26", 148, 149, {139, 134, 19, 30}},
+    {"backspace", 94, 174, {80, 163, 28, 22}},
+    {"page ABC", 95, 53, {79, 37, 32, 32}},
+    {"page abc", 129, 53, {113, 37, 32, 32}},
+    {"page 123", 163, 53, {147, 37, 32, 32}},
+    {"slot 1", 235, 57, {219, 41, 32, 32}},
+    {"slot 2", 235, 109, {219, 93, 32, 32}},
+    {"slot 3", 235, 160, {219, 144, 32, 32}},
+    {"close", 235, 18, {219, 2, 32, 32}},
+};
+
 const List kEmpty;
 }
 
@@ -209,8 +252,10 @@ const std::vector<Hotspot>& HotspotsFor(ScreenState s)
     case Screen::Cards: return kCards;
     case Screen::Catalogue: return kCatalogue;
     case Screen::Build: return kBuild;
+    case Screen::MixerSave: return kMixerSave;
     case Screen::None: case Screen::Vacuum: case Screen::Unknown:
-    case Screen::FrontEnd: case Screen::CreateASim: case Screen::SaveSlots: case Screen::ItemHand: case Screen::Loading: return kEmpty;
+    case Screen::FrontEnd: case Screen::CreateASim: case Screen::SaveSlots: case Screen::Loading: case Screen::Drencher: case Screen::MooGoo: case Screen::Crime:
+    case Screen::Autopsy: case Screen::Detector: case Screen::Art: case Screen::Scratch: case Screen::Mixer: case Screen::Trading: return kEmpty;
     }
     return kEmpty;
 }
@@ -242,5 +287,11 @@ int Neighbour(const std::vector<Hotspot>& h, int from, int dx, int dy)
         }
     }
     return best;
+}
+
+int SaveSlotAt(int focus)
+{
+    const std::vector<Hotspot>& h = HotspotsFor({Screen::MixerSave, Tab::None});
+    return focus >= 0 && focus < (int)h.size() && !strncmp(h[focus].name, "slot ", 5) ? atoi(h[focus].name + 5) - 1 : -1;
 }
 }

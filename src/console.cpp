@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 
 #include "activities.h"
 #include "hotspots.h"
@@ -19,7 +20,9 @@
 #include "port/note.h"
 #include "port/options.h"
 #include "port/panelmenu.h"
+#include "port/minigame.h"
 #include "port/phone.h"
+#include "port/statusbar.h"
 #include "port/popup.h"
 #include "romdata.h"
 
@@ -58,6 +61,21 @@ Overlay Text(int x, int y, const char* text, int scale)
     o.text = text;
     o.textScale = scale;
     return o;
+}
+
+// The money's last change (port/statusbar.h's bar at `bar`): a small kit panel right of it, "+§12"
+// in a light green or "-§1" in a light red, on the bar's layer.
+void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom)
+{
+    const std::string text = (payout > 0 ? "+" : "-") + MenuWords(rom, kStrMgMoney, std::abs(payout));
+    const float size = 26;
+    const int w = (int)std::ceil(ui::TextWidth(text, size, ui::Weight::ExtraBold)) + 36;
+    if (bar.x + bar.w + 12 + w > kConsoleW - 8) return;
+    ui::UiItem p = ui::PanelItem({bar.x + bar.w + 12, bar.y, w, bar.h});
+    p.layer = kStatusBarLayer;
+    c.ui.push_back(p);
+    PanelText(c, {bar.x + bar.w + 12 + 18, bar.y, w - 36, bar.h}, text, size, size, ui::Align::Left, ui::Weight::ExtraBold,
+              payout > 0 ? 0xFFB4F0A8 : 0xFFFF9A90, kStatusBarLayer);
 }
 
 // The focus ring around hotspot `focus`'s area, as the topmost touchable bottom piece showing the
@@ -125,7 +143,8 @@ static void AddCursorHint(Composition& c, int y, bool right = false)
 }
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
-                         const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed)
+                         const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed, const PointerView* pointer,
+                         int payout)
 {
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
@@ -162,7 +181,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         }
     // A black load (both screens black, RAM between screens): the bare backdrop.
     if (s.screen == Screen::Loading) return c;
-    const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::ItemHand || s.screen == Screen::Unknown;
+    const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::Unknown;
     if (s.screen == Screen::None || s.screen == Screen::FrontEnd || s.screen == Screen::CreateASim)
     {
         // No HUD (title, main menu, Create-a-Sim, an unmapped front-end screen; None from the pixels
@@ -220,7 +239,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {
         // The world dimmed behind the touch screen: not playable, the mouse does nothing there.
-        // The stick cursor's screens (no table: SaveSlots, ItemHand, Unknown) get a frame.
+        // The stick cursor's screens (no table: SaveSlots, Unknown) get a frame.
         Piece world = World(topW, worldRows, bar);
         world.touch = false;
         c.pieces.push_back(world);
@@ -240,7 +259,12 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.overlays.push_back(Frame(kRailFrame, 1));
         c.pieces.push_back(Bottom(kRailPhoneFrom, kRailPhoneTo));
         c.pieces.push_back(Bottom(kRailTabsFrom, kRailTabsTo));
-        if (bar) AddStatusBar(c, *hud, *strings);
+        if (bar)
+        {
+            const Rect r = AddStatusBar(c, *hud, *strings);
+            // The money's last change (an animation's payout, a prize) beside the bar, in the game's words.
+            if (payout != 0 && rom && rom->StringCount() > kStrMgMoney) AddPayout(c, r, payout, *rom);
+        }
     }
     else if (s.screen == Screen::Dialogue && game && game->valid && rom && rom->StringCount() > 0 && bottom)
     {
@@ -259,6 +283,12 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(Bottom(kDialoguePortraitFrom, kDialoguePortraitTo));
         c.pieces.push_back(Bottom(kDialogueArrowFrom, kDialogueArrowTo));
     }
+    else if (MinigameFramed(s, game, rom))
+    {
+        // The HD minigame frame (port/minigame.h): the playfield big, the top screen beside it, the
+        // title, the game's values and the hints' chips.
+        BuildMinigame(c, s, topW, topH, hud, strings, *game, *rom, bottom, icons, pointer, focus);
+    }
     else
     {
         // Social, Vacuum, Cards, Catalogue, Build; the hints' box for the activities. All but the
@@ -273,6 +303,14 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kActivityBottomTo));
         c.pieces.push_back({Src::Top, {0, 0, topW, rows}, topTo});
         AddHints(c, ActivityHints(s.screen));
+        if (pointer && pointer->mark.w > 0)
+        {
+            // MooGoo's focus (activities.h): a ring around what A touches.
+            const Rect m = pointer->mark, to = kActivityBottomTo;
+            const int x0 = to.x + m.x * to.w / SW, y0 = to.y + m.y * to.h / SH, x1 = to.x + (m.x + m.w) * to.w / SW, y1 = to.y + (m.y + m.h) * to.h / SH;
+            constexpr int t = 4;
+            c.overlays.push_back({{x0 - t, y0 - t, x1 - x0 + 2 * t, y1 - y0 + 2 * t}, 0, 8, t, kRingArgb, -1});
+        }
         if (hudHere) AddStatusBar(c, *hud, *strings, topTo.x - 6, topTo.y + topTo.h + kActivityBarGap, topTo.w + 12);
     }
     AddRing(c, s, focus);

@@ -18,8 +18,10 @@ namespace
 {
 // Chip geometry, canvas pixels, from the label's text size.
 float ChipHeight(float size) { return std::round(size * 1.3f); }
-bool Round(Button b) { return b == Button::A || b == Button::B || b == Button::X || b == Button::Y || b == Button::DPad ||
-                        b == Button::DPadV || b == Button::DPadH; }
+bool Cross(Button b) { return b == Button::DPad || b == Button::DPadV || b == Button::DPadH || b == Button::DPadL || b == Button::DPadU ||
+                        b == Button::DPadR || b == Button::DPadD; }
+bool Round(Button b) { return b == Button::A || b == Button::B || b == Button::X || b == Button::Y || Cross(b) || b == Button::LStick ||
+                        b == Button::RStick; }
 const char* ButtonText(Button b)
 {
     switch (b)
@@ -30,9 +32,11 @@ const char* ButtonText(Button b)
     case Button::Y: return "Y";
     case Button::LB: return "LB";
     case Button::RB: return "RB";
+    case Button::LT: return "LT";
     case Button::Start: return "START";
-    case Button::RS: return "RS";
-    case Button::DPad: case Button::DPadV: case Button::DPadH: return "";
+    case Button::LStick: return "L";
+    case Button::RStick: return "R";
+    case Button::DPad: case Button::DPadV: case Button::DPadH: case Button::DPadL: case Button::DPadU: case Button::DPadR: case Button::DPadD: return "";
     }
     return "";
 }
@@ -208,6 +212,21 @@ void DrawChip(Layer& L, const UiItem& it, float s, float ox, float oy)
         FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, it.button == Button::DPadV ? 0x59FFFFFF : 0xFFFFFFFF);
         FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, it.button == Button::DPadH ? 0x59FFFFFF : 0xFFFFFFFF);
     }
+    else if (Cross(it.button))
+    {
+        // The cross faint, its one arm lit (from the centre out).
+        const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
+        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0x38FFFFFF);
+        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0x38FFFFFF);
+        // The lit arm a little wider than the cross, from its centre out.
+        const Button d = it.button;
+        const float w = b * 1.45f;
+        const float l = d == Button::DPadL ? cx - a : d == Button::DPadR ? cx - w * 0.5f : cx - w;
+        const float r = d == Button::DPadR ? cx + a : d == Button::DPadL ? cx + w * 0.5f : cx + w;
+        const float t = d == Button::DPadU ? cy - a : d == Button::DPadD ? cy - w * 0.5f : cy - w;
+        const float u = d == Button::DPadD ? cy + a : d == Button::DPadU ? cy + w * 0.5f : cy + w;
+        FillRoundRect(L, l, t, r, u, w * 0.5f, 0xFFFFFFFF);
+    }
     else
     {
         // The face buttons in their usual colours; the others white.
@@ -221,7 +240,14 @@ void DrawChip(Layer& L, const UiItem& it, float s, float ox, float oy)
         default: break;
         }
         const bool round = Round(it.button);
-        const float ts = round ? size * 0.82f : PillText(size);
+        if (it.button == Button::LStick || it.button == Button::RStick)
+        {
+            // A stick: a light ring inside the face, the letter smaller.
+            const float in = (y1 - y0) * 0.16f;
+            FillRoundRect(L, x0 + in, y0 + in, x1 - in, y1 - in, r - in, 0xB3E4E7FA);
+            FillRoundRect(L, x0 + in + line, y0 + in + line, x1 - in - line, y1 - in - line, r - in - line, 0xFF2E3063);
+        }
+        const float ts = it.button == Button::LStick || it.button == Button::RStick ? size * 0.6f : round ? size * 0.82f : PillText(size);
         const LineMetrics m = Metrics(ts, Weight::ExtraBold);
         // Centred on the cap height (about 0.7 em).
         const float base = (h + ts * 0.70f) / 2;

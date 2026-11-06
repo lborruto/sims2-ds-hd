@@ -1,0 +1,4 @@
+# From G-X-scratch (the hint up): A closes it, B asks, B again quits (the ticket's X).
+10 2 pad a
+40 2 pad b
+60 2 pad b

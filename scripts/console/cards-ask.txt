@@ -1,0 +1,2 @@
+# From act-cards, CONSOLE: B asks to quit (the HD prompts: A Yes, B No).
+20 2 pad b

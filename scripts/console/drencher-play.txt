@@ -1,0 +1,5 @@
+# From G-C-wg-pump: A held fires, X held pumps, Y targets, B puts it away.
+10 400 pad a
+430 300 pad x
+760 2 pad y
+820 2 pad b

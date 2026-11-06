@@ -259,10 +259,10 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     const Rect top = FrontFit(kCasTopBox, topW, topH);
     FrontFramed(c, {Src::Top, {0, 0, topW, topH}, top});
     {
-        // What turns it: RS; off the Name page X (left) and Y (right) too, either side of it.
-        const Rect rs = ChipRect(0, 0, Button::RS, "", 28), xr = ChipRect(0, 0, Button::X, "", 28);
+        // What turns it: the right stick (RStick); off the Name page X (left) and Y (right) too, either side of it.
+        const Rect rs = ChipRect(0, 0, Button::RStick, "", 28), xr = ChipRect(0, 0, Button::X, "", 28);
         const int y = top.y + top.h + 22, cx = top.x + top.w / 2;
-        c.ui.push_back(ChipItem(cx - rs.w / 2, y, Button::RS, "", 28));
+        c.ui.push_back(ChipItem(cx - rs.w / 2, y, Button::RStick, "", 28));
         if (v.xyTurns)
         {
             c.ui.push_back(ChipItem(cx - rs.w / 2 - 16 - xr.w, y + (rs.h - xr.h) / 2, Button::X, "", 28));

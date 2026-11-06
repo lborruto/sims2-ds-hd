@@ -22,6 +22,13 @@ static bool PadAction(const std::string& name, PadState& p)
         {"l", &PadState::lb}, {"lb", &PadState::lb}, {"r", &PadState::rb}, {"rb", &PadState::rb},
         {"start", &PadState::start}, {"select", &PadState::select}, {"menu", &PadState::menu},
         {"up", &PadState::up}, {"down", &PadState::down}, {"left", &PadState::left}, {"right", &PadState::right}};
+    // The sticks, held over: "lx-" left, "lx+" right, "ly-" up, "ly+" down (rx, ry the right one);
+    // "lt" the slow trigger.
+    static const std::map<std::string, std::pair<float PadState::*, float>> kAxes = {
+        {"lx-", {&PadState::lx, -1}}, {"lx+", {&PadState::lx, 1}}, {"ly-", {&PadState::ly, -1}}, {"ly+", {&PadState::ly, 1}},
+        {"rx-", {&PadState::rx, -1}}, {"rx+", {&PadState::rx, 1}}, {"ry-", {&PadState::ry, -1}}, {"ry+", {&PadState::ry, 1}},
+        {"lt", {&PadState::lt, 1}}};
+    if (auto ax = kAxes.find(name); ax != kAxes.end()) { p.*(ax->second.first) = ax->second.second; return true; }
     // The right stick pushed fully left / right (Create-a-Sim's model turns).
     if (name == "rsleft" || name == "rsright") { p.rx = name == "rsleft" ? -1.0f : 1.0f; return true; }
     auto it = kPad.find(name);

@@ -9,7 +9,14 @@
 
 namespace sims2wide
 {
-enum class GScreen { Unknown, FrontEnd /*title or main menu*/, CreateASim, Panel, Popup, Phone, Dialogue, Gift, Catalogue, Build, Vacuum, Social, Cards, SaveSlots, ItemHand };
+enum class GScreen { Unknown, FrontEnd /*title or main menu*/, CreateASim, Panel, Popup, Phone, Dialogue, Gift, Catalogue, Build, Vacuum, Social, Cards, SaveSlots, Drencher,
+               // The minigames (milestone 6; MinigameState): CONSOLE knows none of them yet (the stick cursor's screens).
+               Autopsy, Detector, MooGoo /*intro and game*/, Scratch, Crime, Mixer, MixerSave, ArtGallery,
+               // The wireless lobby (module 0x1E, CWirelessLobby, "DS Wireless" 2026: the title's way to the
+               // trading session, Keelhaulin' and MooGoo over wireless) and its trading screen (CTradingGame):
+               // out of the port's scope (one DS), shown safely.
+               Trading,
+               ItemHand = Drencher /*the old name: Pockets > the hand with the Super Drencher, overlay 18*/ };
 
 // The status bar (top screen rows 176-191), from the game-state block G. valid: G reads and every
 // field is in range (hour 0..23, minute 0..59, sanity <= max, tier 0..3, a printable name).
@@ -454,6 +461,257 @@ struct StatState
     bool operator==(const StatState&) const = default;
 };
 
+// ---- The minigames (milestone 6). Each minigame's part is read only on its own screen (vtable and
+// overlay checked), apart from the others, valid on its own; the lists are capped. All of them are
+// the game's own fields (docs/research/ram-map.md, "The minigames"); the port reads RAM only.
+
+// Alien Autopsy (overlay 0): three organ slots, up to 8 parasites, the laser / hand / tweezers.
+constexpr int kAutopsyOrgans = 3, kAutopsyParasites = 8;
+constexpr int kAutopsyKindGone = 5;        // an organ slot's kind once the organ is removed
+constexpr int kAutopsyDestroyed = 0xA00;   // an organ's damage when it is destroyed
+struct AutopsyOrgan
+{
+    int kind = -1;                    // 0..4 the organ (the game's table of five), 5 removed
+    int damage = 0;                   // 0..0xA00 (destroyed)
+    bool freed = false;               // the cut has enclosed it: the hand can lift it
+    bool present() const { return kind >= 0 && kind < kAutopsyKindGone; }
+    bool operator==(const AutopsyOrgan&) const = default;
+};
+struct AutopsyParasite
+{
+    int slot = -1;                    // 0..7
+    int x = 0, y = 0;                 // the sprite's position on the touch screen (off the screen while it walks in)
+    int organ = -1;                   // the organ it is heading for / eating (0..2), -1 none
+    bool eating = false;              // +5 damage per tick
+    bool operator==(const AutopsyParasite&) const = default;
+};
+struct AutopsyState
+{
+    bool valid = false;
+    int phase = 0;                    // 0 laser, 1 hand, 2 tweezers (the tool), 3 specimen done, 4 fade, 5 wait for the tear, 6 tearing
+    int sub = 0;                      // 0 idle, 1 lasering, 3 dragging an organ, 4 organ into the tray, 6 holding a parasite, 7 parasite into the flask
+    int specimen = 0;                 // 0 or 1 (the second is behind the closed membrane)
+    int tool = 0;                     // 0 laser, 1 hand, 2 tweezers
+    int earnings = 0;                 // $ banked this autopsy (paid when the second specimen is done; B / Start quit and forfeit it)
+    AutopsyOrgan organs[kAutopsyOrgans];
+    std::vector<AutopsyParasite> parasites;   // the live ones, in slot order (at most 8)
+    int dragged = -1;                 // the organ the hand holds (sub 3 / 4), else -1
+    int held = -1;                    // the parasite the tweezers hold (sub 6 / 7), else -1
+    bool handAlert = false;           // an organ is freed: the hand's button flashes
+    bool tweezersAlert = false;       // a parasite is eating: the tweezers' button flashes
+    int tearX = -1, tearY = -1;       // phase 6: where the tearing drag is now
+    bool operator==(const AutopsyState&) const = default;
+};
+
+// Metal Detector (overlay 9): walks the hero on the top screen; the bottom is the instrument.
+constexpr int kDetectorFull = 0x100000;   // charge 256.0 (20.12)
+constexpr int kDetectorSliderMax = 0x1000;
+struct DetectorState
+{
+    bool valid = false;
+    int state = 0;                    // 0 switching off, 1 power-on, 2 opening, 3 active, 4 closing, 5 "found" card
+    int charge = 0;                   // 0..kDetectorFull (-0x40 per tick active, -48.0 per dig)
+    bool inRange = false;             // a find is within reach of the hero
+    int slider = 0;                   // the depth slider, 0..kDetectorSliderMax
+    int mismatch = 0;                 // 0..128: |slider - the find's depth| (the scope's noise)
+    bool card = false;                // the "Found:" card is up
+    int findType = -1;                // the sensed find's type (0 lead rock ... 8 sarcophagus) when inRange or the card is up (the find dug), else -1
+    int findCount = 0;                // the finds the place loaded
+    int earnings = 0;                 // "Metal Detector Earnings" (G)
+    bool operator==(const DetectorState&) const = default;
+};
+
+// MooGoo Monkey (overlay 10): the intro (one arrow) and the game.
+constexpr int kMooGooMonkeys = 6, kMooGooPlayers = 3, kMooGooHand = 5, kMooGooCards = 8;
+constexpr int kMooGooHandEmpty = 0xFF;
+struct MooGooMonkey
+{
+    int cards[kMooGooCards] = {};     // the cards under it (v = 8 * monkey + rank; 0x30.. the specials), the first `count`
+    int count = 0;
+    int bets[kMooGooPlayers] = {};    // fruit each player put on it
+    int slots = 0;                    // bet slots used (4 is full)
+    bool eliminated = false;
+    bool operator==(const MooGooMonkey&) const = default;
+};
+struct MooGooPlayer
+{
+    int nameId = -1;                  // string id ("Player 1", a monkey's name...)
+    int hand[kMooGooHand] = {};       // card ids, kMooGooHandEmpty none
+    int selected = -1;                // the hand index the cursor is on
+    int score = 0;                    // its fruit on the monkeys still in
+    bool ai = false, outOfCards = false, bet = false;
+    bool operator==(const MooGooPlayer&) const = default;
+};
+struct MooGooState
+{
+    bool valid = false;
+    bool intro = false;               // the intro: only its play arrow (238, 174) goes on
+    int phase = 0;                    // 0 players prompt, 1 names, 2/3 hint, 4/5 betting banner, 6 first bets, 7 shuffle, 8 deal, 9/0xA round banner, 0xB/0xC turn banner, 0xD the turn, 0xE..0x11 elimination, 0x12/0x13 results, 0x14/0x15 Stale Bananas / Game Over, 0x17 out of cards
+    int sub = 0;                      // the turn: 0 start, 1 pick a monkey to bet on, 2 bet placed, 3 play a card, 4 card picked, 5 pick a target monkey, 6 target picked, 7 draw, 8 end of turn, 9 animation
+    int timer = 0;                    // frames left of the phase (30 = a half second), -1 none
+    int current = 0;                  // the player whose turn it is (0 = you)
+    int humans = 1;                   // 1..3 (the players prompt's choice + 1)
+    int round = 0;                    // 1..3
+    bool hotSeat = false, turnDone = false, betPlaced = false, stale = false;
+    bool quit = false, quitAsk = false;   // quit chosen / the quit box is up
+    int winnings = 0;
+    int deckNext = 0, deckSize = 0;
+    MooGooMonkey monkeys[kMooGooMonkeys];
+    MooGooPlayer players[kMooGooPlayers];
+    bool operator==(const MooGooState&) const = default;
+};
+
+// Scratch lottery (overlay 13): eight boxes, two winning pictures.
+constexpr int kScratchBoxes = 8, kScratchPixels = 1024, kScratchNeeded = 684;
+struct ScratchBox
+{
+    int picture = -1;                 // 0..6
+    bool revealed = false;
+    int erased = 0;                   // pixels scratched of kScratchPixels (kScratchNeeded reveals the box)
+    bool operator==(const ScratchBox&) const = default;
+};
+struct ScratchState
+{
+    bool valid = false;
+    int tier = 0;                     // 0 "Cash Mummy!" ($1), 1 "Milking For Moo-lah" ($5), 2 "The Emperor's Coffers" ($10)
+    int prize = 0;                    // the tier's top prize (paid when it is won)
+    int state = 0;                    // 1 playing, 2 won, 3 lost
+    int revealed = 0;                 // boxes revealed (three of a winning picture win; five lose)
+    int winA = -1, winB = -1;         // the two winning pictures (three boxes each)
+    int active = -1;                  // the box being scratched, -1 none
+    bool hint = false;                // the hint popup has been shown
+    ScratchBox boxes[kScratchBoxes];
+    bool operator==(const ScratchState&) const = default;
+};
+
+// Super Drencher (overlay 18): a tool screen over the world; the hero walks on the top screen.
+constexpr int kDrencherPumpMax = 180;
+struct DrencherState
+{
+    bool valid = false;
+    int pump = 0;                     // the handle, 0..kDrencherPumpMax (stylus x - 50)
+    int target = -1;                  // the locked target's record index, -1 none
+    int targetType = -1;              // 2 a Sim (name 323 + target), 0xB an object (463 + target)
+    bool pumping = false, firing = false;
+    bool targetMode = false;          // the target button is lit
+    bool help = false, helpText = false;   // help mode / a help text is up (the next tap closes it)
+    int water = 0;                    // the tank, whole units of 100 (G)
+    int pressure = 0;                 // the pressure, whole units of 125 (G)
+    bool operator==(const DrencherState&) const = default;
+};
+
+// Crime (the Ratarang): scare, aim and throw, subdue.
+struct CrimeState
+{
+    bool valid = false;
+    bool help = false;                // help mode
+    bool dragging = false;            // the aim slider is held
+    int phase = 0;                    // the throw: 0 idle, 1 grabbed, 2 aiming, 3 released
+    int angle = 0;                    // -90..90 degrees
+    bool canScare = false;            // an unscared goon is within 30 units
+    bool armed = false;               // a scared goon is within 50
+    bool canSubdue = false;           // a clobbered goon is within 10
+    bool scarePressed = false, subduePressed = false;
+    bool hit = false;                 // the last throw hit
+    bool operator==(const CrimeState&) const = default;
+};
+
+// Music Mixer: the keyboard and sequencer.
+constexpr int kMixerKeys = 3, kMixerSongs = 8;
+struct MixerState
+{
+    bool valid = false;
+    int mode = 0;                     // 0 song, 1 ringtone, 2 resumed from the save menu
+    int phase = 0;                    // 0 idle, 1 playing, 2 recording, 5 VOX (microphone) recording, 7 song select, 8 help, 9 a help text, 0xA the save prompt
+    int tracks = 0xFF;                // bit t: track t+1 is audible
+    int keys[kMixerKeys] = {-1, -1, -1};   // the keys held (0..12 C4..C5: note 60 + key + 12 * octave), -1 none
+    int octave = 0;                   // -1..1
+    int instrument = 1;               // 1, 2, 3 or 5 (VOX)
+    bool sustain = false;
+    int sliderA = 13, sliderB = 0;    // the filters, 0..26 (A 13 = off)
+    int tempo = 0;                    // BPM
+    int variation = 0;                // 0 I, 1 II
+    int song = 0;                     // 0..7, 8 the ringtone
+    int controlEvents = 0, noteEvents = 0;   // the recording's
+    bool prep = false, previewing = false, micFull = false;
+    std::vector<int> unlocked;        // the songs unlocked (at most 8), in the game's order
+    bool operator==(const MixerState&) const = default;
+};
+
+// The mixer's save menu (module 0x13): a name and three slots.
+constexpr int kMixerSaveSlots = 3;
+struct MixerSaveState
+{
+    bool valid = false;
+    int mode = 0;                     // 0 song, 1 ringtone
+    int slot = -1;                    // the slot being burnt, -1 none
+    std::string name;                 // the name typed so far (the game's raw text: GameTextToUtf8)
+    bool used[kMixerSaveSlots] = {};
+    std::string slotName[kMixerSaveSlots];   // raw text, as name
+    bool operator==(const MixerSaveState&) const = default;
+};
+
+// Art Gallery's painting: a 48 x 32 canvas of palette indices.
+constexpr int kArtCols = 48, kArtRows = 32;
+struct ArtState
+{
+    bool valid = false;
+    int stroke = 0;                   // 0 idle, 1 drawing, 2 touched outside
+    int button = 0;                   // the tool button 0..9
+    int tool = 0;                     // 0 pencil, 1 eraser, 2 line, 3 bucket, 4 rect, 5 filled rect
+    int swatch = 0;                   // 0..14 (the colour is swatch + 1 of the page)
+    int page = 0;                     // the palette page 0..15 (resource 6028: 16 colours each)
+    int brush = 0;                    // 0..2
+    bool inCanvas = false;            // the stylus is on the canvas
+    int cellRow = -1, cellCol = -1;   // its cell (inCanvas)
+    std::vector<u8> cells;            // kArtRows * kArtCols palette indices (1 = white), row by row: what is drawn, a stroke in progress included
+    bool operator==(const ArtState&) const = default;
+};
+
+// Keelhaulin' Cards (module 0x10, no overlay; GScreen::Cards). The hands are ten slots each (a
+// card pointer into the object's own card table, 0 when the place is empty); the counts are what
+// the score board shows beside each player's name.
+constexpr int kCardsSlots = 10, kCardsMax = 60;
+struct CardsState
+{
+    bool valid = false;
+    int deck = 0, total = 0;          // cards left in the draw deck, of the game's total
+    int hand = 0, opponent = 0;       // the cards in the player's hand and the opponent's (0..10)
+    int score = 0, opponentScore = 0; // the players' scores (the first to 200 wins; a cannon can take them below 0)
+    int treasure = 0;                 // the treasure chest's points (the round's winner takes them)
+    bool box = false;                 // a box is up over the table (help, the quit question, a message)
+    bool message = false;             // the "End of Turn. Touch for @1's turn." message (any touch goes on)
+    bool quitAsk = false;             // "Are you sure you want to quit?" (its tick and cross: kCardsQuitYes / No)
+    std::string name;                 // the player's name as the board shows it (ASCII; empty: unreadable)
+    bool operator==(const CardsState&) const = default;
+};
+
+// The vacuum (overlay 17; GScreen::Vacuum): the filter's clog (touching dust; a blow clears it) and
+// the stat panel's "Vacuum Earnings" (G).
+struct VacuumState
+{
+    bool valid = false;
+    bool clogged = false;
+    int earnings = 0;
+    bool operator==(const VacuumState&) const = default;
+};
+
+struct MinigameState
+{
+    CardsState cards;
+    VacuumState vacuum;
+    AutopsyState autopsy;
+    DetectorState detector;
+    MooGooState mooGoo;
+    ScratchState scratch;
+    DrencherState drencher;
+    CrimeState crime;
+    MixerState mixer;
+    MixerSaveState mixerSave;
+    ArtState art;
+    bool operator==(const MinigameState&) const = default;
+};
+
 // Milestone 5: the front end (title, Settings, Load-a-Sim, Create-a-Sim, the boot screens, the video),
 // read from RAM (research m5-front-end). Each part reads only on its own screen and is valid on its
 // own; none of it is in GameState ==.
@@ -589,6 +847,7 @@ struct GameState
     PlacementState placement;
     CatalogueState catalogue;
     StatState stat;
+    MinigameState minigame;        // the minigames (milestone 6): the screen's part only; logged apart (--print-minigame)
     FrontState front;              // milestone 5: the front end's screens (logged apart: --print-front)
     // Screen identity only: hud and dialogue change every minute / page and are logged apart
     // (--print-hud), so --print-game stays one line per screen change.
@@ -621,6 +880,9 @@ SimRecord ReadSimRecord(RamView ram, int k);    // k 0..45, from G
 // ROM), in table order, repeats kept; empty when the table does not read. For checks: the
 // conversations' texts in each language measured against the HD box (--measure-string all).
 std::vector<int> SpeechStringIds(RamView ram);
+// One line of the minigame the screen shows (the part's fields as k=v), empty when the screen is
+// none or its part does not read: what --print-minigame logs when it changes.
+std::string MinigameLine(const GameState&);
 const char* GScreenName(GScreen);
 std::string GameStateName(const GameState&);   // "Panel/Goals", "Popup", "Unknown(ov=8,vt=0x0214B1C4)"
 // CONSOLE's screen from the game's: Panel with its tab, the rest by name; not valid, a Panel
@@ -635,6 +897,6 @@ ScreenState ToScreenState(const GameState&);
 // The pixels' None (RAM not read at all) stays None.
 ScreenState ConsoleScreenOf(const GameState&, ScreenState pixels, bool hud, bool black);
 // Whether the pixel tracker's answer (screens.h) is what the game's screen looks like:
-// the same, or None for FrontEnd / CreateASim (no HUD), Unknown for SaveSlots / ItemHand.
+// the same, or None for FrontEnd / CreateASim (no HUD), Unknown for SaveSlots / Drencher.
 bool PixelsAgree(const GameState&, ScreenState pixels);
 }

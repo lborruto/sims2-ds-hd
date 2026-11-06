@@ -59,7 +59,7 @@ Before opening a pull request:
     ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
     bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts (the shop's buys and sells, Build Rooms' buy, cancel and double press, the Registry, check-in, room info, the music and stat pages, the front end: boot, title, main menu, Settings, Load-a-Sim and Create-a-Sim, including the Start and A pressed during the splashes that take no touch), the HD conversation (its page follows the game's, A turns two pages, every language's conversations fit the box, every language's HD menu words fit theirs, no character missing from the font, no game text: milestone 1's box) (ROM, shots/, the complete save, Pillow)
     ninja -C build gamestate_test && ./build/gamestate_test   # the RAM reader and its screen names on a synthetic RAM (the menus' lists and the hotel's and shops' screens too, fuzzed: the tabs, the phone, Give Gift, notes, the catalogue, Build Rooms, the Registry, room info, music, the stat panel never crash or run past their caps)
-    bash tests/gamestate_check.sh            # each save state's game state read from RAM (the front end's included), the recorder's captures (ROM, shots/, the complete save)
+    bash tests/gamestate_check.sh            # each save state's game state read from RAM (the front end's included), the minigames' parts (`--print-minigame`), the recorder's captures (ROM, shots/, the complete save)
     ninja -C build romdata_test && ./build/romdata_test       # the ROM's archive and string tables, the compressions, the sprites and the icon cache on a synthetic ROM: decoded, and every broken table refused (also once under UBSan and libc++'s hardened mode, not ASan)
     ninja -C build uikit_test && ./build/uikit_test           # the UI kit: text wrapping, the raster's determinism and hash, panels, text and chips (no ROM, no window)
     bash tests/romdata_check.sh              # the game's strings read from the ROM in its five languages, its compressed resources and sprites (ROM; RESEARCH= the decoded lines to compare with, else that part is skipped)
@@ -142,10 +142,15 @@ The headless mode runs the game without a window, about four times faster than r
 | `--console-menu`, `--console-focus N` | (checks) pin CONSOLE's menu open and its focus on item N of the HD view, for a picture; `-1` none |
 | `--dialogue-string ID` | (checks) the HD conversation shows string ID on every page (the longest strings' pictures) |
 | `--game-unknown-after N` | (checks) fake a new unmapped screen every 200 frames from frame N, to drive the recorder |
+| `--print-minigame` | print the minigame the bottom screen shows (the autopsy, detector, MooGoo, lottery, Drencher, crime game, mixer, save page, painting, cards, vacuum), read from RAM, when it changes |
 | `--no-romdata` | do not read the game's text: CONSOLE as in milestone 1 (the old status bar and conversation) |
 | `--compose-scale N` | `--compose` pictures N times the canvas (1 to 4), the UI drawn at that size |
 | `--ui-demo` | the UI kit's demonstration drawn over the picture |
 | `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
+
+Every `*_check.sh` runs at most `MAX_SIMS` emulators at once (4 by default: set it lower on a
+slow or hot machine). Their pictures and runs of the minigames use the research's `G-*` states in
+`shots/` and copies of the complete save.
 
 A headless run ends with a line that says what the DS clock reads, how often the hold wrote
 it, and how many microphone samples the game read (0 unless it listened).

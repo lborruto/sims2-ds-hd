@@ -91,6 +91,7 @@ void AddInteractView(MenuView& v, const InteractState& in, const RomData* rom)
         it.action = {TapStep(kInteractArrowX, kInteractArrowY0 + i * kInteractArrowStep)};
         it.group = 1;
         it.id = kInteractRowId + ((u32)in.actions[i].code << 4) + (u32)i;
+        it.closesMenu = InteractAnimation(in.actions[i].code);
         if (rom) it.word = InteractLabel(*rom, in.actions[i].labelId, in.actions[i].amount);
         v.items.push_back(it);
     }

@@ -1,0 +1,3 @@
+# From G-X-scratch: A closes the hint, B once (asked), then nothing: still the ticket.
+10 2 pad a
+40 2 pad b

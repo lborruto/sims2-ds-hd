@@ -1,0 +1,6 @@
+# From G-B-sc-two-p10 (two 4s revealed, the prize 10): the pointer to box 7 (Right held 52 frames,
+# Down 24), X rubs it (the third 4: the game's win), A closes the win: paid, the panel.
+10 52 pad right
+70 24 pad down
+100 2 pad x
+420 2 pad a

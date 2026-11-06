@@ -1,0 +1,2 @@
+# From the detector (CONSOLE): B powers it off: back to the panel.
+20 2 pad b

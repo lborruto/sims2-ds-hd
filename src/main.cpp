@@ -46,6 +46,7 @@
 #include "port/roominfo.h"
 #include "port/music.h"
 #include "port/statpanel.h"
+#include "port/minigame.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/interact.h"
@@ -97,6 +98,7 @@ static void Usage()
         "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
         "  --print-hotel                 print the hotel block (rooms, score, guests, songs) and the hotel's and shops' screens (registry, room info, music, build rooms, placement, catalogue, stat panel), read from RAM, when they change\n"
+        "  --print-minigame              print the minigame the bottom screen shows (Alien Autopsy, Metal Detector, MooGoo Monkey, scratch lottery, Super Drencher, Crime, Music Mixer and its save menu, Art Gallery), read from RAM, when it changes\n"
         "  --print-front                 print the front end (title, Settings, Load-a-Sim, Create-a-Sim, boot screens, video), read from RAM, when it changes\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
@@ -155,7 +157,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printFront = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
     bool uiDemo = false;
@@ -196,6 +198,7 @@ int main(int argc, char** argv)
         else if (a == "--print-hud") printHud = true;
         else if (a == "--print-town") printTown = true;
         else if (a == "--print-hotel") printHotel = true;
+        else if (a == "--print-minigame") printMinigame = true;
         else if (a == "--print-front") printFront = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
@@ -466,6 +469,12 @@ int main(int argc, char** argv)
         printf("statpanel: %d words, tallest %d (%d lines), %d shrunk, %d cut", sp.checked, sp.tallestId, sp.tallestLines, sp.shrunk, sp.cut);
         for (int id : sp.cutIds) printf(" %d", id);
         printf("\n");
+        // The minigame frame (port/minigame.*): the titles, the cards' board, the vacuum's line, the hints' game words.
+        BlockMeasure mg;
+        MeasureMinigames(*app.rom, mg);
+        printf("minigame: %d words, %d shrunk, %d cut", mg.checked, mg.shrunk, mg.cut);
+        for (int id : mg.cutIds) printf(" %d", id);
+        printf("\n");
         // The front end's main menu: the four buttons' labels.
         BlockMeasure fe;
         MeasureFront(*app.rom, fe);
@@ -487,7 +496,7 @@ int main(int argc, char** argv)
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || fe.cut > 0 || fm.cut > 0 || ca.cut > 0 ||
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || mg.cut > 0 || fe.cut > 0 || fm.cut > 0 || ca.cut > 0 ||
                        !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
@@ -607,6 +616,7 @@ int main(int argc, char** argv)
         {
             // CONSOLE's navigator from the script's "pad" events; its taps over the script's touch.
             input.Steer(app, input.scriptPad, keys);
+            input.PointerTouch(app, touching, tx, ty);
             input.ScriptTouch(touching, tx, ty);
         }
         else
@@ -827,6 +837,18 @@ int main(int argc, char** argv)
                 {
                     if (t.note.valid) fprintf(stderr, "frame %ld: note text=%d playername=%d\n", frame, t.note.textId, t.note.playerName ? 1 : 0);
                     else fprintf(stderr, "frame %ld: note none\n", frame);
+                }
+            }
+            if (app.portSupported && printMinigame)
+            {   // the minigames (gamestate.h): one line when the screen's part changes
+                const std::string now = MinigameLine(app.game), was = MinigameLine(before);
+                if (now != was || frame == 0) fprintf(stderr, "frame %ld: minigame %s\n", frame, now.empty() ? "none" : now.c_str());
+                // A pointing minigame's stylus at its pointer (activities.h): its press and release.
+                static bool pointerDown = false;
+                if (app.consolePointer.down != pointerDown)
+                {
+                    pointerDown = app.consolePointer.down;
+                    fprintf(stderr, "frame %ld: pointer %s at %d,%d\n", frame, pointerDown ? "down" : "up", (int)app.consolePointer.x, (int)app.consolePointer.y);
                 }
             }
             if (app.portSupported && printHotel)
