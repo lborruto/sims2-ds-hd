@@ -261,7 +261,8 @@ Plug in any controller, before or during the game: Xbox (and every XInput pad), 
 / 5, Switch Pro and Joy-Cons, 8BitDo and the many others SDL knows, by USB or Bluetooth, on
 Windows, Mac and Linux. Several can be plugged in: whichever you touch last plays. The keyboard
 always works beside them. The pause menu is Start + Back (or Esc): the Guide / PS / Home button
-stays the system's.
+stays the system's. A controller plugged in says so at the top of the window, and the touch
+screen's cursor hint shows it too.
 
 **Through Steam** (and on a **Steam Deck**): in Steam, *Add a Game > Add a Non-Steam Game*, pick
 `sims2wide.exe` (or `sims2wide` on Linux), and leave Steam Input on. To skip the file picker, put
@@ -274,7 +275,8 @@ output. Make one with [SDL2 Gamepad Tool](https://generalarcade.com/gamepadtool/
 controller settings and put the line in `gamecontrollerdb.txt` in the settings folder (below); a
 mapping in the `SDL_GAMECONTROLLERCONFIG` environment variable (what Steam sets) wins over it.
 SETTINGS > CONTROLS also has the sticks' dead zone (raise it if the Sim walks on its own), how far
-the triggers go down to count, and rumble.
+the triggers go down to count, and rumble. A controller SDL already knows keeps SDL's own mapping;
+the built-in database only adds the others.
 
 ## Settings
 

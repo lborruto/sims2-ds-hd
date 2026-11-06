@@ -62,6 +62,7 @@
 #include "recorder.h"
 #include "state.h"
 #include "video.h"
+#include "port/ownwords.h"
 
 using namespace sims2wide;
 using melonDS::NDS;
@@ -630,6 +631,15 @@ int main(int argc, char** argv)
             SDL_Event ev;
             input.PushScript(script, iter, video);
             while (SDL_PollEvent(&ev)) input.HandleEvent(ev, app, video, menu.open);
+            // A controller connected (at start too): how to pause, now that Guide is Steam's.
+            for (const Pads::Connected& pc : input.pads.TakeConnected())
+            {
+                std::string msg = OwnWord(app.rom.get(), OwnWordId::PadConnected);
+                const std::string name = pc.name.empty() ? "?" : pc.name.substr(0, 40);
+                if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, name);
+                if (size_t at = msg.find("@2"); at != std::string::npos) msg.replace(at, 2, PauseCombo(pc.style, pc.type));
+                video.Toast(msg, 5000);
+            }
             if (ScriptWindowShot(script, iter))
             {
                 char name[64];

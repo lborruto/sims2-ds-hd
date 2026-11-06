@@ -14,9 +14,9 @@ using namespace Controls;
 static constexpr int kZoomFramesPerNotch = 6;   // X or Y held this long per wheel notch
 static constexpr int kDragPixelsPerFrame = 3;   // a right-button drag: this many points = one frame of L or R
 
-// Marks the keys an input script pushes (SDL_KeyboardEvent's padding): they are not the
+// Marks the keys an input script pushes (a window id no window has): they are not the
 // player's, so the chips do not turn to the keyboard for them.
-static constexpr Uint8 kScriptedKey = 0x5C;
+static constexpr Uint32 kScriptedWindow = 0x5C5C5C5Cu;
 
 PadOptions Input::PadOptionsOf(const Settings& s)
 {
@@ -42,7 +42,7 @@ void Input::PushScript(const std::vector<InputEvent>& script, long iter, const V
             ev.key.keysym.sym = k;
             ev.key.keysym.scancode = SDL_GetScancodeFromKey(k);
             ev.key.state = down ? SDL_PRESSED : SDL_RELEASED;
-            ev.key.padding2 = kScriptedKey;
+            ev.key.windowID = kScriptedWindow;
         }
         else if (e.move && down)
         {
@@ -98,7 +98,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
     else if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP)
     {
         const bool down = ev.type == SDL_KEYDOWN;
-        if (down && ev.key.padding2 != kScriptedKey) lastKeyboard = true;
+        if (down && ev.key.windowID != kScriptedWindow) lastKeyboard = true;
         const SDL_Keycode k = ev.key.keysym.sym;
         const int a = s.controls.ActionOfKey(k);
         if (!down)
@@ -221,7 +221,7 @@ void Input::Poll(const App& app, bool menuOpen)
     padStyle = pads.Style();
     const bool labels = NintendoLabels();
     if (!pads.Any()) lastKeyboard = true; // (no controller: the keyboard's keys, whatever was pressed)
-    ui::SetChipLook(ChipLookFor(lastKeyboard, padStyle, s.controls, labels));
+    ui::SetChipLook(ChipLookFor(lastKeyboard, padStyle, s.controls, labels, pads.Type()));
     // One controller drives: the last one used (pads.h), its sticks outside the dead zone.
     pad = pads.Read(PadOptionsOf(s));
     if (!pads.Any()) { panelButton = ReleasePulse(); return; }

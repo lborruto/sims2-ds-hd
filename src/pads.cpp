@@ -36,10 +36,32 @@ std::string Pads::UserMappingsPath()
     return f;
 }
 
+int Pads::AddUnmapped(const char* text, size_t size)
+{
+    // Line by line; a pad SDL maps already (its own database, whose Switch and 8BitDo lines
+    // follow SDL_GAMECONTROLLER_USE_BUTTON_LABELS, XInput's, HIDAPI's) keeps SDL's mapping:
+    // a line added through the API would replace it.
+    int added = 0;
+    const std::string all(text, size);
+    for (size_t at = 0; at < all.size();)
+    {
+        size_t end = all.find('\n', at);
+        if (end == std::string::npos) end = all.size();
+        std::string line = all.substr(at, end - at);
+        at = end + 1;
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+        const size_t comma = line.find(',');
+        if (line.empty() || line[0] == '#' || comma == std::string::npos) continue;
+        const SDL_JoystickGUID guid = SDL_JoystickGetGUIDFromString(line.substr(0, comma).c_str());
+        if (char* had = SDL_GameControllerMappingForGUID(guid)) { SDL_free(had); continue; }
+        if (SDL_GameControllerAddMapping(line.c_str()) == 1) added++;
+    }
+    return added;
+}
+
 int Pads::LoadMappings(const std::string& userFile)
 {
-    const int bundled = SDL_GameControllerAddMappingsFromRW(SDL_RWFromConstMem(gamecontrollerdb, (int)gamecontrollerdb_size), 1);
-    if (bundled < 0) fprintf(stderr, "controllers: the bundled mappings: %s\n", SDL_GetError());
+    const int bundled = AddUnmapped(reinterpret_cast<const char*>(gamecontrollerdb), gamecontrollerdb_size);
     if (!userFile.empty())
         if (SDL_RWops* f = SDL_RWFromFile(userFile.c_str(), "rb"))
         {
@@ -85,7 +107,11 @@ void Pads::Open(int index, const PadOptions& o)
     SDL_GameController* c = SDL_GameControllerOpen(index);
     if (!c) { fprintf(stderr, "controller %d: %s\n", index, SDL_GetError()); return; }
     SDL_Joystick* j = SDL_GameControllerGetJoystick(c);
-    const bool steam = SteamVirtual(SDL_JoystickGetVendor(j), SDL_JoystickGetProduct(j), SDL_JoystickGetProductVersion(j));
+    // From the GUID, not SDL_JoystickGetVendor / Product: with Steam's SteamVirtualGamepadInfo
+    // those give the real pad's ids behind the virtual one; the GUID keeps the virtual pad's.
+    Uint16 vendor = 0, product = 0, version = 0;
+    SDL_GetJoystickGUIDInfo(SDL_JoystickGetGUID(j), &vendor, &product, &version, nullptr);
+    const bool steam = SteamVirtual(vendor, product, version);
     // Steam's virtual pad in a game Steam did not launch with Steam Input (its desktop
     // configuration, mapping the pad to a mouse and keys): a twin of a physical pad. SDL's own
     // drivers leave it out the same way; this keeps it out whatever driver reports it.
@@ -94,8 +120,10 @@ void Pads::Open(int index, const PadOptions& o)
         SDL_GameControllerClose(c);
         return;
     }
-    pads_.push_back({c, SDL_JoystickInstanceID(j), steam, StyleOf(SDL_GameControllerGetType(c))});
+    const SDL_GameControllerType type = SDL_GameControllerGetType(c);
+    pads_.push_back({c, SDL_JoystickInstanceID(j), steam, StyleOf(type), type});
     const char* name = SDL_GameControllerName(c);
+    connected_.push_back({name ? name : "", StyleOf(type), type});
     fprintf(stderr, "controller: %s%s\n", name ? name : "?", steam ? " (Steam Input)" : "");
     if (o.rumble && SDL_GameControllerHasRumble(c)) SDL_GameControllerRumble(c, 0x3000, 0x6000, 150);
 }
@@ -161,6 +189,26 @@ int Pads::Style() const
     return p ? p->style : XBOX;
 }
 
+SDL_GameControllerType Pads::Type() const
+{
+    const Pad* p = Driving();
+    return p ? p->type : SDL_CONTROLLER_TYPE_UNKNOWN;
+}
+
+std::vector<Pads::Connected> Pads::TakeConnected()
+{
+    std::vector<Connected> c;
+    c.swap(connected_);
+    return c;
+}
+
+const char* PauseCombo(int style, SDL_GameControllerType type)
+{
+    if (style == PLAYSTATION) return type == SDL_CONTROLLER_TYPE_PS5 ? "Options + Create" : type == SDL_CONTROLLER_TYPE_PS3 ? "Start + Select" : "Options + Share";
+    if (style == NINTENDO) return "+ / -";
+    return "Start + Back";
+}
+
 bool Pads::Event(const SDL_Event& ev, const PadOptions& o)
 {
     switch (ev.type)
@@ -213,7 +261,12 @@ PadRaw Pads::Read(const PadOptions& o) const
     auto stick = [&](SDL_GameControllerAxis ax, SDL_GameControllerAxis ay, float& x, float& y) {
         x = axis(ax);
         y = axis(ay);
-        if (std::sqrt(x * x + y * y) <= o.deadZone) x = y = 0;
+        const float mag = std::sqrt(x * x + y * y);
+        if (mag <= o.deadZone) { x = y = 0; return; }
+        // Rescaled from the dead zone's edge, so a push starts from 0 and the edge still reads 1.
+        const float k = std::min(1.0f, (mag - o.deadZone) / (1 - o.deadZone)) / mag;
+        x *= k;
+        y *= k;
     };
     stick(SDL_CONTROLLER_AXIS_LEFTX, SDL_CONTROLLER_AXIS_LEFTY, r.lx, r.ly);
     stick(SDL_CONTROLLER_AXIS_RIGHTX, SDL_CONTROLLER_AXIS_RIGHTY, r.rx, r.ry);
@@ -240,7 +293,7 @@ int PrintedInput(int in, int style, bool nintendoLabels)
     }
 }
 
-ui::ChipLook ChipLookFor(bool keyboard, int style, const Bindings& b, bool nintendoLabels)
+ui::ChipLook ChipLookFor(bool keyboard, int style, const Bindings& b, bool nintendoLabels, SDL_GameControllerType type)
 {
     using ui::Button;
     ui::ChipLook look;
@@ -266,6 +319,15 @@ ui::ChipLook ChipLookFor(bool keyboard, int style, const Bindings& b, bool ninte
     {
         const Button k = (Button)i;
         const int a = action(k);
+        if (k == Button::Pause)
+        {
+            // The pause menu: Start + Back on every pad (Poll's combo, whatever the bindings), the
+            // MENU key on the keyboard (Esc).
+            if (keyboard) { if (b.Key(MENU) != kNone) look.glyph[i] = KeyName(b.Key(MENU)); }
+            else look.glyph[i] = style != PLAYSTATION ? "start+back" : type == SDL_CONTROLLER_TYPE_PS5 ? "start+create"
+                               : type == SDL_CONTROLLER_TYPE_PS3 ? "start+select" : "start+back";
+            continue;
+        }
         if (keyboard)
         {
             if (a >= 0 && b.Key(a) != kNone) look.glyph[i] = KeyName(b.Key(a));
@@ -273,6 +335,9 @@ ui::ChipLook ChipLookFor(bool keyboard, int style, const Bindings& b, bool ninte
         }
         const int in = a >= 0 ? b.Pad(a) : k == Button::LT ? (int)IN_LT : -1;
         if (in >= 0) look.glyph[i] = InputKey(PrintedInput(in, style, nintendoLabels));
+        // PlayStation's Back is the PS5's Create, the PS3's Select (else the PS4's Share).
+        if (look.glyph[i] == "back" && style == PLAYSTATION)
+            look.glyph[i] = type == SDL_CONTROLLER_TYPE_PS5 ? "create" : type == SDL_CONTROLLER_TYPE_PS3 ? "select" : "back";
     }
     return look;
 }

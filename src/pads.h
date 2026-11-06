@@ -18,7 +18,7 @@ namespace sims2wide
 {
 // A controller's inputs as read (the navigator's PadState is the actions they make): the
 // buttons in Controls::PadInput's order (the triggers past their threshold), the sticks in
-// -1..1, zero inside the dead zone.
+// -1..1, zero inside the dead zone and rescaled from its edge.
 struct PadRaw
 {
     bool btn[Controls::IN_COUNT] = {};
@@ -45,6 +45,8 @@ public:
     // which SDL read at SDL_Init, keeps its priority over all of them. Returns the bundled
     // mappings added (-1: none could be read).
     static int LoadMappings(const std::string& userFile);
+    // The lines of a mappings file whose GUID SDL has no mapping for yet; how many were added.
+    static int AddUnmapped(const char* text, size_t size);
     // gamecontrollerdb.txt in the settings folder ("" when SDL has none).
     static std::string UserMappingsPath();
 
@@ -60,8 +62,17 @@ public:
     // The driving pad: the last one used, else the last one connected (Steam's virtual pads
     // only, when one is open). -1: none.
     SDL_JoystickID Active() const;
-    // Its labels (Controls::Style), XBOX without one.
+    // Its labels (Controls::Style), XBOX without one, and SDL's type for it.
     int Style() const;
+    SDL_GameControllerType Type() const;
+    // The controllers opened since the last call (the window tells the player how to pause).
+    struct Connected
+    {
+        std::string name;
+        int style;
+        SDL_GameControllerType type;
+    };
+    std::vector<Connected> TakeConnected();
 
     static int StyleOf(SDL_GameControllerType t);
     // Steam's virtual pad, as SDL tells it (SDL_IsJoystickSteamVirtualGamepad).
@@ -74,8 +85,10 @@ private:
         SDL_JoystickID id;
         bool steam;
         int style;
+        SDL_GameControllerType type;
     };
     std::vector<Pad> pads_;
+    std::vector<Connected> connected_;
     SDL_JoystickID active_ = -1;
 
     void Open(int index, const PadOptions& o);
@@ -92,6 +105,10 @@ bool NintendoLabels();
 // The name printed on a pad's input for a Nintendo pad, `in` swapped when the labels are off.
 int PrintedInput(int in, int style, bool nintendoLabels);
 // The HD chips' look (ui::SetChipLook): the keyboard's keys bound to the chips' actions when
-// the keyboard was used last, else the pad's own buttons in its style.
-ui::ChipLook ChipLookFor(bool keyboard, int style, const Controls::Bindings& b, bool nintendoLabels);
+// the keyboard was used last, else the pad's own buttons in its style (a PlayStation pad's
+// Back by its type: Create, Share, Select).
+ui::ChipLook ChipLookFor(bool keyboard, int style, const Controls::Bindings& b, bool nintendoLabels,
+                         SDL_GameControllerType type = SDL_CONTROLLER_TYPE_UNKNOWN);
+// The pause menu's buttons on a pad, by their printed names ("Start + Back", "Options + Create"…).
+const char* PauseCombo(int style, SDL_GameControllerType type);
 }

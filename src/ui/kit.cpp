@@ -43,6 +43,7 @@ const char* DefaultGlyph(Button b)
     case Button::LT: return "lt";
     case Button::Start: return "start";
     case Button::Back: return "back";
+    case Button::Pause: return "start+back";
     case Button::LStick: return "ls";
     case Button::RStick: return "rs";
     default: return "";
@@ -68,7 +69,9 @@ Resolved Resolve(Button b, Face face, const std::string& glyph)
         r.mark = Mark::Pill;
         struct N { const char *key, *xbox, *ps, *nin; };
         static const N names[] = {{"lb", "LB", "L1", "L"}, {"rb", "RB", "R1", "R"}, {"lt", "LT", "L2", "ZL"}, {"rt", "RT", "R2", "ZR"},
-                                  {"start", "START", "OPTIONS", "+"}, {"back", "BACK", "SHARE", "-"}, {"guide", "GUIDE", "PS", "HOME"}};
+                                  {"start", "START", "OPTIONS", "+"}, {"back", "BACK", "SHARE", "-"}, {"create", "BACK", "CREATE", "-"}, {"select", "BACK", "SELECT", "-"},
+                                  {"start+back", "START + BACK", "OPTIONS + SHARE", "+ / -"}, {"start+create", "START + BACK", "OPTIONS + CREATE", "+ / -"},
+                                  {"start+select", "START + BACK", "START + SELECT", "+ / -"}, {"guide", "GUIDE", "PS", "HOME"}};
         r.text = g;
         for (const N& n : names)
             if (g == n.key) r.text = ps ? n.ps : nin ? n.nin : n.xbox;
@@ -472,7 +475,6 @@ void LookOf(Button b, Face& face, std::string& glyph)
 }
 
 void SetChipLook(const ChipLook& look) { gLook = look; }
-const ChipLook& CurrentChipLook() { return gLook; }
 
 Rect ChipRect(int x, int y, Button b, const std::string& label, float size, float labelAt, Weight wt)
 {

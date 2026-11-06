@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "shots.h"
+#include "ui/font.h"
+#include "ui/kit.h"
 
 namespace sims2wide
 {
@@ -82,7 +84,23 @@ void Video::Present(const App& app, const Canvas* over)
     }
     // --- end looks
     SDL_UpdateTexture(tex[1], nullptr, app.Bottom(), SW * 4);
-    const Composition comp = Composed(app);
+    Composition comp = Composed(app);
+    if (!toast.empty() && SDL_GetTicks() < toastUntil)
+    {
+        // On a layer of its own above every other, so it rasters alone.
+        constexpr float kSize = 26;
+        constexpr int kLayer = 9;
+        const int tw = (int)std::ceil(ui::TextWidth(toast, kSize)), w = std::min(tw + 48, comp.cw - 32), h = 56;
+        const Rect box {(comp.cw - w) / 2, 24, w, h};
+        ui::UiItem panel = ui::PanelItem(box);
+        ui::UiItem text = ui::TextItem({box.x + 24, box.y, box.w - 48, box.h}, toast, kSize, ui::Align::Centre);
+        text.wrap = false;
+        text.middle = true;
+        panel.layer = text.layer = kLayer;
+        comp.ui.push_back(panel);
+        comp.ui.push_back(text);
+    }
+    else toast.clear();
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, ow, oh);

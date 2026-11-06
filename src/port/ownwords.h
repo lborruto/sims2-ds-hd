@@ -52,6 +52,10 @@ enum class OwnWordId : int
     Close,
     // The town's hint for the HD menu (its chip says the button).
     Menu,
+    // A controller connected (@1 its name, @2 its pause buttons, Pads' PauseCombo): the window's toast.
+    PadConnected,
+    // The pause menu, beside Start + Back's chips (the cursor's hint).
+    Pause,
     Count
 };
 

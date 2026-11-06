@@ -69,10 +69,13 @@ FetchContent_Declare(sdl2
     URL_HASH SHA256=24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4)
 FetchContent_MakeAvailable(sdl2)
 # What SDL's configure found: its config header lists the joystick drivers compiled in. Said at
-# configure time; a Windows or Mac build without its main backends stops here.
-file(GLOB_RECURSE SIMS2WIDE_SDL_CONFIG "${sdl2_BINARY_DIR}/include-config-*/SDL2/SDL_config.h")
-if(SIMS2WIDE_SDL_CONFIG)
-    list(GET SIMS2WIDE_SDL_CONFIG 0 SIMS2WIDE_SDL_CONFIG)
+# configure time; a build without its platform's main backends stops here. (The header SDL
+# installs is made by file(GENERATE), after this file has run: its configure_file'd
+# SDL_config.h.intermediate exists already, on the first configure too.)
+set(SIMS2WIDE_SDL_CONFIG "${sdl2_BINARY_DIR}/SDL_config.h.intermediate")
+if(NOT EXISTS "${SIMS2WIDE_SDL_CONFIG}")
+    message(WARNING "SDL's ${SIMS2WIDE_SDL_CONFIG} not found: its controller drivers are not checked")
+else()
     file(STRINGS "${SIMS2WIDE_SDL_CONFIG}" sdl_drivers REGEX "^#define SDL_(JOYSTICK|HAPTIC)_[A-Z0-9_]+ 1")
     string(REGEX REPLACE "#define SDL_([A-Z0-9_]+) 1" "\\1" sdl_drivers "${sdl_drivers}")
     message(STATUS "SDL controllers: ${sdl_drivers}")
@@ -89,7 +92,7 @@ if(SIMS2WIDE_SDL_CONFIG)
         endif()
     endforeach()
     if(NOT WIN32 AND NOT APPLE)
-        file(STRINGS "${SIMS2WIDE_SDL_CONFIG}" sdl_udev REGEX "^#define SDL_USE_LIBUDEV 1")
+        file(STRINGS "${SIMS2WIDE_SDL_CONFIG}" sdl_udev REGEX "^#define HAVE_LIBUDEV_H 1")
         if(NOT sdl_udev)
             message(WARNING "SDL without libudev (install libudev-dev): HIDAPI pads and hot-plug are poorer on Linux")
         endif()

@@ -254,9 +254,12 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   `SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD`, and normally hides the physical pads with
   `SDL_GAMECONTROLLER_IGNORE_DEVICES`), the physical ones are not read, so nothing acts twice.
   `Pads::Read` gives the driving pad's buttons, its triggers as buttons past `trigger_threshold`
-  and its sticks zeroed inside the round `stick_dead_zone`. Mappings, lowest first: SDL's own,
-  the bundled SDL_GameControllerDB (`assets/controllers/gamecontrollerdb.txt`, mdqinc/SDL_GameControllerDB
-  at ff33382, zlib, `LICENSE.txt` beside it; this platform's lines embedded at build time by
+  and its sticks zeroed inside the round `stick_dead_zone`, rescaled from its edge. Steam's
+  virtual pad is told by its GUID's ids (`SDL_GetJoystickGUIDInfo`), not `SDL_JoystickGetVendor`,
+  which gives the real pad's when Steam passes them. A pad connected shows a toast (`Video::Toast`)
+  with its pause buttons; the stick cursor's hint has the pause chip (`ui::Button::Pause`) beside it. Mappings, lowest first: SDL's own,
+  the bundled SDL_GameControllerDB (only for pads SDL maps not already: `AddUnmapped`) (`assets/controllers/gamecontrollerdb.txt`, mdqinc/SDL_GameControllerDB
+  at ff333823, zlib, `LICENSE.txt` beside it; this platform's lines embedded at build time by
   `cmake/embed.cmake`), the player's `gamecontrollerdb.txt` in the settings folder, the file
   `SDL_GAMECONTROLLERCONFIG_FILE` names, and `SDL_GAMECONTROLLERCONFIG` over all (SDL gives it
   the user priority: nothing here overrides it). To update the database: download the file at a

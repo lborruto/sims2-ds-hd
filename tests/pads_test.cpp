@@ -104,6 +104,9 @@ static void Trigger(SDL_JoystickID id, int a, float t)
     if (j) SDL_JoystickSetVirtualAxis(j, a, (Sint16)std::lround(-32768.0f + t * 65535.0f));
 }
 
+// A stick's reading: rescaled from the dead zone's edge.
+static float Rescaled(float v, float dz) { return (v - dz) / (1 - dz); }
+
 static constexpr Uint16 kMicrosoft = 0x045E, kXboxOne = 0x02EA, kSony = 0x054C, kDs4 = 0x09CC, kNintendo = 0x057E, kSwitchPro = 0x2009;
 
 static void hotplug()
@@ -186,7 +189,7 @@ static void two_pads()
     Axis(x, SDL_CONTROLLER_AXIS_LEFTX, 0.9f);
     CHECK(Pump(pads) == 1);
     CHECK(pads.Active() == x);
-    CHECK(std::fabs(pads.Read(opt).lx - 0.9f) < 0.01f);
+    CHECK(std::fabs(pads.Read(opt).lx - Rescaled(0.9f, opt.deadZone)) < 0.01f);
     // Both press A at once: one press (the driving pad's), never two.
     Button(p, SDL_CONTROLLER_BUTTON_A, true);
     Button(x, SDL_CONTROLLER_BUTTON_A, true);
@@ -243,7 +246,9 @@ static void triggers_and_dead_zone()
     Axis(x, SDL_CONTROLLER_AXIS_LEFTY, 0.2f); // 0.28 off centre, diagonally
     Pump(pads);
     r = pads.Read(opt);
-    CHECK(std::fabs(r.lx - 0.2f) < 0.01f && std::fabs(r.ly - 0.2f) < 0.01f);
+    // Rescaled from the dead zone's edge, the direction kept.
+    const float d = Rescaled(std::sqrt(0.08f), opt.deadZone) / std::sqrt(2.0f);
+    CHECK(r.lx > 0 && std::fabs(r.lx - d) < 0.01f && std::fabs(r.ly - d) < 0.01f);
     PadOptions wide = opt;
     wide.deadZone = 0.35f;
     r = pads.Read(wide);
@@ -251,7 +256,11 @@ static void triggers_and_dead_zone()
     Axis(x, SDL_CONTROLLER_AXIS_RIGHTX, -0.6f);
     Pump(pads);
     r = pads.Read(wide);
-    CHECK(std::fabs(r.rx + 0.6f) < 0.01f && r.ry == 0);
+    CHECK(std::fabs(r.rx + Rescaled(0.6f, wide.deadZone)) < 0.01f && r.ry == 0);
+    // Full: 1 whatever the dead zone.
+    Axis(x, SDL_CONTROLLER_AXIS_RIGHTX, 1);
+    Pump(pads);
+    CHECK(std::fabs(pads.Read(wide).rx - 1) < 0.01f && std::fabs(pads.Read(opt).rx - 1) < 0.01f);
     pads.CloseAll();
     Detach(x);
     Pump(pads);
@@ -308,14 +317,22 @@ static void types_and_looks()
     CHECK(look.glyph[(int)Button::A] == "a" && look.glyph[(int)Button::LB] == "lb" && look.glyph[(int)Button::Start] == "start");
     CHECK(look.glyph[(int)Button::LT] == "lt" && look.glyph[(int)Button::DPad].empty());
     CHECK(look.glyph[(int)Button::Back] == "back"); // TOUCH MENU's button (the town's menu hint)
+    CHECK(look.glyph[(int)Button::Pause] == "start+back");
     ui::SetChipLook(look);
     const ui::UiItem xa = ui::ChipItem(0, 0, Button::A, "", 24);
     CHECK(xa.face == ui::Face::Xbox && xa.glyph.empty());
     CHECK(ui::Hash({xa}) == ui::Hash({[] { ui::UiItem i = ui::ChipItem(0, 0, Button::A, "", 24); return i; }()}));
     const int startXbox = ui::ChipRect(0, 0, Button::Start, "", 24).w;
     // PlayStation: the cross for A; L1 and OPTIONS.
-    look = ChipLookFor(false, PLAYSTATION, b, true);
-    CHECK(look.face == ui::Face::PlayStation && look.glyph[(int)Button::A] == "a");
+    // PlayStation's Back by its type: the PS5's Create, the PS3's Select, else Share.
+    CHECK(ChipLookFor(false, PLAYSTATION, b, true, SDL_CONTROLLER_TYPE_PS5).glyph[(int)Button::Back] == "create");
+    CHECK(ChipLookFor(false, PLAYSTATION, b, true, SDL_CONTROLLER_TYPE_PS5).glyph[(int)Button::Pause] == "start+create");
+    CHECK(ChipLookFor(false, PLAYSTATION, b, true, SDL_CONTROLLER_TYPE_PS3).glyph[(int)Button::Back] == "select");
+    CHECK(ChipLookFor(false, XBOX, b, true, SDL_CONTROLLER_TYPE_PS5).glyph[(int)Button::Back] == "back");
+    CHECK(std::string(PauseCombo(PLAYSTATION, SDL_CONTROLLER_TYPE_PS5)) == "Options + Create");
+    CHECK(std::string(PauseCombo(XBOX, SDL_CONTROLLER_TYPE_XBOXONE)) == "Start + Back");
+    look = ChipLookFor(false, PLAYSTATION, b, true, SDL_CONTROLLER_TYPE_PS4);
+    CHECK(look.face == ui::Face::PlayStation && look.glyph[(int)Button::A] == "a" && look.glyph[(int)Button::Back] == "back");
     ui::SetChipLook(look);
     const ui::UiItem pa = ui::ChipItem(4, 4, Button::A, "", 24);
     CHECK(pa.face == ui::Face::PlayStation && pa.glyph == "a");
@@ -362,6 +379,7 @@ static void types_and_looks()
     CHECK(look.glyph[(int)Button::A] == KeyName(b.Key(A)));
     CHECK(look.glyph[(int)Button::Start] == "ENTER");
     CHECK(look.glyph[(int)Button::Back] == KeyName(b.Key(PANEL))); // E on QWERTY once the keymap is known
+    CHECK(look.glyph[(int)Button::Pause] == "ESC");                  // the pause menu's key, not a pad's combo
     CHECK(look.glyph[(int)Button::LT].empty() && look.glyph[(int)Button::DPad].empty());
     ui::SetChipLook(look);
     const ui::UiItem ka = ui::ChipItem(0, 0, Button::Start, "", 24);
@@ -399,6 +417,12 @@ static void steam()
     CHECK(pads.Count() == 2);
     CHECK(pads.Active() == virt);
     CHECK(pads.Style() == XBOX); // Xbox-like, unless Steam tells SDL the real type
+    {
+        // Each pad opened is told once (the window's toast: how to pause).
+        const std::vector<Pads::Connected> c = pads.TakeConnected();
+        CHECK(c.size() == 2 && c.back().name == "Steam Virtual Gamepad");
+        CHECK(pads.TakeConnected().empty());
+    }
     Button(phys, SDL_CONTROLLER_BUTTON_A, true);
     CHECK(Pump(pads) == 0);
     CHECK(pads.Active() == virt);
@@ -440,8 +464,38 @@ static void mappings()
     for (int i = 0; i < SDL_NumJoysticks(); i++)
         if (SDL_JoystickGetDeviceInstanceID(i) == id) SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i), guid, sizeof guid);
     CHECK(guid[0] != 0);
-    // The bundled database: this platform's lines, hundreds of them.
+    // SDL's own mappings (its database, hint-aware for Nintendo pads) are kept: a bundled line for
+    // a pad SDL maps already is not added over it.
+    std::vector<std::pair<std::string, std::string>> own;
+    for (int i = 0; i < SDL_GameControllerNumMappings() && own.size() < 40; i++)
+        if (char* m = SDL_GameControllerMappingForIndex(i))
+        {
+            const std::string line = m;
+            SDL_free(m);
+            own.push_back({line.substr(0, line.find(',')), line});
+        }
+    CHECK(own.size() > 5);
+    {
+        // A file with a line over one of SDL's pads and a new one: only the new one is added.
+        const std::string over = own[0].first + ",Bundled Over SDL,a:b5,b:b6,platform:" + SDL_GetPlatform() + ",";
+        const std::string fresh = "03000000ab1200000077000000000000,Bundled New,a:b0,b:b1,platform:" + std::string(SDL_GetPlatform()) + ",";
+        const std::string text = "# comment\n" + over + "\r\n" + fresh + "\n\n";
+        CHECK(Pads::AddUnmapped(text.data(), text.size()) == 1);
+        char* m = SDL_GameControllerMappingForGUID(SDL_JoystickGetGUIDFromString(own[0].first.c_str()));
+        CHECK(m && std::string(m).find("Bundled Over SDL") == std::string::npos);
+        SDL_free(m);
+        m = SDL_GameControllerMappingForGUID(SDL_JoystickGetGUIDFromString("03000000ab1200000077000000000000"));
+        CHECK(m && std::string(m).find("Bundled New") != std::string::npos);
+        SDL_free(m);
+    }
+    // The bundled database: this platform's lines, hundreds of them; SDL's own still as they were.
     CHECK(Pads::LoadMappings("") > 100);
+    for (const auto& o : own)
+    {
+        char* m = SDL_GameControllerMappingForGUID(SDL_JoystickGetGUIDFromString(o.first.c_str()));
+        CHECK(m && std::string(m) == o.second);
+        SDL_free(m);
+    }
     // The player's file wins over what is there.
     const std::filesystem::path dir = std::filesystem::temp_directory_path();
     const std::string user = (dir / "sims2wide_pads_test_db.txt").string();
