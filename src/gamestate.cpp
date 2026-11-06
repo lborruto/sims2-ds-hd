@@ -144,7 +144,7 @@ struct EUTable
         // Super Drencher
         u32 dwPump, dwTarget, dwType, dwPumping, dwFiring, dwTargetMode, dwHelp, dwHelpText, dwWater, dwPressure;   // water and pressure from G
         // Crime
-        u32 crHelp, crDrag, crPhase, crAngle, crScare, crArmed, crSubdue, crScareDown, crSubdueDown, crHit;
+        u32 crHelp, crDrag, crPhase, crAngle, crScare, crArmed, crSubdue, crScareDown, crSubdueDown, crHit, crHelpText;
         // Music Mixer and its save menu
         u32 mxMode, mxPhase, mxTracks, mxKeys, mxOctave, mxInst, mxSustain, mxSliderA, mxSliderB, mxTempo, mxVariation, mxSong, mxCtl, mxNotes, mxFlags, mxMic, mxUnlocked, mxUnlockedN;
         u32 msMode, msSlot, msName, msContext, msSongs, msSongStride, msRingtones, msRingStride;   // msSongs / msRingtones from G; byte 15 of each entry = used
@@ -291,7 +291,7 @@ constexpr EUTable kEU = {
         0x138, 0x28, 0x18, 0x1C, 0x21, 0x22, 0x23,
         0xE0, 0x10, 0xC8, 0xCC, 0xD0, 0xD8, 0xDC, 0xDE, 0xE4, 0x24, 0xC, 0xA4, 0x98,
         0x24, 0x28, 0x2C, 0x34, 0x35, 0x70, 0x78, 0x79, 0x18, 0x1C,
-        0x4C, 0x52, 0x58, 0x5A, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, 0x61,
+        0x4C, 0x52, 0x58, 0x5A, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, 0x61, 0x4D,
         8, 0xA55, 0x8E2, 0x8E3, 0x8E6, 0x8E7, 0x8E9, 0x8EA, 0x8EB, 0x8EC, 0x8ED, 0xA5C, 0xA4C, 0xA4E, 0xA52, 0xA6C, 0xA63, 0xA6B,
         8, 0x28, 0x88, 0xC, 0x46AC, 16, 0x46DC, 64,
         0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40, 0x650, 0xC68, 0xC60, 0xC64,
@@ -1453,14 +1453,14 @@ CrimeState ReadCrime(const Reader& m, u32 S)
 {
     const auto& q = kEU.mg;
     CrimeState v;
-    u32 help, drag, phase, scare, armed, subdue, sd, bd, hit;
-    if (!m.In(S, 0x64) || !m.R8(S + q.crHelp, help) || help > 1 || !m.R8(S + q.crDrag, drag) || drag > 1 || !m.R8(S + q.crPhase, phase) || phase > 3 ||
+    u32 help, text, drag, phase, scare, armed, subdue, sd, bd, hit;
+    if (!m.In(S, 0x64) || !m.R8(S + q.crHelp, help) || help > 1 || !m.R8(S + q.crHelpText, text) || text > 1 || !m.R8(S + q.crDrag, drag) || drag > 1 || !m.R8(S + q.crPhase, phase) || phase > 3 ||
         !m.R8(S + q.crScare, scare) || scare > 1 || !m.R8(S + q.crArmed, armed) || armed > 1 || !m.R8(S + q.crSubdue, subdue) || subdue > 1 ||
         !m.R8(S + q.crScareDown, sd) || sd > 1 || !m.R8(S + q.crSubdueDown, bd) || bd > 1 || !m.R8(S + q.crHit, hit))
         return v;
     const int angle = (int)(short)m.S16(S + q.crAngle);
     if (angle < -90 || angle > 90) return CrimeState{};
-    v.help = help == 1; v.dragging = drag == 1; v.phase = (int)phase; v.angle = angle; v.canScare = scare == 1; v.armed = armed == 1; v.canSubdue = subdue == 1;
+    v.help = help == 1; v.helpText = text == 1; v.dragging = drag == 1; v.phase = (int)phase; v.angle = angle; v.canScare = scare == 1; v.armed = armed == 1; v.canSubdue = subdue == 1;
     v.scarePressed = sd == 1; v.subduePressed = bd == 1;
     v.hit = hit == 1;   // 0x10 before the first throw: unset
     v.valid = true;
@@ -2051,7 +2051,7 @@ std::string MinigameLine(const GameState& g)
     {
         const CrimeState& v = a.crime;
         if (!v.valid) return "";
-        snprintf(b, sizeof b, "crime help=%d drag=%d phase=%d angle=%d scare=%d armed=%d subdue=%d down=%d%d hit=%d", v.help, v.dragging, v.phase, v.angle, v.canScare, v.armed, v.canSubdue, v.scarePressed, v.subduePressed, v.hit);
+        snprintf(b, sizeof b, "crime help=%d text=%d drag=%d phase=%d angle=%d scare=%d armed=%d subdue=%d down=%d%d hit=%d", v.help, v.helpText, v.dragging, v.phase, v.angle, v.canScare, v.armed, v.canSubdue, v.scarePressed, v.subduePressed, v.hit);
         return b;
     }
     case GScreen::Mixer:

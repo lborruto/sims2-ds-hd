@@ -281,6 +281,32 @@ static void unknown_presses_the_cursor()
     CHECK(!r.nav.CursorScreen());
 }
 
+// The hotel's furniture editor (an Unknown screen, the stick cursor's): B and MENU tap its X, B
+// never the DS's; on another Unknown screen B stays the DS's.
+static void placement_editor_leaves()
+{
+    Rig r;
+    ActivityRam ram;
+    ram.placement = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kUnknown);
+    for (bool PadState::*b : {&PadState::b, &PadState::menu})
+    {
+        PadState p;
+        p.*b = true;
+        CHECK(!(r.Frame(kUnknown, p) & (1u << kB)));
+        int x, y;
+        CHECK(r.Touched(x, y) && x == kPlacementX.x && y == kPlacementX.y);
+        r.Drain();
+        r.Frame(kUnknown);
+    }
+    r.nav.SetActivityRam(ActivityRam());
+    PadState p;
+    p.b = true;
+    CHECK(r.Frame(kUnknown, p) & (1u << kB));
+    CHECK(!r.touch.Owns());
+}
+
 static void unknown_without_a_cursor_keeps_a()
 {
     // The keyboard alone (no controller, or the cursor off): A stays the DS's on Unknown screens.
@@ -557,12 +583,21 @@ static void vacuum_blows_drives_and_grabs()
         CHECK(blows >= 8);
         CHECK(!r.nav.Blow());
     }
-    // The D-pad and the stick drive; B, L and R stay the DS's.
+    // The D-pad and the stick drive; L and R stay the DS's; B taps the bowl's X (the way out), not the DS's B.
     PadState d;
     d.up = d.b = d.lb = true;
     d.lx = 1;
     u32 k = r.Frame(kVacuum, d);
-    for (int key : {kUp, kRight, kB, kL}) CHECK(k & (1u << key));
+    for (int key : {kUp, kRight, kL}) CHECK(k & (1u << key));
+    CHECK(!(k & (1u << kB)));
+    {
+        int tx, ty;
+        CHECK(r.Touched(tx, ty) && tx == kVacuumX.x && ty == kVacuumX.y);
+        r.Drain();
+        r.Frame(kVacuum, d);   // (held: once)
+        CHECK(!r.touch.Owns());
+        r.Frame(kVacuum);
+    }
     CHECK(r.nav.HandDx() == 0 && r.nav.HandDy() == 0);
     // X held: the D-pad moves the hand (no driving); the stick still drives.
     PadState hx;
@@ -988,12 +1023,25 @@ static void drencher_scheme()
     CHECK(tapped(&PadState::y, kDrencherTarget));
     CHECK(tapped(&PadState::rb, kDrencherRefill));
     CHECK(tapped(&PadState::b, kDrencherX));
-    // Help mode (opened with the mouse): B taps the "?" (not the X); a help text closes on any press.
+    // Start taps the "?" (help); in its mode each button taps its own control (the game explains
+    // it), A not firing; B or Start the "?" again (not the X); a help text closes on any press.
+    CHECK(tapped(&PadState::start, kDrencherHelp));
     ram.drencherHelp = true;
     r.nav.SetActivityRam(ram);
     r.Frame(kDrencher);
     CHECK(tapped(&PadState::b, kDrencherHelp));
-    CHECK(!tapped(&PadState::y, kDrencherTarget));
+    CHECK(tapped(&PadState::start, kDrencherHelp));
+    CHECK(tapped(&PadState::y, kDrencherTarget));
+    CHECK(tapped(&PadState::x, kDrencherPumpBand));
+    CHECK(tapped(&PadState::rb, kDrencherRefill));
+    {
+        PadState fire;
+        fire.a = true;
+        CHECK(!(r.Frame(kDrencher, fire) & (1u << kA)));
+        CHECK(r.Touched(tx, ty) && tx == kDrencherFire.x && ty == kDrencherFire.y);
+        r.Drain();
+        r.Frame(kDrencher);
+    }
     ram.drencherHelpText = true;
     r.nav.SetActivityRam(ram);
     r.Frame(kDrencher);
@@ -1033,6 +1081,34 @@ static void crime_scheme()
     CHECK(tapped(&PadState::x, kCrimeScare));
     CHECK(tapped(&PadState::y, kCrimeSubdue));
     CHECK(tapped(&PadState::b, kCrimeX));
+    // Start taps the "?" (help); in its mode X / A / Y tap scare, the rat, subdue (no grab), B or
+    // Start the "?" again; a help text closes on any press; A still held after it grabs nothing.
+    CHECK(tapped(&PadState::start, kCrimeHelp));
+    ActivityRam ram;
+    ram.crime = ram.crimeHelp = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kCrime);
+    CHECK(tapped(&PadState::x, kCrimeScare));
+    CHECK(tapped(&PadState::y, kCrimeSubdue));
+    CHECK(tapped(&PadState::b, kCrimeHelp));
+    CHECK(tapped(&PadState::start, kCrimeHelp));
+    {
+        PadState held;
+        held.a = true;
+        r.Frame(kCrime, held);
+        CHECK(r.Touched(x, y) && x == kCrimeRat.x && y == kCrimeRat.y && !r.nav.PointerShown());
+        r.Drain();
+        ram.crimeHelp = false;
+        r.nav.SetActivityRam(ram);
+        for (int i = 0; i < 5; i++) r.Frame(kCrime, held);
+        CHECK(!r.nav.PointerDown() && !r.touch.Owns());   // (the help's A, still held: no grab)
+        r.Frame(kCrime);
+    }
+    ram.crimeHelp = ram.crimeHelpText = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kCrime);
+    CHECK(tapped(&PadState::a, kCrimeHelp));
+    CHECK(tapped(&PadState::rb, kCrimeHelp));
 }
 
 static const ScreenState kScratch {Screen::Scratch, Tab::None};
@@ -1219,6 +1295,19 @@ static void mixer_scheme()
     ram.mixerPhase = 8;
     r.nav.SetActivityRam(ram);
     CHECK(tapped(&PadState::b, kMixHelp));
+    CHECK(tapped(&PadState::start, kMixHelp));
+    ram.mixerPhase = 9;
+    r.nav.SetActivityRam(ram);
+    CHECK(tapped(&PadState::b, kMixHelp));
+    // Start from the idle mixer: its "?" (help).
+    ram.mixerPhase = 0;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kMixer);
+    CHECK(tapped(&PadState::start, kMixHelp));
+    ram.mixerPhase = 1;   // (playing: Start nothing)
+    r.nav.SetActivityRam(ram);
+    r.Press(kMixer, &PadState::start);
+    CHECK(!r.touch.Owns());
 }
 
 // The mixer's save page: the D-pad moves the focus over its table (from the first key), A taps the
@@ -1302,6 +1391,8 @@ static void art_scheme()
     CHECK(tapped(&PadState::x, ArtSwatch(0)));
     CHECK(tapped(&PadState::y, kArtUndo));
     CHECK(tapped(&PadState::b, kArtDone));
+    CHECK(tapped(&PadState::start, kArtDone));      // (Start too: the game reads no key here)
+    CHECK(tapped(&PadState::menu, kArtPageNext));   // MENU: the palette's next page
     // The buttons the game draws: the ten tools in two columns, the fifteen swatches in two rows.
     CHECK(ArtTool(0).x == 14 && ArtTool(5).y == 144 && ArtTool(6).x == 241 && ArtTool(6).y == 66 && ArtTool(9).y == 144);
     CHECK(ArtSwatch(5).x == 180 && ArtSwatch(5).y == 165 && ArtSwatch(7).x == 43 && ArtSwatch(14).y == 187);
@@ -2830,6 +2921,7 @@ int main()
     phone_closed_by_b();
     town_and_dialogue_keep_the_buttons();
     unknown_presses_the_cursor();
+    placement_editor_leaves();
     unknown_without_a_cursor_keeps_a();
     touch_menu_on_release_unless_start();
     leaving_console_releases_all();

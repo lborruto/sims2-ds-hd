@@ -605,6 +605,7 @@ struct CrimeState
 {
     bool valid = false;
     bool help = false;                // help mode
+    bool helpText = false;            // a help text is up (S+0x4D: the next press closes it)
     bool dragging = false;            // the aim slider is held
     int phase = 0;                    // the throw: 0 idle, 1 grabbed, 2 aiming, 3 released
     int angle = 0;                    // -90..90 degrees

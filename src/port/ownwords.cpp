@@ -153,6 +153,11 @@ constexpr const char* kWords[][5] = {
     {"@1: @2 opens the pause menu", "@1 : @2 ouvre le menu pause", "@1: @2 öffnet das Pausenmenü", "@1: @2 apre il menu di pausa",
      "@1: @2 abre el menú de pausa"},
     {"Pause", "Pause", "Pause", "Pausa", "Pausa"},
+    // The painting's palette page, a minigame's help, the stick cursor
+    {"Next palette", "Palette suivante", "Nächste Palette", "Tavolozza seguente", "Paleta siguiente"},
+    {"What it does", "À quoi ça sert", "Was es tut", "A cosa serve", "Para qué sirve"},
+    {"Leave help", "Quitter l'aide", "Hilfe beenden", "Esci dall'aiuto", "Salir de la ayuda"},
+    {"Cursor", "Curseur", "Cursor", "Cursore", "Cursor"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

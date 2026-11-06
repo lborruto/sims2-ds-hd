@@ -140,14 +140,17 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
             return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}, {{C(Button::X)}, Words(rom, kStrMgMixPreview)}};
         if (phase == 7)
             return {{{C(Button::DPadV)}, own(OwnWordId::MixerChoose)}, {{C(Button::A)}, Words(rom, kStrMgMixSelect)}, {{C(Button::B)}, own(OwnWordId::MixerBack)}};
-        if (phase == 8 || phase == 9) return {PointHint(rom), touch, {{C(Button::B)}, own(OwnWordId::MixerBack)}};
+        // Help: the pointer and A pick the control the game explains (8); its text, A closes it (9).
+        if (phase == 8) return {PointHint(rom), {{C(Button::A)}, own(OwnWordId::HelpWhat)}, {{C(Button::B)}, own(OwnWordId::HelpLeave)}};
+        if (phase == 9) return {{{C(Button::A)}, own(OwnWordId::Close)}, {{C(Button::B)}, own(OwnWordId::HelpLeave)}};
         if (phase == 5) return {PointHint(rom), touch, {{C(Button::Y)}, own(OwnWordId::MixerVoxStop), true}};
         if (phase == 1) return {PointHint(rom), touch, {{C(Button::X), Sep("/"), C(Button::B)}, own(OwnWordId::MixerStop), true}, octave};
         if (phase == 2) return {PointHint(rom), touch, {{C(Button::RB), Sep("/"), C(Button::B)}, own(OwnWordId::MixerStop), true}, octave};
         // (Idle: every button has a use; the pointer and A as one hint, the D-pad's three as one.)
         return {{{C(Button::LStick), Sep("+"), C(Button::A)}, own(OwnWordId::MixerPoint)}, {{C(Button::X)}, Words(rom, kStrMgMixPlay)},
                 {{C(Button::RB)}, Words(rom, kStrMgMixRecord)}, {{C(Button::Y)}, Words(rom, kStrMgMixVox)}, {{C(Button::LB)}, Words(rom, kStrMgMixGenre)},
-                {{C(Button::DPad)}, With(Own(rom, OwnWordId::MixerDpad), Words(rom, kStrMgMixPrep))}, {{C(Button::B)}, Words(rom, kStrMgMixQuit)}};
+                {{C(Button::Start)}, own(OwnWordId::MixerHelp)}, {{C(Button::B)}, Words(rom, kStrMgMixQuit)}};
+        // (the D-pad's octave, sustain and PREP: the game's own keys; the octave's hint shows while it plays)
     }
     case Screen::MixerSave:
     {
@@ -190,8 +193,9 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         const ArtWords w(rom);
         const PopupState& p = game.town.popup;
         if (p.valid && p.state >= 1 && p.state <= 3 && p.kind == 2) return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
-        return {PointHint(rom), SlowHint(rom), {{C(Button::A)}, w.paint}, {{C(Button::LB), C(Button::RB)}, w.tool},
-                {{C(Button::X)}, w.colour}, {{C(Button::Y)}, w.undo}, {{C(Button::B)}, w.done}};
+        // (the pointer and A as one hint, as the mixer's: the bar holds eight hints in no language)
+        return {{{C(Button::LStick), Sep("+"), C(Button::A)}, w.paint}, {{C(Button::LB), C(Button::RB)}, w.tool},
+                {{C(Button::X)}, w.colour}, {{C(Button::Back)}, Own(rom, OwnWordId::ArtNextPalette)}, {{C(Button::Y)}, w.undo}, {{C(Button::B)}, w.done}};
     }
     case Screen::MooGoo:
     {
@@ -217,20 +221,27 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     {
         const DrencherState& d = game.minigame.drencher;
         const bool low = d.valid && DrencherLow(d.pressure);
-        // Help (opened with the mouse): its text closes on any press; its mode leaves with B.
+        // Help (Start, the game's "?"): its text closes on any press; in its mode each button asks
+        // the game what that button does, B leaves.
         if (d.valid && d.helpText) return {{{C(Button::A)}, Own(rom, OwnWordId::Close)}};
-        if (d.valid && d.help) return {{{C(Button::B)}, Own(rom, OwnWordId::MixerHelp)}};
-        return {{{C(Button::LStick), Sep("/"), C(Button::DPad)}, Own(rom, OwnWordId::DetectorWalk)},
+        if (d.valid && d.help)
+            return {{{C(Button::A), C(Button::X), C(Button::Y), C(Button::RB)}, Own(rom, OwnWordId::HelpWhat)}, {{C(Button::B)}, Own(rom, OwnWordId::HelpLeave)}};
+        return {{{C(Button::LStick)}, Own(rom, OwnWordId::DetectorWalk)},
                 {{C(Button::A)}, Own(rom, OwnWordId::DrencherFire)},
                 {{C(Button::X)}, Own(rom, OwnWordId::DrencherPump), low},
                 {{C(Button::Y)}, Own(rom, OwnWordId::DrencherTarget)},
                 {{C(Button::RB)}, Own(rom, OwnWordId::DrencherRefill)},
                 {{C(Button::LB)}, Own(rom, OwnWordId::DrencherRun)},
+                {{C(Button::Start)}, Own(rom, OwnWordId::MixerHelp)},
                 {{C(Button::B)}, Own(rom, OwnWordId::DrencherPutAway)}};
     }
     case Screen::Crime:
     {
         const CrimeState& k = game.minigame.crime;
+        // Help (Start, the game's "?"): as the Drencher's.
+        if (k.valid && k.helpText) return {{{C(Button::A)}, Own(rom, OwnWordId::Close)}};
+        if (k.valid && k.help)
+            return {{{C(Button::X), C(Button::A), C(Button::Y)}, Own(rom, OwnWordId::HelpWhat)}, {{C(Button::B)}, Own(rom, OwnWordId::HelpLeave)}};
         if (k.valid && (k.phase == 1 || k.phase == 2))
             return {{{C(Button::LStick), Sep("/"), C(Button::DPadH)}, Own(rom, OwnWordId::CrimeAimLabel)}, {{C(Button::A)}, Own(rom, OwnWordId::CrimeThrow), true}};
         return {{{C(Button::LStick), Sep("/"), C(Button::DPad)}, Own(rom, OwnWordId::DetectorWalk)},
@@ -238,6 +249,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
                 {{C(Button::A)}, Own(rom, OwnWordId::CrimeAim), k.valid && k.armed},
                 {{C(Button::Y)}, Own(rom, OwnWordId::CrimeSubdue), k.valid && k.canSubdue},
                 {{C(Button::LB)}, Own(rom, OwnWordId::DrencherRun)},
+                {{C(Button::Start)}, Own(rom, OwnWordId::MixerHelp)},
                 {{C(Button::B)}, Own(rom, OwnWordId::DrencherPutAway)}};
     }
     case Screen::Cards:
@@ -252,7 +264,8 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     {
         const bool clog = game.minigame.vacuum.valid && game.minigame.vacuum.clogged;
         return {{{C(Button::LStick)}, Own(rom, OwnWordId::VacuumDrive)}, {{C(Button::RStick), Sep("/"), C(Button::X), Sep("+"), C(Button::DPad)}, Own(rom, OwnWordId::VacuumHand)},
-                {{C(Button::A)}, Own(rom, OwnWordId::VacuumGrab)}, {{C(Button::Y)}, Own(rom, clog ? OwnWordId::VacuumBlowNow : OwnWordId::VacuumBlow), clog}};
+                {{C(Button::A)}, Own(rom, OwnWordId::VacuumGrab)}, {{C(Button::Y)}, Own(rom, clog ? OwnWordId::VacuumBlowNow : OwnWordId::VacuumBlow), clog},
+                {{C(Button::B)}, Own(rom, OwnWordId::DrencherPutAway)}};
     }
     case Screen::Social:
         return {{{C(Button::DPadL), C(Button::DPadU), C(Button::DPadR)}, Own(rom, OwnWordId::SocialAnswer)}, {{C(Button::A)}, Own(rom, OwnWordId::SocialAgain)}};
@@ -870,7 +883,8 @@ ActivityRam MinigameRam(const GameState* game)
         r.mooGooSelected = g.players[p].selected;
     }
     if (game->screen == GScreen::Drencher && m.drencher.valid) { r.drencher = true; r.drencherPump = m.drencher.pump; r.drencherHelp = m.drencher.help; r.drencherHelpText = m.drencher.helpText; }
-    if (game->screen == GScreen::Crime && m.crime.valid) { r.crime = true; r.crimePhase = m.crime.phase; }
+    if (game->screen == GScreen::Crime && m.crime.valid) { r.crime = true; r.crimePhase = m.crime.phase; r.crimeHelp = m.crime.help; r.crimeHelpText = m.crime.helpText; }
+    r.placement = game->placement.valid;
     if (game->screen == GScreen::Scratch && m.scratch.valid)
     {
         r.scratch = true;
@@ -1004,11 +1018,15 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     for (int sub : {1, 3, 5})
         add(Screen::MooGoo, [sub](GameState& g) { g.minigame.mooGoo.valid = true; g.minigame.mooGoo.phase = 0xD; g.minigame.mooGoo.sub = sub; });
     add(Screen::Drencher, [](GameState& g) { g.minigame.drencher.valid = true; });
+    add(Screen::Drencher, [](GameState& g) { g.minigame.drencher.valid = g.minigame.drencher.help = true; });
+    add(Screen::Drencher, [](GameState& g) { g.minigame.drencher.valid = g.minigame.drencher.help = g.minigame.drencher.helpText = true; });
+    add(Screen::Crime, [](GameState& g) { g.minigame.crime.valid = g.minigame.crime.help = true; });
+    add(Screen::Crime, [](GameState& g) { g.minigame.crime.valid = g.minigame.crime.help = g.minigame.crime.helpText = true; });
     add(Screen::Crime, [](GameState& g) { g.minigame.crime.valid = g.minigame.crime.canScare = g.minigame.crime.armed = g.minigame.crime.canSubdue = true; });
     add(Screen::Crime, [](GameState& g) { g.minigame.crime.valid = true; g.minigame.crime.phase = 2; });
     add(Screen::Scratch, [](GameState& g) { g.minigame.scratch.valid = true; });
     add(Screen::Scratch, [](GameState& g) { g.minigame.scratch.valid = g.town.popup.valid = true; g.town.popup.state = 2; });
-    for (int phase : {0, 1, 2, 5, 7, 8, 0xA})
+    for (int phase : {0, 1, 2, 5, 7, 8, 9, 0xA})
         add(Screen::Mixer, [phase](GameState& g) { g.minigame.mixer.valid = true; g.minigame.mixer.phase = phase; });
     add(Screen::Trading, [](GameState&) {});
     std::vector<std::vector<HdHint>> bars;

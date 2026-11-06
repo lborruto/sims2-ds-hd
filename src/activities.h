@@ -13,7 +13,7 @@
 //     hand is the stick cursor (input.h): the right stick moves it, and so does the D-pad while
 //     X or A is held (the keyboard's way, no stick needed); A held keeps the stylus down at the
 //     hand (grab a find, drag it into the box); Y blows into the microphone (7 frames or more
-//     clear a clog).
+//     clear a clog); B taps the bowl's X (kVacuumX: the game's only way out, the vacuum put away).
 //   The pointing minigames (milestone 6) have a pointer of their own, a stick cursor that works
 //   headless too (ActivityState::px / py; MovePointer): either stick moves it, faster with a
 //   fuller deflection (a square curve: a light touch is slow), LT held makes it slow (a quarter);
@@ -30,8 +30,11 @@
 //     off (the game's buttons tapped: the way out); LB / RB (or the right stick, up and down)
 //     hold the depth slider's knob and move it shallower / deeper (a drag along x 195).
 //   Art Gallery: LB / RB the previous / next tool (the game's ten buttons in their order), X the
-//     next colour of the page, Y undo, B the game's X ("Are you done painting?"); while that
-//     question is up A taps its tick, B its cross (the other buttons wait).
+//     next colour of the page, MENU (the TOUCH MENU's button: Back / View) the next palette page
+//     (the game's ▶, kArtPageNext: 16 pages in a ring, so all 240 colours), Y undo, B or Start the
+//     game's X ("Are you done painting?": its Yes is the game's way back to the panel, on a gallery
+//     entered by an easel); while that question is up A taps its tick, B its cross (the other
+//     buttons wait).
 //   The timing minigames (milestone 6; tuned in game: console_check.sh's mg-moogoo-*, mg-drencher-*,
 //   mg-crime-*):
 //   MooGoo Monkey: its intro's play arrow on A. The game reads A (the players prompt, its banners),
@@ -51,7 +54,9 @@
 //     scares, Y subdues (their buttons tapped); A held grabs the Rat-A-Rang (the stylus on the
 //     centre rat, kCrimeRat), a stick or the D-pad aims (the rat slides along its row, kCrimeAimMin
 //     to kCrimeAimMax: 1.125 degrees a pixel, at most kCrimeAimSpeed a frame), letting A go throws;
-//     B the game's X (the way out).
+//     B the game's X (the way out). Start taps its "?" (help); in help mode X / A / Y tap scare /
+//     the rat / subdue (the game explains each), B or Start the "?" again; a help text up: any
+//     press taps the "?" (it closes).
 //   The Scratch lottery (milestone 6): the pointer (the pointing games'), A held scratches (the
 //     stylus down at the pointer, capped at kPtrDrag a frame); X rubs the box under the pointer
 //     (or the nearest one still covered) for you: the pointer goes there, presses inside it and
@@ -67,7 +72,8 @@
 //     while the game still records; meanwhile `voice`: the blow's signal, or the computer's own
 //     microphone when the settings say so). The song's list (phase 7): Up / Down a focus over its
 //     rows (`mark`), A picks, B cancels (GENRE again). The save question (0xA): A Yes, B No, X
-//     Preview. Help (8, 9): B taps ? again.
+//     Preview. Start taps ? (help, from the idle mixer); help (8: the pointer and A pick the
+//     control the game explains; 9: its text, A closes it): B taps ? again.
 //   The mixer's save page: the D-pad moves the focus over its targets (HotspotsFor: the keyboard,
 //     backspace, the pages, the three slots, the X), A taps the focused one (a slot already used:
 //     the first A asks, armedSlot, a second saves over it), Y backspace, B the X (back to the
@@ -125,6 +131,7 @@ struct ActivityRam
     bool drencherHelp = false, drencherHelpText = false;   // its help mode; a help text is up (a tap closes it)
     bool crime = false;
     int crimePhase = 0;                    // the throw: 0 idle, 1 grabbed, 2 aiming, 3 released
+    bool crimeHelp = false, crimeHelpText = false;   // its help mode; a help text is up (the next press closes it)
     // The Scratch lottery: the ticket's tier (its boxes' places), a popup of the game's up over it
     // (the hint, the result), which boxes are revealed (or wiping).
     bool scratch = false, scratchPopup = false;
@@ -140,6 +147,9 @@ struct ActivityRam
     // painting waits); it takes taps once shown: its tick and cross.
     bool askUp = false, ask = false;
     Point askYes {0, 0}, askNo {0, 0};
+    // The hotel's furniture editor is up (GameState::placement: the stick cursor's Unknown screen,
+    // where B and MENU tap its X, kPlacementX).
+    bool placement = false;
 };
 
 struct ActivityState
@@ -245,6 +255,13 @@ constexpr float kKnobStep = 1.5f, kKnobStick = 3.0f;
 Point ArtTool(int button);
 Point ArtSwatch(int swatch);
 constexpr Point kArtDone {241, 14}, kArtUndo {241, 40};
+// The palette's ▶ (sprite at 229,170: the next of its 16 pages, a ring).
+constexpr Point kArtPageNext {241, 182};
+// The vacuum's X at the bowl's top right (measured on act-vacuum's touch screen: its round
+// button x 226-250, y 6-30): the game's only way out, back to the panel.
+constexpr Point kVacuumX {237, 18};
+// The hotel's furniture editor's X (module 0x14): back to the panel (checked: BD-place-lobby).
+constexpr Point kPlacementX {235, 18};
 constexpr int kArtTools = 10, kArtSwatches = 15;
 
 // MooGoo Monkey (the game's rectangles, research/m6 code-B 1.3): the intro's play arrow; monkey m
@@ -258,11 +275,14 @@ constexpr int kMooGooChainWait = 240;  // frames the intro's B waits for the gam
 // The Super Drencher (strict lo < v < hi rectangles): the X (219-253, 11-45), target (137-171,
 // 46-80), refill (13-51, 159-197); the pump's band (rows 94-146, x 50-230 the handle's travel).
 constexpr Point kDrencherX {236, 28}, kDrencherTarget {154, 63}, kDrencherRefill {32, 178}, kDrencherHelp {88, 176};
+// Its fire button (219-253, 159-193) and the pump's band: in help mode, their texts (1666, 1663).
+constexpr Point kDrencherFire {236, 176}, kDrencherPumpBand {140, 120};
 constexpr int kPumpY = 120, kPumpLeft = 52, kPumpRight = 228;
 constexpr float kPumpSpeed = 8.0f;     // a frame (16 a tick of the game's: past its 5)
 // The crime game: the X (209-239, 17-47), scare (94-161, 13-56), subdue (94-161, 135-178), the
 // centre rat (the aim slider, x 47-207 on row 96, 128 at rest).
 constexpr Point kCrimeX {224, 32}, kCrimeScare {128, 35}, kCrimeSubdue {128, 156}, kCrimeRat {128, 96};
+constexpr Point kCrimeHelp {32, 32};   // its "?" (17-47, 17-47)
 constexpr int kCrimeAimMin = 47, kCrimeAimMax = 207;
 constexpr float kCrimeAimSpeed = 3.0f;
 // The Scratch lottery (research/m6 code-B 2.2): box i's centre on a ticket of tier t (its cover the

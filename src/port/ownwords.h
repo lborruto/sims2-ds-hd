@@ -56,6 +56,9 @@ enum class OwnWordId : int
     PadConnected,
     // The pause menu, beside Start + Back's chips (the cursor's hint).
     Pause,
+    // The painting's next palette page; a minigame's help ("?"): what a button does, leaving it;
+    // the stick cursor (the cursor's hint).
+    ArtNextPalette, HelpWhat, HelpLeave, Cursor,
     Count
 };
 

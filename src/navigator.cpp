@@ -512,6 +512,12 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     case Mode::Cursor:
         dsKeys |= DsKeys(pad, !pad.cursor);
         cursorPress_ = pad.cursor && pad.a;
+        // The hotel's furniture editor (the game reads no key there): B and MENU tap its X.
+        if (activityRam_.placement)
+        {
+            dsKeys &= ~(1u << kB);
+            if (pressed(&PadState::b) || pressed(&PadState::menu)) tap({"close", kPlacementX.x, kPlacementX.y, {}});
+        }
         break;
     case Mode::Activity:
         if ((s.screen == Screen::Cards || s.screen == Screen::MixerSave) && focus_ >= 0 && focus_ < (int)h.size() && move)

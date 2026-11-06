@@ -130,31 +130,42 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
     c.overlays[box].to.h = std::min(y - kHintGap + kHintPad - kHintBox.y, kHintBox.h);
 }
 
-// The cursor's hint box at y: the text with its shadow (TextRect) and, on each side, the padding
-// and the box's 4-pixel border; centred, or (right) at the canvas's right edge, clear of the HD
-// status bar under the touch screen. Kept on the canvas.
-static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right = false)
+// The stick cursor's hints at y, as the kit's chips in a panel: the right stick moves the cursor,
+// A touches, and (close: the hotel's furniture editor) B taps the game's X; beside them a second
+// panel, the pause menu's chip (Start + Back, as the device used last prints them; Esc on the
+// keyboard). Centred side by side, or (right) at the canvas's right edge, clear of the HD status
+// bar under the touch screen, the pause panel above it right of the touch screen's frame. Kept on
+// the canvas.
+static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right = false, bool close = false)
 {
-    constexpr int border = 4;
-    const Rect t = TextRect(0, 0, kFrontHint, 3);
-    const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset;
-    // Beside it, a kit panel: the pause menu's chip (Start + Back, as the device used last prints
-    // them; Esc on the keyboard) and the word, now that the Guide button is Steam's.
     constexpr float kSize = 24;
-    constexpr int kGap = 12, kPad = 14;
+    constexpr int kGap = 12, kPad = 14, kBetween = 22, kH = 58;
+    struct Hint
+    {
+        ui::Button b;
+        const char* word;
+    };
+    std::vector<Hint> hints {{ui::Button::RStick, OwnWord(rom, OwnWordId::Cursor)}, {ui::Button::A, OwnWord(rom, OwnWordId::MixerPoint)}};
+    if (close) hints.push_back({ui::Button::B, OwnWord(rom, OwnWordId::Close)});
+    int bw = 2 * kPad - kBetween;
+    for (const Hint& h : hints) bw += ui::ChipRect(0, 0, h.b, h.word, kSize).w + kBetween;
     const char* word = OwnWord(rom, OwnWordId::Pause);
     const Rect chip = ui::ChipRect(0, 0, ui::Button::Pause, word, kSize);
     const int pw = kPad + chip.w + kPad;
-    // Centred: side by side. At the right (the stick cursor's screens, the status bar at the left
-    // of the same rows): the panel above the hint, right of the touch screen's frame.
     const int bx = right ? kConsoleW - bw - 24 : (kConsoleW - (bw + kGap + pw)) / 2;
-    y = std::min(y, kConsoleH - bh - 4);
-    c.overlays.push_back({{bx, y, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
-    c.overlays.push_back(Text(bx + inset, y + inset, kFrontHint, 3));
-    const Rect panel = right ? Rect {std::max(kMenuTo.x + kMenuTo.w + 12, kConsoleW - 16 - pw), y - bh - kGap, pw, bh}
-                             : Rect {bx + bw + kGap, y, pw, bh};
+    y = std::min(y, kConsoleH - kH - 4);
+    c.ui.push_back(ui::PanelItem({bx, y, bw, kH}));
+    int x = bx + kPad;
+    for (const Hint& h : hints)
+    {
+        const Rect r = ui::ChipRect(0, 0, h.b, h.word, kSize);
+        c.ui.push_back(ui::ChipItem(x, y + (kH - r.h) / 2, h.b, h.word, kSize));
+        x += r.w + kBetween;
+    }
+    const Rect panel = right ? Rect {std::max(kMenuTo.x + kMenuTo.w + 12, kConsoleW - 16 - pw), y - kH - kGap, pw, kH}
+                             : Rect {bx + bw + kGap, y, pw, kH};
     c.ui.push_back(ui::PanelItem(panel));
-    c.ui.push_back(ui::ChipItem(panel.x + kPad, panel.y + (bh - chip.h) / 2, ui::Button::Pause, word, kSize));
+    c.ui.push_back(ui::ChipItem(panel.x + kPad, panel.y + (kH - chip.h) / 2, ui::Button::Pause, word, kSize));
 }
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
@@ -262,7 +273,8 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         if (cursorScreen)
         {
             c.overlays.push_back(FrameAround(kMenuTo, 1));
-            AddCursorHint(c, kMenuTo.y + kMenuTo.h + 10, rom, true);   // (a controller player: how to leave, as on the title)
+            // (a controller player: how to leave, as on the title; the furniture editor's B its X)
+            AddCursorHint(c, kMenuTo.y + kMenuTo.h + 10, rom, true, s.screen == Screen::Unknown && game && game->placement.valid);
         }
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
         // Not dimmed: the game keeps its status bar up while the touch screen is used.

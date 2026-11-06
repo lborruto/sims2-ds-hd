@@ -421,7 +421,7 @@ def status_bar(values=None, left=132):
 
 def front():
     """No HUD: the top screen fitted in 24,72 568 x 480 (4:3: 568 x 426 at 24,99), the touch
-    screen 2.5x at 616,72, both framed; the hint's box below; the canvas dark elsewhere."""
+    screen 2.5x at 616,72, both framed; the hints' panel below; the canvas dark elsewhere."""
     expect("canvas", comp.size, (1280, 720))
     for x in range(0, 256, 7):
         for y in range(0, 192, 7):
@@ -434,7 +434,9 @@ def front():
     expect("top frame", C(20, 300), OUTLINE)
     expect("backdrop", C(5, 5), (16, 18, 24))
     expect("backdrop between", C(604, 300), (16, 18, 24))
-    expect("hint box", C(640, 604), FRAME)
+    # the hints: a kit panel of chips below (the right stick, A, the pause menu's), its fill and white words
+    if FRAME not in [C(x, y) for y in range(600, 660) for x in range(240, 1040)]:
+        errors.append("no hint panel")
     row = [C(x, y) for y in range(614, 646) for x in range(240, 1040)]
     if (255, 255, 255) not in row or OUTLINE not in row:
         errors.append("no hint text")
@@ -2095,5 +2097,52 @@ for f, (y0, y1) in (("f000020.png", (13, 56)), ("f000040.png", (135, 178))):
         sys.exit(1)
 EOF
 then echo "ok   mg-crime-buttons"; else echo "FAIL mg-crime-buttons"; fails=$((fails + 1)); fi
+# No dead ends (the controller alone leaves every screen; copies of the complete save):
+# pad_t1 NAME STATE SCRIPT FRAMES CLOCK. The vacuum's B taps the bowl's X (the panel); the
+# painting's MENU its palette's next page (1, 2: all 240 colours), Start its X (the question); the
+# Drencher's, the crime game's and the mixer's Start their "?" (help mode), a button its control's
+# text, any press closing it, B leaving help; the furniture editor's B its X (the panel); the boot's
+# last splash takes Start and A at frames where a 3-frame touch fell between its slow polls.
+pad_t1() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 clock=$5
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-game --print-town --print-minigame --print-front --print-hotel --clock "$clock" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_t1 mg-vacuum-leave act-vacuum vacuum-leave 120 "2026-01-01 14:00" &
+pad_t1 mg-art-palette G-X-artgal art-palette 200 "2026-11-05 12:05" &
+pad_t1 mg-drencher-help G-C-wg-pump drencher-help 240 "2026-11-05 12:05" &
+pad_t1 mg-crime-help G-X-crime crime-help 240 "2026-11-05 12:05" &
+wait
+pad_t1 mg-mixer-help G-X-music mixer-help 120 "2026-11-05 12:05" &
+pad_t1 pad-placement-leave BD-place-lobby placement-leave 120 "2026-11-05 12:05" &
+pad_t1 pad-boot-late-start F-boot-900 boot-late-start 220 "2026-11-05 12:05" &
+pad_t1 pad-boot-late-a F-boot-900 boot-late-a 220 "2026-11-05 12:05" &
+wait
+vacuum_leave() { in_order mg-vacuum-leave 'game Vacuum' 'minigame none' 'game Panel/Interact'; }
+check_pad mg-vacuum-leave vacuum_leave
+art_palette() {
+    in_order mg-art-palette 'minigame art .*swatch=3 page=0 ' 'minigame art .*page=1 ' 'minigame art .*page=2 ' 'minigame art .*swatch=4 page=2 ' \
+        'popup state=2 kind=2 .*done painting'
+}
+check_pad mg-art-palette art_palette
+drencher_help() {
+    in_order mg-drencher-help 'minigame drencher .*help=00' 'minigame drencher .*help=10' 'minigame drencher .*help=11' 'minigame drencher .*help=00' \
+        'minigame drencher .*help=10' 'minigame drencher .*help=00'
+}
+check_pad mg-drencher-help drencher_help
+crime_help() {
+    in_order mg-crime-help 'crime help=0 text=0 ' 'crime help=1 text=0 ' 'crime help=1 text=1 ' 'crime help=0 text=0 ' 'crime help=1 text=0 ' \
+        'crime help=0 text=0 ' && ! grep -q 'game Panel' "$tmp/mg-crime-help.log"
+}
+check_pad mg-crime-help crime_help
+mixer_help() { in_order mg-mixer-help 'minigame mixer .* phase=0 ' 'minigame mixer .* phase=8 ' 'minigame mixer .* phase=0 ' && ! grep -q 'game Panel' "$tmp/mg-mixer-help.log"; }
+check_pad mg-mixer-help mixer_help
+placement_leave() { in_order pad-placement-leave 'game Unknown\(ov=-1,vt=0x021351A8\)' 'placement none' 'game Panel/Interact'; }
+check_pad pad-placement-leave placement_leave
+boot_late() { in_order "$1" 'boot mode=0' 'front Title' 'title phase=0'; }
+check_pad pad-boot-late-start boot_late pad-boot-late-start
+check_pad pad-boot-late-a boot_late pad-boot-late-a
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

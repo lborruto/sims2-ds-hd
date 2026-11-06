@@ -83,7 +83,9 @@ MenuView FrontViewOf(ScreenState s, const GameState& game, const RomData* rom)
             ViewItem it;
             it.rect = kFrSplash;
             it.id = kFrBootId;
-            it.action = {TapStep(kFrSplashX, kFrSplashY)};
+            MenuStep tap = TapStep(kFrSplashX, kFrSplashY);
+            tap.frames = kFrSplashHold;
+            it.action = {tap};
             v.items.push_back(it);
             v.buttons[(int)MenuButton::Start] = it.action;
         }

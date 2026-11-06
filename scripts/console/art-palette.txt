@@ -1,0 +1,6 @@
+# From G-X-artgal, CONSOLE: MENU twice taps the palette's next page (pages 1, 2), X the next
+# swatch, Start the game's X ("Are you done painting?", as B).
+20 2 pad menu
+60 2 pad menu
+100 2 pad x
+140 2 pad start

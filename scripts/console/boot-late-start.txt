@@ -1,0 +1,3 @@
+# From F-boot-900 ("Touch the Touch Screen to continue." over the intro video), CONSOLE: Start at a
+# frame where a 3-frame touch fell between two of the splash's slow polls (frame 145): the title.
+145 2 pad start

@@ -67,12 +67,12 @@ constexpr int kHintPad = 14, kHintGap = 8, kHintChipH = 33, kHintTextX = kHintBo
 
 // No HUD (FrontEnd, CreateASim, None: the title, the main menu, Create-a-Sim, unmapped screens):
 // the top screen in kFrontTopBox at its own shape (fitted, centred), the touch screen 2.5x at
-// the right, both framed on the dark canvas, and the buttons' hint in a box centred below (these
-// screens are touch-only: the navigator's A presses the stick cursor there).
+// the right, both framed on the dark canvas, and the buttons' hint (the kit's chips: the right
+// stick, A) in a panel centred below (these screens are touch-only: the navigator's A presses the
+// stick cursor there).
 constexpr Rect kFrontBottomTo {616, 72, SW * 5 / 2, SH * 5 / 2};
 constexpr Rect kFrontTopBox {24, 72, 568, SH * 5 / 2};
-constexpr int kFrontHintY = 600, kFrontHintPad = 14;
-constexpr const char* kFrontHint = "STICK: CURSOR - A: TOUCH";
+constexpr int kFrontHintY = 600;
 
 // The top picture's rows without the game's status bar (its last 16 of 192, whatever the
 // picture's size): the world CONSOLE shows wherever the HD bar or a conversation's box replaces it.

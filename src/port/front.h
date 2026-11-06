@@ -48,6 +48,11 @@ constexpr Rect kFrBigButtonFrom {64, 41, 128, 128};
 constexpr int kFrBigX = 128, kFrBigY = 105;
 constexpr int kFrMenuButtons = 4, kFrMenuBoxX = 170, kFrMenuBoxY0 = 22, kFrMenuBoxDy = 40, kFrMenuBoxW = 26, kFrMenuBoxH = 26;
 constexpr int kFrSplashX = 128, kFrSplashY = 100;
+// How long A / Start hold the splash's touch: while the intro video plays the splash's object
+// updates only every 4 to 6 frames (the video's decoding slows its loop), so the touch script's
+// usual 3-frame tap fell between two of its polls about one press in four (pad-boot-late); 8
+// frames always span one.
+constexpr int kFrSplashHold = 8;
 // The game's strings: the four buttons' labels.
 constexpr int kStrFrMenu[kFrMenuButtons] = {6, 7, 39, 9};
 // The game's sprites (descriptors): the buttons' ▶ (normal, pressed), the DS Wireless icon.

@@ -142,7 +142,7 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 | F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
 | F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
 | 0 to 4 | | layout: AUTO / FOCUS / SIDE / STACKED / CONSOLE |
-| Mouse | right stick + LT (the cursor; A too wherever the cursor is the way to touch: DS Wireless, the furniture editor) | the touch screen, wherever it is shown |
+| Mouse | right stick + LT (the cursor; A too wherever the cursor is the way to touch: DS Wireless, the furniture editor, where B leaves) | the touch screen, wherever it is shown |
 | Mouse wheel / right button drag, over the world | | zoom / turn the camera |
 
 Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND
@@ -204,6 +204,7 @@ comes back on the same row after it. A note closes on A or B.
 | | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
 | | X (hold) | A (hold) | grab a find with the hand and drag it to the box |
 | | A (hold) | Y (hold) | blow: clears a clogged filter (a tap is enough; works with any microphone setting) |
+| | Z | B | put the vacuum away |
 | Alien Autopsy, painting | Arrows | either stick (LT: slow), D-pad | move the pointer (the D-pad a pixel at a time, faster held) |
 | | X (hold) | A (hold) | the stylus down: cut, lift an organ, pick a parasite, paint |
 | Alien Autopsy | S / A / W | X / Y / RB | laser / hand / tweezers |
@@ -214,7 +215,8 @@ comes back on the same row after it. A note closes on A or B.
 | | Q / W | LB / RB, right stick | depth |
 | Painting | Q / W | LB / RB | the previous / next tool |
 | | S / A | X / Y | the next color / undo |
-| | Z | B | done (then X / A: yes, Z / B: no) |
+| | E | Back | the next palette (16 of them: all 240 colors) |
+| | Z / Enter | B / Start | done (then X / A: yes, Z / B: no) |
 | Moogoo Monkey | Left / Right | D-pad or left stick | on your turn: choose the monkey to bet on, the card to play, the monkey a special card goes on (a green ring shows it) |
 | | X | A | bet, play the card; otherwise go on (the rules, the banners, the number of players) |
 | | Z | B | take the bet or the special card back; else quit (then X / A: yes, Z / B: no); a bet placed or a card picked: undo |
@@ -224,11 +226,13 @@ comes back on the same row after it. A note closes on A or B.
 | | S (hold) | X (hold) | pump |
 | | A / W | Y / RB | target / refill |
 | | Q | LB | run |
-| | Z | B | put it away (if you opened the game's help with the mouse: any button closes its text, B leaves help) |
+| | Z | B | put it away |
+| | Enter | Start | the game's help: then a button shows what it does, any button closes the text, Z / B leaves help |
 | Rat-A-Rang | Arrows | left stick or D-pad | walk |
 | | S / A | X / Y | scare / subdue |
 | | X (hold) + arrows | A (hold) + a stick or the D-pad | aim; let go to throw |
 | | Q / Z | LB / B | run / put it away |
+| | Enter | Start | the game's help (as the Drencher's) |
 | Scratch ticket | Arrows | either stick (LT: slow), D-pad | move the pointer |
 | | X (hold) | A (hold) | scratch |
 | | S | X | scratch the box under the pointer for you |
@@ -240,6 +244,7 @@ comes back on the same row after it. A note closes on A or B.
 | | S / W / Q | X / RB / LB | PLAY, RECORD, GENRE (Z / B stops) |
 | | A (hold) | Y (hold) | record your voice (VOX): the microphone while held |
 | | Z | B | quit; in the song list: back |
+| | Enter | Start | the game's help: point at a control and X / A; Z / B leaves help |
 | | X / Z / S | A / B / X | "save your song?": yes / no / preview |
 | Saving a song | Arrows | D-pad or left stick | choose a letter, a page, a slot |
 | | X | A | type it, or save into the slot (a used slot asks: again to save over it) |
@@ -336,9 +341,9 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
   lobby, basement, Registry and music, the social games, the vacuum and the casino's card game are
   checked; not everything the game has is yet.
 - **A few screens are still the game's own picture.** The end credits (after the story),
-  the furniture editor of a hotel room, and
+  the furniture editor of a hotel room (B leaves it), and
   any screen CONSOLE has no HD page for, are drawn big with the stick as a cursor (the right
-  stick moves it, A touches), and a hint box says so.
+  stick moves it, A touches), and the hints below say so.
 - **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
   world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it. (CONSOLE has no such strip.)
 - **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).

@@ -492,8 +492,9 @@ int main()
                     CHECK(std::abs(w.to.w * w.from.h - w.to.h * w.from.w) <= w.from.h + w.from.w);
                     CHECK(w.to.y == 0 && w.to.x >= 0 && w.to.x + w.to.w <= kConsoleW && w.to.h <= kConsoleH);
                     CHECK(top.first * 3 == top.second * 4 ? w.to.h == kConsoleH : (w.to.w == kConsoleW && w.to.h == 661));
-                    // The bar's items (its layer); the stick cursor's screens also have the pause
-                    // chip's panel (layer 0) beside their hint, right of the touch screen's frame.
+                    // The bar's items (its layer); the stick cursor's screens also have the hint's
+                    // chips panel at the bottom right (right of the bar) and the pause chip's panel
+                    // above it, right of the touch screen's frame (layer 0).
                     size_t first = 0;
                     while (first < c.ui.size() && c.ui[first].layer != kStatusBarLayer) first++;
                     CHECK(first < c.ui.size());
@@ -509,7 +510,10 @@ int main()
                         else
                         {
                             CHECK(st.screen == Screen::SaveSlots && c.ui[i].layer == 0);
-                            CHECK(r.x > kMenuTo.x + kMenuTo.w && r.x + r.w <= kConsoleW && r.y + r.h < b.y); // never over the bar or the frame
+                            CHECK(r.x + r.w <= kConsoleW && r.y + r.h <= kConsoleH);
+                            // never over the bar or the frame
+                            CHECK(r.x > b.x + b.w || (r.x > kMenuTo.x + kMenuTo.w && r.y + r.h < b.y));
+                            CHECK(r.y >= kMenuTo.y + kMenuTo.h + 6 || r.x > kMenuTo.x + kMenuTo.w);
                         }
                     }
                 }
@@ -620,9 +624,11 @@ int main()
             // The top screen at its own shape (within a pixel), never stretched.
             const Rect t = c.pieces[0].to;
             CHECK(std::abs(t.w * top.second - t.h * top.first) <= top.first);
+            // (the kit's chips: the right stick, A, the pause menu's; no 5 x 7 text)
             bool hint = false;
-            for (const Overlay& o : c.overlays) hint |= o.text != nullptr && o.to.y > 600;
+            for (const ui::UiItem& it : c.ui) hint |= it.kind == ui::UiItem::Chip && it.to.y > 600;
             CHECK(hint);
+            for (const Overlay& o : c.overlays) CHECK(o.text == nullptr);
             float cx, cy, sc2;
             CHECK(CanvasFromTouch(c, 10, 20, cx, cy, sc2) && sc2 == 2.5f && cx == c.pieces[1].to.x + 25 && cy == c.pieces[1].to.y + 50);
             // Both pieces framed (6 pixels outside each, drawn before the top piece); the top
@@ -654,10 +660,32 @@ int main()
     {
         const Composition m = BuildConsole({sc, Tab::None}, false, -1, SW, SH);
         CHECK(m.pieces.size() == 2 && !m.pieces[0].touch && m.pieces[1].src == Src::Bottom && m.pieces[1].to.x == kMenuTo.x && m.pieces[1].to.y == kMenuTo.y && m.pieces[1].to.w == SW * 3);
-        // (and the cursor's hint box under it, at the right clear of the HD status bar: how to leave)
-        CHECK(m.overlays.size() == 4 && m.overlays[0].argb == kDimArgb && m.overlays[1].argb == kFrameArgb && m.overlays[1].to.x == kMenuTo.x - 6);
-        const Rect hb = m.overlays[2].to;
+        // (and the cursor's hint panel under it, at the right clear of the HD status bar: how to
+        // leave; the kit's chips, the 5 x 7 font gone)
+        CHECK(m.overlays.size() == 2 && m.overlays[0].argb == kDimArgb && m.overlays[1].argb == kFrameArgb && m.overlays[1].to.x == kMenuTo.x - 6);
+        CHECK(m.ui.size() >= 4 && m.ui[0].kind == ui::UiItem::Panel);
+        const Rect hb = m.ui[0].to;
         CHECK(hb.x >= 720 && hb.x + hb.w <= kConsoleW && hb.y >= kMenuTo.y + kMenuTo.h && hb.y + hb.h <= kConsoleH);
+        int chips = 0;
+        for (const ui::UiItem& it : m.ui) chips += it.kind == ui::UiItem::Chip;
+        CHECK(chips == 3);   // the right stick, A, the pause menu
+        // The furniture editor's: B too (its X).
+        if (sc == Screen::Unknown)
+        {
+            GameState g;
+            g.valid = true;
+            g.placement.valid = true;
+            const Composition e = BuildConsole({sc, Tab::None}, false, -1, SW, SH, nullptr, nullptr, &g);
+            int ec = 0;
+            bool b = false;
+            for (const ui::UiItem& it : e.ui)
+            {
+                ec += it.kind == ui::UiItem::Chip;
+                b |= it.kind == ui::UiItem::Chip && it.button == ui::Button::B;
+            }
+            CHECK(ec == 4 && b);
+            CHECK(e.ui[0].to.x >= 720 && e.ui[0].to.x + e.ui[0].to.w <= kConsoleW);
+        }
     }
     // The menu: the dimmed world swallows clicks and the camera; the touch screen 3x is the stylus.
     for (ScreenState s : {ScreenState {Screen::Panel, Tab::Goals}, ScreenState {Screen::Popup, Tab::None}, ScreenState {Screen::Gift, Tab::None}})
@@ -2361,6 +2389,8 @@ int main()
                 {
                     CHECK(v.items[0].id == kFrBootId && v.items[0].action.size() == 1 && v.buttons[(int)MenuButton::Start] == v.items[0].action);
                     CHECK(v.items[0].action[0].x == kFrSplashX && v.items[0].action[0].y == kFrSplashY);
+                    // (held past the splash's slowest poll, 6 frames: a 3-frame tap was lost)
+                    CHECK(v.items[0].action[0].frames == kFrSplashHold && kFrSplashHold > 6);
                 }
                 Composition comp {kConsoleW, kConsoleH, {}, {}};
                 BuildFront(comp, v, MenuFirst(v), at, g, rom, nullptr, 256, 192);

@@ -1,0 +1,7 @@
+# From G-C-wg-pump, CONSOLE: Start taps the "?" (help mode), A asks about the fire button (its
+# text up), A closes it, Start again (help mode), B leaves help.
+20 2 pad start
+60 2 pad a
+120 2 pad a
+160 2 pad start
+200 2 pad b

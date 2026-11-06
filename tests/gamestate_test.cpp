@@ -1195,13 +1195,16 @@ static void drencher_and_crime()
     r = mg_ram(0x02134EC8, -1);
     r.W8(kS + 0x61, 0x10);   // unset before the first throw
     CrimeState c = ReadGameState(r.View()).minigame.crime;
-    CHECK(c.valid && !c.help && c.phase == 0 && c.angle == 0 && !c.hit && !c.canScare);
+    CHECK(c.valid && !c.help && !c.helpText && c.phase == 0 && c.angle == 0 && !c.hit && !c.canScare);
+    r.W8(kS + 0x4D, 1);
+    CHECK(ReadGameState(r.View()).minigame.crime.helpText);
+    r.W8(kS + 0x4D, 0);
     r.W8(kS + 0x4C, 1); r.W8(kS + 0x52, 1); r.W8(kS + 0x58, 2); r.W16(kS + 0x5A, 82); r.W8(kS + 0x5C, 1); r.W8(kS + 0x5D, 1); r.W8(kS + 0x5E, 1); r.W8(kS + 0x5F, 1); r.W8(kS + 0x60, 1); r.W8(kS + 0x61, 1);
     c = ReadGameState(r.View()).minigame.crime;
     CHECK(c.valid && c.help && c.dragging && c.phase == 2 && c.angle == 82 && c.canScare && c.armed && c.canSubdue && c.scarePressed && c.subduePressed && c.hit);
     r.W16(kS + 0x5A, (u32)(-90 & 0xFFFF));
     CHECK(ReadGameState(r.View()).minigame.crime.angle == -90);
-    for (auto [off, val] : {std::pair<u32, u32>{0x4C, 2}, {0x58, 4}, {0x5C, 2}, {0x60, 3}})
+    for (auto [off, val] : {std::pair<u32, u32>{0x4C, 2}, {0x4D, 2}, {0x58, 4}, {0x5C, 2}, {0x60, 3}})
     {
         Ram q = r;
         q.W8(kS + off, val);

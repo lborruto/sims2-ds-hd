@@ -120,8 +120,10 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
     else if (pressed(&PadState::b)) quit();
 }
 
-void Vacuum(const PadState& pad, u32& dsKeys, ActivityState& st)
+void Vacuum(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
 {
+    // B: the bowl's X, the game's only way out (its own B does nothing here).
+    if (pad.b && !st.prev.b && canTap) touch.Tap(kVacuumX.x, kVacuumX.y);
     // A tap on Y is 4-6 frames and the game wants 7: a press holds the blow for 8.
     if (pad.y && !st.prev.y) st.blowFrames = 8;
     st.blow = pad.y || st.blowFrames > 0;
@@ -139,12 +141,19 @@ void Vacuum(const PadState& pad, u32& dsKeys, ActivityState& st)
     set((pad.down && !hand) || pad.ly > kStick, kDown);
     set((pad.left && !hand) || pad.lx < -kStick, kLeft);
     set((pad.right && !hand) || pad.lx > kStick, kRight);
-    set(pad.b, kB);
     set(pad.lb, kL);
     set(pad.rb, kR);
 }
 
 bool Pressed(const PadState& pad, const ActivityState& st, bool PadState::*b) { return pad.*b && !(st.prev.*b); }
+
+// Any face button, shoulder or Start newly pressed (a help text closes on any press).
+bool AnyPressed(const PadState& pad, const ActivityState& st)
+{
+    for (bool PadState::*b : {&PadState::a, &PadState::b, &PadState::x, &PadState::y, &PadState::lb, &PadState::rb, &PadState::start})
+        if (Pressed(pad, st, b)) return true;
+    return false;
+}
 
 // The stylus at the pointer while A is held (not when a tap runs, nor after a glide until A is let go).
 void PressPointer(const PadState& pad, ActivityState& st, bool canTap)
@@ -249,8 +258,9 @@ void Art(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap
     if (Pressed(pad, st, &PadState::lb)) { const Point t = ArtTool((button + kArtTools - 1) % kArtTools); touch.Tap(t.x, t.y); }
     else if (Pressed(pad, st, &PadState::rb)) { const Point t = ArtTool((button + 1) % kArtTools); touch.Tap(t.x, t.y); }
     else if (Pressed(pad, st, &PadState::x)) { const Point t = ArtSwatch((std::clamp(st.ram.artSwatch, 0, kArtSwatches - 1) + 1) % kArtSwatches); touch.Tap(t.x, t.y); }
+    else if (Pressed(pad, st, &PadState::menu)) touch.Tap(kArtPageNext.x, kArtPageNext.y);
     else if (Pressed(pad, st, &PadState::y)) touch.Tap(kArtUndo.x, kArtUndo.y);
-    else if (Pressed(pad, st, &PadState::b)) touch.Tap(kArtDone.x, kArtDone.y);
+    else if (Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::start)) touch.Tap(kArtDone.x, kArtDone.y);
 }
 
 void Walk(const PadState& pad, u32& dsKeys)
@@ -363,22 +373,28 @@ void Drencher(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityStat
 {
     Walk(pad, dsKeys);
     auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
-    set(pad.a, kA);    // fire (held)
     set(pad.lb, kB);   // run
     const ActivityRam& r = st.ram;
-    // Help (opened with the mouse): a help text closes on any press (a tap on the "?"), the mode leaves with B.
+    auto tap = [&](Point p) { touch.Tap(p.x, p.y); };
+    // Help: a help text closes on any press (a tap on the "?"); in help mode each button taps the
+    // control it plays (the game explains it), B or Start the "?" again (the mode leaves).
     if (r.drencherHelpText)
     {
-        if (canTap && (Pressed(pad, st, &PadState::a) || Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::x) || Pressed(pad, st, &PadState::y) ||
-                       Pressed(pad, st, &PadState::lb) || Pressed(pad, st, &PadState::rb) || Pressed(pad, st, &PadState::start)))
-            touch.Tap(kDrencherHelp.x, kDrencherHelp.y);
+        if (canTap && AnyPressed(pad, st)) tap(kDrencherHelp);
         return;
     }
     if (r.drencherHelp)
     {
-        if (canTap && Pressed(pad, st, &PadState::b)) touch.Tap(kDrencherHelp.x, kDrencherHelp.y);
+        if (!canTap) return;
+        if (Pressed(pad, st, &PadState::a)) tap(kDrencherFire);
+        else if (Pressed(pad, st, &PadState::x)) tap(kDrencherPumpBand);
+        else if (Pressed(pad, st, &PadState::y)) tap(kDrencherTarget);
+        else if (Pressed(pad, st, &PadState::rb)) tap(kDrencherRefill);
+        else if (Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::start)) tap(kDrencherHelp);
         return;
     }
+    set(pad.a, kA);    // fire (held)
+    if (Pressed(pad, st, &PadState::start) && canTap) { tap(kDrencherHelp); return; }
     // X held: the pump, the stylus swept along its band.
     if (pad.x && (canTap || st.pumpFrames > 0))
     {
@@ -407,6 +423,31 @@ void Drencher(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityStat
 
 void Crime(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
 {
+    const ActivityRam& r = st.ram;
+    auto tap = [&](Point p) { touch.Tap(p.x, p.y); };
+    // Help: a text closes on any press (a tap on the "?"); in help mode X / A / Y tap scare, the
+    // rat and subdue (the game explains each), B or Start the "?" again. Not while aiming.
+    if (r.crimeHelpText && st.aimFrames == 0)
+    {
+        Walk(pad, dsKeys);
+        if (canTap && AnyPressed(pad, st)) { tap(kCrimeHelp); st.latch = true; }
+        return;
+    }
+    if (r.crimeHelp && st.aimFrames == 0)
+    {
+        Walk(pad, dsKeys);
+        if (!pad.a) st.latch = false;
+        if (!canTap) return;
+        if (Pressed(pad, st, &PadState::x)) tap(kCrimeScare);
+        else if (Pressed(pad, st, &PadState::a)) { tap(kCrimeRat); st.latch = true; }
+        else if (Pressed(pad, st, &PadState::y)) tap(kCrimeSubdue);
+        else if (Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::start)) tap(kCrimeHelp);
+        return;
+    }
+    // (A still held from a help press: not a grab.)
+    if (!pad.a) st.latch = false;
+    if (st.latch) { Walk(pad, dsKeys); return; }
+    if (Pressed(pad, st, &PadState::start) && canTap && st.aimFrames == 0) { tap(kCrimeHelp); return; }
     // A held: the Rat-A-Rang grabbed (the stylus on the centre rat), aimed, thrown when let go.
     if (pad.a && (canTap || st.aimFrames > 0))
     {
@@ -556,7 +597,8 @@ void Mixer(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& 
     MovePointer(pad, st, pad.a ? kPtrDrag : kPtrMax, false);
     PressPointer(pad, st, canTap);
     if (pad.a || !canTap) return;
-    if (phase == 8 || phase == 9) { if (b) Tap(touch, kMixHelp); return; }
+    if (phase == 8 || phase == 9) { if (b || Pressed(pad, st, &PadState::start)) Tap(touch, kMixHelp); return; }
+    if (Pressed(pad, st, &PadState::start) && phase == 0) { Tap(touch, kMixHelp); return; }
     if (x) Tap(touch, kMixPlay);
     else if (Pressed(pad, st, &PadState::rb)) Tap(touch, kMixRecord);
     else if (Pressed(pad, st, &PadState::lb) && phase == 0) Tap(touch, kMixGenre);
@@ -676,9 +718,10 @@ void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKey
     st.voice = false;
     // (The autopsy quits on Start at once: its Start asks first, ActivityInput's Autopsy; MooGoo's
     // Start is its X; the lottery's Start asks as its B; the mixer's and its save page's do nothing
-    // in the game; the wireless lobby's are its own.)
+    // in the game (the mixer's is its help); the wireless lobby's are its own; the painting's is its
+    // X, the Drencher's and the crime game's their help: the game reads none of them there.)
     if (pad.start && s != Screen::Autopsy && s != Screen::MooGoo && s != Screen::Scratch && s != Screen::Mixer && s != Screen::MixerSave &&
-        s != Screen::Trading)
+        s != Screen::Trading && s != Screen::Art && s != Screen::Drencher && s != Screen::Crime)
         dsKeys |= 1u << kStart;
     if (pad.select && s != Screen::Trading) dsKeys |= 1u << kSelect;
     const bool canTap = !touch.Owns();
@@ -686,7 +729,7 @@ void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKey
     {
     case Screen::Social: Social(pad, touch, st, canTap); break;
     case Screen::Cards: Cards(pad, touch, st, canTap); break;
-    case Screen::Vacuum: Vacuum(pad, dsKeys, st); st.focus = -1; break;
+    case Screen::Vacuum: Vacuum(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     case Screen::Autopsy: Autopsy(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     case Screen::Detector: Detector(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     case Screen::Art: Art(pad, touch, st, canTap); st.focus = -1; break;
