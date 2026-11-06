@@ -935,8 +935,185 @@ static void hotel_random()
     }
 }
 
+// ---- The front end (milestone 5): made-up RAM with the research's layouts.
+constexpr u32 kFT = 0x021A1000, kFN = 0x021A2000, kFH = 0x021A3000, kFB = 0x021A4000;
+static Ram front_ram(u32 vt, int ov)
+{
+    Ram r = Make(vt, ov, 0xFF);
+    r.W32(0x0213E434, kGb);
+    r.W32(0x02139FA4 + 0, kP);
+    r.W32(kP + 0xDA8, kFT);
+    return r;
+}
+static u32 slot_time(int y, int mo, int d, int h, int mi, int sec)   // the game's: days from 2000 by 365 / leap every 4th year
+{
+    static const int md[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    long days = 0;
+    for (int k = 2000; k < y; k++) days += k % 4 == 0 ? 366 : 365;
+    for (int k = 0; k < mo - 1; k++) days += md[k] + (k == 1 && y % 4 == 0);
+    days += d - 1;
+    return 0x80000000u + (u32)(days * 86400 + h * 3600 + mi * 60 + sec);
+}
+static void front_title_boot_video()
+{
+    Ram r = front_ram(0x02131960, -1);
+    CHECK(!ReadGameState(r.View()).front.title.valid && ReadGameState(r.View()).front.kind == FrontKind::None);   // the top object is no title
+    r.W32(kFT, 0x0214ABB8); r.W8(kFT + 0x25, 0); r.W8(kFT + 0x26, 0xFF);
+    GameState g = ReadGameState(r.View());
+    CHECK(g.screen == GScreen::FrontEnd && g.front.title.valid && g.front.title.phase == 0 && !g.front.title.menu && g.front.title.button == -1 && g.front.kind == FrontKind::Title);
+    CHECK(!g.front.settings.valid && !g.front.load.valid && !g.front.cas.valid && !g.front.boot.valid && !g.front.video.valid);
+    r.W8(kFT + 0x25, 3); r.W8(kFT + 0x26, 2);
+    g = ReadGameState(r.View());
+    CHECK(g.front.kind == FrontKind::MainMenu && g.front.title.menu && g.front.title.button == 2);
+    for (u32 ph : {1u, 2u, 4u}) { r.W8(kFT + 0x25, ph); CHECK(ReadGameState(r.View()).front.title.valid && ReadGameState(r.View()).front.title.menu == (ph >= 2)); }
+    r.W8(kFT + 0x25, 5); CHECK(!ReadGameState(r.View()).front.title.valid);        // a phase past the game's
+    r.W8(kFT + 0x25, 3); r.W8(kFT + 0x26, 4); CHECK(!ReadGameState(r.View()).front.title.valid);   // a button past the four
+    // the front end parts do not move the screen identity
+    Ram a = front_ram(0x02131960, -1), b = front_ram(0x02131960, -1);
+    b.W32(kFT, 0x0214ABB8);
+    CHECK(ReadGameState(a.View()) == ReadGameState(b.View()));
+    // the boot screens: a BGDisplay in the bottom (video over it on top) or in the top
+    Ram v = front_ram(0x02131A70, -1);
+    v.W32(kS + 0x28 - 0 + 0, 0);   // (the object's mode byte is at +0x28)
+    v.W8(kS + 0x28, 0); v.W16(kS + 0x24, 33); v.W16(kS + 0x26, 50);
+    v.W32(kFT, 0x02131E20); v.W32(kFT + 0x2C, 3);
+    g = ReadGameState(v.View());
+    CHECK(g.front.boot.valid && g.front.boot.mode == 0 && g.front.boot.countdown == 33 && g.front.boot.duration == 50 && !g.front.boot.top);
+    CHECK(g.front.video.valid && g.front.video.movie == 3 && g.front.kind == FrontKind::Video);
+    v.W32(kFT + 0x2C, 4); CHECK(!ReadGameState(v.View()).front.video.valid);
+    v.W32(kFT + 0x2C, 1); v.W16(kS + 0x24, 0xFFFF); CHECK(ReadGameState(v.View()).front.boot.countdown == -1);
+    v.W8(kS + 0x28, 7); CHECK(!ReadGameState(v.View()).front.boot.valid && ReadGameState(v.View()).front.kind == FrontKind::Video);
+    Ram t = front_ram(0x02131960, -1);
+    t.W32(kFT, 0x02131A70); t.W8(kFT + 0x28, 2); t.W16(kFT + 0x24, 20); t.W16(kFT + 0x26, 100);
+    g = ReadGameState(t.View());
+    CHECK(g.front.boot.valid && g.front.boot.top && g.front.boot.mode == 2 && g.front.kind == FrontKind::Boot);
+}
+static void front_settings()
+{
+    Ram r = front_ram(0x02131BF0, -1);
+    const u32 vts[4] = {0x02131CF4, 0x02131CB8, 0x02131C0C, 0x02131BD4};
+    for (u32 i = 0; i < 4; i++) { r.W32(kFH + 0x100 * i, vts[i]); r.W32(kS + 0x2C + 4 * i, kFH + 0x100 * i); }
+    r.W32(kS + 0x28, kFH); r.W8(kS + 0x24, 1);
+    r.W32(kGb + 0x2F70, 0x510); r.W32(kGb + 0x2F74, 0x1000);
+    GameState g = ReadGameState(r.View());
+    CHECK(g.front.settings.valid && g.front.kind == FrontKind::Settings && g.front.settings.page == 0 && g.front.settings.music == 0x510 && g.front.settings.sfx == 0x1000 && !g.front.settings.art);
+    CHECK(!g.front.settings.conceptKnown && !g.front.settings.creditsKnown);
+    r.W8(kS + 0x24, 0); CHECK(ReadGameState(r.View()).front.settings.art);
+    // the Concept page: button i at page+0xC+4i, its byte +0x8D (unlocked)
+    r.W32(kS + 0x28, kFH + 0x200);
+    for (u32 i = 0; i < 12; i++) { r.W32(kFH + 0x200 + 0xC + 4 * i, kFB + 0x100 * i); r.W8(kFB + 0x100 * i + 0x8D, i == 3 || i == 11); }
+    g = ReadGameState(r.View());
+    CHECK(g.front.settings.page == 2 && g.front.settings.conceptKnown && g.front.settings.conceptBits == ((1u << 3) | (1u << 11)));
+    r.W8(kFB + 0x8D, 2); CHECK(!ReadGameState(r.View()).front.settings.conceptKnown && ReadGameState(r.View()).front.settings.valid);
+    // the Credits page: scroll and line
+    r.W32(kS + 0x28, kFH + 0x300); r.W32(kFH + 0x300 + 0xC, 0xBF000); r.W32(kFH + 0x300 + 0x14, 11);
+    g = ReadGameState(r.View());
+    CHECK(g.front.settings.page == 3 && g.front.settings.creditsKnown && g.front.settings.creditsPos == 0xBF000 && g.front.settings.creditsLine == 11);
+    // garbage: a page object that is not the S+0x28 one, a volume past 100 %, a vtable that is not a page
+    r.W32(kS + 0x38, kFH); CHECK(!ReadGameState(r.View()).front.settings.valid); r.W32(kS + 0x38, kFH + 0x300);
+    r.W32(kGb + 0x2F70, 0x1001); CHECK(!ReadGameState(r.View()).front.settings.valid); r.W32(kGb + 0x2F70, 0x1000);
+    r.W32(kFH + 0x300, 0x1234); CHECK(!ReadGameState(r.View()).front.settings.valid);
+}
+static void front_load()
+{
+    Ram r = front_ram(0x0214B15C, 8);
+    for (u32 i = 0; i < 3; i++) r.W8(0x0213D848 + i, 0);
+    r.W32(0x0213D84C, 0xFFFFFFFF); r.W32(kS + 0x70, 0xFFFFFFFF);
+    GameState g = ReadGameState(r.View());
+    CHECK(g.front.load.valid && g.front.kind == FrontKind::Load && !g.front.load.wireless && g.front.load.green == -1 && g.front.load.tapped == -1 && !g.front.load.rows[0].used);
+    r.W8(0x0213D848 + 1, 1); r.W32(0x0213D84C, 1);
+    const u32 h = 0x0213D7B8 + 0x30;
+    r.W32(h + 0x18, 3226); put_text(r, h + 0x1C, "Chris"); r.W8(h + 0x2C, 3);
+    r.W32(h + 0x14, slot_time(2008, 11, 21, 0, 52, 4));
+    g = ReadGameState(r.View());
+    const LoadRow& w = g.front.load.rows[1];
+    CHECK(w.used && w.name == "Chris" && w.money == 3226 && w.place == 3 && w.placeNameId == 70 && w.timeKnown && w.month == 11 && w.day == 21 && w.hour12 == 12 && w.minute == 52 && !w.pm && g.front.load.green == 1);
+    struct T { int y, mo, d, h, mi, h12; bool pm; } cases[] = {{2008, 11, 16, 13, 30, 1, true}, {2008, 11, 20, 20, 3, 8, true}, {2000, 1, 1, 0, 0, 12, false}, {2008, 2, 29, 12, 0, 12, true},
+                                                              {2009, 3, 1, 11, 59, 11, false}, {2012, 12, 31, 23, 59, 11, true}, {2011, 2, 28, 12, 1, 12, true}};
+    for (const T& c : cases)
+    {
+        r.W32(h + 0x14, slot_time(c.y, c.mo, c.d, c.h, c.mi, 30));
+        const LoadRow& x = ReadGameState(r.View()).front.load.rows[1];
+        CHECK(x.timeKnown && x.month == c.mo && x.day == c.d && x.hour12 == c.h12 && x.minute == c.mi && x.pm == c.pm);
+    }
+    r.W32(h + 0x14, 0x7FFFFFFF); CHECK(!ReadGameState(r.View()).front.load.rows[1].timeKnown && ReadGameState(r.View()).front.load.valid);   // not the game's base
+    r.W32(h + 0x14, 0xFFFFFFFFu); CHECK(ReadGameState(r.View()).front.load.rows[1].timeKnown && ReadGameState(r.View()).front.load.rows[1].month == 1);   // 2068-01-19
+    put_text(r, h + 0x1C, ""); put_text(r, 0x0214B1F4, "Sim");
+    CHECK(ReadGameState(r.View()).front.load.rows[1].name == "Sim");
+    r.W8(0x0213D848, 2); CHECK(!ReadGameState(r.View()).front.load.valid);
+    r.W8(0x0213D848, 0); r.W32(0x0213D84C, 3); CHECK(!ReadGameState(r.View()).front.load.valid);
+    Ram w2 = front_ram(0x0214B190, 8); for (u32 i = 0; i < 3; i++) w2.W8(0x0213D848 + i, 0);
+    CHECK(ReadGameState(w2.View()).front.kind == FrontKind::Wireless && ReadGameState(w2.View()).front.load.wireless);
+}
+static void front_cas()
+{
+    const u32 pages[6] = {0x02150B54, 0x02150B10, 0x02150AA8, 0x02150BF4, 0x02150A2C, 0x02150B9C};
+    Ram r = front_ram(0x021509B0, 3);
+    r.W32(kS + 0x48, kFB); r.W32(kS + 0x4C, kFB + 0x400);
+    r.W16(kFB + 0x232, 2); r.W16(kFB + 0x236, 5); r.W16(kFB + 0x400 + 0x232, 1); r.W16(kFB + 0x400 + 0x236, 7);
+    put_text(r, kGb + 0x53, "Sim");
+    auto setpage = [&](u32 pg, u32 obj) { r.W16(kS + 0x74, pg); r.W32(kS + 0x58, kFN); r.W32(kFN, pages[obj]); };
+    setpage(0, 0); r.W16(kS + 0x76, 0); r.W16(kFN + 0x12, 1); put_text(r, kFN + 0x70, "SimAB");
+    GameState g = ReadGameState(r.View());
+    CHECK(g.screen == GScreen::CreateASim && g.front.kind == FrontKind::CreateASim && g.front.cas.valid && g.front.cas.page == 0 && g.front.cas.gender == 0 && g.front.cas.simName == "Sim" && g.front.cas.skin == 2 && g.front.cas.hairColour == 5);
+    CHECK(g.front.cas.nameKnown && g.front.cas.name == "SimAB" && g.front.cas.keyboard == 1);
+    r.W16(kS + 0x76, 1); g = ReadGameState(r.View()); CHECK(g.front.cas.gender == 1 && g.front.cas.skin == 1 && g.front.cas.hairColour == 7);
+    put_text(r, kFN + 0x70, "SimABCD"); CHECK(ReadGameState(r.View()).front.cas.name == "SimABCD" && ReadGameState(r.View()).front.cas.name.size() == 7);
+    for (u32 i = 0; i < 8; i++) r.W8(kFN + 0x70 + i, 'A');   // 8 characters, no NUL: past the game's limit
+    CHECK(!ReadGameState(r.View()).front.cas.valid);
+    put_text(r, kFN + 0x70, "Si"); r.W8(kFN + 0x71, 0x07); CHECK(!ReadGameState(r.View()).front.cas.valid);   // not printable
+    put_text(r, kFN + 0x70, "Sim"); r.W16(kFN + 0x12, 3); CHECK(!ReadGameState(r.View()).front.cas.valid); r.W16(kFN + 0x12, 0);
+    setpage(1, 1); r.W16(kFN + 0x3E, 2); r.W16(kFN + 0x38, 3);
+    g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.hairKnown && g.front.cas.hairStyle == 2 && g.front.cas.hairScroll == 3 && !g.front.cas.nameKnown);
+    r.W16(kFN + 0x3E, 18); CHECK(!ReadGameState(r.View()).front.cas.valid); r.W16(kFN + 0x3E, 17);
+    setpage(2, 2); r.W16(kFN + 0x10, 8); CHECK(ReadGameState(r.View()).front.cas.face == 8); r.W16(kFN + 0x10, 9); CHECK(!ReadGameState(r.View()).front.cas.valid);
+    setpage(3, 3); r.W16(kFN + 0x14, 4); r.W16(kFN + 0x16, 1); r.W16(kFN + 0x18, 16);
+    g = ReadGameState(r.View()); CHECK(g.front.cas.clothesKnown && g.front.cas.category == 4 && g.front.cas.clothesPage == 1 && g.front.cas.item == 16);
+    r.W16(kFN + 0x14, 6); CHECK(!ReadGameState(r.View()).front.cas.valid);
+    setpage(4, 4); r.W8(kFN + 0x10, 3); r.W8(kFN + 0x11, 1);
+    g = ReadGameState(r.View()); CHECK(g.front.kind == FrontKind::KeepSim && g.front.cas.keepKnown && g.front.cas.aspiration == 3 && g.front.cas.answer == 1);
+    r.W8(kFN + 0x11, 3); CHECK(!ReadGameState(r.View()).front.cas.valid && ReadGameState(r.View()).front.kind == FrontKind::None);
+    // the page and its object must agree; the in-game pages reuse the Hair / Clothes objects
+    setpage(4, 1); CHECK(!ReadGameState(r.View()).front.cas.valid);
+    setpage(6, 1); r.W16(kFN + 0x3E, 1); r.W16(kFN + 0x38, 0); CHECK(ReadGameState(r.View()).front.cas.valid && ReadGameState(r.View()).front.cas.page == 6);
+    setpage(5, 5); CHECK(ReadGameState(r.View()).front.cas.valid && !ReadGameState(r.View()).front.cas.hairKnown);
+    setpage(8, 5); CHECK(!ReadGameState(r.View()).front.cas.valid);
+    setpage(0, 0); r.W32(kS + 0x58, 0); CHECK(!ReadGameState(r.View()).front.cas.valid);   // a page change in flight
+    // the committed name never exceeds the game's 7 + NUL
+    r.W32(kS + 0x58, kFN); put_text(r, kGb + 0x53, "ABCDEFG"); CHECK(ReadGameState(r.View()).front.cas.simName == "ABCDEFG");
+    for (u32 i = 0; i < 8; i++) r.W8(kGb + 0x53 + i, 'A'); CHECK(!ReadGameState(r.View()).front.cas.valid);
+    // no hero: the page still reads, the hero's fields stay -1
+    put_text(r, kGb + 0x53, "Sim"); r.W32(kS + 0x48, 0); g = ReadGameState(r.View()); r.W16(kS + 0x76, 0);
+    g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.skin == -1 && g.front.cas.hairColour == -1);
+}
+static void front_random()
+{
+    unsigned seed = 12345;
+    auto rnd = [&]() { seed = seed * 1664525u + 1013904223u; return seed >> 8; };
+    const u32 vts[] = {0x0214ABB8, 0x02131BF0, 0x0214B15C, 0x0214B190, 0x021509B0, 0x02131A70, 0x02131E20, 0x02131CF4, 0x02131C0C, 0x02131BD4, 0x02150B54, 0x02150B10, 0x02150BF4, 0x02150A2C};
+    for (int n = 0; n < 300; n++)
+    {
+        Ram r = front_ram(vts[rnd() % 6 + 1 - 1], 3);
+        r.W32(kFT, vts[rnd() % 14]);
+        for (u32 a = kS; a < kS + 0x100; a += 4) if (rnd() % 3) r.W32(a, rnd());
+        for (u32 a = kFT; a < kFT + 0x100; a += 4) if (rnd() % 3) r.W32(a, rnd());
+        r.W32(kS + 0x58, kFN); r.W32(kS + 0x2C, kFH); r.W32(kS + 0x28, kFH);
+        for (u32 i = 0; i < 4; i++) r.W32(kFH + 0x100 * i, vts[7 + rnd() % 7]);
+        for (u32 a = kFN; a < kFN + 0x100; a += 4) if (rnd() % 3) r.W32(a, rnd());
+        for (u32 a = 0x0213D7B8; a < 0x0213D7B8 + 0x90; a += 4) r.W32(a, rnd());
+        const GameState g = ReadGameState(r.View());   // no crash, no overrun
+        CHECK(g.front.cas.name.size() <= 7 && g.front.cas.simName.size() <= 7);
+        for (const LoadRow& x : g.front.load.rows) CHECK(x.name.size() <= 16);
+    }
+}
+
 int main()
 {
+    front_title_boot_video();
+    front_settings();
+    front_load();
+    front_cas();
+    front_random();
     hotel_block();
     registry_and_room();
     music_build_placement();

@@ -177,6 +177,42 @@ screen (vtable and overlay checked), valid on its own, every list capped. Places
 `--print-hotel` logs each part when it changes (`hotel`, `checkin`, `roominfo`, `music`, `build`, `placement`, `catalogue`, `stat`).
 Checked by `tests/gamestate_test.cpp` (made-up RAM, garbage per part) and `tests/gamestate_check.sh` (held-out states).
 
+## The front end (`GameState::front`)
+
+`T = *(P+0xDA8)` is the top slot's object, `S` the bottom's (heap: re-read every frame). `GameState::front` (`FrontState`) reads
+each screen only when its class is up (vtable checked, every value range-checked, valid on its own; `kind` is `None` unless a
+part reads, so a caller falls back to the pixel front end). `--print-front` logs each part when it changes (`front`, `title`,
+`settings`, `load`, `cas`, `boot`, `video`). None of it is in `GameState ==`, and no `GScreen` was added.
+
+- **Title / main menu**: top `CTitleSceenMenu` 0x0214ABB8 over `CInvalidMenu` (the existing FrontEnd). `u8 T+0x25` phase: 0 touch to
+  begin, 1 delay, 2 buttons fading in, 3 main menu, 4 a choice made; `menu` = phase >= 2. `s8 T+0x26` = the button under the stylus
+  0..3 (-1 none). Buttons are at x 170..195, y 22 / 62 / 102 / 142 (+25): Create-a-Sim, Load-a-Sim, Settings, DS Wireless.
+- **Settings**: `COptionsMenu` 0x02131BF0 (S). `S+0x28` = the current page object, matched against the four in `S+0x2C..0x38`:
+  0x02131CF4 Music, 0x02131CB8 SFX, 0x02131C0C Concept Art, 0x02131BD4 Credits (page 0..3). Music / SFX volume `G+0x2F70 / 0x2F74`
+  (20.12, 0x1000 = 100 %); `u8 S+0x24` = 0 while a concept art is on the top screen. Concept page: button i (< 12) =
+  `*(page+0xC+4i)`, `+0x8D` unlocked (read only on that page). Credits page: `s32 page+0xC` scroll (16.16), `+0x14` line (read only on
+  that page: the other pages' objects hold garbage). High.
+- **Load-a-Sim / DS Wireless**: `CLoadMenu` 0x0214B15C (ov 8) / `CWirelessLoadMenu` 0x0214B190. Rows from the save headers
+  (`0x0213D7B8 + 0x30 i`, used `0x0213D848 + i`): money `+0x18`, name `+0x1C` (char[16], the game's default string at 0x0214B1F4
+  when empty), place `+0x2C` (string `67 +`), time `u32 +0x14` = `0x80000000 +` seconds since 2000-01-01 00:00 (every fourth year
+  leap), printed `m/d h:mm am/pm` ("11/21 12:52am", no year); green slot `s32 0x0213D84C` (-1 none); `S+0x70` = the row whose
+  tick was tapped (stale garbage until the first tick: read as -1 outside 0..2). The three headers of `F-cload-150` decode to
+  the drawn texts. High.
+- **Create-a-Sim**: `CCreateASim` 0x021509B0 (ov 3). `u16 S+0x74` page 0 Name, 1 Hair, 2 Face, 3 Clothes, 4 Keep this Sim?, in game 5 Tan,
+  6 Hair, 7 Clothes; `*(S+0x58)` the page object, its vtable must match the page (0x02150B54 Name, B10 Hair, AA8 Face, BF4
+  Clothes, A2C Confirm, B9C Tan). `u16 S+0x76` gender (0 female: `*(S+0x48)`, 1 male: `*(S+0x4C)` = the hero H); hero `u16 H+0x232`
+  skin figure 0..3, `u16 H+0x236` hair colour 0..7; the committed name `char G+0x53[8]` (7 + NUL). Name page: live buffer
+  `char N+0x70[8]` (NUL within the 7 + 1, printable), `u16 N+0x12` keyboard page 0 ABC / 1 abc / 2 123!. Hair: `u16 N+0x3E` selected
+  style 0..17, `N+0x38` scroll 0..7. Face: `u16 N+0x10` 0..8. Clothes: `u16 N+0x14` category 0..5, `+0x16` page, `+0x18` item
+  (medium: the cell to item map is not decoded). Confirm: `u8 N+0x10` aspiration 0 Fortune, 1 Romance, 2 Popularity, 3 Party, `u8 N+0x11`
+  0 choosing / 1 tick pressed / 2 cross pressed. Name never above 7 characters; a longer or non-printable buffer makes the
+  whole part invalid.
+- **Boot and video**: `CBGDisplayMenu` 0x02131A70 in either slot, `u8 +0x28` mode (0 touch to continue, 1 Maxis, 2 EA, 3 legal,
+  4 popup, 5 zoom, 6 blank), `s16 +0x24` countdown, `+0x26` duration; `CVideoScreenMenu` 0x02131E20 in the top slot, `u32 +0x2C` movie 0..3
+  (the intro is 3), over a mode-0 BGDisplay.
+
+Checked by `tests/gamestate_test.cpp` (made-up RAM, garbage per part) and `tests/gamestate_check.sh` (the research's `F-*` states).
+
 ## Backup signal
 
 Sub-engine BG layer records at 0x02139618, 0x0213968C, 0x02139700 and 0x02139774 (stride 0x74)
@@ -189,7 +225,7 @@ Popup share 0x0009. Kept as a cross-check; the manager above is the source.
 
 Not seen in any state: other shops, other minigames, later towns, the phonebook, the messages'
 own pages (only the phone's page value as Messages opened), Goals and Relationships sub-pages, save slot and Quit choices, Build and Gift selections,
-Create-a-Sim pages, game over, credits. Not found: the highlighted Social answer, the dialogue's
+game over, the end credits and the Tan page (code only). Not found: the highlighted Social answer, the dialogue's
 page count, the Pockets counted item or slot, the Relationships list index, the title/menu
 cursor, the Options sliders. `P+0x54C` (0x0219C388) is 8 with a popup and 7 between popups;
 undecoded.

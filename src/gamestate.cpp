@@ -122,6 +122,22 @@ struct EUTable
         u32 stMaxPage, stMaxTransition, stMaxLevel, stMaxPoints;   // stat panel bounds (the aspiration level 3 is the top)
         u32 buildTimers;                                     // from G: u32 per place, the time its building ends (vs `clock`; noCheckOut: never set)
     } hotel;
+    // Milestone 5: the front end (research m5-front-end §0-§5). T = *(P+topObj) the top slot's object, S the bottom's.
+    struct
+    {
+        u32 topObj;                                          // from P
+        u32 vtTitle, vtSettings, vtLoad, vtWireless, vtBoot, vtVideo;   // CTitleSceenMenu (top), COptionsMenu, CLoadMenu, CWirelessLoadMenu, CBGDisplayMenu, CVideoScreenMenu
+        u32 tPhase, tCount, tButton, maxPhase, maxButton;    // title, from T
+        u32 oPage, oPages, oArt, vtPages[4], oSlotSize;      // Settings, from S: the current page object, the four (Music, SFX, Concept, Credits), size
+        u32 volMax;                                          // 20.12: 100 %
+        u32 cpButtons, cpFlag, cpN, crPos, crLine, crSize;   // Concept page: button i at page+cpButtons+4i, its unlocked byte; credits scroll / line
+        u32 ldTapped, ldSize, ldPlace, ldNameDefault, ldTimeBase, ldYearMax;   // Load: tapped row, object size, the string id base 67 (place), the default name's address, the time's base, years kept
+        u32 casPage, casGender, casObj, casHero, casSize, casMaxPage, vtCasBottom;   // CAS, from S: hero at S+casHero+4*gender
+        u32 vtCas[6], sizeCas[6];                            // page objects: Name, Hair, Face, Clothes, Confirm, Tan, and their sizes
+        u32 nameKb, nameBuf, hairSel, hairScroll, face, thCat, thPage, thItem, cfAsp, cfAnswer;
+        u32 heroSkin, heroHair, heroSize, maxSkin, maxHairColour, maxHairStyle, maxHairScroll, maxFace, maxCat, maxThPage, maxThItem;
+        u32 bgMode, bgCount, bgDuration, bgMaxMode, vdMovie, vdMaxMovie;   // boot, video
+    } front;
 };
 constexpr EUTable kEU = {
     0x02000000, 0x02139FA4,
@@ -218,6 +234,20 @@ constexpr EUTable kEU = {
         0x2B, 0xFF, 5,
         4, 2, 3, 9999,
         0x4418,
+    },
+    {
+        0xDA8,
+        0x0214ABB8, 0x02131BF0, 0x0214B15C, 0x0214B190, 0x02131A70, 0x02131E20,
+        0x25, 0x24, 0x26, 4, 3,
+        0x28, 0x2C, 0x24, {0x02131CF4, 0x02131CB8, 0x02131C0C, 0x02131BD4}, 0x54,
+        0x1000,
+        0xC, 0x8D, 12, 0xC, 0x14, 0x18,
+        0x70, 0x78, 67, 0x0214B1F4, 0x80000000, 100,
+        0x74, 0x76, 0x58, 0x48, 0x84, 7, 0x021509B0,
+        {0x02150B54, 0x02150B10, 0x02150AA8, 0x02150BF4, 0x02150A2C, 0x02150B9C}, {0xDC, 0x4C, 0x14, 0x24, 0x18, 0x18},
+        0x12, 0x70, 0x3E, 0x38, 0x10, 0x14, 0x16, 0x18, 0x10, 0x11,
+        0x232, 0x236, 0x244, 3, 7, 17, 7, 8, 5, 7, 127,
+        0x28, 0x24, 0x26, 6, 0x2C, 3,
     },
 };
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
@@ -1172,6 +1202,203 @@ StatState ReadStat(const Reader& m, u32 S, const HotelState& hotel)
     v.valid = true;
     return v;
 }
+
+// ---- The front end (milestone 5). Heap objects: re-read every frame, vtable checked; each part reads apart from the others.
+TitleState ReadTitle(const Reader& m, u32 T)
+{
+    const auto& f = kEU.front;
+    TitleState t;
+    u32 phase, btn;
+    if (!m.In(T, 0x4C) || !m.R8(T + f.tPhase, phase) || phase > f.maxPhase || !m.R8(T + f.tButton, btn) || (btn != 0xFF && btn > f.maxButton)) return t;
+    t.phase = (int)phase; t.menu = phase >= 2;
+    t.button = btn == 0xFF ? -1 : (int)btn;
+    t.valid = true;
+    return t;
+}
+
+SettingsState ReadSettings(const Reader& m, u32 S)
+{
+    const auto& f = kEU.front;
+    SettingsState v;
+    u32 cur, vt, music, sfx, art, G;
+    if (!m.In(S, f.oSlotSize) || !m.R32(S + f.oPage, cur) || cur == 0 || !m.In(cur, 0x18) || !m.R32(cur, vt)) return v;
+    int page = -1;
+    for (int i = 0; i < 4; i++) if (vt == f.vtPages[i]) page = i;
+    u32 obj[4];
+    for (int i = 0; i < 4; i++) if (!m.R32(S + f.oPages + 4 * (u32)i, obj[i]) || !m.In(obj[i], 0x18)) return v;
+    if (page < 0 || obj[page] != cur) return v;
+    if (!m.R32(kEU.gameBlock, G) || !m.R32(G + kEU.town.optMusic, music) || !m.R32(G + kEU.town.optSfx, sfx) || music > f.volMax || sfx > f.volMax || !m.R8(S + f.oArt, art) || art > 1) return v;
+    v.page = page; v.music = (int)music; v.sfx = (int)sfx; v.art = art == 0;
+    // The Concept page's buttons (their unlocked byte) and the Credits page's scroll: only while their page is up (the others are not built yet).
+    u32 vc;
+    if (page == 2 && m.R32(obj[2], vc) && vc == f.vtPages[2])
+    {
+        u16 bits = 0;
+        bool ok = true;
+        for (u32 i = 0; i < f.cpN && ok; i++)
+        {
+            u32 btn, flag;
+            if (!m.R32(obj[2] + f.cpButtons + 4 * i, btn) || !m.In(btn, f.cpFlag + 1) || !m.R8(btn + f.cpFlag, flag) || flag > 1) ok = false;
+            else if (flag) bits |= (u16)(1u << i);
+        }
+        if (ok) { v.conceptKnown = true; v.conceptBits = bits; }
+    }
+    u32 vr, pos, line;
+    if (page == 3 && m.R32(obj[3], vr) && vr == f.vtPages[3] && m.In(obj[3], f.crSize) && m.R32(obj[3] + f.crPos, pos) && m.R32(obj[3] + f.crLine, line) && (int)line >= 0 && line < 100000)
+    {
+        v.creditsKnown = true; v.creditsPos = (int)pos; v.creditsLine = (int)line;
+    }
+    v.valid = true;
+    return v;
+}
+
+// The slot time: 0x80000000 + the seconds since 2000-01-01 00:00 (the game's calendar: every fourth year leap).
+bool DecodeSlotTime(u32 v, LoadRow& r)
+{
+    const auto& f = kEU.front;
+    if (v < f.ldTimeBase) return false;
+    const u32 t = v - f.ldTimeBase;
+    u32 days = t / 86400, sec = t % 86400, year = 2000;
+    for (;; year++)
+    {
+        const u32 len = year % 4 == 0 ? 366 : 365;
+        if (days < len) break;
+        days -= len;
+        if (year >= 2000 + f.ldYearMax) return false;
+    }
+    static const u32 mdays[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    u32 month = 0;
+    for (; month < 12; month++)
+    {
+        const u32 len = mdays[month] + (month == 1 && year % 4 == 0 ? 1 : 0);
+        if (days < len) break;
+        days -= len;
+    }
+    if (month >= 12) return false;
+    const u32 h = sec / 3600;
+    r.month = (int)month + 1; r.day = (int)days + 1;
+    r.pm = h >= 12; r.hour12 = h % 12 == 0 ? 12 : (int)(h % 12); r.minute = (int)(sec / 60 % 60);
+    r.timeKnown = true;
+    return true;
+}
+
+LoadScreen ReadLoad(const Reader& m, u32 S, bool wireless)
+{
+    const auto& f = kEU.front; const auto& t = kEU.town;
+    LoadScreen v;
+    u32 cur, tapped;
+    if (!m.In(S, f.ldSize) || !m.R32(t.saveCurrent, cur) || (int)cur < -1 || (int)cur >= kLoadRows || !m.R32(S + f.ldTapped, tapped)) return v;
+    for (int i = 0; i < kLoadRows; i++)
+    {
+        u32 used;
+        if (!m.R8(t.saveUsed + (u32)i, used) || used > 1) return LoadScreen{};
+        LoadRow& r = v.rows[i];
+        r.used = used == 1;
+        if (!r.used) continue;
+        const u32 h = t.saveHeader + t.saveHeaderSize * (u32)i;
+        u32 money, time, place;
+        if (!m.R32(h + t.saveMoney, money) || !m.R32(h + t.saveTime, time) || !m.R8(h + t.savePlace, place) || f.ldPlace + place >= kEU.menus.stringMax) return LoadScreen{};
+        r.money = (int)money; r.place = (int)place; r.placeNameId = (int)(f.ldPlace + place);
+        std::string name;
+        bool ok = ReadCString(m, h + t.saveName, t.saveNameMax, name);
+        if (ok && name.empty()) ok = ReadCString(m, f.ldNameDefault, t.saveNameMax, name);
+        for (char ch : name) if (ch < 0x20 || ch > 0x7E) ok = false;
+        r.name = ok ? name : std::string();
+        DecodeSlotTime(time, r);
+    }
+    v.green = (int)cur;
+    v.tapped = tapped < (u32)kLoadRows ? (int)tapped : -1;   // stale garbage before the first tick
+    v.wireless = wireless;
+    v.valid = true;
+    return v;
+}
+
+// Create-a-Sim: the bottom screen's page object by its vtable, then that page's fields.
+CasState ReadCas(const Reader& m, u32 S)
+{
+    const auto& f = kEU.front;
+    CasState c;
+    u32 page, gender, N, vt, G;
+    if (!m.In(S, f.casSize) || !m.R16(S + f.casPage, page) || page > f.casMaxPage || !m.R16(S + f.casGender, gender) || gender > 1 || !m.R32(S + f.casObj, N) || N == 0 || !m.R32(N, vt)) return c;
+    static const int kObjOfPage[8] = {0, 1, 2, 3, 4, 5, 1, 3};   // the in-game pages 6 / 7 reuse the Hair and Clothes pages
+    const int idx = kObjOfPage[page];
+    if (vt != f.vtCas[idx] || !m.In(N, f.sizeCas[idx])) return c;
+    if (!m.R32(kEU.gameBlock, G) || !ReadCString(m, G + kEU.simName, kEU.simNameMax, c.simName) || c.simName.size() > (size_t)kCasName) return CasState{};
+    for (char ch : c.simName) if (ch < 0x20 || ch > 0x7E) return CasState{};
+    u32 H;
+    if (m.R32(S + f.casHero + 4 * gender, H) && H != 0 && m.In(H, f.heroSize))
+    {
+        u32 skin, hair;
+        if (m.R16(H + f.heroSkin, skin) && skin <= f.maxSkin) c.skin = (int)skin;
+        if (m.R16(H + f.heroHair, hair) && hair <= f.maxHairColour) c.hairColour = (int)hair;
+    }
+    u32 a, b, d;
+    switch (idx)
+    {
+    case 0:
+        if (!m.R16(N + f.nameKb, a) || a > 2 || !ReadCString(m, N + f.nameBuf, kCasName + 1, c.name)) return CasState{};   // NUL within the game's 7 + 1
+        for (char ch : c.name) if (ch < 0x20 || ch > 0x7E) return CasState{};
+        c.keyboard = (int)a; c.nameKnown = true;
+        break;
+    case 1:
+        if (!m.R16(N + f.hairSel, a) || a > f.maxHairStyle || !m.R16(N + f.hairScroll, b) || b > f.maxHairScroll) return CasState{};
+        c.hairStyle = (int)a; c.hairScroll = (int)b; c.hairKnown = true;
+        break;
+    case 2:
+        if (!m.R16(N + f.face, a) || a > f.maxFace) return CasState{};
+        c.face = (int)a;
+        break;
+    case 3:
+        if (!m.R16(N + f.thCat, a) || a > f.maxCat || !m.R16(N + f.thPage, b) || b > f.maxThPage || !m.R16(N + f.thItem, d) || d > f.maxThItem) return CasState{};
+        c.category = (int)a; c.clothesPage = (int)b; c.item = (int)d; c.clothesKnown = true;
+        break;
+    case 4:
+        if (!m.R8(N + f.cfAsp, a) || a > 3 || !m.R8(N + f.cfAnswer, b) || b > 2) return CasState{};
+        c.aspiration = (int)a; c.answer = (int)b; c.keepKnown = true;
+        break;
+    default: break;
+    }
+    c.page = (int)page; c.gender = (int)gender;
+    c.valid = true;
+    return c;
+}
+
+BootState ReadBoot(const Reader& m, u32 obj, bool top)
+{
+    const auto& f = kEU.front;
+    BootState b;
+    u32 mode, cnt, dur;
+    if (!m.In(obj, 0x38) || !m.R8(obj + f.bgMode, mode) || mode > f.bgMaxMode || !m.R16(obj + f.bgCount, cnt) || !m.R16(obj + f.bgDuration, dur)) return b;
+    b.mode = (int)mode; b.countdown = (int)(s16)cnt; b.duration = (int)(s16)dur; b.top = top;
+    b.valid = true;
+    return b;
+}
+
+FrontState ReadFront(const Reader& m, u32 P, u32 S, u32 sVt)
+{
+    const auto& f = kEU.front;
+    FrontState v;
+    u32 T = 0, tVt = 0;
+    if (!m.R32(P + f.topObj, T) || T == 0 || !m.R32(T, tVt)) { T = 0; tVt = 0; }
+    if (T && tVt == f.vtTitle) v.title = ReadTitle(m, T);
+    if (T && tVt == f.vtVideo)
+    {
+        u32 movie;
+        if (m.In(T, 0x30) && m.R32(T + f.vdMovie, movie) && movie <= f.vdMaxMovie) { v.video.movie = (int)movie; v.video.valid = true; }
+    }
+    if (sVt == f.vtSettings) v.settings = ReadSettings(m, S);
+    else if (sVt == f.vtLoad || sVt == f.vtWireless) v.load = ReadLoad(m, S, sVt == f.vtWireless);
+    else if (sVt == f.vtCasBottom) v.cas = ReadCas(m, S);
+    if (sVt == f.vtBoot) v.boot = ReadBoot(m, S, false);
+    else if (T && tVt == f.vtBoot) v.boot = ReadBoot(m, T, true);
+    if (v.video.valid) v.kind = FrontKind::Video;
+    else if (v.boot.valid) v.kind = FrontKind::Boot;
+    else if (v.title.valid) v.kind = v.title.menu ? FrontKind::MainMenu : FrontKind::Title;
+    else if (v.settings.valid) v.kind = FrontKind::Settings;
+    else if (v.load.valid) v.kind = v.load.wireless ? FrontKind::Wireless : FrontKind::Load;
+    else if (v.cas.valid) v.kind = v.cas.page == 4 ? FrontKind::KeepSim : FrontKind::CreateASim;
+    return v;
+}
 }
 
 RecordRow ReadSimRow(RamView ram, int k)
@@ -1221,6 +1448,7 @@ GameState ReadGameState(RamView ram)
     g.town.saves = ReadSaves(m);
     g.town.popup = ReadPopup(m, P);
     g.hotel = ReadHotel(m);
+    g.front = ReadFront(m, P, S, vt);
     // The note (overlay 11) has no GScreen of its own: its vtable and overlay say it.
     if (vt == kEU.menus.noteVt && (int)ovRaw == (int)kEU.menus.noteOverlay) g.town.note = ReadNote(m, S);
     g.vtable = vt;
@@ -1275,6 +1503,23 @@ GameState ReadGameState(RamView ram)
         else if (vt == h.vtPlacement && ov == -1) g.placement = ReadPlacement(m, S);
     }
     return g;
+}
+
+const char* FrontKindName(FrontKind k)
+{
+    switch (k)
+    {
+    case FrontKind::Title: return "Title";
+    case FrontKind::MainMenu: return "MainMenu";
+    case FrontKind::Settings: return "Settings";
+    case FrontKind::Load: return "Load";
+    case FrontKind::Wireless: return "Wireless";
+    case FrontKind::CreateASim: return "CreateASim";
+    case FrontKind::KeepSim: return "KeepSim";
+    case FrontKind::Boot: return "Boot";
+    case FrontKind::Video: return "Video";
+    default: return "None";
+    }
 }
 
 const char* GScreenName(GScreen s)

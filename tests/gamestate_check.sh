@@ -286,4 +286,63 @@ hotel_want h-stat stat '^stat page=0 transition=0 aspiration=0 level=2 points=29
 hotel_want h-statp stat '^stat page=3 ' "hotel: the Skills page"
 hotel_want h-town hotel '^hotel built=' "hotel: the block reads in the town too"
 hotel_want h-town checkin '^checkin none$' "hotel: no registry on the town's screen"
+# The front end (--print-front; milestone 5): the title and menu, Settings, Load-a-Sim, Create-a-Sim's pages, Keep this Sim?
+# and the boot screens, from copies of the research's F-* states in shots/. The first line of each kind (the state's own frame 0).
+front_run() { # NAME STATE: the front lines in NAME.front
+    local name=$1 file=$shots/$2.st
+    [ -f "$file" ] || file=$more_shots/$2.st
+    if [ ! -f "$file" ]; then echo "no save state $2.st" > "$tmp/$name.front"; return; fi
+    "$bin" "$rom" --headless --frames 30 --state-load "$file" --save "$tmp/$name.sav" --print-front "${town[@]}" > "$tmp/$name.frontlog" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.frontlog" && touch "$tmp/$name.frontok"
+    grep -E '^frame [0-9]+: (front|title|settings|load|cas|boot|video) ' "$tmp/$name.frontlog" | sed 's/^frame [0-9]*: //' > "$tmp/$name.front"
+}
+front_want() { # NAME KIND PATTERN LABEL: the last line of that kind matches
+    if [ -f "$tmp/$1.frontok" ] && grep "^$2 " "$tmp/$1.front" | tail -n 1 | grep -q -E "$3"; then echo "ok   $4"
+    else echo "FAIL $4: got '$(grep "^$2 " "$tmp/$1.front" 2>/dev/null | tail -n 1 | cut -c1-300)'"; fail=1; fi
+}
+for st in F-title0 F-mm-touch-150 F-mm-load-150 F-mm-opt-150 F-mm-wl-150 F-cas-a-30 F-cas-male-40 F-cas-fig3-40 F-cas-kabc-a-80 F-cas-k123-40 F-cas-kabcdef-200 F-cas-kbs4-140 \
+          F-cas-tab2-60 F-cas-tab3-60 F-cas-tab4-60 F-hair-c8-40 F-hair-s3-40 F-hair-next3-130 F-face-5-40 F-thr-cat3-40 F-thr-6-40 F-keep-asp2-30 F-keep-tick-30 F-keep-cross-30 \
+          F-opt-sfx-40 F-opt-concept-40 F-opt-credits-400 F-opt-music-drag-80 F-copt-concept-80 F-cload-150 F-cload-t1-60 F-boot-900 F-boot-skip-1500; do front_run "$st" "$st"; done
+front_want F-title0 front '^front Title$' "front: the touch-to-begin title"
+front_want F-title0 title '^title phase=0 menu=0 button=-1$' "front: title phase 0, no button"
+front_want F-mm-touch-150 front '^front MainMenu$' "front: the main menu"
+front_want F-mm-touch-150 title '^title phase=3 menu=1 ' "front: main menu phase 3"
+front_want F-boot-skip-1500 front '^front MainMenu$' "front: the boot, skipped, ends on the main menu"
+front_want F-mm-load-150 load '^load wireless=0 green=-1 tapped=-1 rows=-,-,-$' "front: Load-a-Sim, three empty slots"
+front_want F-mm-wl-150 front '^front Wireless$' "front: DS Wireless"
+front_want F-cload-150 load '^load wireless=0 green=0 tapped=-1 rows=Chris:3226:70:11/21 12:52am,Clare:1055:86:11/16 1:30pm,Jun:9150:87:11/20 8:03pm$' "front: the three saves, the game's own date and time"
+front_want F-cload-t1-60 load 'tapped=0 ' "front: the first slot's tick tapped"
+front_want F-mm-opt-150 settings '^settings page=0 music=4096 sfx=4096 art=0 concept=\? credits=\?$' "front: Settings opens on Music at 100 %"
+front_want F-opt-sfx-40 settings '^settings page=1 ' "front: the SFX page"
+front_want F-opt-concept-40 settings '^settings page=2 .* concept=0 ' "front: Concept Art, none unlocked without a save"
+front_want F-copt-concept-80 settings '^settings page=2 .* concept=8 ' "front: Concept Art, the third unlocked (the complete save)"
+front_want F-opt-credits-400 settings '^settings page=3 .* credits=[0-9]+/[0-9]+$' "front: Credits scrolling"
+front_want F-opt-music-drag-80 settings '^settings page=0 music=1296 ' "front: the Music slider dragged to 32 %"
+front_want F-cas-a-30 front '^front CreateASim$' "front: Create-a-Sim"
+front_want F-cas-a-30 cas '^cas page=0 gender=0 simname=Sim skin=0 haircolour=0 name=Sim len=3 keyboard=0$' "front: the Name page, Sim, ABC"
+front_want F-cas-male-40 cas '^cas page=0 gender=1 ' "front: the male Sim"
+front_want F-cas-fig3-40 cas ' skin=2 ' "front: the third skin figure"
+front_want F-cas-kabc-a-80 cas ' name=Sima len=4 keyboard=1$' "front: abc keyboard, Sima"
+front_want F-cas-k123-40 cas ' keyboard=2$' "front: the 123! keyboard"
+front_want F-cas-kabcdef-200 cas ' name=SimABCD len=7 ' "front: the name stops at 7 characters"
+front_want F-cas-kbs4-140 cas ' name= len=0 ' "front: the name emptied by backspace"
+front_want F-cas-tab2-60 cas '^cas page=1 .* hair=0 scroll=0$' "front: the Hair page"
+front_want F-hair-c8-40 cas 'haircolour=7 hair=0 ' "front: hair colour 8"
+front_want F-hair-s3-40 cas ' hair=2 scroll=0$' "front: the third hair style"
+front_want F-hair-next3-130 cas ' hair=0 scroll=3$' "front: the hair scrolled by 3"
+front_want F-cas-tab3-60 cas '^cas page=2 .* face=0$' "front: the Face page"
+front_want F-face-5-40 cas ' face=4$' "front: face 5"
+front_want F-cas-tab4-60 cas '^cas page=3 .* category=0 clothespage=0 item=0$' "front: the Clothes page"
+front_want F-thr-cat3-40 cas ' category=2 ' "front: the third clothes category"
+front_want F-thr-6-40 cas ' item=16$' "front: the sixth cell of Clothes"
+front_want F-keep-asp2-30 front '^front KeepSim$' "front: Keep this Sim?"
+front_want F-keep-asp2-30 cas ' aspiration=2 answer=0$' "front: Popularity chosen"
+front_want F-keep-tick-30 cas ' aspiration=0 answer=1$' "front: the tick pressed"
+front_want F-keep-cross-30 cas ' answer=2$' "front: the cross pressed"
+front_want F-boot-900 front '^front Video$' "front: the intro video"
+front_want F-boot-900 video '^video movie=3$' "front: the intro is movie 3"
+front_want F-boot-900 boot '^boot mode=0 ' "front: touch to continue under the video"
+front_want F-title0 settings '^settings none$' "front: no Settings on the title"
+front_want F-cas-a-30 title '^title none$' "front: no title in Create-a-Sim"
+
 exit $fail
