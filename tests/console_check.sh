@@ -985,11 +985,11 @@ check_pad pad-hotseat hotseat
 check_pad pad-target target
 check_pad pad-buy buy
 # Pockets and Give Gift (src/port/pockets.*, gift.*): from A-pk-slot1-key2 (the Super Drencher
-# selected), MENU, A → the Super Drencher's game (overlay 18, ItemHand); MENU, Left (slot 1), X →
+# selected), MENU, A → the Super Drencher's game (overlay 18, Drencher: CONSOLE's ItemHand); MENU, Left (slot 1), X →
 # the game selects the slot (nothing thrown), X again → the bin empties the pockets; from
 # A-gift2-base, Right, A → the bed given (the pockets keep the arcade), back to the panel; from
 # sit-gift, B → the game's X, the panel.
-drencher() { in_order pad-drencher 'console menu open, focus 7' 'game ItemHand'; }
+drencher() { in_order pad-drencher 'console menu open, focus 7' 'game Drencher'; }
 bin_twice() {
     in_order pad-bin 'console menu open, focus 7' 'focus 0' 'pockets slot=0' 'inventory slots=- ' || return 1
     # The first X threw nothing: the pockets emptied only after the second (frame 140 on).
@@ -1330,6 +1330,17 @@ done
 for lang in 1 2 3 4 5; do
     if out=$("$bin" "$rom" --language $lang --measure-menu 2> "$tmp/menu-$lang.log"); then echo "ok   menu-words-$lang: $out"
     else echo "FAIL menu-words-$lang: $out $(tail -n 1 "$tmp/menu-$lang.log")"; fails=$((fails + 1)); fi
+done
+# The minigames (milestone 6, `GScreen::Autopsy` ... `ArtGallery`): CONSOLE knows none of them yet, so each
+# is the stick cursor's Unknown screen as before the kinds existed: the game's kind is printed, the pixels
+# agree (no "pixels disagree"), and the run (a stick move, A) ends well.
+for st in G-X-autopsy:Autopsy G-X-metal:Detector G-X-moogoo-game:MooGoo G-X-scratch:Scratch G-X-crime:Crime G-X-music:Mixer G-D-mus-save:MixerSave G-X-artgal:ArtGallery; do
+    pad "pad-mg-${st%%:*}" "${st%%:*}" minigame 120 &
+done
+wait
+for st in G-X-autopsy:Autopsy G-X-metal:Detector G-X-moogoo-game:MooGoo G-X-scratch:Scratch G-X-crime:Crime G-X-music:Mixer G-D-mus-save:MixerSave G-X-artgal:ArtGallery; do
+    mg_cursor() { in_order "pad-mg-${st%%:*}" "game ${st#*:}"; }
+    check_pad "pad-mg-${st%%:*}" mg_cursor
 done
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

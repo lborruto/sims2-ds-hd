@@ -122,7 +122,36 @@ struct EUTable
         u32 stMaxPage, stMaxTransition, stMaxLevel, stMaxPoints;   // stat panel bounds (the aspiration level 3 is the top)
         u32 buildTimers;                                     // from G: u32 per place, the time its building ends (vs `clock`; noCheckOut: never set)
     } hotel;
+    // The minigames (milestone 6; docs/research/ram-map.md, "The minigames"): every screen's (overlay, vtable) and the offsets from S.
+    struct Minigames
+    {
+        OvScreen screens[9];                                 // ov kAnyOverlay: the class has no overlay of its own (its vtable says it)
+        u32 vtMooGooIntro;                                   // the intro's vtable (screens[] names the game's)
+        // Alien Autopsy
+        u32 auOrgans, auOrganStride, auDamage, auKind, auFreed;      // from S: organ slots {+0xC u16 damage, +0xE u8 kind, +0xF u8 freed}
+        u32 auParasites, auParaStride, auParaTarget, auParaEating;   // from S: parasite slots {+0 sprite, +0x11 target organ, +0x14 eating}
+        u32 auSpriteX, auSpriteY;                                    // from a sprite: 20.12 positions
+        u32 auEarnings, auPhase, auSub, auSpecimen, auTool, auDragged, auHeld, auTearX, auTearY;
+        // Metal Detector
+        u32 mdState, mdCharge, mdInRange, mdSlider, mdSliderValue, mdCard, mdMismatch, mdFind, mdFindType, mdEarnings, mdFinds;   // earnings and finds from G
+        // MooGoo Monkey
+        u32 mgPhase, mgSub, mgTimer, mgCurrent, mgChoice, mgRound, mgFlags, mgQuit, mgQuitAsk, mgWinnings, mgDeckNext, mgDeckSize;
+        u32 mgMonkeys, mgMonkeyStride, mgMCards, mgMBets, mgMCount, mgMSlots, mgMFlags;
+        u32 mgPlayers, mgPlayerStride, mgPName, mgPHand, mgPSel, mgPScore, mgPFlags;
+        // Scratch lottery
+        u32 scTier, scPrize, scA, scB, scState, scRevealed, scActive, scWhich, scHint, scBoxes, scBoxStride, scCovers, scCoverLeft;
+        // Super Drencher
+        u32 dwPump, dwTarget, dwType, dwPumping, dwFiring, dwTargetMode, dwHelp, dwHelpText, dwWater, dwPressure;   // water and pressure from G
+        // Crime
+        u32 crHelp, crDrag, crPhase, crAngle, crScare, crArmed, crSubdue, crScareDown, crSubdueDown, crHit;
+        // Music Mixer and its save menu
+        u32 mxMode, mxPhase, mxTracks, mxKeys, mxOctave, mxInst, mxSustain, mxSliderA, mxSliderB, mxTempo, mxVariation, mxSong, mxCtl, mxNotes, mxFlags, mxMic, mxUnlocked, mxUnlockedN;
+        u32 msMode, msSlot, msName, msContext, msSongs, msSongStride, msRingtones, msRingStride;   // msSongs / msRingtones from G; byte 15 of each entry = used
+        // Art Gallery
+        u32 arStroke, arButton, arTool, arSwatch, arPage, arBrush, arWork, arIn, arRow, arCol;
+    } mg;
 };
+constexpr int kAnyOverlay = -2;
 constexpr EUTable kEU = {
     0x02000000, 0x02139FA4,
     0xDAC, 0xE34, 0x8, 0xE42,
@@ -218,6 +247,28 @@ constexpr EUTable kEU = {
         0x2B, 0xFF, 5,
         4, 2, 3, 9999,
         0x4418,
+    },
+    {
+        {
+            {0, 0x0214EBC4, GScreen::Autopsy}, {9, 0x0214C124, GScreen::Detector}, {10, 0x02152E0C, GScreen::MooGoo}, {10, 0x02152EC8, GScreen::MooGoo},
+            {13, 0x0214AFC4, GScreen::Scratch}, {kAnyOverlay, 0x02134EC8, GScreen::Crime}, {kAnyOverlay, 0x02134F10, GScreen::Mixer},
+            {kAnyOverlay, 0x02134FA0, GScreen::MixerSave}, {kAnyOverlay, 0x02134D70, GScreen::ArtGallery},
+        },
+        0x02152EC8,
+        0x28, 0x10, 0xC, 0xE, 0xF,
+        0x58, 0x18, 0x11, 0x14,
+        0x50, 0x54,
+        0xC9EC, 0xC9F4, 0xC9F5, 0xC9F6, 0xC9F7, 0xCA0C, 0xCA0D, 0xCA16, 0xCA18,
+        0x9C, 0xD0, 0xD4, 0xD8, 0x90, 0x4E, 0x54, 0x58, 8, 0x80, 0x31C8,
+        0x1C, 0xC, 0x18, 0x1E6, 0x1E7, 0x1E9, 0x1EA, 0x1F0, 0x1F1, 0x1F2, 0x1E4, 0x1E5,
+        0x30, 0x2C, 0x18, 0x23, 0x26, 0x27, 0x28,
+        0x138, 0x28, 0x18, 0x1C, 0x21, 0x22, 0x23,
+        0xE0, 0x10, 0xC8, 0xCC, 0xD0, 0xD8, 0xDC, 0xDE, 0xE4, 0x24, 0xC, 0xA4, 0x98,
+        0x24, 0x28, 0x2C, 0x34, 0x35, 0x70, 0x78, 0x79, 0x18, 0x1C,
+        0x4C, 0x52, 0x58, 0x5A, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, 0x61,
+        8, 0xA55, 0x8E2, 0x8E3, 0x8E6, 0x8E7, 0x8E9, 0x8EA, 0x8EB, 0x8EC, 0x8ED, 0xA5C, 0xA4C, 0xA4E, 0xA52, 0xA6C, 0xA63, 0xA6B,
+        8, 0x28, 0x88, 0xC, 0x46AC, 16, 0x46DC, 64,
+        0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40, 0x650, 0xC68, 0xC60, 0xC64,
     },
 };
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
@@ -1172,6 +1223,301 @@ StatState ReadStat(const Reader& m, u32 S, const HotelState& hotel)
     v.valid = true;
     return v;
 }
+
+// ---- The minigames (milestone 6). Each reader is given the screen object S (vtable already checked)
+// and answers an invalid part, never a partial one, when a field is out of its range.
+int Fix12(u32 raw) { return (int)raw >> 12; }   // a 20.12 fixed value, whole units
+// The game's raw text for a log line: printable ASCII as it is, the rest \xNN.
+std::string TextEsc(const std::string& raw)
+{
+    std::string r;
+    for (unsigned char c : raw)
+    {
+        if (c >= 0x20 && c < 0x7F && c != '"' && c != '\\') r += (char)c;
+        else { char h[8]; snprintf(h, sizeof h, "\\x%02x", c); r += h; }
+    }
+    return r;
+}
+
+AutopsyState ReadAutopsy(const Reader& m, u32 S)
+{
+    const auto& q = kEU.mg;
+    AutopsyState v;
+    u32 phase, sub, spec, tool, dragged, held, tx, ty;
+    if (!m.In(S, 0xCA40) || !m.R8(S + q.auPhase, phase) || phase > 6 || !m.R8(S + q.auSub, sub) || sub > 7 || !m.R8(S + q.auSpecimen, spec) || spec > 1 ||
+        !m.R8(S + q.auTool, tool) || tool > 2 || !m.R8(S + q.auDragged, dragged) || !m.R8(S + q.auHeld, held) || !m.R16(S + q.auTearX, tx) || !m.R16(S + q.auTearY, ty))
+        return v;
+    const int earn = m.S32(S + q.auEarnings);
+    if (earn < 0 || earn > 999999) return AutopsyState{};
+    v.phase = (int)phase; v.sub = (int)sub; v.specimen = (int)spec; v.tool = (int)tool; v.earnings = earn;
+    for (int i = 0; i < kAutopsyOrgans; i++)
+    {
+        const u32 o = S + q.auOrgans + q.auOrganStride * (u32)i;
+        u32 damage, kind, freed;
+        if (!m.R16(o + q.auDamage, damage) || damage > (u32)kAutopsyDestroyed || !m.R8(o + q.auKind, kind) || kind > (u32)kAutopsyKindGone || !m.R8(o + q.auFreed, freed) || freed > 1)
+            return AutopsyState{};
+        v.organs[i] = {(int)kind, (int)damage, freed == 1};
+        if (v.organs[i].present() && v.organs[i].freed) v.handAlert = true;
+    }
+    for (int j = 0; j < kAutopsyParasites; j++)
+    {
+        const u32 e = S + q.auParasites + q.auParaStride * (u32)j;
+        u32 sprite, target, eating;
+        if (!m.R32(e, sprite)) return AutopsyState{};
+        if (sprite == 0) continue;
+        if (!m.In(sprite, q.auSpriteY + 4) || !m.R8(e + q.auParaTarget, target) || target > 3 || !m.R8(e + q.auParaEating, eating) || eating > 1) return AutopsyState{};
+        const int x = Fix12((u32)m.S32(sprite + q.auSpriteX)), y = Fix12((u32)m.S32(sprite + q.auSpriteY));
+        if (x < -4096 || x > 4096 || y < -4096 || y > 4096) return AutopsyState{};
+        v.parasites.push_back({j, x, y, target < 3 ? (int)target : -1, eating == 1});
+        if (eating == 1) v.tweezersAlert = true;
+    }
+    // The "none" bytes are only written after a use (stale before it): read them under their sub-phase.
+    if ((sub == 3 || sub == 4) && dragged < (u32)kAutopsyOrgans) v.dragged = (int)dragged;
+    if ((sub == 6 || sub == 7) && held < (u32)kAutopsyParasites) v.held = (int)held;
+    if (phase == 6) { v.tearX = (int)tx; v.tearY = (int)ty; }
+    v.valid = true;
+    return v;
+}
+
+DetectorState ReadDetector(const Reader& m, u32 S)
+{
+    const auto& q = kEU.mg;
+    DetectorState v;
+    u32 G, state, range, slider, sliderVal, card, mismatch, earn, finds;
+    if (!m.In(S, 0xE4) || !m.R32(kEU.gameBlock, G) || !m.R32(S + q.mdState, state) || state > 5 || !m.R8(S + q.mdInRange, range) || range > 1 ||
+        !Ptr(m, S + q.mdSlider, q.mdSliderValue + 4, slider) || !m.R32(slider + q.mdSliderValue, sliderVal) || sliderVal > (u32)kDetectorSliderMax ||
+        !m.R8(S + q.mdCard, card) || card > 1 || !m.R32(S + q.mdMismatch, mismatch) || mismatch > 128 || !m.R32(G + q.mdEarnings, earn) || earn > 99999999 ||
+        !m.R32(G + q.mdFinds, finds) || finds > 150)
+        return v;
+    const int charge = m.S32(S + q.mdCharge);
+    if (charge < 0 || charge > 2 * kDetectorFull) return DetectorState{};
+    v.state = (int)state; v.charge = charge; v.inRange = range == 1; v.slider = (int)sliderVal; v.mismatch = (int)mismatch; v.card = card == 1;
+    v.earnings = (int)earn; v.findCount = (int)finds;
+    u32 find, type;
+    if (v.inRange && Ptr(m, S + q.mdFind, q.mdFindType + 1, find) && m.R8(find + q.mdFindType, type) && type <= 8) v.findType = (int)type;
+    v.valid = true;
+    return v;
+}
+
+MooGooState ReadMooGoo(const Reader& m, u32 S, bool intro)
+{
+    const auto& q = kEU.mg;
+    MooGooState v;
+    if (intro) { v.intro = v.valid = true; return v; }
+    u32 phase, sub, cur, choice, round, flags, quit, ask, deckNext, deckSize;
+    if (!m.In(S, 0x214) || !m.R32(S + q.mgPhase, phase) || phase > 0x17 || !m.R32(S + q.mgSub, sub) || sub > 9 || !m.R8(S + q.mgCurrent, cur) || cur >= (u32)kMooGooPlayers ||
+        !m.R8(S + q.mgChoice, choice) || choice >= (u32)kMooGooPlayers || !m.R8(S + q.mgRound, round) || round > 3 || !m.R8(S + q.mgFlags, flags) || !m.R8(S + q.mgQuit, quit) || quit > 1 ||
+        !m.R8(S + q.mgQuitAsk, ask) || ask > 1 || !m.R8(S + q.mgDeckNext, deckNext) || !m.R8(S + q.mgDeckSize, deckSize) || deckSize > 54 || deckNext > deckSize)
+        return v;
+    const int timer = m.S32(S + q.mgTimer), winnings = (int)(short)m.S16(S + q.mgWinnings);
+    if (timer < -1 || timer > 0x10000) return MooGooState{};
+    v.phase = (int)phase; v.sub = (int)sub; v.timer = timer; v.current = (int)cur; v.humans = (int)choice + 1; v.round = (int)round;
+    v.hotSeat = flags & 1; v.turnDone = flags & 2; v.betPlaced = flags & 4; v.stale = flags & 8;
+    v.quit = quit == 1; v.quitAsk = ask == 1; v.winnings = winnings; v.deckNext = (int)deckNext; v.deckSize = (int)deckSize;
+    for (int k = 0; k < kMooGooMonkeys; k++)
+    {
+        const u32 e = S + q.mgMonkeys + q.mgMonkeyStride * (u32)k;
+        u32 count, slots, fl;
+        if (!m.R8(e + q.mgMCount, count) || count > (u32)kMooGooCards || !m.R8(e + q.mgMSlots, slots) || slots > 4 || !m.R8(e + q.mgMFlags, fl)) return MooGooState{};
+        MooGooMonkey& mk = v.monkeys[k];
+        mk.count = (int)count; mk.slots = (int)slots; mk.eliminated = fl & 1;
+        for (u32 i = 0; i < count; i++)
+        {
+            u32 c;
+            if (!m.R8(e + q.mgMCards + i, c) || c > 0x35) return MooGooState{};
+            mk.cards[i] = (int)c;
+        }
+        for (int p = 0; p < kMooGooPlayers; p++)
+        {
+            u32 b;
+            if (!m.R8(e + q.mgMBets + (u32)p, b) || b > 4) return MooGooState{};
+            mk.bets[p] = (int)b;
+        }
+    }
+    for (int p = 0; p < kMooGooPlayers; p++)
+    {
+        const u32 e = S + q.mgPlayers + q.mgPlayerStride * (u32)p;
+        u32 name, sel, score, fl;
+        if (!m.R32(e + q.mgPName, name) || name > 0xFFFF || !m.R8(e + q.mgPSel, sel) || (sel >> 4) > 4 || !m.R8(e + q.mgPScore, score) || score > 99 || !m.R8(e + q.mgPFlags, fl)) return MooGooState{};
+        MooGooPlayer& pl = v.players[p];
+        pl.nameId = (int)name; pl.selected = (int)(sel >> 4); pl.score = (int)score; pl.ai = fl & 1; pl.outOfCards = fl & 4; pl.bet = fl & 8;
+        for (int i = 0; i < kMooGooHand; i++)
+        {
+            u32 c;
+            if (!m.R8(e + q.mgPHand + (u32)i, c) || (c > 0x35 && c != (u32)kMooGooHandEmpty)) return MooGooState{};
+            pl.hand[i] = phase < 8 ? kMooGooHandEmpty : (int)c;   // before the deal the bytes are zeros, not "empty"
+        }
+    }
+    v.valid = true;
+    return v;
+}
+
+ScratchState ReadScratch(const Reader& m, u32 S)
+{
+    const auto& q = kEU.mg;
+    ScratchState v;
+    u32 tier, prize, a, b, state, revealed, active, which, hint;
+    if (!m.In(S, 0xE8) || !m.R32(S + q.scTier, tier) || tier > 2 || !m.R32(S + q.scPrize, prize) || prize > 99999 || !m.R32(S + q.scA, a) || a > 6 || !m.R32(S + q.scB, b) || b > 6 ||
+        !m.R32(S + q.scState, state) || state < 1 || state > 3 || !m.R16(S + q.scRevealed, revealed) || revealed > (u32)kScratchBoxes || !m.R8(S + q.scActive, active) || active > 1 ||
+        !m.R16(S + q.scWhich, which) || (which != 0xFFFF && which >= (u32)kScratchBoxes) || !m.R8(S + q.scHint, hint) || hint > 1)
+        return v;
+    v.tier = (int)tier; v.prize = (int)prize; v.winA = (int)a; v.winB = (int)b; v.state = (int)state; v.revealed = (int)revealed;
+    v.active = active == 1 && which != 0xFFFF ? (int)which : -1; v.hint = hint == 1;
+    for (int i = 0; i < kScratchBoxes; i++)
+    {
+        const u32 e = S + q.scBoxes + q.scBoxStride * (u32)i;
+        u32 pic, st, cover, left;
+        if (!m.R32(e, pic) || pic > 6 || !m.R8(e + 9, st) || st > 2 || !Ptr(m, S + q.scCovers + 4 * (u32)i, q.scCoverLeft + 4, cover) || !m.R32(cover + q.scCoverLeft, left) || left > (u32)kScratchPixels)
+            return ScratchState{};
+        v.boxes[i] = {(int)pic, st == 2, kScratchPixels - (int)left};
+    }
+    v.valid = true;
+    return v;
+}
+
+DrencherState ReadDrencher(const Reader& m, u32 S)
+{
+    const auto& q = kEU.mg;
+    DrencherState v;
+    u32 G, pumping, firing, mode, help, text;
+    if (!m.In(S, 0x90) || !m.R32(kEU.gameBlock, G) || !m.R8(S + q.dwPumping, pumping) || pumping > 1 || !m.R8(S + q.dwFiring, firing) || firing > 1 || !m.R8(S + q.dwTargetMode, mode) || mode > 1 ||
+        !m.R8(S + q.dwHelp, help) || help > 1 || !m.R8(S + q.dwHelpText, text) || text > 1)
+        return v;
+    const int pump = Fix12((u32)m.S32(S + q.dwPump)), target = m.S32(S + q.dwTarget), type = m.S32(S + q.dwType);
+    const int water = m.S32(G + q.dwWater), pressure = m.S32(G + q.dwPressure);
+    if (pump < 0 || pump > kDrencherPumpMax || target < -1 || target > 0x1FF || water < 0 || water > (101 << 12) || pressure < 0 || pressure > (126 << 12)) return DrencherState{};
+    if (target >= 0 && (type < 0 || type > 0xFF)) return DrencherState{};
+    v.pump = pump; v.target = target; v.targetType = target >= 0 ? type : -1; v.pumping = pumping == 1; v.firing = firing == 1; v.targetMode = mode == 1;
+    v.help = help == 1; v.helpText = text == 1; v.water = Fix12((u32)water); v.pressure = Fix12((u32)pressure);
+    v.valid = true;
+    return v;
+}
+
+CrimeState ReadCrime(const Reader& m, u32 S)
+{
+    const auto& q = kEU.mg;
+    CrimeState v;
+    u32 help, drag, phase, scare, armed, subdue, sd, bd, hit;
+    if (!m.In(S, 0x64) || !m.R8(S + q.crHelp, help) || help > 1 || !m.R8(S + q.crDrag, drag) || drag > 1 || !m.R8(S + q.crPhase, phase) || phase > 3 ||
+        !m.R8(S + q.crScare, scare) || scare > 1 || !m.R8(S + q.crArmed, armed) || armed > 1 || !m.R8(S + q.crSubdue, subdue) || subdue > 1 ||
+        !m.R8(S + q.crScareDown, sd) || sd > 1 || !m.R8(S + q.crSubdueDown, bd) || bd > 1 || !m.R8(S + q.crHit, hit))
+        return v;
+    const int angle = (int)(short)m.S16(S + q.crAngle);
+    if (angle < -90 || angle > 90) return CrimeState{};
+    v.help = help == 1; v.dragging = drag == 1; v.phase = (int)phase; v.angle = angle; v.canScare = scare == 1; v.armed = armed == 1; v.canSubdue = subdue == 1;
+    v.scarePressed = sd == 1; v.subduePressed = bd == 1;
+    v.hit = hit == 1;   // 0x10 before the first throw: unset
+    v.valid = true;
+    return v;
+}
+
+MixerState ReadMixer(const Reader& m, u32 S)
+{
+    const auto& q = kEU.mg;
+    MixerState v;
+    u32 mode, phase, tracks, octave, inst, sus, sa, sb, tempo, var, song, ctl, notes, flags, mic, nUnlocked;
+    if (!m.In(S, 0xA70) || !m.R32(S + q.mxMode, mode) || mode > 2 || !m.R8(S + q.mxPhase, phase) || phase > 0xA || !m.R8(S + q.mxTracks, tracks) || !m.R8(S + q.mxOctave, octave) ||
+        !m.R8(S + q.mxInst, inst) || !(inst == 1 || inst == 2 || inst == 3 || inst == 5) || !m.R8(S + q.mxSustain, sus) || sus > 1 || !m.R8(S + q.mxSliderA, sa) || sa > 26 ||
+        !m.R8(S + q.mxSliderB, sb) || sb > 26 || !m.R8(S + q.mxTempo, tempo) || !m.R8(S + q.mxVariation, var) || var > 1 || !m.R8(S + q.mxSong, song) || song > 8 ||
+        !m.R16(S + q.mxCtl, ctl) || !m.R16(S + q.mxNotes, notes) || !m.R8(S + q.mxFlags, flags) || !m.R8(S + q.mxMic, mic) || !m.R8(S + q.mxUnlockedN, nUnlocked) || nUnlocked > (u32)kMixerSongs)
+        return v;
+    const int oct = (int)(signed char)octave;
+    if (oct < -1 || oct > 1) return MixerState{};
+    for (int i = 0; i < kMixerKeys; i++)
+    {
+        u32 k;
+        if (!m.R8(S + q.mxKeys + (u32)i, k) || k > 0xD) return MixerState{};
+        v.keys[i] = k == 0xD ? -1 : (int)k;
+    }
+    for (u32 i = 0; i < nUnlocked; i++)
+    {
+        u32 s;
+        if (!m.R8(S + q.mxUnlocked + i, s) || s >= (u32)kMixerSongs) return MixerState{};
+        v.unlocked.push_back((int)s);
+    }
+    v.mode = (int)mode; v.phase = (int)phase; v.tracks = (int)tracks; v.octave = oct; v.instrument = (int)inst; v.sustain = sus == 1; v.sliderA = (int)sa; v.sliderB = (int)sb;
+    v.tempo = (int)tempo; v.variation = (int)var; v.song = (int)song; v.controlEvents = (int)ctl; v.noteEvents = (int)notes;
+    v.prep = flags & 4; v.previewing = flags & 0x10; v.micFull = mic & 2;
+    v.valid = true;
+    return v;
+}
+
+// A name field of the save menu: a raw text of at most 15 bytes (byte 15 is the entry's used flag) ending in a NUL.
+bool ReadName15(const Reader& m, u32 a, std::string& out)
+{
+    out.clear();
+    for (u32 i = 0; i < 15; i++)
+    {
+        u32 ch;
+        if (!m.R8(a + i, ch)) return false;
+        if (ch == 0) return true;
+        out += (char)ch;
+    }
+    return true;
+}
+
+MixerSaveState ReadMixerSave(const Reader& m, u32 S)
+{
+    const auto& q = kEU.mg;
+    MixerSaveState v;
+    u32 G, mode, slot, ctx;
+    if (!m.In(S, 0x13C) || !m.R32(kEU.gameBlock, G) || !m.R32(S + q.msMode, mode) || mode > 1 || !m.R8(S + q.msSlot, slot) || (slot > 2 && slot != 0xFF) || !Ptr(m, S + q.msContext, 0x108, ctx))
+        return v;   // the context is the mixer's: without it the menu draws black (no buttons)
+    if (!ReadName15(m, S + q.msName, v.name)) return MixerSaveState{};
+    const u32 base = mode == 0 ? q.msSongs : q.msRingtones, stride = mode == 0 ? q.msSongStride : q.msRingStride;
+    for (int j = 0; j < kMixerSaveSlots; j++)
+    {
+        u32 used;
+        if (!m.R8(G + base + stride * (u32)j + 15, used)) return MixerSaveState{};
+        v.used[j] = used != 0;
+        if (v.used[j] && !ReadName15(m, G + base + stride * (u32)j, v.slotName[j])) return MixerSaveState{};
+    }
+    v.mode = (int)mode; v.slot = slot == 0xFF ? -1 : (int)slot;
+    v.valid = true;
+    return v;
+}
+
+ArtState ReadArt(const Reader& m, u32 S)
+{
+    const auto& q = kEU.mg;
+    ArtState v;
+    u32 stroke, button, tool, swatch, page, brush, in;
+    if (!m.In(S, 0xCE8) || !m.R32(S + q.arStroke, stroke) || stroke > 2 || !m.R32(S + q.arButton, button) || button > 9 || !m.R32(S + q.arTool, tool) || tool > 5 ||
+        !m.R32(S + q.arSwatch, swatch) || swatch > 14 || !m.R32(S + q.arPage, page) || page > 15 || !m.R32(S + q.arBrush, brush) || brush > 2 || !m.R8(S + q.arIn, in))
+        return v;
+    v.cells.resize((size_t)kArtRows * kArtCols);
+    for (u32 i = 0; i < v.cells.size(); i++)
+    {
+        u32 c;
+        if (!m.R8(S + q.arWork + i, c) || c > 15) return ArtState{};
+        v.cells[i] = (u8)c;
+    }
+    v.stroke = (int)stroke; v.button = (int)button; v.tool = (int)tool; v.swatch = (int)swatch; v.page = (int)page; v.brush = (int)brush;
+    // The stylus's cell is stale (garbage) while it is off the canvas.
+    const int row = m.S32(S + q.arRow), col = m.S32(S + q.arCol);
+    if (in == 1 && row >= 0 && row < kArtRows && col >= 0 && col < kArtCols) { v.inCanvas = true; v.cellRow = row; v.cellCol = col; }
+    v.valid = true;
+    return v;
+}
+
+// The part of the screen the game shows (g.screen is set), apart from every other.
+void ReadMinigame(const Reader& m, u32 S, u32 vt, GameState& g)
+{
+    MinigameState& a = g.minigame;
+    switch (g.screen)
+    {
+    case GScreen::Autopsy: a.autopsy = ReadAutopsy(m, S); break;
+    case GScreen::Detector: a.detector = ReadDetector(m, S); break;
+    case GScreen::MooGoo: a.mooGoo = ReadMooGoo(m, S, vt == kEU.mg.vtMooGooIntro); break;
+    case GScreen::Scratch: a.scratch = ReadScratch(m, S); break;
+    case GScreen::Drencher: a.drencher = ReadDrencher(m, S); break;
+    case GScreen::Crime: a.crime = ReadCrime(m, S); break;
+    case GScreen::Mixer: a.mixer = ReadMixer(m, S); break;
+    case GScreen::MixerSave: a.mixerSave = ReadMixerSave(m, S); break;
+    case GScreen::ArtGallery: a.art = ReadArt(m, S); break;
+    default: break;
+    }
+}
 }
 
 RecordRow ReadSimRow(RamView ram, int k)
@@ -1234,6 +1580,8 @@ GameState ReadGameState(RamView ram)
     for (const auto& e : kEU.plain) if (e.vt == vt) { g.screen = e.screen; break; }
     if (g.screen == GScreen::Unknown)
         for (const auto& e : kEU.overlays) if (e.vt == vt && e.ov == g.overlay) { g.screen = e.screen; break; }
+    if (g.screen == GScreen::Unknown)
+        for (const auto& e : kEU.mg.screens) if (e.vt == vt && (e.ov == kAnyOverlay || e.ov == g.overlay)) { g.screen = e.screen; break; }
 
     switch (g.screen)
     {
@@ -1274,7 +1622,112 @@ GameState ReadGameState(RamView ram)
         else if (vt == h.vtStat && ov == (int)h.ovStat) g.stat = ReadStat(m, S, g.hotel);
         else if (vt == h.vtPlacement && ov == -1) g.placement = ReadPlacement(m, S);
     }
+    ReadMinigame(m, S, vt, g);
     return g;
+}
+
+std::string MinigameLine(const GameState& g)
+{
+    const MinigameState& a = g.minigame;
+    auto n = [](int v) { return std::to_string(v); };
+    auto join = [](const std::vector<std::string>& v) { std::string r; for (const std::string& x : v) r += (r.empty() ? "" : ",") + x; return r.empty() ? std::string("-") : r; };
+    char b[1024];
+    switch (g.screen)
+    {
+    case GScreen::Autopsy:
+    {
+        const AutopsyState& v = a.autopsy;
+        if (!v.valid) return "";
+        std::vector<std::string> o, p;
+        for (const AutopsyOrgan& x : v.organs) o.push_back(n(x.kind) + ":" + n(x.damage) + (x.freed ? ":freed" : ""));
+        for (const AutopsyParasite& x : v.parasites) p.push_back(n(x.slot) + ":" + n(x.x) + ":" + n(x.y) + ":" + n(x.organ) + (x.eating ? ":eat" : ""));
+        snprintf(b, sizeof b, "autopsy phase=%d sub=%d specimen=%d tool=%d earnings=%d dragged=%d held=%d alert=%d%d tear=%d,%d organs=%s parasites=%s", v.phase, v.sub, v.specimen, v.tool, v.earnings,
+                 v.dragged, v.held, v.handAlert, v.tweezersAlert, v.tearX, v.tearY, join(o).c_str(), join(p).c_str());
+        return b;
+    }
+    case GScreen::Detector:
+    {
+        const DetectorState& v = a.detector;
+        if (!v.valid) return "";
+        snprintf(b, sizeof b, "detector state=%d charge=%d range=%d slider=%d mismatch=%d card=%d find=%d finds=%d earnings=%d", v.state, v.charge, v.inRange, v.slider, v.mismatch, v.card, v.findType, v.findCount, v.earnings);
+        return b;
+    }
+    case GScreen::MooGoo:
+    {
+        const MooGooState& v = a.mooGoo;
+        if (!v.valid) return "";
+        if (v.intro) return "moogoo intro";
+        std::vector<std::string> mk, pl;
+        for (const MooGooMonkey& x : v.monkeys)
+        {
+            std::string c;
+            for (int i = 0; i < x.count; i++) c += (c.empty() ? "" : "/") + n(x.cards[i]);
+            mk.push_back((x.eliminated ? "out:" : "") + (c.empty() ? std::string("-") : c) + ":" + n(x.bets[0]) + n(x.bets[1]) + n(x.bets[2]) + ":" + n(x.slots));
+        }
+        for (const MooGooPlayer& x : v.players)
+        {
+            std::string h;
+            for (int c : x.hand) h += (h.empty() ? "" : "/") + (c == kMooGooHandEmpty ? std::string("_") : n(c));
+            pl.push_back(n(x.nameId) + ":" + h + ":sel" + n(x.selected) + ":score" + n(x.score) + (x.ai ? ":ai" : "") + (x.outOfCards ? ":out" : "") + (x.bet ? ":bet" : ""));
+        }
+        snprintf(b, sizeof b, "moogoo phase=%d sub=%d timer=%d current=%d humans=%d round=%d hotseat=%d done=%d bet=%d stale=%d quit=%d%d winnings=%d deck=%d/%d monkeys=%s players=%s", v.phase, v.sub, v.timer,
+                 v.current, v.humans, v.round, v.hotSeat, v.turnDone, v.betPlaced, v.stale, v.quit, v.quitAsk, v.winnings, v.deckNext, v.deckSize, join(mk).c_str(), join(pl).c_str());
+        return b;
+    }
+    case GScreen::Scratch:
+    {
+        const ScratchState& v = a.scratch;
+        if (!v.valid) return "";
+        std::vector<std::string> bx;
+        for (const ScratchBox& x : v.boxes) bx.push_back(n(x.picture) + ":" + n(x.erased) + (x.revealed ? ":open" : ""));
+        snprintf(b, sizeof b, "scratch tier=%d prize=%d state=%d revealed=%d win=%d,%d active=%d hint=%d boxes=%s", v.tier, v.prize, v.state, v.revealed, v.winA, v.winB, v.active, v.hint, join(bx).c_str());
+        return b;
+    }
+    case GScreen::Drencher:
+    {
+        const DrencherState& v = a.drencher;
+        if (!v.valid) return "";
+        snprintf(b, sizeof b, "drencher pump=%d target=%d/%d pumping=%d firing=%d targetmode=%d help=%d%d water=%d pressure=%d", v.pump, v.target, v.targetType, v.pumping, v.firing, v.targetMode, v.help, v.helpText, v.water, v.pressure);
+        return b;
+    }
+    case GScreen::Crime:
+    {
+        const CrimeState& v = a.crime;
+        if (!v.valid) return "";
+        snprintf(b, sizeof b, "crime help=%d drag=%d phase=%d angle=%d scare=%d armed=%d subdue=%d down=%d%d hit=%d", v.help, v.dragging, v.phase, v.angle, v.canScare, v.armed, v.canSubdue, v.scarePressed, v.subduePressed, v.hit);
+        return b;
+    }
+    case GScreen::Mixer:
+    {
+        const MixerState& v = a.mixer;
+        if (!v.valid) return "";
+        std::vector<std::string> u;
+        for (int s : v.unlocked) u.push_back(n(s));
+        snprintf(b, sizeof b, "mixer mode=%d phase=%d tracks=0x%02x keys=%d,%d,%d octave=%d instrument=%d sustain=%d sliders=%d,%d tempo=%d variation=%d song=%d events=%d/%d prep=%d preview=%d micfull=%d unlocked=%s", v.mode, v.phase, v.tracks,
+                 v.keys[0], v.keys[1], v.keys[2], v.octave, v.instrument, v.sustain, v.sliderA, v.sliderB, v.tempo, v.variation, v.song, v.controlEvents, v.noteEvents, v.prep, v.previewing, v.micFull, join(u).c_str());
+        return b;
+    }
+    case GScreen::MixerSave:
+    {
+        const MixerSaveState& v = a.mixerSave;
+        if (!v.valid) return "";
+        std::vector<std::string> s;
+        for (int j = 0; j < kMixerSaveSlots; j++) s.push_back(v.used[j] ? "\"" + TextEsc(v.slotName[j]) + "\"" : std::string("empty"));
+        snprintf(b, sizeof b, "mixersave mode=%d slot=%d name=\"%s\" slots=%s", v.mode, v.slot, TextEsc(v.name).c_str(), join(s).c_str());
+        return b;
+    }
+    case GScreen::ArtGallery:
+    {
+        const ArtState& v = a.art;
+        if (!v.valid) return "";
+        int painted = 0;
+        u32 hash = 2166136261u;
+        for (u8 c : v.cells) { if (c != 1) painted++; hash = (hash ^ c) * 16777619u; }
+        snprintf(b, sizeof b, "art stroke=%d button=%d tool=%d swatch=%d page=%d brush=%d cell=%d,%d painted=%d hash=%08x", v.stroke, v.button, v.tool, v.swatch, v.page, v.brush, v.cellRow, v.cellCol, painted, hash);
+        return b;
+    }
+    default: return "";
+    }
 }
 
 const char* GScreenName(GScreen s)
@@ -1294,7 +1747,15 @@ const char* GScreenName(GScreen s)
     case GScreen::Social: return "Social";
     case GScreen::Cards: return "Cards";
     case GScreen::SaveSlots: return "SaveSlots";
-    case GScreen::ItemHand: return "ItemHand";
+    case GScreen::Drencher: return "Drencher";
+    case GScreen::Autopsy: return "Autopsy";
+    case GScreen::Detector: return "Detector";
+    case GScreen::MooGoo: return "MooGoo";
+    case GScreen::Scratch: return "Scratch";
+    case GScreen::Crime: return "Crime";
+    case GScreen::Mixer: return "Mixer";
+    case GScreen::MixerSave: return "MixerSave";
+    case GScreen::ArtGallery: return "ArtGallery";
     default: return "Unknown";
     }
 }
@@ -1332,7 +1793,10 @@ ScreenState ToScreenState(const GameState& g)
     case GScreen::FrontEnd: return {Screen::FrontEnd};
     case GScreen::CreateASim: return {Screen::CreateASim};
     case GScreen::SaveSlots: return {Screen::SaveSlots};
-    case GScreen::ItemHand: return {Screen::ItemHand};
+    case GScreen::Drencher: return {Screen::ItemHand};
+    // The minigames: CONSOLE has no frame for them yet, so they are the stick cursor's screens (Unknown).
+    case GScreen::Autopsy: case GScreen::Detector: case GScreen::MooGoo: case GScreen::Scratch: case GScreen::Crime:
+    case GScreen::Mixer: case GScreen::MixerSave: case GScreen::ArtGallery:
     case GScreen::Unknown: break;
     }
     return {Screen::Unknown};

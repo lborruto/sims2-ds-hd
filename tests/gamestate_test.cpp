@@ -134,7 +134,7 @@ static void overlay_screens()
 
     struct { u32 vt; int ov; GScreen s; } t[] = {
         {0x0214ABA4, 6, GScreen::Gift}, {0x0214B1D0, 1, GScreen::Build}, {0x0214C658, 17, GScreen::Vacuum},
-        {0x021509B0, 3, GScreen::CreateASim}, {0x0214B1C4, 8, GScreen::SaveSlots}, {0x0214B8BC, 18, GScreen::ItemHand},
+        {0x021509B0, 3, GScreen::CreateASim}, {0x0214B1C4, 8, GScreen::SaveSlots}, {0x0214B8BC, 18, GScreen::Drencher},
     };
     for (auto& c : t)
     {
@@ -214,12 +214,20 @@ static void to_screen_state()
         {GScreen::Gift, Screen::Gift}, {GScreen::Catalogue, Screen::Catalogue}, {GScreen::Build, Screen::Build},
         {GScreen::Vacuum, Screen::Vacuum}, {GScreen::Social, Screen::Social}, {GScreen::Cards, Screen::Cards},
         {GScreen::FrontEnd, Screen::FrontEnd}, {GScreen::CreateASim, Screen::CreateASim},
-        {GScreen::SaveSlots, Screen::SaveSlots}, {GScreen::ItemHand, Screen::ItemHand}, {GScreen::Unknown, Screen::Unknown}};
+        {GScreen::SaveSlots, Screen::SaveSlots}, {GScreen::Unknown, Screen::Unknown}};
     for (auto [gs, sc] : same)
     {
         g.screen = gs;
         CHECK(ToScreenState(g) == (ScreenState{sc}));
         CHECK(std::string(ScreenName(sc)) == GScreenName(gs));
+    }
+    // The Drencher is CONSOLE's ItemHand; the minigames are the stick cursor's Unknown.
+    g.screen = GScreen::Drencher;
+    CHECK(ToScreenState(g) == (ScreenState{Screen::ItemHand}));
+    for (GScreen m : {GScreen::Autopsy, GScreen::Detector, GScreen::MooGoo, GScreen::Scratch, GScreen::Crime, GScreen::Mixer, GScreen::MixerSave, GScreen::ArtGallery})
+    {
+        g.screen = m;
+        CHECK(ToScreenState(g) == (ScreenState{Screen::Unknown}));
     }
     // The pixels' answers that go with the game's screens.
     g.screen = GScreen::FrontEnd;
@@ -935,6 +943,321 @@ static void hotel_random()
     }
 }
 
+// ---- The minigames (milestone 6): made-up RAM with the research's layouts.
+constexpr u32 kMg = 0x021670A4;   // G
+static Ram mg_ram(u32 vt, int ov)
+{
+    Ram r = Make(vt, ov);
+    r.W32(0x0213E434, kMg);
+    return r;
+}
+
+static void minigame_screens()
+{
+    // Every minigame's (overlay, vtable) is its own screen kind; the arm9 ones ignore the overlay.
+    struct { u32 vt; int ov; GScreen s; } t[] = {
+        {0x0214EBC4, 0, GScreen::Autopsy}, {0x0214C124, 9, GScreen::Detector}, {0x02152E0C, 10, GScreen::MooGoo}, {0x02152EC8, 10, GScreen::MooGoo},
+        {0x0214AFC4, 13, GScreen::Scratch}, {0x0214B8BC, 18, GScreen::Drencher}, {0x02134EC8, -1, GScreen::Crime},
+        {0x02134F10, -1, GScreen::Mixer}, {0x02134FA0, -1, GScreen::MixerSave}, {0x02134D70, -1, GScreen::ArtGallery},
+    };
+    for (auto& c : t)
+    {
+        const GameState g = ReadGameState(mg_ram(c.vt, c.ov).View());
+        CHECK(g.valid && g.screen == c.s);
+        CHECK(std::string(GScreenName(c.s)) == GameStateName(g));
+        // CONSOLE does not know them: the stick cursor's Unknown, except the Drencher (ItemHand, a cursor screen too).
+        CHECK(ToScreenState(g) == (ScreenState{c.s == GScreen::Drencher ? Screen::ItemHand : Screen::Unknown}));
+    }
+    // The overlay's classes need their overlay; the arm9 classes do not care.
+    CHECK(ReadGameState(mg_ram(0x0214EBC4, 1).View()).screen == GScreen::Unknown);
+    CHECK(ReadGameState(mg_ram(0x02152E0C, 11).View()).screen == GScreen::Unknown);
+    CHECK(ReadGameState(mg_ram(0x02134EC8, 15).View()).screen == GScreen::Crime);
+    CHECK(GScreen::ItemHand == GScreen::Drencher && std::string(GScreenName(GScreen::ItemHand)) == "Drencher");
+    // A part is read only on its own screen: the autopsy's bytes under the cards' vtable read nothing.
+    Ram r = mg_ram(0x0214EBC4, 0);
+    const GameState a = ReadGameState(r.View());
+    CHECK(a.minigame.autopsy.valid && !a.minigame.scratch.valid && !a.minigame.mooGoo.valid && !a.minigame.art.valid && !a.minigame.mixer.valid);
+    r.W32(kS, 0x0212F98C);
+    const GameState c = ReadGameState(r.View());
+    CHECK(c.screen == GScreen::Cards && !c.minigame.autopsy.valid && c.minigame == MinigameState{});
+    CHECK(MinigameLine(c).empty());
+}
+
+static Ram autopsy_ram()
+{
+    Ram r = mg_ram(0x0214EBC4, 0);
+    for (u32 i = 0; i < 3; i++) { const u32 o = kS + 0x28 + 0x10 * i; r.W16(o + 0xC, 20); r.W8(o + 0xE, i); }
+    r.W8(kS + 0xCA0C, 208); r.W8(kS + 0xCA0D, 16);   // stale: neither "none"
+    return r;
+}
+static void autopsy()
+{
+    Ram r = autopsy_ram();
+    GameState g = ReadGameState(r.View());
+    const AutopsyState& v = g.minigame.autopsy;
+    CHECK(v.valid && v.phase == 0 && v.sub == 0 && v.tool == 0 && v.earnings == 0 && v.parasites.empty());
+    CHECK(v.organs[0].kind == 0 && v.organs[2].kind == 2 && v.organs[1].damage == 20 && v.organs[2].present() && !v.handAlert && !v.tweezersAlert);
+    CHECK(v.dragged == -1 && v.held == -1 && v.tearX == -1);   // the stale "none" bytes are not read outside their sub-phase
+    // An organ freed (the hand flashes), one removed (kind 5, freed stays): not an alert.
+    r.W8(kS + 0x28 + 0xF, 1);
+    CHECK(ReadGameState(r.View()).minigame.autopsy.handAlert);
+    r.W8(kS + 0x28 + 0xE, 5);
+    CHECK(!ReadGameState(r.View()).minigame.autopsy.handAlert);
+    // Parasites: a sprite with 20.12 positions (one off the screen on the left), the eating one flashes the tweezers.
+    r.W32(kS + 0x58, 0x021A0000); r.W32(0x021A0000 + 0x50, (u32)(-22 << 12)); r.W32(0x021A0000 + 0x54, 85u << 12); r.W8(kS + 0x58 + 0x11, 2);
+    r.W32(kS + 0x58 + 0x18 * 5, 0x021A0100); r.W32(0x021A0100 + 0x50, 140u << 12); r.W32(0x021A0100 + 0x54, 37u << 12); r.W8(kS + 0x58 + 0x18 * 5 + 0x11, 3); r.W8(kS + 0x58 + 0x18 * 5 + 0x14, 1);
+    g = ReadGameState(r.View());
+    CHECK(g.minigame.autopsy.parasites.size() == 2 && g.minigame.autopsy.tweezersAlert);
+    CHECK(g.minigame.autopsy.parasites[0] == (AutopsyParasite{0, -22, 85, 2, false}) && g.minigame.autopsy.parasites[1] == (AutopsyParasite{5, 140, 37, -1, true}));
+    CHECK(MinigameLine(g).find("parasites=0:-22:85:2,5:140:37:-1:eat") != std::string::npos);
+    // The dragged organ and the held parasite count under their sub-phase.
+    r.W8(kS + 0xC9F4, 1); r.W8(kS + 0xC9F5, 3); r.W8(kS + 0xCA0C, 1);
+    CHECK(ReadGameState(r.View()).minigame.autopsy.dragged == 1);
+    r.W8(kS + 0xCA0C, 3);
+    CHECK(ReadGameState(r.View()).minigame.autopsy.dragged == -1);
+    r.W8(kS + 0xC9F5, 6); r.W8(kS + 0xCA0D, 5);
+    CHECK(ReadGameState(r.View()).minigame.autopsy.held == 5);
+    r.W8(kS + 0xC9F4, 6); r.W8(kS + 0xC9F5, 0); r.W16(kS + 0xCA16, 125); r.W16(kS + 0xCA18, 100);
+    g = ReadGameState(r.View());
+    CHECK(g.minigame.autopsy.phase == 6 && g.minigame.autopsy.tearX == 125 && g.minigame.autopsy.tearY == 100);
+    // Out-of-range fields: the part is invalid, the screen stays the autopsy's.
+    for (auto [off, val, w] : {std::tuple<u32, u32, int>{0xC9F4, 7, 8}, {0xC9F5, 8, 8}, {0xC9F6, 2, 8}, {0xC9F7, 3, 8}, {0x28 + 0xC, 0xA01, 16}, {0x28 + 0xE, 6, 8}, {0x28 + 0xF, 2, 8}, {0xC9EC, 0xFFFFFFFF, 32}})
+    {
+        Ram q = r;
+        if (w == 8) q.W8(kS + off, val); else if (w == 16) q.W16(kS + off, val); else q.W32(kS + off, val);
+        g = ReadGameState(q.View());
+        CHECK(g.screen == GScreen::Autopsy && !g.minigame.autopsy.valid);
+    }
+    { Ram q = r; q.W32(kS + 0x58 + 0x18 * 3, 0x021A0300); q.W32(0x021A0300 + 0x50, 5000u << 12); CHECK(!ReadGameState(q.View()).minigame.autopsy.valid); }
+    { Ram q = r; q.W32(kS + 0x58 + 0x18 * 3, 0x02500000); CHECK(!ReadGameState(q.View()).minigame.autopsy.valid); }   // a sprite outside RAM
+}
+
+static void detector()
+{
+    Ram r = mg_ram(0x0214C124, 9);
+    r.W32(kS + 0x9C, 3); r.W32(kS + 0xD0, 0x99480); r.W32(kS + 0xD8, 0x021A0000); r.W32(0x021A0000 + 0x90, 0x800);
+    r.W32(kMg + 0x80, 2020); r.W32(kMg + 0x31C8, 0);
+    GameState g = ReadGameState(r.View());
+    CHECK(g.screen == GScreen::Detector && g.minigame.detector.valid);
+    DetectorState v = g.minigame.detector;
+    CHECK(v.state == 3 && v.charge == 0x99480 && !v.inRange && v.slider == 0x800 && v.mismatch == 0 && !v.card && v.findType == -1 && v.earnings == 2020 && v.findCount == 0);
+    // In range: the sensed find's type is read (a stale pointer out of range is not).
+    r.W8(kS + 0xD4, 1); r.W32(kS + 0x54, 128); r.W32(kS + 0x58, 0x021A0200); r.W8(0x021A0200 + 8, 7); r.W8(kS + 0x4E, 1); r.W32(kMg + 0x31C8, 12);
+    v = ReadGameState(r.View()).minigame.detector;
+    CHECK(v.valid && v.inRange && v.mismatch == 128 && v.findType == 7 && v.card && v.findCount == 12);
+    r.W8(0x021A0200 + 8, 9);
+    CHECK(ReadGameState(r.View()).minigame.detector.findType == -1);
+    r.W8(kS + 0xD4, 0); r.W8(0x021A0200 + 8, 7);
+    CHECK(ReadGameState(r.View()).minigame.detector.findType == -1);
+    for (auto [off, val] : {std::pair<u32, u32>{0x9C, 6}, {0xD0, 0xFFFFFFF0}, {0xD0, 0x300000}, {0x54, 129}})
+    {
+        Ram q = r;
+        q.W32(kS + off, val);
+        CHECK(ReadGameState(q.View()).screen == GScreen::Detector && !ReadGameState(q.View()).minigame.detector.valid);
+    }
+    { Ram q = r; q.W32(0x021A0000 + 0x90, 0x1001); CHECK(!ReadGameState(q.View()).minigame.detector.valid); }
+    { Ram q = r; q.W32(kS + 0xD8, 0); CHECK(!ReadGameState(q.View()).minigame.detector.valid); }
+    { Ram q = r; q.W32(0x0213E434, 0); CHECK(!ReadGameState(q.View()).minigame.detector.valid); }
+}
+
+static void moogoo()
+{
+    // The intro is the arrow alone, valid on its own.
+    GameState g = ReadGameState(mg_ram(0x02152EC8, 10).View());
+    CHECK(g.screen == GScreen::MooGoo && g.minigame.mooGoo.valid && g.minigame.mooGoo.intro && MinigameLine(g) == "moogoo intro");
+    Ram r = mg_ram(0x02152E0C, 10);
+    r.W32(kS + 0x1C, 0xD); r.W32(kS + 0xC, 1); r.W32(kS + 0x18, 0xFFFFFFFF); r.W8(kS + 0x1E6, 0); r.W8(kS + 0x1E7, 1); r.W8(kS + 0x1E9, 1); r.W8(kS + 0x1EA, 1 | 4);
+    r.W8(kS + 0x1E4, 19); r.W8(kS + 0x1E5, 54); r.W16(kS + 0x1F2, 0xFFF6);
+    // Monkey 2 has two cards under it and bets 2/0/0 in 2 slots; monkey 4 is out.
+    const u32 m2 = kS + 0x30 + 0x2C * 2;
+    r.W8(m2 + 0x18, 20); r.W8(m2 + 0x19, 48); r.W8(m2 + 0x26, 2); r.W8(m2 + 0x23, 2); r.W8(m2 + 0x27, 2);
+    r.W8(kS + 0x30 + 0x2C * 4 + 0x28, 1);
+    // Players: 0 a human with a full hand, the third the AI with an empty slot.
+    const u32 p0 = kS + 0x138, p2 = kS + 0x138 + 0x28 * 2;
+    r.W32(p0 + 0x18, 1758); for (u32 i = 0; i < 5; i++) r.W8(p0 + 0x1C + i, 45 - i); r.W8(p0 + 0x21, 0x30); r.W8(p0 + 0x22, 2); r.W8(p0 + 0x23, 8);
+    r.W32(p2 + 0x18, 326); for (u32 i = 0; i < 5; i++) r.W8(p2 + 0x1C + i, i == 2 ? 0xFF : 12 + i); r.W8(p2 + 0x23, 9 | 4);
+    g = ReadGameState(r.View());
+    const MooGooState& v = g.minigame.mooGoo;
+    CHECK(v.valid && !v.intro && v.phase == 0xD && v.sub == 1 && v.timer == -1 && v.current == 0 && v.humans == 2 && v.round == 1);
+    CHECK(v.hotSeat && !v.turnDone && v.betPlaced && !v.stale && !v.quit && !v.quitAsk && v.winnings == -10 && v.deckNext == 19 && v.deckSize == 54);
+    CHECK(v.monkeys[2].count == 2 && v.monkeys[2].cards[0] == 20 && v.monkeys[2].cards[1] == 48 && v.monkeys[2].bets[0] == 2 && v.monkeys[2].slots == 2 && !v.monkeys[2].eliminated);
+    CHECK(v.monkeys[4].eliminated && v.monkeys[0].count == 0);
+    CHECK(v.players[0].nameId == 1758 && v.players[0].hand[0] == 45 && v.players[0].hand[4] == 41 && v.players[0].selected == 3 && v.players[0].score == 2 && !v.players[0].ai && v.players[0].bet == true);
+    CHECK(v.players[2].hand[2] == kMooGooHandEmpty && v.players[2].ai && v.players[2].outOfCards && v.players[2].bet);
+    // Before the deal the hands are zeros, not cards.
+    r.W32(kS + 0x1C, 7);
+    CHECK(ReadGameState(r.View()).minigame.mooGoo.players[0].hand[0] == kMooGooHandEmpty);
+    r.W32(kS + 0x1C, 0xD);
+    // Bounds: a card id, a bet, the count, the phase, the current player.
+    for (auto [off, val, w] : {std::tuple<u32, u32, int>{0x1C, 0x18, 32}, {0xC, 10, 32}, {0x1E6, 3, 8}, {0x1E7, 3, 8}, {0x1E9, 4, 8}, {0x1E5, 55, 8}, {0x1E4, 60, 8}, {0x1F1, 2, 8},
+                               {0x30 + 0x26, 9, 8}, {0x30 + 0x23, 5, 8}, {0x30 + 0x27, 5, 8}, {0x138 + 0x1C, 54, 8}, {0x138 + 0x21, 0x50, 8}, {0x138 + 0x18, 0x10000, 32}})
+    {
+        Ram q = r;
+        if (w == 8) q.W8(kS + off, val); else q.W32(kS + off, val);
+        g = ReadGameState(q.View());
+        CHECK(g.screen == GScreen::MooGoo && !g.minigame.mooGoo.valid);
+    }
+    { Ram q = r; q.W8(m2 + 0x19, 54); CHECK(!ReadGameState(q.View()).minigame.mooGoo.valid); }
+    // The quit box and a quit in progress.
+    r.W8(kS + 0x1F1, 1);
+    CHECK(ReadGameState(r.View()).minigame.mooGoo.quitAsk);
+}
+
+static void scratch()
+{
+    Ram r = mg_ram(0x0214AFC4, 13);
+    r.W32(kS + 0xE0, 1); r.W32(kS + 0x10, 50); r.W32(kS + 0xC8, 4); r.W32(kS + 0xCC, 5); r.W32(kS + 0xD0, 1); r.W16(kS + 0xD8, 2); r.W8(kS + 0xDC, 1); r.W16(kS + 0xDE, 3); r.W8(kS + 0xE4, 1);
+    for (u32 i = 0; i < 8; i++)
+    {
+        r.W32(kS + 0x24 + 0xC * i, i % 7); r.W32(kS + 0xA4 + 4 * i, 0x021A0000 + 0x500 * i); r.W32(0x021A0000 + 0x500 * i + 0x98, 1024);
+    }
+    r.W8(kS + 0x24 + 0xC * 1 + 9, 2); r.W32(0x021A0000 + 0x500 + 0x98, 339);   // box 1 revealed
+    r.W32(0x021A0000 + 0x500 * 3 + 0x98, 700);                                  // box 3 started: 324 erased
+    GameState g = ReadGameState(r.View());
+    const ScratchState& v = g.minigame.scratch;
+    CHECK(g.screen == GScreen::Scratch && v.valid && v.tier == 1 && v.prize == 50 && v.state == 1 && v.revealed == 2 && v.winA == 4 && v.winB == 5 && v.active == 3 && v.hint);
+    CHECK(v.boxes[0].picture == 0 && !v.boxes[0].revealed && v.boxes[0].erased == 0 && v.boxes[1].revealed && v.boxes[1].erased == 685 && v.boxes[3].erased == 324 && v.boxes[7].picture == 0);
+    r.W8(kS + 0xDC, 0);
+    CHECK(ReadGameState(r.View()).minigame.scratch.active == -1);
+    r.W8(kS + 0xDC, 1); r.W16(kS + 0xDE, 0xFFFF);
+    CHECK(ReadGameState(r.View()).minigame.scratch.active == -1);
+    // A popup (the hint, the result) is the popup part's: the screen stays Scratch.
+    r.W8(kP + 0x8, 2);
+    CHECK(ReadGameState(r.View()).screen == GScreen::Scratch && ReadGameState(r.View()).popup == 2);
+    for (auto [off, val] : {std::pair<u32, u32>{0xE0, 3}, {0xC8, 7}, {0xD0, 0}, {0xD0, 4}, {0xD8, 9}, {0x24 + 0xC * 2, 7}, {0x24 + 0xC * 2 + 9, 3}})
+    {
+        Ram q = r;
+        if (off == 0xD8) q.W16(kS + off, val); else if (off == 0x24 + 0xC * 2 + 9) q.W8(kS + off, val); else q.W32(kS + off, val);
+        CHECK(ReadGameState(q.View()).screen == GScreen::Scratch && !ReadGameState(q.View()).minigame.scratch.valid);
+    }
+    { Ram q = r; q.W32(0x021A0000 + 0x500 * 6 + 0x98, 1025); CHECK(!ReadGameState(q.View()).minigame.scratch.valid); }
+    { Ram q = r; q.W32(kS + 0xA4 + 4 * 6, 0); CHECK(!ReadGameState(q.View()).minigame.scratch.valid); }
+}
+
+static void drencher_and_crime()
+{
+    Ram r = mg_ram(0x0214B8BC, 18);
+    r.W32(kS + 0x24, 90u << 12); r.W32(kS + 0x28, (u32)-1); r.W32(kS + 0x2C, 0); r.W32(kMg + 0x18, (65u << 12) + 1000); r.W32(kMg + 0x1C, (125u << 12));
+    r.W32(kS + 0x70, 0x2229800);   // the byte at +0x70 is the mode, the rest of the word is not
+    GameState g = ReadGameState(r.View());
+    DrencherState v = g.minigame.drencher;
+    CHECK(g.screen == GScreen::Drencher && v.valid && v.pump == 90 && v.target == -1 && v.targetType == -1 && !v.firing && !v.targetMode && v.water == 65 && v.pressure == 125);
+    r.W32(kS + 0x28, 29); r.W32(kS + 0x2C, 0xB); r.W8(kS + 0x35, 1); r.W8(kS + 0x34, 1); r.W8(kS + 0x70, 1); r.W8(kS + 0x78, 1); r.W8(kS + 0x79, 1);
+    v = ReadGameState(r.View()).minigame.drencher;
+    CHECK(v.valid && v.target == 29 && v.targetType == 0xB && v.firing && v.pumping && v.targetMode && v.help && v.helpText);
+    for (auto [off, val] : {std::pair<u32, u32>{0x24, 181u << 12}, {0x24, (u32)-1}, {0x28, 0x200}, {0x2C, 0x100}, {0x35, 2}})
+    {
+        Ram q = r;
+        if (off == 0x35) q.W8(kS + off, val); else q.W32(kS + off, val);
+        CHECK(ReadGameState(q.View()).screen == GScreen::Drencher && !ReadGameState(q.View()).minigame.drencher.valid);
+    }
+    { Ram q = r; q.W32(kMg + 0x1C, 130u << 12); CHECK(!ReadGameState(q.View()).minigame.drencher.valid); }
+    { Ram q = r; q.W32(kMg + 0x18, (u32)-1); CHECK(!ReadGameState(q.View()).minigame.drencher.valid); }
+
+    r = mg_ram(0x02134EC8, -1);
+    r.W8(kS + 0x61, 0x10);   // unset before the first throw
+    CrimeState c = ReadGameState(r.View()).minigame.crime;
+    CHECK(c.valid && !c.help && c.phase == 0 && c.angle == 0 && !c.hit && !c.canScare);
+    r.W8(kS + 0x4C, 1); r.W8(kS + 0x52, 1); r.W8(kS + 0x58, 2); r.W16(kS + 0x5A, 82); r.W8(kS + 0x5C, 1); r.W8(kS + 0x5D, 1); r.W8(kS + 0x5E, 1); r.W8(kS + 0x5F, 1); r.W8(kS + 0x60, 1); r.W8(kS + 0x61, 1);
+    c = ReadGameState(r.View()).minigame.crime;
+    CHECK(c.valid && c.help && c.dragging && c.phase == 2 && c.angle == 82 && c.canScare && c.armed && c.canSubdue && c.scarePressed && c.subduePressed && c.hit);
+    r.W16(kS + 0x5A, (u32)(-90 & 0xFFFF));
+    CHECK(ReadGameState(r.View()).minigame.crime.angle == -90);
+    for (auto [off, val] : {std::pair<u32, u32>{0x4C, 2}, {0x58, 4}, {0x5C, 2}, {0x60, 3}})
+    {
+        Ram q = r;
+        q.W8(kS + off, val);
+        CHECK(ReadGameState(q.View()).screen == GScreen::Crime && !ReadGameState(q.View()).minigame.crime.valid);
+    }
+    r.W16(kS + 0x5A, 91);
+    CHECK(!ReadGameState(r.View()).minigame.crime.valid);
+}
+
+static void mixer_and_art()
+{
+    Ram r = mg_ram(0x02134F10, -1);
+    r.W8(kS + 0xA55, 2); r.W8(kS + 0x8E2, 0xFE); r.W8(kS + 0x8E3, 0); r.W8(kS + 0x8E4, 0xD); r.W8(kS + 0x8E5, 12); r.W8(kS + 0x8E6, 0xFF); r.W8(kS + 0x8E7, 5); r.W8(kS + 0x8E9, 1);
+    r.W8(kS + 0x8EA, 25); r.W8(kS + 0x8EB, 3); r.W8(kS + 0x8EC, 110); r.W8(kS + 0x8ED, 1); r.W8(kS + 0xA5C, 8); r.W16(kS + 0xA4C, 4); r.W16(kS + 0xA4E, 24); r.W8(kS + 0xA52, 0x34); r.W8(kS + 0xA6C, 2);
+    r.W8(kS + 0xA6B, 6); for (u32 i = 0; i < 6; i++) r.W8(kS + 0xA63 + i, i);
+    GameState g = ReadGameState(r.View());
+    const MixerState& v = g.minigame.mixer;
+    CHECK(g.screen == GScreen::Mixer && v.valid && v.phase == 2 && v.tracks == 0xFE && v.keys[0] == 0 && v.keys[1] == -1 && v.keys[2] == 12 && v.octave == -1 && v.instrument == 5 && v.sustain);
+    CHECK(v.sliderA == 25 && v.sliderB == 3 && v.tempo == 110 && v.variation == 1 && v.song == 8 && v.controlEvents == 4 && v.noteEvents == 24 && v.prep && v.previewing && v.micFull);
+    CHECK(v.unlocked.size() == 6 && v.unlocked[5] == 5);
+    for (auto [off, val] : {std::pair<u32, u32>{0xA55, 0xB}, {0x8E7, 4}, {0x8E6, 2}, {0x8EA, 27}, {0x8E3, 0xE}, {0xA5C, 9}, {0xA6B, 9}, {0xA63, 8}})
+    {
+        Ram q = r;
+        q.W8(kS + off, val);
+        CHECK(ReadGameState(q.View()).screen == GScreen::Mixer && !ReadGameState(q.View()).minigame.mixer.valid);
+    }
+    r.W32(kS + 8, 3);
+    CHECK(!ReadGameState(r.View()).minigame.mixer.valid);
+
+    // The save menu: valid with the mixer's context; names from G by mode, byte 15 the used flag.
+    r = mg_ram(0x02134FA0, -1);
+    r.W32(kS + 0xC, 0x021A0000); r.W8(kS + 0x28, 0xFF);
+    r.W8(kS + 0x88, 'H'); r.W8(kS + 0x89, 'i');
+    r.W8(kMg + 0x46AC + 16 + 15, 1); r.W8(kMg + 0x46AC + 16, 'A'); r.W8(kMg + 0x46AC + 17, 'b');
+    g = ReadGameState(r.View());
+    const MixerSaveState& s = g.minigame.mixerSave;
+    CHECK(g.screen == GScreen::MixerSave && s.valid && s.mode == 0 && s.slot == -1 && s.name == "Hi" && !s.used[0] && s.used[1] && s.slotName[1] == "Ab" && !s.used[2]);
+    r.W32(kS + 8, 1); r.W8(kS + 0x28, 2); r.W8(kMg + 0x46DC + 64 * 2 + 15, 1); r.W8(kMg + 0x46DC + 64 * 2, 'R');
+    const MixerSaveState s1 = ReadGameState(r.View()).minigame.mixerSave;
+    CHECK(s1.valid && s1.mode == 1 && s1.slot == 2 && !s1.used[1] && s1.used[2] && s1.slotName[2] == "R");
+    { Ram q = r; q.W32(kS + 0xC, 0); CHECK(!ReadGameState(q.View()).minigame.mixerSave.valid); }   // no context: the black screen
+    { Ram q = r; q.W8(kS + 0x28, 3); CHECK(!ReadGameState(q.View()).minigame.mixerSave.valid); }
+    { Ram q = r; q.W32(kS + 8, 2); CHECK(!ReadGameState(q.View()).minigame.mixerSave.valid); }
+
+    // Art Gallery: the 48 x 32 working canvas, the tool state, the stylus's cell only while it is on the canvas.
+    r = mg_ram(0x02134D70, -1);
+    for (u32 i = 0; i < 48 * 32; i++) r.W8(kS + 0x650 + i, 1);
+    r.W8(kS + 0x650 + 17 * 48 + 21, 4);
+    r.W32(kS + 0x2C, 1); r.W32(kS + 0x30, 7); r.W32(kS + 0x34, 2); r.W32(kS + 0x38, 5); r.W32(kS + 0x3C, 1); r.W32(kS + 0x40, 2);
+    r.W8(kS + 0xC68, 52); r.W32(kS + 0xC60, 0xFFFFFFFF); r.W32(kS + 0xC64, 77);   // garbage while off the canvas
+    g = ReadGameState(r.View());
+    const ArtState& a = g.minigame.art;
+    CHECK(g.screen == GScreen::ArtGallery && a.valid && a.stroke == 1 && a.button == 7 && a.tool == 2 && a.swatch == 5 && a.page == 1 && a.brush == 2 && !a.inCanvas && a.cellRow == -1);
+    CHECK(a.cells.size() == 48 * 32 && a.cells[17 * 48 + 21] == 4 && a.cells[0] == 1);
+    r.W8(kS + 0xC68, 1); r.W32(kS + 0xC60, 17); r.W32(kS + 0xC64, 21);
+    CHECK(ReadGameState(r.View()).minigame.art.inCanvas && ReadGameState(r.View()).minigame.art.cellRow == 17 && ReadGameState(r.View()).minigame.art.cellCol == 21);
+    r.W32(kS + 0xC64, 48);
+    CHECK(ReadGameState(r.View()).minigame.art.valid && !ReadGameState(r.View()).minigame.art.inCanvas);
+    for (auto [off, val] : {std::pair<u32, u32>{0x2C, 3}, {0x30, 10}, {0x34, 6}, {0x38, 15}, {0x3C, 16}, {0x40, 3}})
+    {
+        Ram q = r;
+        q.W32(kS + off, val);
+        CHECK(ReadGameState(q.View()).screen == GScreen::ArtGallery && !ReadGameState(q.View()).minigame.art.valid);
+    }
+    { Ram q = r; q.W8(kS + 0x650 + 100, 16); CHECK(!ReadGameState(q.View()).minigame.art.valid); }
+}
+
+// Random bytes in every minigame object: the readers stay in bounds, the lists capped, and a part
+// that reads is valid in itself (no part invalid with its fields half filled).
+static void minigame_random()
+{
+    std::mt19937 rng(77);
+    const struct { u32 vt; int ov; } k[] = {{0x0214EBC4, 0}, {0x0214C124, 9}, {0x02152E0C, 10}, {0x02152EC8, 10}, {0x0214AFC4, 13}, {0x0214B8BC, 18}, {0x02134EC8, -1}, {0x02134F10, -1}, {0x02134FA0, -1}, {0x02134D70, -1}};
+    for (int round = 0; round < 600; round++)
+    {
+        Ram r = mg_ram(k[round % 10].vt, k[round % 10].ov);
+        for (int i = 0; i < 300; i++) r.W8(kS + rng() % 0xCA40, (u32)rng() & (i % 3 ? 0x3F : 0xFF));
+        for (int i = 0; i < 100; i++) r.W8(kMg + 0x30 + rng() % 0x4700, (u32)rng());
+        const GameState g = ReadGameState(r.View());
+        const MinigameState& m = g.minigame;
+        CHECK(m.autopsy.parasites.size() <= 8 && m.mixer.unlocked.size() <= 8 && (m.art.cells.empty() || m.art.cells.size() == 48 * 32));
+        CHECK(!m.autopsy.valid || g.screen == GScreen::Autopsy);
+        CHECK(!m.detector.valid || g.screen == GScreen::Detector);
+        CHECK(!m.mooGoo.valid || g.screen == GScreen::MooGoo);
+        CHECK(!m.scratch.valid || g.screen == GScreen::Scratch);
+        CHECK(!m.drencher.valid || g.screen == GScreen::Drencher);
+        CHECK(!m.crime.valid || g.screen == GScreen::Crime);
+        CHECK(!m.mixer.valid || g.screen == GScreen::Mixer);
+        CHECK(!m.mixerSave.valid || g.screen == GScreen::MixerSave);
+        CHECK(!m.art.valid || g.screen == GScreen::ArtGallery);
+        (void)MinigameLine(g);
+    }
+}
+
 int main()
 {
     hotel_block();
@@ -954,6 +1277,14 @@ int main()
     relations_list();
     phone_gift_note();
     menus_random();
+    minigame_screens();
+    autopsy();
+    detector();
+    moogoo();
+    scratch();
+    drencher_and_crime();
+    mixer_and_art();
+    minigame_random();
     hud();
     dialogue();
     between_screens();

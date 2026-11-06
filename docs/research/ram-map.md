@@ -61,7 +61,11 @@ Options > Quit is a popup (popup = 2 over the Options tab).
 | 0x0214C658 | 17 | Vacuum |
 | 0x021509B0 | 3 | Create-a-Sim and its confirmation |
 | 0x0214B1C4 | 8 | Options > Save slots |
-| 0x0214B8BC | 18 | Pockets > item in hand |
+| 0x0214B8BC | 18 | Pockets > item in hand: the Super Drencher |
+| 0x0214EBC4 / 0x0214C124 | 0 / 9 | Alien Autopsy / Metal Detector (the minigames: below) |
+| 0x02152E0C / 0x02152EC8 | 10 | MooGoo Monkey game / intro |
+| 0x0214AFC4 | 13 | Scratch lottery |
+| 0x02134EC8, 0x02134F10, 0x02134FA0, 0x02134D70 | -1 | Crime, Music Mixer, its save menu, Art Gallery painting |
 
 Not separable: title versus main menu, Create-a-Sim versus its confirmation. A screen not in the
 table is reported as `Unknown(ov=N,vt=0x...)`: log it, it is a new screen to map.
@@ -177,6 +181,66 @@ screen (vtable and overlay checked), valid on its own, every list capped. Places
 `--print-hotel` logs each part when it changes (`hotel`, `checkin`, `roominfo`, `music`, `build`, `placement`, `catalogue`, `stat`).
 Checked by `tests/gamestate_test.cpp` (made-up RAM, garbage per part) and `tests/gamestate_check.sh` (held-out states).
 
+## The minigames (`GameState::minigame`)
+
+Each minigame is a bottom-screen object `S` with its own vtable (`GScreen::Autopsy` ... `ArtGallery`, and the Super Drencher, `GScreen::Drencher`,
+CONSOLE's ItemHand); the part of the screen the game shows is read only on that screen, valid on its own (an out-of-range field
+makes only that part invalid, never partial), every list capped. The top screen stays the world. All of them leave through the
+panel (module 0xC). The game logic of the overlays ticks every other frame (30 Hz); a press / release is an event, so a stylus
+tap must last two frames or more. Fields are from `S` unless said; the values are the game's own (`kEU.mg`).
+
+| Screen | Overlay | Vtable | Module | Kind |
+| --- | --- | --- | --- | --- |
+| Alien Autopsy | 0 | 0x0214EBC4 | 0x15 | `Autopsy` |
+| Metal Detector | 9 | 0x0214C124 | 0x4 | `Detector` |
+| MooGoo Monkey (game / intro) | 10 | 0x02152E0C / 0x02152EC8 | 0x16 / 0x17 | `MooGoo` (`mooGoo.intro` for the intro) |
+| Scratch lottery | 13 | 0x0214AFC4 | 0x11 | `Scratch` |
+| Super Drencher | 18 | 0x0214B8BC | 0x23 | `Drencher` (was `ItemHand`, kept as an alias) |
+| Crime (Ratarang) | none | 0x02134EC8 | 0x2A | `Crime` |
+| Music Mixer / its save menu | none | 0x02134F10 / 0x02134FA0 | 0x12 / 0x13 | `Mixer` / `MixerSave` |
+| Art Gallery painting | none | 0x02134D70 | 0xB | `ArtGallery` |
+
+The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the social games and the vacuum are unchanged.
+The screen request that brings one up (`P + 0xDF0 + 0x20 * slot`: module, r3, ...) is research-only; the port never writes RAM.
+
+- **Autopsy** (`AutopsyState`): organ slots `S+0x28+0x10 i` (i < 3) {`+0xC` u16 damage 0..0xA00, `+0xE` u8 kind 0..4 (5 removed), `+0xF` u8
+  freed}; parasites `S+0x58+0x18 j` (j < 8) {`+0` sprite ptr (0 empty; its position 20.12 at `+0x50 / +0x54`), `+0x11` target organ (3
+  none), `+0x14` eating}; `S+0xC9EC` s32 earnings, `S+0xC9F4` phase 0 laser / 1 hand / 2 tweezers / 3 done / 4 fade / 5 wait for the
+  tear / 6 tearing, `S+0xC9F5` sub-phase 0 idle / 1 lasering / 3 dragging an organ / 4 into the tray / 6 holding a parasite / 7 into the flask,
+  `S+0xC9F6` specimen, `S+0xC9F7` tool, `S+0xCA0C` / `+0xCA0D` the organ dragged / parasite held (stale until used: the port reads them
+  only under their sub-phase), `S+0xCA16 / +0xCA18` u16 the tear's current point. The flashing buttons are derived: the hand when an organ
+  is freed and present, the tweezers when a parasite eats. Stylus: laser / hand / tweezers buttons x 0..31 at y 72..119 / 8..55 / 136..183, tray
+  216..255 x 16..55, flask 216..255 x 136..175; B or Start quit and forfeit the earnings.
+- **Detector** (`DetectorState`): `S+0x9C` state 0 switching off / 1 power-on / 2 opening / 3 active / 4 closing / 5 found card, `S+0xD0` s32 charge
+  (0x100000 full; `G+0x41DC` its copy), `S+0xD4` a find in range, `S+0xD8` -> slider (`+0x90` 0..0x1000), `S+0x4E` card shown, `S+0x54` depth mismatch
+  0..128, `S+0x58` -> the sensed find (`+8` u8 type 0..8: lead rock, copper, silver, gold, ..., 7 mummified alien), `G+0x80` earnings, `G+0x31C8` finds loaded.
+  Stylus: power 54..101 x 136..167, dig 156..203 x 136..167, slider knob x 195 over y 33..121.
+- **MooGoo** (`MooGooState`): `S+0x1C` phase (0 players prompt ... 0xD the turn ... 0x13 results, 0x14 / 0x15 Stale Bananas / Game Over), `S+0xC` turn sub-state
+  (1 pick a monkey to bet on, 3 play a card, 5 pick a target), `S+0x18` s32 timer (-1 none), `S+0x1E6` current player, `S+0x1E7` players choice, `S+0x1E9` round, `S+0x1EA` flags (1 hot-seat,
+  2 turn done, 4 bet placed, 8 stale), `S+0x1F0` leaving, `S+0x1F1` quit box, `S+0x1F2` s16 winnings, `S+0x1E4 / 5` deck next / size; monkeys `S+0x30+0x2C m` (m < 6) {`+0x18` u8[8] cards, `+0x23`
+  u8[3] bets, `+0x26` count, `+0x27` slots, `+0x28` bit 0 eliminated}; players `S+0x138+0x28 p` (p < 3) {`+0x18` name string id, `+0x1C` u8[5] hand (0xFF empty; zeros before the
+  deal), `+0x21` high nibble selected, `+0x22` score, `+0x23` flags 1 AI, 4 out of cards, 8 bet}. The intro is its play arrow (238, 174) only. Stylus: monkey m (56+32m, 32,
+  24x32), card holder (56+32m, 88), hand card i (72+32i, 137), quit X (241, 177) radius 10, Yes / No (80 / 144, 80, 32x32).
+- **Scratch** (`ScratchState`): `S+0xE0` tier, `S+0x10` prize, `S+0xC8 / CC` the two winning pictures, `S+0xD0` state 1 playing / 2 won / 3 lost, `S+0xD8` u16 revealed, `S+0xDC` active,
+  `S+0xDE` u16 which box (0xFFFF none), `S+0xE4` hint shown; boxes `S+0x24+0xC i` (i < 8) {u32 picture 0..6, `+9` 2 revealed}; covers ptr `S+0xA4+4 i` -> `+0x98` pixels left of 1024 (684 erased
+  reveals). The hint / result popups are the popup part's (`P+0x8`).
+- **Drencher** (`DrencherState`): `S+0x24` s32 pump 20.12 (0..180), `S+0x28 / 2C` target record / type (2 Sim, 0xB object; -1 none), `S+0x34` pumping, `S+0x35` firing, `S+0x70` u8 target
+  mode, `S+0x78 / 79` help / help text; `G+0x18` water (20.12, 0..100), `G+0x1C` pressure (0..125). Stylus: X 219..253 x 11..45, target 137..171 x 46..80, ? 71..105 x 159..193, refill
+  13..51 x 159..197, fire 219..253 x 159..193 held, pump band y 94..146.
+- **Crime** (`CrimeState`): `S+0x4C` help, `S+0x52` dragging, `S+0x58` u8 throw phase 0 idle / 1 grabbed / 2 aiming / 3 released, `S+0x5A` s16 angle -90..90, `S+0x5C / 5D / 5E` scare /
+  armed / subdue available, `S+0x5F / 60` pressed, `S+0x61` the throw hit (0x10 until the first throw: unset). Stylus: X 209..239 x 17..47, scare 94..161 x 13..56, subdue 94..161 x 135..178.
+- **Mixer** (`MixerState`): `S+8` mode, `S+0xA55` phase (0 idle, 1 playing, 2 recording, 5 VOX, 7 song select, 8 / 9 help, 0xA save prompt), `S+0x8E2` track mask, `S+0x8E3` u8[3] keys held
+  (0xD none), `S+0x8E6` s8 octave, `S+0x8E7` instrument (1, 2, 3, 5), `S+0x8E9` sustain, `S+0x8EA / EB` sliders 0..26, `S+0x8EC` tempo, `S+0x8ED` variation, `S+0xA5C` song 0..8,
+  `S+0xA4C / A4E` u16 control / note events, `S+0xA52` flags (4 PREP, 0x10 playing), `S+0xA6C` (2 mic buffer full), `S+0xA63` u8[8] unlocked songs, count `S+0xA6B`. Stylus: the 39 regions of
+  the table at 0x0212564C (research: m6-minigames §8). **Save menu** (`MixerSaveState`): `S+8` mode, `S+0x28` slot (0xFF none), `S+0x88` the typed name, `S+0xC` the mixer's context (null:
+  the screen draws black), names and used flags from `G+0x46AC + 16 j` (songs) / `G+0x46DC + 64 j` (ringtones), byte 15 the used flag.
+- **ArtGallery** (`ArtState`): `S+0x2C` stroke 0 idle / 1 drawing / 2 outside, `S+0x30` tool button, `S+0x34` tool (0 pencil, 1 eraser, 2 line, 3 bucket, 4 rect, 5 filled rect), `S+0x38` swatch,
+  `S+0x3C` palette page, `S+0x40` brush, `S+0x650` u8[32][48] the working canvas (palette index 1..15, 1 white; each cell 4x4 px at (32 + 4 col, 8 + 4 row)), `S+0xC68` stylus on canvas
+  (garbage while off it), `S+0xC60 / C64` its cell row / column. The colour is the swatch + 1 of the page (resource 6028, 16 colours a page: a ROM resource, not RAM).
+
+`--print-minigame` logs the screen's part (`MinigameLine`) when it changes. Checked by `tests/gamestate_test.cpp` (made-up RAM, garbage per part, random bytes) and
+`tests/gamestate_check.sh` (held-out `G-*` states from the research's minigame run).
+
 ## Backup signal
 
 Sub-engine BG layer records at 0x02139618, 0x0213968C, 0x02139700 and 0x02139774 (stride 0x74)
@@ -187,7 +251,7 @@ Popup share 0x0009. Kept as a cross-check; the manager above is the source.
 
 ## Unknown
 
-Not seen in any state: other shops, other minigames, later towns, the phonebook, the messages'
+Not seen in any state: other shops, the minigames' launches by play (the research wrote the screen request), later towns, the phonebook, the messages'
 own pages (only the phone's page value as Messages opened), Goals and Relationships sub-pages, save slot and Quit choices, Build and Gift selections,
 Create-a-Sim pages, game over, credits. Not found: the highlighted Social answer, the dialogue's
 page count, the Pockets counted item or slot, the Relationships list index, the title/menu
