@@ -78,8 +78,10 @@ u64 MenuView::Hash() const
         MixAction(h, it.action);
         MixAction(h, it.left);
         MixAction(h, it.right);
+        MixAction(h, it.buttonX);
         for (int n : it.next) Mix(h, (u64)(u32)n);
         MixText(h, it.word);
+        MixText(h, it.xWord);
     }
     for (const MenuAction& a : buttons) MixAction(h, a);
     MixAction(h, back);

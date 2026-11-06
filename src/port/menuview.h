@@ -49,6 +49,10 @@ struct ViewItem
     // Left / Right while this item has the focus (a slider's knob: Options' volumes): before the
     // view's screen-wide Left / Right and before a focus move; empty: as without.
     MenuAction left, right;
+    // X while this item has the focus (Pockets: the bin for the focused slot), before the view's
+    // screen-wide X; empty: as without.
+    MenuAction buttonX;
+    std::string xWord;    // its hint's word (the frame shows X with it while the item has the focus)
     // Explicit focus moves, item indices for Up, Down, Left, Right (-1: the nearest by geometry,
     // MenuNeighbour): a link the geometry would leave to chance (the panel's phone button above
     // the tab's first row and back).

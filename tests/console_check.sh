@@ -9,8 +9,10 @@
 #   world; casino-menu (sit-casino, --console-menu, the focus on row 2), at 2x and --wide: the HD
 #   Interact tab (the portrait the touch screen's pixels 3x, three labelled rows, the focus ring on
 #   the second only, the world dimmed); s7 (the phone): the touch screen 3x over the dimmed world; the same with
-#   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item): 3x over the
-#   dimmed world; s5 with --no-romdata (no game text: milestone 1's conversation): the dialogue
+#   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item, empty pockets)
+#   and gift-items (A-gift2-base; 1x, 2x, --wide): the HD Give Gift (src/port/gift.*: the portrait
+#   3x and the bow 2x as the touch screen's pixels, the focus around the selected slot);
+#   pockets-menu (A-pk-cnt3-slot1, the complete save): the HD Pockets tab (src/port/pockets.*); s5 with --no-romdata (no game text: milestone 1's conversation): the dialogue
 #   rebuilt wide from the game's pieces; s5-hd (the HD conversation, src/port/dialogue.*): the
 #   world whole, the panel, the name plate's and the text's white pixels, the portrait as the
 #   touch screen's own pixels 2x; s5-hd-wide (--wide): the world not cut at its sides;
@@ -64,11 +66,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    case $state in act-cards|sit-casino) cp "$complete_save" "$save" || return ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    case $state in act-cards|sit-casino) cp "$complete_save" "$save" ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -105,10 +107,15 @@ run casino-menu sit-casino "${late[@]}" --console-menu --console-focus 1 --print
 run casino-menu-2x sit-casino "${late[@]}" --console-menu --console-focus 1 --print-hud --compose-scale 2 &
 run casino-menu-wide sit-casino "${late[@]}" --console-menu --console-focus 0 --wide &
 wait
+run pockets-menu A-pk-cnt3-slot1 "${late[@]}" --console-menu --console-focus 0 &
+run gift-items A-gift2-base "${town[@]}" --console-focus 0 &
+run gift-items-2x A-gift2-base "${town[@]}" --console-focus 0 --compose-scale 2 &
+run gift-items-wide A-gift2-base "${town[@]}" --console-focus 0 --wide &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
-    menu-m1 casino-menu casino-menu-2x casino-menu-wide; do
+    menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu gift-items gift-items-2x gift-items-wide; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -359,8 +366,50 @@ elif case == "s7-menu":
     expect("focus ring left", C(256 + 36 - 2, 72 + 420 + 75), RING)
     expect("focus ring top", C(256 + 36 + 100, 72 + 420 - 3), RING)
     expect("inside the ring", C(256 + 36 + 1, 72 + 420 + 75), bottom(12, 165))
-elif case == "gift":
-    big_over_dim()
+elif case in ("gift", "gift-items", "gift-items-2x", "gift-items-wide"):
+    # Give Item in HD (src/port/gift.*): the panel, the title's well, the recipient's portrait as
+    # the touch screen's own pixels 3x (DS 167,47 65 x 81), the bow 2x; never the touch screen 3x.
+    expect("panel outline", C(176, 300), OUTLINE)
+    expect("panel band", C(180, 300), hexrgb("6171B2"))
+    expect("title well", C(640, 50), hexrgb("6A72B8"))
+    piece("portrait 3x", 167, 47, 65, 81, 862, 195, 3, step=4)
+    piece("bow 2x", 108, 67, 38, 38, 468, 476, 2, step=3)
+    if C(256 + 3 * 120 + 1, 72 + 3 * 100 + 1) == bottom(120, 100) and C(256 + 3 * 30 + 1, 72 + 3 * 160 + 1) == bottom(30, 160):
+        errors.append("the touch screen 3x is drawn")
+    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    # The focus ring (green) around the game's selected slot when the pockets hold something.
+    if case == "gift":
+        if ring(197, 235): errors.append("a focus ring with empty pockets")
+    else:
+        if not ring(197, 235): errors.append("no focus ring around slot 1")
+        if ring(313, 235): errors.append("a focus ring around slot 2")
+        # Slot 1's item: the game's own icon (not the cell's flat fill).
+        cell = {C(x, y) for y in range(200, 290, 4) for x in range(215, 290, 4)}
+        if len(cell) < 8: errors.append(f"slot 1 has no icon ({len(cell)} colours)")
+elif case == "pockets-menu":
+    # Pockets in HD (src/port/pockets.*): the Pockets tab's icon green, the focus ring around slot
+    # 1 (the Arcade-Pie Factory), the counted items' icons the touch screen's pixels 2x (DS 99 +
+    # 29i, 155, 23 x 23), their counts in white, the item's name in the info; never the touch
+    # screen 3x.
+    expect("panel outline", C(176, 300), OUTLINE)
+    def greens(cell):
+        x0 = 420 + 88 * cell
+        return sum(1 for y in range(48, 126, 2) for x in range(x0 + 8, x0 + 80, 2)
+                   if (lambda p: p[1] > p[0] + 50 and p[1] > p[2] + 30)(C(x, y)))
+    counts = [greens(i) for i in range(5)]
+    if counts[1] < 200 or counts[0] or any(counts[2:]):
+        errors.append(f"tab icons' green pixels {counts} (want Pockets' only)")
+    for i in range(4):
+        piece(f"counted {i} 2x", 99 + 29 * i, 155, 23, 23, 200 + 87 * i + 14, 462, 2, step=3)
+    r, g, b = C(197, 258)
+    if not (g > r + 80 and g > b + 60): errors.append("no focus ring around slot 1")
+    if (255, 255, 255) not in [C(x, y) for y in range(540, 560) for x in range(215, 260)]:
+        errors.append("no count under the first counted item")
+    if (255, 255, 255) not in [C(x, y) for y in range(222, 258) for x in range(692, 900)]:
+        errors.append("no name in the info")
+    # (The panel's colours are the game's: a few pixels may match the touch screen 3x by chance.)
+    same = sum(1 for y in range(8, 184, 16) for x in range(8, 248, 16) if C(256 + 3 * x + 1, 72 + 3 * y + 1) == bottom(x, y))
+    if same > 100: errors.append(f"the touch screen 3x is drawn ({same} of 165 samples)")
 elif case == "s5":
     expect("dialogue frame left", C(112, 600), OUTLINE)
     expect("dialogue frame top", C(640, 458), OUTLINE)
@@ -447,7 +496,7 @@ done
 pad() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4
     "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
-        --layout console --print-screen --print-game "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        --layout console --print-screen --print-game --print-town "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
 # in_order NAME LINE...: each line (a grep -E pattern) is printed, after the one before.
@@ -470,6 +519,10 @@ pad_late() {
 pad_late pad-hotseat sit-casino interact-hotseat 300 &
 pad_late pad-target D-cas-right2 interact-target 220 &
 pad pad-buy sit-store interact-buy 200 &
+pad_late pad-drencher A-pk-slot1-key2 pockets-drencher 200 &
+pad_late pad-bin A-pk-slot1-key2 pockets-bin 240 &
+pad pad-give A-gift2-base gift-give 200 &
+pad pad-gift-close sit-gift gift-close 150 &
 pad pad-tabs s7 tabs 320 &
 pad pad-popup s6 popup 120 &
 pad pad-opening s6 popup-opening 200 &
@@ -519,6 +572,25 @@ buy() { in_order pad-buy 'console menu open, focus 0' 'game Catalogue'; }
 check_pad pad-hotseat hotseat
 check_pad pad-target target
 check_pad pad-buy buy
+# Pockets and Give Gift (src/port/pockets.*, gift.*): from A-pk-slot1-key2 (the Super Drencher
+# selected), MENU, A → the Super Drencher's game (overlay 18, ItemHand); MENU, Left (slot 1), X →
+# the game selects the slot (nothing thrown), X again → the bin empties the pockets; from
+# A-gift2-base, Right, A → the bed given (the pockets keep the arcade), back to the panel; from
+# sit-gift, B → the game's X, the panel.
+drencher() { in_order pad-drencher 'console menu open, focus 7' 'game ItemHand'; }
+bin_twice() {
+    in_order pad-bin 'console menu open, focus 7' 'focus 0' 'pockets slot=0' 'inventory slots=- ' || return 1
+    # The first X threw nothing: the pockets emptied only after the second (frame 140 on).
+    local f
+    f=$(grep -m 1 'inventory slots=- ' "$tmp/pad-bin.log" | sed 's/frame \([0-9]*\):.*/\1/')
+    [ -n "$f" ] && [ "$f" -ge 140 ] || { echo "  pad-bin: the pockets emptied at frame $f (before the second X)"; return 1; }
+}
+give() { in_order pad-give 'console menu closed, focus 1' 'inventory slots=171:[^,]* counted' 'game Panel/Interact'; }
+gift_close() { in_order pad-gift-close 'game Gift' 'game Panel/Interact'; }
+check_pad pad-drencher drencher
+check_pad pad-bin bin_twice
+check_pad pad-give give
+check_pad pad-gift-close gift_close
 
 # The activities on buttons (src/activities.*): act NAME STATE SCRIPT FRAMES SHOTS CLOCK, a
 # CONSOLE run with --print-screen and shots of the two screens at SHOTS (NAME/f*.png).

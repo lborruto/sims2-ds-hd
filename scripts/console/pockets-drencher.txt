@@ -1,0 +1,5 @@
+# From A-pk-slot1-key2 (the complete save, Pockets, the Super Drencher selected), CONSOLE: MENU
+# opens the HD Pockets tab with the focus on the game's selection (the Super Drencher); A taps it
+# and then the hand: the Super Drencher's game (overlay 18).
+20 2 pad menu
+60 2 pad a

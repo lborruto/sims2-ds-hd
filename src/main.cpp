@@ -39,6 +39,7 @@
 #include "romdata.h"
 #include "port/dialogue.h"
 #include "port/interact.h"
+#include "port/pockets.h"
 #include "script.h"
 #include "shots.h"
 #include "recorder.h"
@@ -85,7 +86,7 @@ static void Usage()
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
-        "  --measure-menu                (checks) every word the HD Interact tab can show fitted to its box, in --language's\n"
+        "  --measure-menu                (checks) every word the HD Interact tab, Pockets and Give Gift can show fitted to its box, in --language's\n"
         "                                words: how many shrink, how many need an ellipsis (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load), and stop\n"
@@ -383,9 +384,14 @@ int main(int argc, char** argv)
                m.checked, m.widestId, m.widestW, m.shrunk, m.cut, m.cutIn[0], m.cutIn[1], m.cutIn[2], m.cutIn[3], m.cutIn[4]);
         for (int id : m.cutIds) printf(" %d", id);
         printf("\n");
+        // Pockets and Give Gift: every item's name and description, the buttons, the titles.
+        const BlockMeasure p = MeasurePockets(*app.rom);
+        printf("pockets: %d words, tallest description %d (%d lines), %d shrunk, %d cut, %d names cut", p.checked, p.tallestId, p.tallestLines, p.shrunk, p.cut, p.namesCut);
+        for (int id : p.cutIds) printf(" %d", id);
+        printf("\n");
         // A neighbour's name beside the plate may end in an ellipsis (the Italian table has a
         // sentence at an object's name, 463); every other box must hold its words.
-        return m.cut - m.cutIn[4] > 0 ? 2 : 0;
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.

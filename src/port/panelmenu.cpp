@@ -7,6 +7,7 @@
 #include "hotspots.h"
 #include "port/icons.h"
 #include "port/interact.h"
+#include "port/pockets.h"
 #include "port/statusbar.h"
 #include "romdata.h"
 
@@ -25,9 +26,22 @@ constexpr u32 kTabPlateFill = 0xFF9AA2E3;
 bool IsPunct(char c) { return c == '.' || c == ',' || c == '!' || c == '?' || c == ';' || c == ':' || c == ')'; }
 }
 
-std::string MenuWords(const RomData& rom, int id, int amount)
+std::string MenuWords(const RomData& rom, int id, int amount) { return MenuText(rom.String(id), amount); }
+
+std::string MenuWordsWith(const RomData& rom, int id, const std::string& at1)
 {
-    std::string in = rom.String(id);
+    std::string f = rom.String(id);
+    for (size_t p = 0; (p = f.find("@1", p)) != std::string::npos;)
+    {
+        if (p + 2 < f.size() && std::isdigit((unsigned char)f[p + 2])) { p += 2; continue; }
+        f.replace(p, 2, at1);
+        p += at1.size();
+    }
+    return MenuText(f);
+}
+
+std::string MenuText(std::string in, int amount)
+{
     if (amount >= 0)
     {
         // The amount in @1, the simoleon glyph for '$' (as the HD status bar draws the money).
@@ -160,6 +174,10 @@ MenuView PanelMenuViewOf(ScreenState s, const GameState& game, const RomData* ro
         if (!game.town.interact.valid) return v;
         AddInteractView(v, game.town.interact, rom);
         break;
+    case Tab::Pockets:
+        if (!game.town.inventory.valid || !game.town.pockets.valid) return v;
+        AddPocketsView(v, game.town.inventory, game.town.pockets, rom);
+        break;
     default: return v; // (the other tabs: milestone 1's composition until they are redrawn)
     }
     // The phone button, after the tab's own items (the first focus is the tab's), linked to them
@@ -238,14 +256,20 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
 
     // The tab's content.
     if (s.tab == Tab::Interact) BuildInteract(c, v, focus, game, rom, icons, bottom);
+    else if (s.tab == Tab::Pockets) BuildPockets(c, v, focus, game, rom, icons, bottom);
 
     // The hints: A (the focused item's own word when it has one), B closes.
     int right = kPmHints.x + kPmHints.w - 8;
     right = AddHint(c, right, Button::B, MenuWords(rom, kStrClose));
-    if (MenuFocusable(v, focus))
+    if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) // (nothing to perform: no A)
     {
         const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
-        AddHint(c, right, Button::A, a.text);
+        right = AddHint(c, right, Button::A, a.text);
+    }
+    if (MenuFocusable(v, focus) && !v.items[focus].buttonX.empty())
+    {
+        const FittedText x = FitLine(v.items[focus].xWord, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+        AddHint(c, right, Button::X, x.text);
     }
 
     // The icons (images: drawn above the still layers): the five tabs, the selected one green.

@@ -70,6 +70,10 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
 // fills @1 as the game does for the verbs that carry one (grouped by ',', the game's '$' its
 // simoleon glyph drawn §: "Buy (§1,200)").
 std::string MenuWords(const RomData& rom, int id, int amount = -1);
+// The same on a text (UTF-8, RomData's escapes).
+std::string MenuText(std::string text, int amount = -1);
+// String id with its @1 filled with at1 (a name: "Give Item to @1"), then as MenuWords.
+std::string MenuWordsWith(const RomData& rom, int id, const std::string& at1);
 // The "@1: @2" title with the tab's name and `name` (empty: the tab's name alone, as the game).
 std::string MenuTitle(const RomData& rom, int tab, const std::string& name);
 // A single line fitted to `width`: the size shrunk from `size` to `minSize`, then "…"

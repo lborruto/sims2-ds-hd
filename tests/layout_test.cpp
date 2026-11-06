@@ -15,8 +15,10 @@
 #include "hotspots.h"
 #include "layout.h"
 #include "port/dialogue.h"
+#include "port/gift.h"
 #include "port/interact.h"
 #include "port/panelmenu.h"
+#include "port/pockets.h"
 #include "port/statusbar.h"
 #include "romdata.h"
 #include "ui/kit.h"
@@ -798,6 +800,113 @@ int main()
                 CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty));                          // the dimmed world: nothing
                 CHECK(!OverTopComposition(comp, fit, 20.5f, 360.5f));
             }
+        // Pockets (port/pockets.h) and Give Gift (port/gift.h) on made-up inventories: empty slots
+        // disabled and never focused, every enabled item reachable from every other and the phone
+        // Up from the top row; A on a slot taps it then the hand / the bow; X on a slot the game
+        // has not selected taps the slot (the question), on the one it has the bin. Their mouse
+        // pieces round trip and land on the game's own targets; every item inside the panel.
+        auto inventory = [](int n) {
+            GameState h;
+            h.valid = true;
+            InventoryState& inv = h.town.inventory;
+            inv.valid = true;
+            for (int i = 0; i < n; i++) inv.slots.push_back({100 + i, 563 + i, 922 + i, 1991, 1});
+            for (int k = 0; k < 3; k++) inv.keys[k] = {k, 1968 + k, 1972 + k, -1, k == 1 ? 1 : 0};
+            for (int i = 0; i < 4; i++) inv.counted[i] = {i, 1154 + i, 845 + i, -1, i * 3};
+            h.town.pockets.valid = true;
+            h.town.gift.valid = true;
+            h.town.gift.recipient = 22;
+            h.town.gift.recipientNameId = 345;
+            return h;
+        };
+        const ScreenState pk {Screen::Panel, Tab::Pockets}, gs {Screen::Gift, Tab::None};
+        for (int n = 0; n <= 6; n++)
+            for (int sel : {-1, 0, 5})
+            {
+                GameState h = inventory(n);
+                h.town.pockets.slot = sel < n ? sel : -1;
+                h.town.gift.slot = sel < n ? sel : -1;
+                if (n == 4) h.town.gift.refused[2] = true;
+                const MenuView p = PanelMenuViewOf(pk, h);
+                CHECK(p.valid && p.items.size() == 6 + 3 + 4 + 1 && AllReachable(p));
+                for (int i = 0; i < 6; i++)
+                {
+                    CHECK(p.items[i].enabled == (i < n));
+                    if (i >= n) continue;
+                    CHECK(p.items[i].action.size() == 2 && p.items[i].action[1].x == kPkHandX && p.items[i].action[1].y == kPkHandY);
+                    CHECK(p.items[i].buttonX.size() == 1);
+                    const MenuStep x = p.items[i].buttonX[0];
+                    CHECK(h.town.pockets.slot == i ? (x.x == kPkBinX && x.y == kPkBinY) : (x.x == p.items[i].action[0].x && x.y == p.items[i].action[0].y));
+                }
+                CHECK(p.items[6].action.empty() && !p.items[7].action.empty() && p.items[9].action.empty()); // a key item not owned, owned; counted
+                CHECK(MenuMove(p, 13, 1) == MenuFirst(p));
+                if (h.town.pockets.slot >= 0) CHECK(MenuFirst(p) == h.town.pockets.slot);
+                const MenuView g = GiftMenuViewOf(gs, h);
+                CHECK(g.valid && g.items.size() == 6 && g.back.size() == 1 && g.back[0].x == kGiftCloseX);
+                for (int i = 0; i < 6; i++)
+                {
+                    CHECK(g.items[i].enabled == (i < n && !(n == 4 && i == 2)));
+                    if (g.items[i].enabled) CHECK(g.items[i].action.size() == 2 && g.items[i].action[1].x == kGiftBowX);
+                }
+                bool any = false;
+                for (const ViewItem& it : g.items) any |= it.enabled;
+                if (any) CHECK(AllReachable(g));
+                std::vector<u32> pic(SW * SH, 0xFF808080);
+                for (int focus : {-1, 0, 7, 9, 13})
+                {
+                    for (bool gift : {false, true})
+                    {
+                        Composition comp {kConsoleW, kConsoleH, {}, {}};
+                        Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                        world.touch = false;
+                        comp.pieces.push_back(world);
+                        if (gift) BuildGiftMenu(comp, g, focus < 6 ? focus : -1, h, rom, nullptr, pic.data());
+                        else BuildPanelMenu(comp, pk, p, focus, h, rom, nullptr, pic.data());
+                        int layer = 0;
+                        for (const ui::UiItem& u : comp.ui)
+                        {
+                            CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                                  u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                            if (u.kind == ui::UiItem::Image) continue;
+                            CHECK(u.layer >= layer);
+                            layer = u.layer;
+                        }
+                        if (n != 2 || focus != 0) continue;
+                        for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                            TestConsoleRoundtrip(gift ? gs : pk, true, 256, 192, o.first, o.second, true, &comp);
+                        const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                        const std::vector<Hotspot>& hs = HotspotsFor(gift ? gs : pk);
+                        const MenuView& w = gift ? g : p;
+                        int tx, ty;
+                        for (int i = 0; i < 6; i++)
+                        {
+                            const Rect r = w.items[i].rect;
+                            CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                            const Rect a = hs[i].area;
+                            CHECK(tx >= a.x && tx < a.x + a.w && ty >= a.y && ty < a.y + a.h);
+                        }
+                        const Rect act = gift ? kGiftBow : kPkHandBtn;
+                        const Rect a = gift ? hs[6].area : hs[6].area;
+                        CHECK(TouchFromComposition(comp, fit, act.x + act.w / 2.0f, act.y + act.h / 2.0f, tx, ty));
+                        CHECK(tx >= a.x && tx < a.x + a.w && ty >= a.y && ty < a.y + a.h);
+                        if (!gift)
+                        {
+                            CHECK(TouchFromComposition(comp, fit, kPkBinBtn.x + kPkBinBtn.w / 2.0f, kPkBinBtn.y + kPkBinBtn.h / 2.0f, tx, ty));
+                            CHECK(tx >= hs[10].area.x && tx < hs[10].area.x + hs[10].area.w && ty >= hs[10].area.y && ty < hs[10].area.y + hs[10].area.h);
+                        }
+                        CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty)); // the dimmed world: nothing
+                    }
+                }
+            }
+        {
+            GameState bad = inventory(2);
+            bad.town.inventory.valid = false;
+            CHECK(!PanelMenuViewOf(pk, bad).valid && !GiftMenuViewOf(gs, bad).valid);
+            bad = inventory(2);
+            bad.town.gift.valid = false;
+            CHECK(!GiftMenuViewOf(gs, bad).valid && PanelMenuViewOf(pk, bad).valid);
+            CHECK(!GiftMenuView(gs, &bad, &rom).valid); // no strings: milestone 1's
+        }
         // BuildConsole: without the game's strings, milestone 1's menu (the touch screen 3x).
         const HudState hud = TestHud();
         const HudStrings strings = TestStrings();

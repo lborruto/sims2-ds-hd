@@ -107,9 +107,9 @@ bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
         const int f = MenuFocusable(v, focus_) ? focus_ : MenuFirst(v);
         if (b == &PadState::a) return f >= 0 && !v.items[f].action.empty();
         if (b == &PadState::b) return !v.back.empty();
-        if (b == &PadState::x) return !v.buttons[(int)MenuButton::X].empty();
+        if (b == &PadState::x) return !(MenuFocusable(v, f) && !v.items[f].buttonX.empty() ? v.items[f].buttonX : v.buttons[(int)MenuButton::X]).empty();
         if (b == &PadState::y) return !v.buttons[(int)MenuButton::Y].empty();
-        return b == &PadState::lb || b == &PadState::rb; // (the panel's tabs)
+        return s.screen == Screen::Panel && (b == &PadState::lb || b == &PadState::rb); // (the panel's tabs)
     }
     const std::vector<Hotspot>& h = HotspotsFor(s);
     if (b == &PadState::a) return First(h) >= 0;
@@ -189,7 +189,8 @@ const MenuAction* Navigator::DirAction(const MenuView& v, int dir, bool& scroll)
 
 bool Navigator::UsesView(ScreenState s) const
 {
-    return view_ && view_->valid && s.screen == Screen::Panel && menuOpen_;
+    // The panel's menu while open; Give Gift whenever it is up (port/gift.h).
+    return view_ && view_->valid && ((s.screen == Screen::Panel && menuOpen_) || s.screen == Screen::Gift);
 }
 
 void Navigator::Move(ScreenState s, int dx, int dy)
@@ -335,11 +336,12 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
                 }
             }
             if (pressed(&PadState::a) && MenuFocusable(v, focus_)) Run(v.items[focus_].action, touch);
-            if (pressed(&PadState::x)) Run(v.buttons[(int)MenuButton::X], touch);
+            if (pressed(&PadState::x))
+                Run(MenuFocusable(v, focus_) && !v.items[focus_].buttonX.empty() ? v.items[focus_].buttonX : v.buttons[(int)MenuButton::X], touch);
             if (pressed(&PadState::y)) Run(v.buttons[(int)MenuButton::Y], touch);
             const int t = s.tab == Tab::None ? -1 : (int)s.tab - (int)Tab::Interact;
-            if (pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
-            else if (pressed(&PadState::lb)) tap(kTabIcon[t < 0 ? 4 : (t + 4) % 5]);
+            if (s.screen == Screen::Panel && pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
+            else if (s.screen == Screen::Panel && pressed(&PadState::lb)) tap(kTabIcon[t < 0 ? 4 : (t + 4) % 5]);
             const bool back = pressed(&PadState::b), menu = pressed(&PadState::menu);
             if (back && !v.back.empty()) Run(v.back, touch);
             else if (back || menu) menuOpen_ = false;

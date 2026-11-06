@@ -1099,6 +1099,68 @@ static void view_item_left_right()
     CHECK(w.nav.Focus() == 0);
 }
 
+// An item's own X (Pockets' bin) before the view's, held while unsettled; Give Gift's view
+// (no menu to open): A runs the focused slot's taps, B its back (the game's X), LB / RB tap no tab.
+static void view_item_x_and_gift()
+{
+    MenuView v = ListView(4, -1);
+    v.items[1].buttonX = {TapStep(67, 167)};
+    v.buttons[(int)MenuButton::X] = {TapStep(10, 10)};
+    Rig r;
+    r.view = &v;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::x); // row 0: the view's X
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 10 && y == 10);
+    r.Drain();
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::down);
+    PadState px;
+    px.x = true;
+    r.Frame(kInteract, px, false); // unsettled: held
+    r.Frame(kInteract, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(kInteract, {}, true);
+    CHECK(r.Touched(x, y) && x == 67 && y == 167);
+
+    const ScreenState gift {Screen::Gift, Tab::None};
+    MenuView g;
+    g.valid = true;
+    for (int i = 0; i < 6; i++)
+    {
+        ViewItem it;
+        it.rect = {200 + (i % 2) * 116, 183 + (i / 2) * 116, 104, 104};
+        it.enabled = i < 2;
+        if (it.enabled) it.action = {TapStep(37 + 39 * (i % 2), 50), TapStep(127, 85)};
+        it.id = 0x300 + (u32)i;
+        g.items.push_back(it);
+    }
+    g.back = {TapStep(235, 19)};
+    g.initial = 1;
+    Rig q;
+    q.view = &g;
+    q.Frame(gift);
+    CHECK(q.nav.Focus() == 1);
+    q.Press(gift, &PadState::rb);
+    q.Press(gift, &PadState::lb);
+    CHECK(!q.touch.Owns());
+    q.Press(gift, &PadState::left);
+    CHECK(q.nav.Focus() == 0);
+    q.Press(gift, &PadState::down); // the slots below are empty: the focus stays
+    CHECK(q.nav.Focus() == 0);
+    q.Press(gift, &PadState::a);
+    CHECK(q.Touched(x, y) && x == 37 && y == 50);
+    q.Drain();
+    for (int i = 0; i < 3 && !q.touch.Owns(); i++) q.Frame(gift);
+    CHECK(q.Touched(x, y) && x == 127 && y == 85);
+    q.Drain();
+    q.Frame(gift);
+    q.Press(gift, &PadState::b);
+    for (int i = 0; i < 3 && !q.touch.Owns(); i++) q.Frame(gift);
+    CHECK(q.Touched(x, y) && x == 235 && y == 19);
+}
+
 int main()
 {
     menu_opens_and_closes();
@@ -1129,6 +1191,7 @@ int main()
     view_scrolls_with_the_game();
     view_selection_the_game_owns();
     view_item_left_right();
+    view_item_x_and_gift();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

@@ -1,5 +1,6 @@
 #include "input.h"
 
+#include "port/gift.h"
 #include "port/panelmenu.h"
 
 #include <algorithm>
@@ -323,7 +324,8 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
     {
         // The panel's HD menu (port/panelmenu.h), built from the game's state as CONSOLE draws it.
         const ScreenState screen = app.ConsoleScreen();
-        const MenuView view = PanelMenuView(screen, app.portSupported ? &app.game : nullptr, app.rom.get());
+        const GameState* game = app.portSupported ? &app.game : nullptr;
+        const MenuView view = screen.screen == Screen::Gift ? GiftMenuView(screen, game, app.rom.get()) : PanelMenuView(screen, game, app.rom.get());
         navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }

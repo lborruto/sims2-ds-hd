@@ -6,6 +6,7 @@
 #include "activities.h"
 #include "hotspots.h"
 #include "port/dialogue.h"
+#include "port/gift.h"
 #include "port/panelmenu.h"
 #include "romdata.h"
 
@@ -141,6 +142,20 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             return (a.kind == ui::UiItem::Image ? 1 << 20 : a.layer) < (b.kind == ui::UiItem::Image ? 1 << 20 : b.layer);
         });
         return c; // (the focus is the view's: no ring from HotspotsFor)
+    }
+    else if (MenuView v; s.screen == Screen::Gift && (v = GiftMenuView(s, game, rom)).valid)
+    {
+        // Give Gift redrawn in HD (port/gift.h) over the dimmed world.
+        Piece world = World(topW, worldRows, bar);
+        world.touch = false;
+        c.pieces.push_back(world);
+        c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
+        BuildGiftMenu(c, v, focus, *game, *rom, icons, bottom);
+        if (bar) AddStatusBar(c, *hud, *strings);
+        std::stable_sort(c.ui.begin(), c.ui.end(), [](const ui::UiItem& a, const ui::UiItem& b) {
+            return (a.kind == ui::UiItem::Image ? 1 << 20 : a.layer) < (b.kind == ui::UiItem::Image ? 1 << 20 : b.layer);
+        });
+        return c;
     }
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {

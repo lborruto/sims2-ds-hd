@@ -9,10 +9,13 @@
 //     HotspotsFor: A runs the focused item's action (taps, DS buttons, drags, in order), greyed
 //     items are skipped and never run, the view's screen-wide buttons (Left / Right: Interact's
 //     targets), the focused item's own Left / Right, a selection the game owns (Up / Down its
-//     scroll) and the list's scroll apply (those taps held by the gate like A's), B runs the
-//     view's back action or closes the menu.
+//     scroll) and the list's scroll apply (those taps held by the gate like A's), X runs the
+//     focused item's own X (Pockets' bin) or the view's, B runs the view's back action or closes
+//     the menu.
 //   Phone: the focus as in the menu; B or MENU tap the phone's X (back to the panel, menu closed).
-//   Gift, Catalogue, Build: the focus as in the menu; B taps the screen's X when it has one.
+//   Gift: in HD (port/gift.h) whenever its view is valid, as the HD menu (B its back: the X; no
+//     tabs); else, like Catalogue and Build: the focus as in the menu; B taps the screen's X
+//     when it has one.
 //   Social, Cards, Vacuum: the activity's own buttons (activities.h); the cards' focus moves as
 //     in the menu, the vacuum's hand is the stick cursor.
 //   Popup (a goal, tips, Game Paused): A or B tap its X; Start stays the DS's (it resumes a pause).
@@ -110,7 +113,7 @@ private:
     // the selection's scroll, the focused item's Left / Right, the view's Left / Right, the list's
     // scroll past its end (scroll true); null: a focus move.
     const MenuAction* DirAction(const MenuView& v, int dir, bool& scroll) const;
-    // The panel's menu is open and the view given is valid: the focus is over it.
+    // The view given is valid and shown (the panel's menu open, or Give Gift): the focus is over it.
     bool UsesView(ScreenState s) const;
     // Whether a press of b would tap on s (the gate holds only those).
     bool WouldTap(ScreenState s, bool PadState::*b) const;
