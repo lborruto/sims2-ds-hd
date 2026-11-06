@@ -82,7 +82,6 @@ struct App
     // widescreen world is on. Layouts size the top screen from it.
     float topAspect = 4.0f / 3.0f;
 
-    std::string quickState;        // F5 / F7
     std::string shotFile;          // F12
 
     // The top screen's picture at its real size when the looks are on (looks.cpp builds it after

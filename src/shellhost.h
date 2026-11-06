@@ -34,6 +34,7 @@ struct ShellHost
     // Called before every state load (main.cpp: a copy of the game's save, as the backups make:
     // melonDS writes the cartridge's memory to disk on a load).
     std::function<void()> beforeLoad;
+    std::function<void()> afterLoad;   // after every successful load (cancels queued taps and the held picture)
     unsigned captureUntil = 0; // SDL ticks
     long frame = 0;            // (for the log)
     int autoLanguage = 1;      // the words without the game's strings (the launch panel): the computer's

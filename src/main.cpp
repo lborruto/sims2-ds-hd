@@ -586,7 +586,7 @@ relaunch:
         if (!launchMessage.empty()) romPath.clear();
         if (!launch(launchMessage))
         {
-            if (window) { input.ClosePads(); SDL_Quit(); }
+            if (window) { if (!settingsPath.empty()) app.settings.Save(settingsPath); input.ClosePads(); SDL_Quit(); }
             return 0;
         }
     }
@@ -953,6 +953,7 @@ relaunch:
     // Every state load copies the game's save first (melonDS writes the cartridge's memory to disk
     // on a load): the backups' copy, which skips a copy equal to the newest.
     host.beforeLoad = [&backups]() { backups.Copy(); };
+    host.afterLoad = [&]() { input.navigator.Leave(input.touchScript); app.consoleHold.Reset(); };
     // Continue: the place kept on quitting, once (then the game's own save leads again). Any other
     // start of the same ROM (the command line, a file chosen, a recent, a drop) drops its place:
     // the game's save leads from then on, and an older place never comes back over it.

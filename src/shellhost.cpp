@@ -131,7 +131,11 @@ bool ShellHost::Load(App& app, const std::string& path, std::vector<u8>* snapsho
     before.clear();
     const bool kept = SaveStateTo(*app.nds, before);
     if (!kept) before.clear();
-    if (LoadState(*app.nds, path)) return true;
+    if (LoadState(*app.nds, path))
+    {
+        if (afterLoad) afterLoad();
+        return true;
+    }
     const bool back = kept && LoadStateFrom(*app.nds, before);
     if (!back)
     {
