@@ -31,6 +31,7 @@
 #include "port/popup.h"
 #include "port/relations.h"
 #include "port/interact.h"
+#include "port/minigame.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "port/statusbar.h"
@@ -242,8 +243,71 @@ static bool AllReachable(const MenuView& v)
     return true;
 }
 
+// The HD minigame frame (port/minigame.*) on made-up states: the playfield and the top screen where
+// milestone 1 put them (the mouse round trips onto the playfield), every UI item on the canvas and
+// off both pictures, the side panel inside the column, the prompt bar under the playfield, layers
+// ascending, the hints following what the game says (the cards' question and message, the clog).
+static void minigame_frame()
+{
+    const HudState hud = TestHud();
+    const HudStrings strings = TestStrings();
+    RomData rom;   // no strings: the words empty, the layout the same
+    static u32 bottom[SW * SH] = {};
+    for (const auto& top : {std::pair<int, int> {SW, SH}, {341, 192}, {682, 384}})
+        for (Screen sc : {Screen::Cards, Screen::Vacuum, Screen::Social})
+            for (int variant = 0; variant < 4; variant++)
+            {
+                GameState g;
+                g.valid = true;
+                CardsState& k = g.minigame.cards;
+                k.valid = variant > 0;
+                k.deck = 40; k.total = 60; k.hand = 10; k.opponent = 10; k.score = -9999; k.opponentScore = 9999; k.treasure = 9999; k.name = "WWWWWWW";
+                k.quitAsk = variant == 2;
+                k.message = k.box = variant == 3;
+                g.minigame.vacuum.valid = variant > 0;
+                g.minigame.vacuum.clogged = variant == 2;
+                g.minigame.vacuum.earnings = 99999999;
+                Composition c {kConsoleW, kConsoleH, {}, {}};
+                BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom);
+                CHECK(c.pieces.size() == 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
+                      c.pieces[0].to.w == kActivityBottomTo.w && c.pieces[0].to.h == kActivityBottomTo.h);
+                const Rect topTo = c.pieces[1].to;
+                CHECK(topTo.x == kActivityTopX && topTo.y == kActivityTopY && topTo.w == kActivityTopW);
+                CHECK(c.pieces[1].from.h == (sc == Screen::Cards ? top.second : HudCropRows(top.second)));
+                int layer = -1, prompt = 0, lit = 0, chips = 0;
+                bool images = false;
+                for (const ui::UiItem& it : c.ui)
+                {
+                    const Rect r = it.to;
+                    CHECK(r.x >= 0 && r.y >= 0 && r.x + r.w <= kConsoleW && r.y + r.h <= kConsoleH);
+                    // Off both pictures (their frames' 6 pixels too).
+                    for (const Piece& q : c.pieces)
+                        CHECK(r.x + r.w <= q.to.x - 6 || r.x >= q.to.x + q.to.w + 6 || r.y + r.h <= q.to.y - 6 || r.y >= q.to.y + q.to.h + 6);
+                    if (it.kind == ui::UiItem::Image) { images = true; CHECK(r.x >= kMgSideX && r.x + r.w <= kMgSideX + kMgSideW && r.y + r.h <= kMgSideBottom); continue; }
+                    CHECK(!images && it.layer >= layer);   // still layers ascending, the images last
+                    layer = it.layer;
+                    if (r.y >= kMgPrompt.y) { prompt++; CHECK(r.y + r.h <= kMgPrompt.y + kMgPrompt.h && r.x >= kMgPrompt.x - 10 && r.x + r.w <= kMgPrompt.x + kMgPrompt.w); }
+                    else if (r.x >= kMgSideX - 2 && r.y > topTo.y + topTo.h) CHECK(r.x + r.w <= kMgSideX + kMgSideW && r.y + r.h <= kMgSideBottom);
+                    if (it.kind == ui::UiItem::Panel && it.plain && it.fill == 0xFFB8323A) lit++;
+                    if (it.kind == ui::UiItem::Chip && r.y >= kMgPrompt.y) chips++;
+                }
+                CHECK(prompt > 0);
+                // The clog lights the blow's hint; the cards' question has two chips (Yes, No), the message one.
+                CHECK(lit == (sc == Screen::Vacuum && variant == 2 ? 1 : 0));
+                if (sc == Screen::Cards) CHECK(chips == (variant == 2 ? 2 : variant == 3 ? 1 : 5));
+                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                    TestConsoleRoundtrip({sc, Tab::None}, false, top.first, top.second, o.first, o.second, true, &c);
+            }
+    // Without the game's strings or RAM: milestone 1's activity layout (the 5 x 7 hints' box).
+    CHECK(!MinigameFramed({Screen::Cards, Tab::None}, nullptr, nullptr));
+    GameState g;
+    g.valid = true;
+    CHECK(!MinigameFramed({Screen::Cards, Tab::None}, &g, &rom));
+}
+
 int main()
 {
+    minigame_frame();
     // CONSOLE's compositions.
     for (ScreenState s : AllStates())
         for (bool menuOpen : {false, true})

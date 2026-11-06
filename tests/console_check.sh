@@ -16,8 +16,11 @@
 #   rebuilt wide from the game's pieces; s5-hd (the HD conversation, src/port/dialogue.*): the
 #   world whole, the panel, the name plate's and the text's white pixels, the portrait as the
 #   touch screen's own pixels 2x; s5-hd-wide (--wide): the world not cut at its sides;
-#   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
-#   top right, the hints' box; s2, s3, s4 (the main menu, Create-a-Sim, Keep this Sim?: no HUD):
+#   act-social, act-vacuum, act-cards: the HD minigame frame (src/port/minigame.*): the touch
+#   screen 3x at the left, the world small at the top right, the title plate (none for the social
+#   game), the side panel, the prompt bar's words (cards-ask: B's quit question, A and B alone;
+#   vacuum-clog: the blow's hint lit red; cards-wide, social-wide, vacuum-2x); cards-m1
+#   (--no-romdata): milestone 1's hints' box; s2, s3, s4 (the main menu, Create-a-Sim, Keep this Sim?: no HUD):
 #   the front end's view, the top screen framed at the left at its shape and the touch screen
 #   2.5x framed at the right, the buttons' hint below, never SIDE; slots (sit-store, Options >
 #   Save: the save slots, from RAM): the HD slot list (src/port/options.*, three "No Data" rows),
@@ -44,10 +47,11 @@
 # Then the activities on buttons (src/activities.*, scripts/console/): from act-social, RIGHT
 # answers with the right icon (it lights green; the game itself plays on for about 1600
 # frames whatever the answers); from act-cards, X draws (Jun's count on the score bar changes),
+# X, Y then A goes on past the end-of-turn message (RAM's message=1, then 0, the opponent drawing),
 # X then Y draws and discards (the count back to its start), B then A quits (Cards, None,
 # Panel/Interact; the game: Cards, Unknown in the black load, which CONSOLE shows as Loading, then
 # Panel/Interact), B then B answers no and X still draws; from act-vacuum-clog, Y held 10
-# frames clears the clog (the bowl's row 1 back to #30A2D3) within 30 frames.
+# frames clears the clog (the bowl's row 1 back to #30A2D3) within 30 frames (RAM: clogged=1, then 0).
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
 #   bash tests/console_check.sh
 # Override with SIMS2WIDE, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh) and
@@ -101,6 +105,13 @@ wait
 run vacuum act-vacuum "${hotel[@]}" &
 run cards act-cards "${late[@]}" &
 run s3 s3 "${town[@]}" &
+wait
+run cards-m1 act-cards "${late[@]}" --no-romdata &
+run cards-ask act-cards "${late[@]}" --input "$repo/scripts/console/cards-ask.txt" &
+run cards-wide act-cards "${late[@]}" --wide &
+run vacuum-clog act-vacuum-clog "${hotel[@]}" &
+run vacuum-2x act-vacuum "${hotel[@]}" --compose-scale 2 &
+run social-wide act-social "${town[@]}" --wide &
 wait
 run s2 s2 "${town[@]}" &
 run s4 s4 "${town[@]}" &
@@ -171,6 +182,7 @@ wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
+    cards-m1 cards-ask cards-wide vacuum-clog vacuum-2x social-wide \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
@@ -318,7 +330,7 @@ def big_over_dim(rows=176):
         r, g, b = w(cx, cy)
         expect(f"dimmed world at {cx},{cy}", C(cx, cy), tuple(v * (255 - 0x8C) // 255 for v in (r, g, b)))
 
-def activity(rows=192):
+def activity(rows=192, hd=True):
     expect("background", C(10, 10), PANEL)
     expect("touch screen frame", C(32, 300), OUTLINE)
     expect("touch screen 3x top-left", C(36, 68), bottom(0, 0))
@@ -327,20 +339,60 @@ def activity(rows=192):
     # The small world, 384 wide; without the game's status bar (176 rows: 264 high) where the
     # HD bar sits under it.
     h = round(384 * rows / 256)
-    for x, y in ((0, 0), (100, 50), (383, h - 1), (200, h - 8)):
+    # (At --compose-scale 2 the small world is sampled from twice as many pixels: not compared.)
+    for x, y in ((0, 0), (100, 50), (383, h - 1), (200, h - 8)) if not case.endswith("-2x") else ():
         expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, y * rows // h))
     if rows < 192:
         region = [C(x, y) for y in range(68 + h + 14, 68 + h + 58) for x in range(852, 1248)]
         if (255, 255, 255) not in region or OUTLINE not in region:
             errors.append("no status bar text under the small world")
-    # The hints' box (kHintBox, 850,400): its outline, its fill, the first button's chip and,
-    # in the first row's text (x 972 on), white letters with the outline's shadow.
-    expect("hints outline", C(851, 500), OUTLINE)
-    expect("hints fill", C(1000, 406), FRAME)
-    expect("hint chip", C(870, 430), PANEL)
-    row = [C(x, y) for y in range(420, 444) for x in range(972, 1100)]
-    if (255, 255, 255) not in row or OUTLINE not in row:
-        errors.append("no hint text in the first row")
+    if hd:
+        minigame_frame(h + (72 if rows < 192 else 18))
+    else:
+        # Milestone 1's hints' box (kHintBox, 850,400; --no-romdata): its outline, its fill, the
+        # first button's chip and, in the first row's text (x 972 on), white letters with the
+        # outline's shadow.
+        expect("hints outline", C(851, 500), OUTLINE)
+        expect("hints fill", C(1000, 406), FRAME)
+        expect("hint chip", C(870, 430), PANEL)
+        row = [C(x, y) for y in range(420, 444) for x in range(972, 1100)]
+        if (255, 255, 255) not in row or OUTLINE not in row:
+            errors.append("no hint text in the first row")
+
+def white_text(name, x0, y0, x1, y1):
+    region = [C(x, y) for y in range(y0, y1) for x in range(x0, x1)]
+    if (255, 255, 255) not in region:
+        errors.append(f"no white text in the {name}")
+    return region
+
+def minigame_frame(side_top):
+    # side_top: the side panel's top less 68 (the secondary panel's top).
+    # The HD minigame frame (src/port/minigame.*): the prompt bar under the playfield (the kit's
+    # panel fill at its left end, white words), the side panel under the secondary one (its fill
+    # just inside its top left), the title plate over the playfield (the cards' and the vacuum's).
+    expect("prompt bar fill", C(40, 686), FRAME)
+    bar = white_text("prompt bar", 40, 664, 1240, 708)
+    if case in ("cards", "cards-ask", "cards-wide", "vacuum", "vacuum-2x", "vacuum-clog"):
+        white_text("title plate", 40, 12, 400, 52)
+    else:
+        for y in range(10, 54, 4):
+            for x in range(40, 400, 8):
+                if C(x, y) != PANEL:
+                    errors.append(f"a title plate where the social game has none, at {x},{y}")
+                    return
+    expect("side panel fill", C(1238, 68 + side_top + 30), FRAME)
+    # The cards' question: A and B only (the face buttons' green and red, no X blue); the clog: the
+    # blow's hint lit red; none of it otherwise.
+    near = lambda p, q: all(abs(a - b) <= 24 for a, b in zip(p, q))
+    has = lambda colour: any(near(p, colour) for p in bar)
+    green, red, blue, lit = (0x6E, 0xDB, 0x5E), (0xFF, 0x6A, 0x5E), (0x5C, 0xB4, 0xFF), (0xB8, 0x32, 0x3A)
+    if case == "cards-ask":
+        if not has(green) or not has(red) or has(blue):
+            errors.append("the question's prompts are not A and B alone")
+    elif case.startswith("cards") and not (has(green) and has(red) and has(blue)):
+        errors.append("the cards' prompts lack A, B or X")
+    if (case == "vacuum-clog") != has(lit):
+        errors.append("the blow's hint lit without the clog, or not lit with it")
 
 def hd_menu(rows, focus, wide=False):
     """The panel's HD menu (src/port/panelmenu.*, interact.*): the panel's outline and frame band,
@@ -737,13 +789,18 @@ elif case in ("s5-hd", "s5-hd-wide"):
         h = round(1280 * rows / tw)
         for cx, cy in ((2, 100), (1277, 100), (640, 300), (40, 440)):
             expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * tw // 1280, cy * rows // h)))
-elif case in ("social", "vacuum"):
-    expect("canvas", comp.size, (1280, 720))
+elif case in ("social", "vacuum", "vacuum-2x", "vacuum-clog"):
     activity(176)
-elif case == "cards":
+elif case in ("cards", "cards-ask", "cards-m1"):
     # The card game has no HUD: its world whole, no status bar.
     expect("canvas", comp.size, (1280, 720))
-    activity()
+    activity(hd=case != "cards-m1")
+elif case in ("cards-wide", "social-wide"):
+    # The widescreen top screen: the secondary panel shorter, the side panel under it.
+    expect("background", C(10, 10), PANEL)
+    piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
+    expect("world frame", C(855, 100), OUTLINE)
+    minigame_frame(round(384 * (192 if case == "cards-wide" else 176) / 341) + (18 if case == "cards-wide" else 72))
 elif case in ("s2", "s3", "s4"):
     front()
 elif case == "load":
@@ -1153,7 +1210,7 @@ act() {
     [ -f "$file" ] || file=$more_shots/$state.st
     case $state in act-cards|sit-casino) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$save" --layout console \
-        --print-screen --print-game --clock "$clock" --input "$input" --shot-at "$at" --shot-dir "$tmp/$name" \
+        --print-screen --print-game --print-minigame --clock "$clock" --input "$input" --shot-at "$at" --shot-dir "$tmp/$name" \
         > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
 act act-social act-social social 50 34,36,38,40,42,44 "2026-01-01 12:00" &
@@ -1163,6 +1220,7 @@ act act-quit act-cards cards-quit 300 10 "2026-11-05 12:05" &
 wait
 act act-cancel act-cards cards-cancel 300 10,299 "2026-11-05 12:05" &
 act act-blow act-vacuum-clog vacuum-blow 60 9,40 "2026-01-01 14:00" &
+act act-continue act-cards cards-continue 300 10 "2026-11-05 12:05" &
 wait
 # pixels NAME CASE: the Python checks below on NAME's shots.
 pixels() {
@@ -1227,6 +1285,14 @@ cancelled() {
 }
 check_pad act-cancel cancelled
 check_pad act-blow pixels act-blow blow
+# The cards' end of turn (RAM: GameState::minigame.cards): the game's message up, then A goes on,
+# and the opponent plays (their hand changes); the vacuum's clog read from RAM and gone after the blow.
+continued() {
+    in_order act-continue 'minigame cards .*message=0' 'minigame cards .*message=1' 'minigame cards .*message=0' 'minigame cards .*opponent=9 '
+}
+check_pad act-continue continued
+unclogged() { in_order act-blow 'minigame vacuum clogged=1' 'minigame vacuum clogged=0'; }
+check_pad act-blow unclogged
 # The HD conversation's pages (src/port/dialogue.*): from s5 tapping the arrow through the first
 # speech (scripts/dlg-taps.txt), the HD text follows the game's page counter the same frame:
 # --print-hud logs the page and the HD box's string on the same frame, and the box's text

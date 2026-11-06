@@ -88,8 +88,8 @@ table is reported as `Unknown(ov=N,vt=0x...)`: log it, it is a new screen to map
 | Dialogue | `pages[S+0x36-1]` | `{u16 string id, u8 speaker}` | text id and speaker of the shown page; speaker < 46 = Sim record, 0x3F none, 0x40 the player; name string id = 323 + u16 at `G+0x21DC+0x2C*k+0x18` | high |
 | Cards | `S+0x2E0` | s32 | lifted card 0..8, -1 none | medium |
 | Cards | `S+0xD0 + 0x14*i` | | card i lifted flag | medium |
-| Cards | `S+0x4C` | u8 | deck count | medium |
-| Cards | `S+0x306` / `S+0x2F7` | | 1 when help or quit is up / quit is up | low-medium |
+| Cards | `S+0x4C` / `S+0x4E` | u16 | the game's total of cards (60) / the draw deck's count (`GameState::minigame.cards`, below) | high |
+| Cards | `S+0x306` / `S+0x307` / `S+0x2F7` | u8 | a box up (help, quit, message) / the quit question / the end-of-turn message (milestone 6: `S+0x2F7` is not the question) | high |
 | Social | `Q = *(0x0213E70C)`; `Q+4/+8/+0xC` | | answers left/middle/right; byte `+2` = 1 when chosen; stale after the game | low-medium |
 
 ## Status bar and conversation (`HudState`, `DialogueState`)
@@ -200,7 +200,17 @@ tap must last two frames or more. Fields are from `S` unless said; the values ar
 | Music Mixer / its save menu | none | 0x02134F10 / 0x02134FA0 | 0x12 / 0x13 | `Mixer` / `MixerSave` |
 | Art Gallery painting | none | 0x02134D70 | 0xB | `ArtGallery` |
 
-The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the social games and the vacuum are unchanged.
+The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the social games and the vacuum keep their screens (milestone 1); the cards and the vacuum have a part each (the HD frame's values, `port/minigame.*`):
+
+- **Cards** (`CardsState`, module 0x10, vtable 0x0212F98C): `S+0x4C` u16 total (60), `S+0x4E` u16 deck left; the hands: ten places each, `S+0xC0 + 0x14 i` (the player's)
+  and `S+0x188 + 0x14 i` (the opponent's), a pointer into the object's own card table (`S+0x200..0x300`) or 0 when empty: their counts are the score board's; `S+0x2CC` /
+  `S+0x2D0` s32 the scores (a cannon takes them below 0), `S+0x2E4` s32 the treasure chest; `S+0x306` a box up, `S+0x307` the quit question, `S+0x2F7` the end-of-turn message
+  ("Touch for @1's turn.", 1695: any touch goes on); `S+0x308` the player's name (ASCII, as the board shows it). Found on the owner's `act-cards` (draw, discard, the message,
+  quit, help: states saved by `--state-save`, the board's numbers compared on the same frames), checked on the research's `G-cas-next-row1` / `G-X-pirate`.
+- **Vacuum** (`VacuumState`, overlay 17, vtable 0x0214C658): `S+0x158` u8 the filter clogged (1 from touching dust to 17 frames after a 7-frame blow: `act-vacuum-clog`, the
+  blow script), the stat panel's "Vacuum Earnings" `G+0x7C`.
+- **Social** (CSocialScreen): no part. `*0x0213E70C + 0xC..0x12` held 0, 1, 2 for Impress's High Five / Dance / Laugh, but re-ordered after an answer: neither the social verb
+  nor the answers' words were found in RAM (the frame shows the game's own labels, live crops).
 The screen request that brings one up (`P + 0xDF0 + 0x20 * slot`: module, r3, ...) is research-only; the port never writes RAM.
 
 - **Autopsy** (`AutopsyState`): organ slots `S+0x28+0x10 i` (i < 3) {`+0xC` u16 damage 0..0xA00, `+0xE` u8 kind 0..4 (5 removed), `+0xF` u8

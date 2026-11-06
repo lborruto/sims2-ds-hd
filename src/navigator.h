@@ -89,6 +89,9 @@ public:
     void Leave(TouchScript& touch);
     // Buttons held now are not taken as presses on the next Update (after the pause menu).
     void Resync() { fresh_ = true; }
+    // The game's RAM on the activity (activities.h), for the next Update (CONSOLE's frame loop sets
+    // it every frame; default: nothing known).
+    void SetActivityRam(const ActivityRam& r) { activityRam_ = r; }
 
     // The panel's menu is up (the touch screen 3x over the dimmed world).
     bool MenuOpen() const { return menuOpen_; }
@@ -140,6 +143,7 @@ private:
     bool menuOpen_ = false, cursorPress_ = false, cursorScreen_ = false, blow_ = false;
     float handDx_ = 0, handDy_ = 0;
     ActivityState activity_;
+    ActivityRam activityRam_;
     int focus_ = -1;
     int closing_ = 0;    // frames left in which A / B do nothing after a tap that closes the screen
     int repeatDir_ = -1, repeatFrames_ = 0; // the held direction (0-3) and how long, for the repeat

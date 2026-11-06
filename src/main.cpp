@@ -43,6 +43,7 @@
 #include "port/roominfo.h"
 #include "port/music.h"
 #include "port/statpanel.h"
+#include "port/minigame.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/interact.h"
@@ -463,10 +464,16 @@ int main(int argc, char** argv)
         printf("statpanel: %d words, tallest %d (%d lines), %d shrunk, %d cut", sp.checked, sp.tallestId, sp.tallestLines, sp.shrunk, sp.cut);
         for (int id : sp.cutIds) printf(" %d", id);
         printf("\n");
+        // The minigame frame (port/minigame.*): the titles, the cards' board, the vacuum's line, the hints' game words.
+        BlockMeasure mg;
+        MeasureMinigames(*app.rom, mg);
+        printf("minigame: %d words, %d shrunk, %d cut", mg.checked, mg.shrunk, mg.cut);
+        for (int id : mg.cutIds) printf(" %d", id);
+        printf("\n");
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 ||
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || mg.cut > 0 ||
                        !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }

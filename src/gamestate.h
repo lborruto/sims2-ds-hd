@@ -664,8 +664,38 @@ struct ArtState
     bool operator==(const ArtState&) const = default;
 };
 
+// Keelhaulin' Cards (module 0x10, no overlay; GScreen::Cards). The hands are ten slots each (a
+// card pointer into the object's own card table, 0 when the place is empty); the counts are what
+// the score board shows beside each player's name.
+constexpr int kCardsSlots = 10, kCardsMax = 60;
+struct CardsState
+{
+    bool valid = false;
+    int deck = 0, total = 0;          // cards left in the draw deck, of the game's total
+    int hand = 0, opponent = 0;       // the cards in the player's hand and the opponent's (0..10)
+    int score = 0, opponentScore = 0; // the players' scores (the first to 200 wins; a cannon can take them below 0)
+    int treasure = 0;                 // the treasure chest's points (the round's winner takes them)
+    bool box = false;                 // a box is up over the table (help, the quit question, a message)
+    bool message = false;             // the "End of Turn. Touch for @1's turn." message (any touch goes on)
+    bool quitAsk = false;             // "Are you sure you want to quit?" (its tick and cross: kCardsQuitYes / No)
+    std::string name;                 // the player's name as the board shows it (ASCII; empty: unreadable)
+    bool operator==(const CardsState&) const = default;
+};
+
+// The vacuum (overlay 17; GScreen::Vacuum): the filter's clog (touching dust; a blow clears it) and
+// the stat panel's "Vacuum Earnings" (G).
+struct VacuumState
+{
+    bool valid = false;
+    bool clogged = false;
+    int earnings = 0;
+    bool operator==(const VacuumState&) const = default;
+};
+
 struct MinigameState
 {
+    CardsState cards;
+    VacuumState vacuum;
     AutopsyState autopsy;
     DetectorState detector;
     MooGooState mooGoo;

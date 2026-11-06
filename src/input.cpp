@@ -325,6 +325,13 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         const ScreenState screen = app.ConsoleScreen();
         const GameState* game = app.portSupported ? &app.game : nullptr;
         const MenuView view = ConsoleView(screen, game, app.rom.get()); // (the same CONSOLE draws: port/popup.h)
+        {
+            // The cards' question and message, as RAM says (activities.h).
+            ActivityRam ar;
+            const CardsState& k = app.game.minigame.cards;
+            if (game && game->valid && game->screen == GScreen::Cards && k.valid) { ar.cards = true; ar.quitAsk = k.quitAsk; ar.message = k.message; }
+            navigator.SetActivityRam(ar);
+        }
         navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }

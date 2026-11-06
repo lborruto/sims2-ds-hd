@@ -29,8 +29,9 @@
   another version of it, the old pictures stay). Each has a focus the D-pad moves and buttons
   that say what A, X and B do: do an action, use or throw away an item, give a gift, read your
   goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend, buy
-  and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions) are still the game's own picture,
-  laid out big. No mouse needed, though it works.
+  and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions) keep their own playfield, big,
+  in an HD frame: the game's name, its numbers (the cards' score board, the vacuum's earnings) and the
+  buttons' hints, which follow what the game asks (the cards' quit question, a clogged filter). No mouse needed, though it works.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
   nothing to set, and it never falls back to the bare two-screen layout. Title, menus and
@@ -167,6 +168,7 @@ comes back on the same row after it. A note closes on A or B.
 | | S | X | draw from the deck |
 | | A | Y | discard the chosen card |
 | | Z | B | quit (then X / A: yes, Z / B: no) |
+| | X | A | at the end of your turn: go on |
 | Vacuum | Arrows | left stick (or D-pad) | drive |
 | | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
 | | X (hold) | A (hold) | grab a find with the hand and drag it to the box |

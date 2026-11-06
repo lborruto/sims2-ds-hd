@@ -16,6 +16,7 @@
 #include "port/note.h"
 #include "port/options.h"
 #include "port/panelmenu.h"
+#include "port/minigame.h"
 #include "port/phone.h"
 #include "port/popup.h"
 #include "romdata.h"
@@ -228,6 +229,12 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(Bottom(kDialogueNameFrom, kDialogueNameTo));
         c.pieces.push_back(Bottom(kDialoguePortraitFrom, kDialoguePortraitTo));
         c.pieces.push_back(Bottom(kDialogueArrowFrom, kDialogueArrowTo));
+    }
+    else if (MinigameFramed(s, game, rom))
+    {
+        // The HD minigame frame (port/minigame.h): the playfield big, the top screen beside it, the
+        // title, the game's values and the hints' chips.
+        BuildMinigame(c, s, topW, topH, hud, strings, *game, *rom, bottom);
     }
     else
     {

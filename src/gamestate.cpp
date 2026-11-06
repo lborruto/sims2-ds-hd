@@ -149,6 +149,11 @@ struct EUTable
         u32 msMode, msSlot, msName, msContext, msSongs, msSongStride, msRingtones, msRingStride;   // msSongs / msRingtones from G; byte 15 of each entry = used
         // Art Gallery
         u32 arStroke, arButton, arTool, arSwatch, arPage, arBrush, arWork, arIn, arRow, arCol;
+        // Keelhaulin' Cards (u16 total and deck; the hands' slots {+0 flags, +4 card pointer, ...}; u8 flags; the name's bytes)
+        u32 cdTotal, cdDeck, cdHand, cdOpponent, cdSlotStride, cdCardFrom, cdCardTo, cdBox, cdMessage, cdQuitAsk, cdName, cdNameMax, cdSize;
+        u32 cdScore, cdOppScore, cdTreasure, cdScoreMax;   // s32 each
+        // The vacuum (u8 clog; the earnings are the stat panel's hotel.stVacuum, from G)
+        u32 vcClog, vcSize;
     } mg;
 };
 constexpr int kAnyOverlay = -2;
@@ -269,6 +274,9 @@ constexpr EUTable kEU = {
         8, 0xA55, 0x8E2, 0x8E3, 0x8E6, 0x8E7, 0x8E9, 0x8EA, 0x8EB, 0x8EC, 0x8ED, 0xA5C, 0xA4C, 0xA4E, 0xA52, 0xA6C, 0xA63, 0xA6B,
         8, 0x28, 0x88, 0xC, 0x46AC, 16, 0x46DC, 64,
         0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40, 0x650, 0xC68, 0xC60, 0xC64,
+        0x4C, 0x4E, 0xC0, 0x188, 0x14, 0x200, 0x300, 0x306, 0x2F7, 0x307, 0x308, 8, 1000,
+        0x2CC, 0x2D0, 0x2E4, 9999,
+        0x158, 0x194,
     },
 };
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
@@ -1500,6 +1508,55 @@ ArtState ReadArt(const Reader& m, u32 S)
     return v;
 }
 
+CardsState ReadCards(const Reader& m, u32 S)
+{
+    const auto& q = kEU.mg;
+    CardsState v;
+    u32 total, deck, box, msg, ask;
+    if (!m.In(S, q.cdSize) || !m.R16(S + q.cdTotal, total) || total == 0 || total > (u32)kCardsMax || !m.R16(S + q.cdDeck, deck) || deck > total ||
+        !m.R8(S + q.cdBox, box) || box > 1 || !m.R8(S + q.cdMessage, msg) || msg > 1 || !m.R8(S + q.cdQuitAsk, ask) || ask > 1)
+        return v;
+    // A hand: its places holding a card (a pointer into the object's card table, or 0).
+    auto count = [&](u32 at, int& n) {
+        n = 0;
+        for (u32 i = 0; i < (u32)kCardsSlots; i++)
+        {
+            u32 p;
+            if (!m.R32(S + at + q.cdSlotStride * i, p)) return false;
+            if (p == 0) continue;
+            if (p < S + q.cdCardFrom || p >= S + q.cdCardTo) return false;
+            n++;
+        }
+        return true;
+    };
+    if (!count(q.cdHand, v.hand) || !count(q.cdOpponent, v.opponent)) return CardsState{};
+    for (u32 i = 0; i < q.cdNameMax; i++)
+    {
+        u32 ch;
+        if (!m.R8(S + q.cdName + i, ch) || (ch != 0 && (ch < 0x20 || ch > 0x7E))) { v.name.clear(); break; }
+        if (ch == 0) break;
+        v.name += (char)ch;
+    }
+    const int score = m.S32(S + q.cdScore), opp = m.S32(S + q.cdOppScore), chest = m.S32(S + q.cdTreasure), lim = (int)q.cdScoreMax;
+    if (score < -lim || score > lim || opp < -lim || opp > lim || chest < 0 || chest > lim) return CardsState{};
+    v.score = score; v.opponentScore = opp; v.treasure = chest;
+    v.total = (int)total; v.deck = (int)deck; v.box = box == 1; v.message = msg == 1; v.quitAsk = ask == 1;
+    v.valid = true;
+    return v;
+}
+
+VacuumState ReadVacuum(const Reader& m, u32 S)
+{
+    VacuumState v;
+    u32 G, clog;
+    if (!m.In(S, kEU.mg.vcSize) || !m.R8(S + kEU.mg.vcClog, clog) || clog > 1 || !m.R32(kEU.gameBlock, G)) return v;
+    const int earnings = m.S32(G + kEU.hotel.stVacuum);
+    if (earnings < 0 || earnings > 99999999) return v;
+    v.clogged = clog == 1; v.earnings = earnings;
+    v.valid = true;
+    return v;
+}
+
 // The part of the screen the game shows (g.screen is set), apart from every other.
 void ReadMinigame(const Reader& m, u32 S, u32 vt, GameState& g)
 {
@@ -1515,6 +1572,8 @@ void ReadMinigame(const Reader& m, u32 S, u32 vt, GameState& g)
     case GScreen::Mixer: a.mixer = ReadMixer(m, S); break;
     case GScreen::MixerSave: a.mixerSave = ReadMixerSave(m, S); break;
     case GScreen::ArtGallery: a.art = ReadArt(m, S); break;
+    case GScreen::Cards: a.cards = ReadCards(m, S); break;
+    case GScreen::Vacuum: a.vacuum = ReadVacuum(m, S); break;
     default: break;
     }
 }
@@ -1714,6 +1773,20 @@ std::string MinigameLine(const GameState& g)
         std::vector<std::string> s;
         for (int j = 0; j < kMixerSaveSlots; j++) s.push_back(v.used[j] ? "\"" + TextEsc(v.slotName[j]) + "\"" : std::string("empty"));
         snprintf(b, sizeof b, "mixersave mode=%d slot=%d name=\"%s\" slots=%s", v.mode, v.slot, TextEsc(v.name).c_str(), join(s).c_str());
+        return b;
+    }
+    case GScreen::Cards:
+    {
+        const CardsState& v = a.cards;
+        if (!v.valid) return "";
+        snprintf(b, sizeof b, "cards deck=%d/%d hand=%d opponent=%d score=%d,%d treasure=%d box=%d message=%d quit=%d name=\"%s\"", v.deck, v.total, v.hand, v.opponent, v.score, v.opponentScore, v.treasure, v.box, v.message, v.quitAsk, TextEsc(v.name).c_str());
+        return b;
+    }
+    case GScreen::Vacuum:
+    {
+        const VacuumState& v = a.vacuum;
+        if (!v.valid) return "";
+        snprintf(b, sizeof b, "vacuum clogged=%d earnings=%d", v.clogged, v.earnings);
         return b;
     }
     case GScreen::ArtGallery:

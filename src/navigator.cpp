@@ -501,6 +501,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         }
         activity_.prev = prev_;
         activity_.focus = focus_;
+        activity_.ram = activityRam_;
         ActivityInput(s.screen, pad, touch, dsKeys, activity_);
         focus_ = activity_.focus;
         // The vacuum's hand is the stick cursor: A held presses it.

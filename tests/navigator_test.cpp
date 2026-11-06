@@ -459,6 +459,44 @@ static void cards_quit_question()
     CHECK(x == HotspotsFor(kCards)[Index(kCards, "card 1")].x);
 }
 
+// What RAM says on the cards (ActivityRam): a question the mouse opened is answered by A / B; the
+// end-of-turn message goes on with A (a touch in its box), the other buttons waiting.
+static void cards_ram()
+{
+    Rig r;
+    r.Frame(kCards);
+    int x = -1, y = -1;
+    ActivityRam ram;
+    ram.cards = true;
+    ram.message = true;
+    r.nav.SetActivityRam(ram);
+    r.Press(kCards, &PadState::x); // waits
+    r.Press(kCards, &PadState::b);
+    CHECK(!r.touch.Owns());
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y));
+    CHECK(x == kCardsMessage.x && y == kCardsMessage.y);
+    r.Drain();
+    // The message gone: A lifts a card again.
+    ram.message = false;
+    r.nav.SetActivityRam(ram);
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y) && x == HotspotsFor(kCards)[Index(kCards, "card 1")].x);
+    r.Drain();
+    // The question opened by the mouse (B never pressed): B answers no.
+    ram.quitAsk = true;
+    r.nav.SetActivityRam(ram);
+    r.Press(kCards, &PadState::b);
+    CHECK(r.Touched(x, y) && x == kCardsQuitNo.x && y == kCardsQuitNo.y);
+    r.Drain();
+    // Nothing known (another ROM): milestone 1's way, A on the focused card.
+    r.nav.SetActivityRam({});
+    r.Frame(kInteract);
+    r.Frame(kCards);
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y) && x == HotspotsFor(kCards)[Index(kCards, "card 1")].x);
+}
+
 static void vacuum_blows_drives_and_grabs()
 {
     Rig r;
@@ -1771,6 +1809,7 @@ int main()
     social_answers_on_the_d_pad();
     cards_draw_lift_play_discard();
     cards_quit_question();
+    cards_ram();
     vacuum_blows_drives_and_grabs();
     unsettled_press_waits();
     unsettled_press_dropped_after_90();

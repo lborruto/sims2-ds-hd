@@ -64,6 +64,14 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
         touch.Tap(q.x, q.y);
         st.confirm = true;
     };
+    // The question opened by the mouse: RAM knows (it still reads Cards).
+    if (st.ram.cards && st.ram.quitAsk) st.confirm = true;
+    if (!st.confirm && st.ram.cards && st.ram.message)
+    {
+        // The end of a turn: a touch anywhere goes on (the other buttons wait).
+        if (pressed(&PadState::a)) touch.Tap(kCardsMessage.x, kCardsMessage.y);
+        return;
+    }
     if (st.confirm)
     {
         // The question: A yes, B no (the other buttons wait for the answer).

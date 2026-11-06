@@ -336,5 +336,5 @@ mg_want mg-G-X-musicsave '^none$' "minigame: the save menu patched without a con
 mg_want mg-G-D-art-stroke '^art stroke=0 button=0 tool=0 swatch=3 page=0 brush=0 cell=17,21 painted=15 ' "minigame: the canvas with a pencil stroke of 15 cells, the stylus on cell (17, 21)"
 mg_want mg-G-D-art-line '^art .* button=7 tool=2 swatch=3 .* painted=16 ' "minigame: the line tool, 16 cells"
 mg_want mg-G-D-art-page '^art .* swatch=3 page=1 .* painted=0 ' "minigame: the second palette page, blank canvas"
-mg_want mg-G-X-pirate '^none$' "minigame: nothing on the cards"
+mg_want mg-G-X-pirate '^cards deck=40/60 hand=8 opponent=8 score=0,0 treasure=0 box=0 message=0 quit=0 name="Jun"$' "minigame: the cards dealt (eight each, forty in the deck), no box"
 exit $fail

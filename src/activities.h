@@ -7,7 +7,8 @@
 //     card); A on a card lifts it (a tap), A again on a card it lifted drags that card onto the
 //     play arrow; A on the deck, the discard pile, ? or X taps them; X taps the deck (draw); Y
 //     drags the focused card onto the discard pile; B taps X (quit: the game asks first). While
-//     the question is up (it still reads Cards) A taps its tick, B its cross.
+//     the question is up (it still reads Cards; or RAM says so: the mouse asked) A taps its tick,
+//     B its cross. While RAM shows the end-of-turn message, A taps it (the turn goes on).
 //   Vacuum: the left stick (and the D-pad) are the DS's D-pad (the game's own steering); the
 //     hand is the stick cursor (input.h): the right stick moves it, and so does the D-pad while
 //     X or A is held (the keyboard's way, no stick needed); A held keeps the stylus down at the
@@ -35,8 +36,19 @@ struct Hint
     const char* text;
 };
 
+// What the game's RAM says about the activity this frame (GameState::minigame), when it reads
+// (cards: false, nothing known: milestone 1's way).
+struct ActivityRam
+{
+    bool cards = false;               // the cards' part read
+    bool quitAsk = false;             // their quit question is up (opened by B or by the mouse)
+    bool message = false;             // their end-of-turn message is up (any touch goes on)
+};
+
 struct ActivityState
 {
+    // In: the RAM's word on the activity (Navigator::SetActivityRam, every frame).
+    ActivityRam ram;
     // In: the previous frame's buttons (the navigator's, so its resync holds here too).
     PadState prev;
     // In and out: the focused target, an index in HotspotsFor (Social, Cards), or -1.
@@ -61,6 +73,8 @@ std::vector<Hint> ActivityHints(Screen s);
 // Where the cards' quit question has its answers (it still reads Cards; checked headless from
 // act-cards: the tick quits through a black load, the cross closes it).
 constexpr Point kCardsQuitYes {93, 92}, kCardsQuitNo {163, 92};
+// The cards' end-of-turn message ("Touch for @1's turn."): any touch goes on; its box's middle.
+constexpr Point kCardsMessage {128, 120};
 // The vacuum's hand speed on the D-pad, DS pixels a frame.
 constexpr float kHandStep = 2.0f;
 }

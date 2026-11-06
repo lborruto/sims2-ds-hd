@@ -182,6 +182,20 @@ static void chips()
     CHECK(ChipRect(0, 0, Button::Start, "", 24).w > ChipRect(0, 0, Button::LB, "", 24).w);
     CHECK(ChipRect(0, 0, Button::LB, "", 24).w > a.w); // a pill
     CHECK(ChipRect(0, 0, Button::A, "Go", 48).h > a1.h);
+    // The one-direction D-pads and the sticks are round like the face buttons; each draws
+    // differently (its arm, its letter), inside its rectangle.
+    {
+        std::vector<std::vector<u32>> seen;
+        for (Button b : {Button::DPad, Button::DPadL, Button::DPadU, Button::DPadR, Button::DPadD, Button::LStick, Button::RStick})
+        {
+            const Rect r = ChipRect(0, 0, b, "", 24);
+            CHECK(r.w == a.w && r.h == a.h);
+            std::vector<u32> px(48 * 48);
+            Rasterise({ChipItem(8, 8, b, "", 24)}, 1, px.data(), 48, 48);
+            for (const std::vector<u32>& o : seen) CHECK(o != px);
+            seen.push_back(px);
+        }
+    }
     // A column of hints: the label starts where asked, whatever the chip.
     CHECK(ChipRect(0, 0, Button::A, "Go", 24, 100).w == ChipRect(0, 0, Button::Start, "Go", 24, 100).w);
     CHECK(ChipRect(0, 0, Button::A, "Go", 24, 100).w > a1.w);

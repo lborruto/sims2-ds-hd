@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstring>
 #include <random>
+#include <tuple>
 #include <string>
 #include <utility>
 #include <vector>
@@ -1233,13 +1234,57 @@ static void mixer_and_art()
 
 // Random bytes in every minigame object: the readers stay in bounds, the lists capped, and a part
 // that reads is valid in itself (no part invalid with its fields half filled).
+// Keelhaulin' Cards and the vacuum (milestone 1's activities, framed in HD by port/minigame.*).
+static void cards_and_vacuum()
+{
+    Ram r = mg_ram(0x0212F98C, -1);
+    r.W16(kS + 0x4C, 60); r.W16(kS + 0x4E, 39);
+    for (u32 i = 0; i < 9; i++) r.W32(kS + 0xC0 + 0x14 * i, kS + 0x250 + i);       // nine cards in hand
+    for (u32 i = 0; i < 10; i += 2) r.W32(kS + 0x188 + 0x14 * i, kS + 0x290 + i);  // five for the opponent, every other place
+    r.W32(kS + 0x2CC, (u32)-10); r.W32(kS + 0x2D0, 30); r.W32(kS + 0x2E4, 10);
+    r.W8(kS + 0x308, 'J'); r.W8(kS + 0x309, 'u'); r.W8(kS + 0x30A, 'n');
+    GameState g = ReadGameState(r.View());
+    CardsState k = g.minigame.cards;
+    CHECK(g.screen == GScreen::Cards && k.valid && k.deck == 39 && k.total == 60 && k.hand == 9 && k.opponent == 5 && k.score == -10 && k.opponentScore == 30 &&
+          k.treasure == 10 && k.name == "Jun" && !k.box && !k.message && !k.quitAsk);
+    CHECK(MinigameLine(g) == "cards deck=39/60 hand=9 opponent=5 score=-10,30 treasure=10 box=0 message=0 quit=0 name=\"Jun\"");
+    r.W8(kS + 0x306, 1); r.W8(kS + 0x307, 1);
+    k = ReadGameState(r.View()).minigame.cards;
+    CHECK(k.valid && k.box && k.quitAsk && !k.message);
+    r.W8(kS + 0x307, 0); r.W8(kS + 0x2F7, 1);
+    k = ReadGameState(r.View()).minigame.cards;
+    CHECK(k.valid && k.box && k.message && !k.quitAsk);
+    // A name that is not text: none (the board's "Player" instead), the rest still reads.
+    { Ram q = r; q.W8(kS + 0x308, 0x07); k = ReadGameState(q.View()).minigame.cards; CHECK(k.valid && k.name.empty()); }
+    // Garbage: a deck past the total, no total, a card pointer out of the object, flags past 1, scores out of range.
+    for (auto [off, val, w] : {std::tuple<u32, u32, int>{0x4E, 61, 2}, {0x4C, 0, 2}, {0x4C, 61, 2}, {0xC0, 0x02000000, 4}, {0x188 + 0x14 * 9, kS + 0x300, 4},
+                               {0x306, 2, 1}, {0x307, 2, 1}, {0x2F7, 2, 1}, {0x2CC, 10000, 4}, {0x2E4, (u32)-1, 4}})
+    {
+        Ram q = r;
+        if (w == 1) q.W8(kS + off, val); else if (w == 2) q.W16(kS + off, val); else q.W32(kS + off, val);
+        CHECK(ReadGameState(q.View()).screen == GScreen::Cards && !ReadGameState(q.View()).minigame.cards.valid);
+    }
+
+    r = mg_ram(0x0214C658, 17);
+    r.W32(kMg + 0x7C, 120);
+    GameState v = ReadGameState(r.View());
+    CHECK(v.screen == GScreen::Vacuum && v.minigame.vacuum.valid && !v.minigame.vacuum.clogged && v.minigame.vacuum.earnings == 120);
+    r.W8(kS + 0x158, 1);
+    v = ReadGameState(r.View());
+    CHECK(v.minigame.vacuum.clogged && MinigameLine(v) == "vacuum clogged=1 earnings=120");
+    { Ram q = r; q.W8(kS + 0x158, 2); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
+    { Ram q = r; q.W32(kMg + 0x7C, (u32)-5); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
+    // Each part only on its own screen.
+    CHECK(!ReadGameState(mg_ram(0x0214C658, 17).View()).minigame.cards.valid && !ReadGameState(mg_ram(0x0212F98C, -1).View()).minigame.vacuum.valid);
+}
+
 static void minigame_random()
 {
     std::mt19937 rng(77);
-    const struct { u32 vt; int ov; } k[] = {{0x0214EBC4, 0}, {0x0214C124, 9}, {0x02152E0C, 10}, {0x02152EC8, 10}, {0x0214AFC4, 13}, {0x0214B8BC, 18}, {0x02134EC8, -1}, {0x02134F10, -1}, {0x02134FA0, -1}, {0x02134D70, -1}};
-    for (int round = 0; round < 600; round++)
+    const struct { u32 vt; int ov; } k[] = {{0x0214EBC4, 0}, {0x0214C124, 9}, {0x02152E0C, 10}, {0x02152EC8, 10}, {0x0214AFC4, 13}, {0x0214B8BC, 18}, {0x02134EC8, -1}, {0x02134F10, -1}, {0x02134FA0, -1}, {0x02134D70, -1}, {0x0212F98C, -1}, {0x0214C658, 17}};
+    for (int round = 0; round < 720; round++)
     {
-        Ram r = mg_ram(k[round % 10].vt, k[round % 10].ov);
+        Ram r = mg_ram(k[round % 12].vt, k[round % 12].ov);
         for (int i = 0; i < 300; i++) r.W8(kS + rng() % 0xCA40, (u32)rng() & (i % 3 ? 0x3F : 0xFF));
         for (int i = 0; i < 100; i++) r.W8(kMg + 0x30 + rng() % 0x4700, (u32)rng());
         const GameState g = ReadGameState(r.View());
@@ -1254,6 +1299,8 @@ static void minigame_random()
         CHECK(!m.mixer.valid || g.screen == GScreen::Mixer);
         CHECK(!m.mixerSave.valid || g.screen == GScreen::MixerSave);
         CHECK(!m.art.valid || g.screen == GScreen::ArtGallery);
+        CHECK(!m.cards.valid || (g.screen == GScreen::Cards && m.cards.deck <= m.cards.total && m.cards.hand <= 10 && m.cards.opponent <= 10));
+        CHECK(!m.vacuum.valid || g.screen == GScreen::Vacuum);
         (void)MinigameLine(g);
     }
 }
@@ -1284,6 +1331,7 @@ int main()
     scratch();
     drencher_and_crime();
     mixer_and_art();
+    cards_and_vacuum();
     minigame_random();
     hud();
     dialogue();

@@ -49,7 +49,8 @@ constexpr Rect kDialogueArrowFrom {219, 155, 31, 32}, kDialogueArrowTo {916, 634
 // its left border (DS x 9) and top border (row 33).
 constexpr Rect kDialogueTextBox {124, 516, 776, 188};
 
-// An activity: the touch screen 3x at the left, the world 384 wide at the top right (its height
+// An activity (with the game's RAM and strings: the HD minigame frame, port/minigame.h, the same two
+// pictures at the same places): the touch screen 3x at the left, the world 384 wide at the top right (its height
 // from its shape: 288 at the DS's 4:3), both framed; the hints' box (AddHints, below).
 constexpr Rect kActivityBottomTo {36, 68, SW * 3, SH * 3};
 constexpr int kActivityTopX = 858, kActivityTopY = 68, kActivityTopW = 384;
