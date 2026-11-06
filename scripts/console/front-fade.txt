@@ -1,0 +1,5 @@
+# From F-title0, CONSOLE: Start (the title's touch: the main menu fades in), A while the buttons
+# fade in (phase 1-2: dead, dropped, never replayed) → the main menu stays, nothing chosen.
+10 2 pad start
+24 2 pad a
+36 2 pad a

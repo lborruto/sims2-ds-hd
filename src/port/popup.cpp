@@ -9,6 +9,7 @@
 #include "port/statpanel.h"
 #include "port/catalogue.h"
 #include "port/gift.h"
+#include "port/front.h"
 #include "port/note.h"
 #include "port/options.h"
 #include "port/panelmenu.h"
@@ -133,6 +134,8 @@ MenuView ScreenView(ScreenState s, const GameState* game, const RomData* rom)
         if (game && game->music.valid) return MusicView(s, game, rom);
         if (game && game->stat.valid) return StatPanelView(s, game, rom);
         return NoteView(s, game, rom);
+    // The front end's boot, title and main menu (port/front.h).
+    case Screen::FrontEnd: case Screen::None: case Screen::Loading: return FrontView(s, game, rom);
     default: return {};
     }
 }

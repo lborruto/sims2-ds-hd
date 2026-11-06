@@ -1,0 +1,2 @@
+# From F-boot-900, CONSOLE: Start (the same touch) → the title.
+10 2 pad start

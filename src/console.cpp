@@ -12,6 +12,7 @@
 #include "port/statpanel.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
+#include "port/front.h"
 #include "port/gift.h"
 #include "port/note.h"
 #include "port/options.h"
@@ -128,6 +129,13 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
     const bool bar = hud && strings && strings->ok;
     const int worldRows = bar ? HudCropRows(topH) : topH;
+    // The front end's boot, title and main menu in HD (port/front.h): the whole canvas theirs.
+    if (s.screen == Screen::FrontEnd || s.screen == Screen::None || s.screen == Screen::Loading)
+        if (const MenuView v = FrontView(s, game, rom); v.valid)
+        {
+            BuildFront(c, v, focus, *game, *rom, icons, topW, topH);
+            return c;
+        }
     // A black load (both screens black, RAM between screens): the bare backdrop.
     if (s.screen == Screen::Loading) return c;
     const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::ItemHand || s.screen == Screen::Unknown;

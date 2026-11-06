@@ -23,6 +23,7 @@
 #include "port/statpanel.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
+#include "port/front.h"
 #include "port/gift.h"
 #include "port/goals.h"
 #include "port/note.h"
@@ -2033,6 +2034,139 @@ int main()
             if (next < mixed.size()) { next++; while (next < mixed.size() && ((unsigned char)mixed[next] & 0xC0) == 0x80) next++; }
             CHECK(ui::TextWidth(mixed.substr(0, next) + "\xE2\x80\xA6", 30) > w || next == mixed.size());
         }
+    }
+
+    // The front end's boot, title and main menu (port/front.h) on made-up states: the title's one
+    // item (A and Start its big button), the menu's four buttons (enabled and tapping their box
+    // only at phase 3: drawn but dead while they fade in and after a choice), the boot's last
+    // splash (A and Start its tap; the earlier splashes nothing, the popup splash no view); never
+    // replayed; ids distinct and the module's; every item reachable; layers ascending; the mouse
+    // round trips (the title's whole canvas onto the big button, a button onto its box, the
+    // splash the touch screen itself); no view on another screen, without the RAM's part or the
+    // strings.
+    {
+        RomData rom;
+        auto front = [](int phase, int mode) {
+            GameState g;
+            g.valid = true;
+            if (phase >= 0)
+            {
+                g.front.title.valid = true;
+                g.front.title.phase = phase;
+                g.front.title.menu = phase >= 2;
+                g.front.kind = phase >= 2 ? FrontKind::MainMenu : FrontKind::Title;
+            }
+            if (mode >= 0)
+            {
+                g.front.boot.valid = true;
+                g.front.boot.mode = mode;
+                g.front.video.valid = true;
+                g.front.video.movie = 3;
+                g.front.kind = FrontKind::Video;
+            }
+            return g;
+        };
+        auto lands = [&](const Composition& comp, Rect hd, int x0, int y0, int w, int h) {
+            for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+            {
+                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, o.first, o.second);
+                for (float fx : {0.1f, 0.5f, 0.9f})
+                    for (float fy : {0.1f, 0.5f, 0.9f})
+                    {
+                        int tx, ty;
+                        const float cx = hd.x + hd.w * fx, cy = hd.y + hd.h * fy;
+                        CHECK(TouchFromComposition(comp, fit, fit.ox + cx * fit.scale, fit.oy + cy * fit.scale, tx, ty));
+                        CHECK(tx >= x0 && tx < x0 + w && ty >= y0 && ty < y0 + h);
+                    }
+            }
+        };
+        auto layers = [&](const Composition& comp) {
+            int layer = 0;
+            for (const ui::UiItem& u : comp.ui)
+            {
+                CHECK(u.to.x >= 0 && u.to.y >= 0 && u.to.x + u.to.w <= kConsoleW && u.to.y + u.to.h <= kConsoleH);
+                if (u.kind == ui::UiItem::Image) continue;
+                CHECK(u.layer >= layer);
+                layer = u.layer;
+            }
+        };
+        const ScreenState fe {Screen::FrontEnd, Tab::None}, none {Screen::None, Tab::None};
+        for (int phase = 0; phase <= 4; phase++)
+        {
+            const GameState g = front(phase, -1);
+            const MenuView v = FrontViewOf(fe, g);
+            CHECK(v.valid && v.own && !v.replay && AllReachable(v));
+            CHECK(!FrontViewOf(none, g).valid && !FrontViewOf({Screen::Panel, Tab::Interact}, g).valid);
+            CHECK(!FrontView(fe, &g, &rom).valid); // no strings: milestone 1's
+            std::set<u32> ids;
+            for (const ViewItem& it : v.items) { ids.insert(it.id); CHECK((it.id >> 24) == (kModFront >> 24)); }
+            CHECK(ids.size() == v.items.size());
+            for (int topW : {256, 341})
+                for (int focus : {-1, 0, 3})
+                {
+                    Composition comp {kConsoleW, kConsoleH, {}, {}};
+                    BuildFront(comp, v, focus, g, rom, nullptr, topW, 192);
+                    layers(comp);
+                    for (const Piece& q : comp.pieces)
+                        if (q.src == Src::Top) CHECK(!q.touch && q.from.w == 256 && q.from.x == (topW - 256) / 2); // (the 2D part)
+                    if (focus != 0 || topW != 256) continue;
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(fe, false, 256, 192, o.first, o.second, false, &comp);
+                    if (phase == 0) lands(comp, {0, 0, kConsoleW, kConsoleH}, kFrBigButtonFrom.x, kFrBigButtonFrom.y, kFrBigButtonFrom.w, kFrBigButtonFrom.h);
+                    else
+                        for (int i = 0; i < kFrMenuButtons; i++)
+                            lands(comp, FrontButtonRect(i), kFrMenuBoxX, kFrMenuBoxY0 + i * kFrMenuBoxDy, kFrMenuBoxW, kFrMenuBoxH);
+                }
+            const MenuAction& start = v.buttons[(int)MenuButton::Start];
+            if (phase == 0)
+            {
+                CHECK(v.items.size() == 1 && v.items[0].enabled && v.items[0].action.size() == 1);
+                CHECK(v.items[0].action[0].x == kFrBigX && v.items[0].action[0].y == kFrBigY && start == v.items[0].action);
+                CHECK(v.items[0].action[0].x >= kFrBigButtonFrom.x && v.items[0].action[0].x < kFrBigButtonFrom.x + kFrBigButtonFrom.w);
+                continue;
+            }
+            CHECK((int)v.items.size() == kFrMenuButtons && start.empty());
+            for (int i = 0; i < kFrMenuButtons; i++)
+            {
+                const ViewItem& it = v.items[i];
+                CHECK(it.enabled == (phase == 3) && it.action.empty() == (phase != 3));
+                if (phase != 3) continue;
+                CHECK(it.action.size() == 1 && it.action[0].kind == MenuStep::Tap);
+                const int x = it.action[0].x, y = it.action[0].y, y0 = kFrMenuBoxY0 + i * kFrMenuBoxDy;
+                CHECK(x >= kFrMenuBoxX && x < kFrMenuBoxX + kFrMenuBoxW && y >= y0 && y < y0 + kFrMenuBoxH);
+                CHECK(MenuMove(v, i, 1) == std::min(i + 1, 3) && MenuMove(v, i, 0) == std::max(i - 1, 0));
+            }
+            if (phase != 3) CHECK(MenuFirst(v) < 0);
+        }
+        for (int mode = 0; mode <= 6; mode++)
+            for (const ScreenState& at : {none, ScreenState {Screen::Loading, Tab::None}})
+            {
+                GameState g = front(-1, mode);
+                const MenuView v = FrontViewOf(at, g);
+                CHECK(v.valid == (mode != 4));
+                if (!v.valid) continue;
+                CHECK(v.own && !v.replay && v.items.size() == (mode == 0 ? 1u : 0u));
+                if (mode == 0)
+                {
+                    CHECK(v.items[0].id == kFrBootId && v.items[0].action.size() == 1 && v.buttons[(int)MenuButton::Start] == v.items[0].action);
+                    CHECK(v.items[0].action[0].x == kFrSplashX && v.items[0].action[0].y == kFrSplashY);
+                }
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                BuildFront(comp, v, MenuFirst(v), g, rom, nullptr, 256, 192);
+                layers(comp);
+                int splash = 0;
+                for (const Piece& q : comp.pieces) splash += q.src == Src::Bottom && q.touch && q.to.x == kFrSplash.x && q.to.w == kFrSplash.w;
+                CHECK(splash == 1);
+                if (mode == 0 && at.screen == Screen::None)
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(none, false, 256, 192, o.first, o.second, false, &comp);
+                g.front.boot.valid = false;
+                CHECK(!FrontViewOf(at, g).valid);
+            }
+        CHECK(!FrontViewOf(fe, front(-1, 0)).valid && !FrontViewOf(none, front(0, -1)).valid);
+        GameState bad = front(3, -1);
+        bad.valid = false;
+        CHECK(!FrontViewOf(fe, bad).valid);
     }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }

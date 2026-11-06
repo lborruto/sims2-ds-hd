@@ -46,6 +46,7 @@ constexpr u32 kModInteract = 1u << 24, kModPockets = 2u << 24, kModGift = 3u << 
               kModRelations = 5u << 24, kModPhone = 6u << 24, kModOptions = 7u << 24, kModPopup = 8u << 24,
               kModNote = 9u << 24, kModCatalogue = 10u << 24, kModBuild = 11u << 24,
               kModCheckIn = 12u << 24, kModRoomInfo = 13u << 24, kModMusic = 14u << 24, kModStat = 15u << 24;
+// (port/front.h: kModFront = 16 << 24.)
 
 // ViewItem::next's "no move that way".
 constexpr int kNoMove = -2;
@@ -84,8 +85,8 @@ struct ViewItem
 };
 
 // Screen-wide buttons (not the focused item's). LB / RB: a screen's own pages (the stat panel's);
-// on the panel they stay its tabs.
-enum class MenuButton { Left, Right, X, Y, LB, RB, Count };
+// on the panel they stay its tabs. Start: the front end's (the boot's and the title's touch).
+enum class MenuButton { Left, Right, X, Y, LB, RB, Start, Count };
 
 struct MenuView
 {

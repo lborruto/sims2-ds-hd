@@ -1751,6 +1751,62 @@ static void view_lb_rb_pages()
     CHECK(!q.touch.Owns());
 }
 
+// The front end's own views (port/front.h): Start runs the view's Start action (the boot's and the
+// title's touch) as A runs the item's; a press while the game is not settled is held and, the
+// view never replaying, dropped; disabled items (the menu fading in): A does nothing; without a
+// Start action Start does nothing on a view.
+static void view_front_start()
+{
+    MenuView v;
+    v.valid = v.own = true;
+    v.replay = false;
+    ViewItem it;
+    it.rect = {0, 0, 1280, 720};
+    it.id = 0x10000001;
+    it.action = {TapStep(128, 105)};
+    v.items.push_back(it);
+    v.buttons[(int)MenuButton::Start] = it.action;
+    int x = -1, y = -1;
+    {
+        Rig r;
+        r.view = &v;
+        r.Frame(kFrontEnd);
+        r.Press(kFrontEnd, &PadState::start);
+        CHECK(r.Touched(x, y) && x == 128 && y == 105);
+    }
+    {
+        Rig r;
+        r.view = &v;
+        r.Frame(kFrontEnd);
+        r.Press(kFrontEnd, &PadState::a);
+        CHECK(r.Touched(x, y) && x == 128 && y == 105);
+    }
+    {
+        Rig r; // unsettled: held, then dropped (never replayed)
+        r.view = &v;
+        r.Frame(kFrontEnd);
+        PadState st;
+        st.start = true;
+        r.Frame(kFrontEnd, st, false);
+        r.Frame(kFrontEnd, {}, false);
+        r.Frame(kFrontEnd, {}, true);
+        r.Frame(kFrontEnd, {}, true);
+        CHECK(!r.touch.Owns());
+    }
+    {
+        MenuView m = v; // the menu fading in: its buttons dead
+        m.buttons[(int)MenuButton::Start].clear();
+        m.items[0].enabled = false;
+        m.items[0].action.clear();
+        Rig r;
+        r.view = &m;
+        r.Frame(kFrontEnd);
+        r.Press(kFrontEnd, &PadState::a);
+        r.Press(kFrontEnd, &PadState::start);
+        CHECK(!r.touch.Owns() && r.nav.Focus() < 0);
+    }
+}
+
 int main()
 {
     view_modules_on_one_screen();
@@ -1792,6 +1848,7 @@ int main()
     view_popup_over_the_registry();
     view_page_change_restarts_the_focus();
     view_lb_rb_pages();
+    view_front_start();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

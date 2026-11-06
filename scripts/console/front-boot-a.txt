@@ -1,0 +1,3 @@
+# From F-boot-900 (the intro video over "Touch the Touch Screen to continue."), CONSOLE: A (the
+# splash's touch: the video ends) → the title.
+10 2 pad a

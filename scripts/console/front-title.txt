@@ -1,0 +1,4 @@
+# From F-title0 (the title, "Touch the Touch Screen to begin"), CONSOLE: A (the game's big button:
+# the main menu fades in), A on Create-a-Sim once the buttons are live (phase 3) → Create-a-Sim.
+10 2 pad a
+120 2 pad a

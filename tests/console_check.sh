@@ -17,8 +17,8 @@
 #   world whole, the panel, the name plate's and the text's white pixels, the portrait as the
 #   touch screen's own pixels 2x; s5-hd-wide (--wide): the world not cut at its sides;
 #   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
-#   top right, the hints' box; s2, s3, s4 (the main menu, Create-a-Sim, Keep this Sim?: no HUD):
-#   the front end's view, the top screen framed at the left at its shape and the touch screen
+#   top right, the hints' box; s2 (the main menu), title, boot: the HD front end (src/port/front.*);
+#   s3, s4 (Create-a-Sim, Keep this Sim?: no HUD): the front end's view, the top screen framed at the left at its shape and the touch screen
 #   2.5x framed at the right, the buttons' hint below, never SIDE; slots (sit-store, Options >
 #   Save: the save slots, from RAM): the HD slot list (src/port/options.*, three "No Data" rows),
 #   never the touch screen 3x; slots-hd (B-cas-opt-save): the current slot's number green;
@@ -102,7 +102,7 @@ run vacuum act-vacuum "${hotel[@]}" &
 run cards act-cards "${late[@]}" &
 run s3 s3 "${town[@]}" &
 wait
-run s2 s2 "${town[@]}" &
+run s2 s2 "${town[@]}" --console-focus 0 &
 run s4 s4 "${town[@]}" &
 run slots sit-store "${town[@]}" --input "$repo/scripts/hotspots/options-save.txt" &
 run load act-cards "${late[@]}" --input "$repo/scripts/console/cards-quit.txt" &
@@ -168,9 +168,18 @@ run stat-hotel SP-hotel-150 "${late[@]}" --console-focus 0 &
 run stat-skills SP-skills "${late[@]}" --console-focus 0 &
 run stat-stats SP-stats "${late[@]}" --console-focus 0 &
 wait
+run title F-title0 "${town[@]}" --console-focus 0 &
+run title-wide F-title0 "${town[@]}" --wide &
+run boot F-boot-900 "${town[@]}" --console-focus 0 &
+run boot-wide F-boot-900 "${town[@]}" --wide &
+run menu-2x s2 "${town[@]}" --console-focus 1 --compose-scale 2 &
+run menu-wide s2 "${town[@]}" --console-focus 0 --wide &
+run menu-de s2 "${town[@]}" --console-focus 3 --language 3 &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
+    title title-wide boot boot-wide menu-2x menu-wide menu-de \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
@@ -308,6 +317,75 @@ def front():
     row = [C(x, y) for y in range(614, 646) for x in range(240, 1040)]
     if (255, 255, 255) not in row or OUTLINE not in row:
         errors.append("no hint text")
+
+BACKDROP = (16, 18, 24)
+
+def front_menu(focus, raw_top=True):
+    """The HD main menu (src/port/front.*): the top screen 3x at 24,72 framed, the panel at the
+    right with four buttons, each a white label, the focused one ringed in green with the game's
+    green arrow, the others' arrows blue; the hints under them."""
+    expect("canvas", comp.size, (1280, 720))
+    if raw_top:
+        for x in range(0, 256, 9):
+            for y in range(0, 192, 9):
+                expect(f"top 3x DS {x},{y}", C(24 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
+                if len(errors) > 4:
+                    return
+    expect("top frame", C(20, 300), OUTLINE)
+    expect("panel", C(1240, 600), FRAME)
+    expect("backdrop", C(5, 5), BACKDROP)
+    for i in range(4):
+        y0 = 84 + 128 * i
+        white = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (255, 255, 255))
+        if white < 30: errors.append(f"button {i}: no label ({white} white pixels)")
+        arrow = [C(x, y) for y in range(y0 + 18, y0 + 82) for x in range(1164, 1228)]
+        green = sum(1 for r, g, b in arrow if g > r + 60 and g > b + 40)
+        blue = sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40)
+        if i == focus:
+            r, g, b = C(835, y0 + 50)
+            if not (g > r + 80 and g > b + 60): errors.append(f"button {i}: no focus ring ({r}, {g}, {b})")
+            if green < 50: errors.append(f"button {i}: the arrow is not green ({green})")
+        else:
+            r, g, b = C(835, y0 + 50)
+            if g > r + 80 and g > b + 60: errors.append(f"button {i}: ringed")
+            if blue < 50: errors.append(f"button {i}: the arrow is not blue ({blue})")
+    hints = [C(x, y) for y in range(616, 656) for x in range(1100, 1232)]
+    if sum(1 for p in hints if p != FRAME) < 40: errors.append("no hints")
+
+def front_title(raw_top=True):
+    """The HD title: the top screen 3.75x (960 x 720 at x 160), the backdrop at its sides, the A
+    chip on its dark plate at the foot."""
+    expect("canvas", comp.size, (1280, 720))
+    if raw_top:
+        for x in range(0, 256, 7):
+            for y in range(0, 160, 7):
+                expect(f"top DS {x},{y}", C(160 + int(x * 3.75 + 1.8), int(y * 3.75 + 1.8)), top(x, y))
+                if len(errors) > 4:
+                    return
+    expect("backdrop left", C(5, 5), BACKDROP)
+    expect("backdrop right", C(1200, 300), BACKDROP)
+    plate = [C(x, y) for y in range(640, 712) for x in range(540, 740)]
+    if sum(1 for r, g, b in plate if g > 180 and r < 160 and b < 140) < 10: errors.append("no A chip")
+    if sum(1 for r, g, b in plate if max(r, g, b) < 70) < 200: errors.append("no dark plate")
+
+def front_boot(raw=True):
+    """The boot: the video (top) 3x at 24,72 and the splash (the touch screen) 1.5x at 838,216,
+    both framed; the A and START chips under the splash."""
+    expect("canvas", comp.size, (1280, 720))
+    if raw:
+        for x in range(0, 256, 9):
+            for y in range(0, 192, 9):
+                expect(f"video 3x DS {x},{y}", C(24 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
+        for x in range(0, 256, 6):
+            for y in range(0, 192, 6):
+                expect(f"splash 1.5x DS {x},{y}", C(838 + x * 3 // 2, 216 + y * 3 // 2), bottom(x, y))
+                if len(errors) > 4:
+                    return
+    expect("top frame", C(20, 300), OUTLINE)
+    expect("splash frame", C(834, 300), OUTLINE)
+    expect("backdrop", C(5, 5), BACKDROP)
+    chips = [C(x, y) for y in range(534, 590) for x in range(838, 1222)]
+    if sum(1 for p in chips if p != BACKDROP) < 300: errors.append("no A / START chips")
 
 def big_over_dim(rows=176):
     piece("touch screen 3x", 0, 0, 256, 192, 256, 72, 3, step=9)
@@ -744,7 +822,15 @@ elif case == "cards":
     # The card game has no HUD: its world whole, no status bar.
     expect("canvas", comp.size, (1280, 720))
     activity()
-elif case in ("s2", "s3", "s4"):
+elif case == "s2":
+    front_menu(0)
+elif case in ("menu-2x", "menu-wide", "menu-de"):
+    front_menu({"menu-2x": 1, "menu-wide": 0, "menu-de": 3}[case], raw_top=case == "menu-2x")
+elif case in ("title", "title-wide"):
+    front_title(raw_top=case == "title")
+elif case in ("boot", "boot-wide"):
+    front_boot(raw=case == "boot")
+elif case in ("s3", "s4"):
     front()
 elif case == "load":
     # Frame 119 of the cards' quit: the game between Cards and the casino's panel, both screens
@@ -1324,6 +1410,41 @@ EOF
     then echo "ok   $name: $(echo "$out" | head -n 1)"
     else echo "FAIL $name"; fails=$((fails + 1)); fi
 done
+# The front end (src/port/front.*, --print-front): from F-title0, A → the main menu, A on
+# Create-a-Sim once it is live → Create-a-Sim; Start → the menu, A twice while it fades in →
+# nothing chosen (no press lands mid-fade); from s2, A on Load-a-Sim, Settings and DS Wireless →
+# each screen, and B (the game's own) → the title at phase 0, never the menu; from F-boot-900, A
+# or Start (the splash's touch) → the title.
+# (Settings, Load-a-Sim and Wireless are not GScreens yet: --print-game's pixel tracker disagrees
+# there, so those runs go without it.)
+pad_front() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4; shift 4
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
+        --layout console --print-screen --print-front "$@" "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_front pad-front-title F-title0 front-title 300 --print-game &
+pad_front pad-front-fade F-title0 front-fade 200 --print-game &
+pad_front pad-front-load s2 front-load 330 &
+pad_front pad-front-settings s2 front-settings 330 &
+pad_front pad-front-wireless s2 front-wireless 330 &
+pad_front pad-front-boot-a F-boot-900 front-boot-a 150 --print-game &
+pad_front pad-front-boot-start F-boot-900 front-boot-start 150 --print-game &
+wait
+front_title() { in_order pad-front-title 'title phase=0' 'title phase=3' 'game CreateASim' 'front CreateASim'; }
+front_fade() {
+    in_order pad-front-fade 'title phase=0' 'title phase=2' 'title phase=3' || return 1
+    ! grep -q -E 'game CreateASim|front (Load|Settings|Wireless)' "$tmp/pad-front-fade.log" || { echo "  pad-front-fade: a press landed mid-fade"; return 1; }
+}
+front_back() { in_order "$1" 'title phase=3' "front $2" 'front Title' 'title phase=0'; }
+front_boot() { in_order "$1" 'front Video' 'boot mode=0' 'front Title' 'title phase=0'; }
+check_pad pad-front-title front_title
+check_pad pad-front-fade front_fade
+check_pad pad-front-load front_back pad-front-load Load
+check_pad pad-front-settings front_back pad-front-settings Settings
+check_pad pad-front-wireless front_back pad-front-wireless Wireless
+check_pad pad-front-boot-a front_boot pad-front-boot-a
+check_pad pad-front-boot-start front_boot pad-front-boot-start
 # The HD Interact tab's words in each language (src/port/interact.*: --measure-menu): every verb
 # in its row and in the A hint, every Sim's and object's name in the title and the strip, held in
 # their boxes (shrunk at most; a neighbour's name beside the plate may end in an ellipsis).

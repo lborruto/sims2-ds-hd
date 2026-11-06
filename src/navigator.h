@@ -152,7 +152,7 @@ private:
     bool viewFocus_ = false;
     u32 focusId_ = 0;
     u32 armed_ = 0;      // the item (id) whose asking X was pressed once (ViewItem::xAsks)
-    u32 moduleId_[16] = {}; // per module tag (the id's top bits): the item it last had the focus on, on this screen
+    u32 moduleId_[32] = {}; // per module tag (the id's top bits): the item it last had the focus on, on this screen
     int Arrive(const MenuView& v) const; // the focus on a view that has none: that module's last item, else its first
     u64 viewHash_ = 0;
     int viewPage_ = 0;   // the view's page last frame (MenuView::page)

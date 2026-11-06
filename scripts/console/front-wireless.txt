@@ -1,0 +1,7 @@
+# From s2, CONSOLE: Down x3, A → DS Wireless (its first page: out of scope beyond it); B (the
+# game's own) → the title at phase 0.
+10 2 pad down
+16 2 pad down
+22 2 pad down
+30 2 pad a
+200 2 pad b
