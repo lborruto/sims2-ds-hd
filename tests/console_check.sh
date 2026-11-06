@@ -896,6 +896,7 @@ pad_late_hotel pad-stat-quick SP-stat-base stat-quick 400 &
 pad_build pad-build-scroll BD-list build-scroll 260 &
 pad_build pad-build-cancel BD-list build-cancel 260 &
 pad_build pad-build-buy BD-list build-buy 330 &
+pad_build pad-build-double BD-list build-double 200 &
 pad_build pad-build-poor BD-down3 build-poor 120 &
 pad_late pad-hotseat sit-casino interact-hotseat 300 &
 pad_late pad-target D-cas-right2 interact-target 220 &
@@ -1037,6 +1038,12 @@ build_poor() {
 check_pad pad-build-scroll build_scroll
 check_pad pad-build-cancel build_cancel
 check_pad pad-build-buy build_buy
+# A, A five frames apart on the tick buys once (the question closes at once; a second press is no second spend).
+build_double() {
+    in_order pad-build-double 'build .*page=1 chosen=1 money=2000 ' 'hotel .*building=0x2 .*money=1000 earned=0 spent=1000 ' || return 1
+    ! grep -Eq 'money=0 |spent=[2-9][0-9]{3} ' "$tmp/pad-build-double.log" || { echo "  pad-build-double: bought twice"; return 1; }
+}
+check_pad pad-build-double build_double
 check_pad pad-build-poor build_poor
 # The Registry and room info (src/port/checkin.*, roominfo.*), the early hotel: from the lobby,
 # MENU, Down, A on the concierge's "Registry" → the game's Registry; A → the Small Guest Room's

@@ -118,6 +118,8 @@ struct EUTable
         // Stat panel (overlay 14)
         u32 vtStat, ovStat, stPage, stTransition, stLevel, stPoints, stSkills, stAliens, stGoons, stVacuum, stMetal;
         u32 stThresholds, stSkillN, stMaxSkill, stGauge;
+        u32 customSong0, muNone, muRowsMax;                  // the first recorded song's code; the playing index when none; rows shown
+        u32 stMaxPage, stMaxTransition, stMaxLevel, stMaxPoints;   // stat panel bounds (the aspiration level 3 is the top)
         u32 buildTimers;                                     // from G: u32 per place, the time its building ends (vs `clock`; noCheckOut: never set)
     } hotel;
 };
@@ -213,6 +215,8 @@ constexpr EUTable kEU = {
         0x260, 0x26C, 0x264, 0x3C, 0x254, 0x258, 0x268, 0x25D, 0x26D, 0x26E, 0x214, 12, 2, 0x3B,
         0x0214B5A4, 14, 0x38, 0x3C, 0x6C, 0x70, 0x5B, 0x74, 0x78, 0x7C, 0x80,
         0x02121DD8, 5, 10, 20,
+        0x2B, 0xFF, 5,
+        4, 2, 3, 9999,
         0x4418,
     },
 };
@@ -369,7 +373,7 @@ InventoryState ReadInventory(const Reader& m)
         if (!m.R16(G + t.invIds + 2 * i, id) || id >= t.maxItems) return InventoryState{};
         RecordRow row = ReadRow(m, t.itemRow0 + id);
         if (!row.valid || row.nameId != (int)(t.itemName + id)) return InventoryState{};   // the row names its own item
-        v.slots.push_back({(int)id, row.nameId, (int)(t.itemDesc + id), row.descRes, 1});
+        v.slots.push_back({(int)id, row.nameId, (int)(t.itemDesc + id), row.descRes, 1, row.tilesRes, row.palRes});
     }
     for (u32 i = 0; i < t.countedN; i++)
     {
@@ -877,7 +881,7 @@ bool ReadSlots(const Reader& m, u32 G, GuestSlot out[5])
 }
 
 // The Sim in a room, -1 vacant: the guest slot that holds it, or the story Sim in the Penthouse while the mission runs.
-bool OccupantOf(const Reader& m, u32 G, const GuestSlot slots[5], u32 place, int& sim)
+bool OccupantOf(const Reader& m, u32 G, const GuestSlot* slots, u32 place, int& sim)
 {
     const auto& h = kEU.hotel; const auto& q = kEU.menus;
     sim = -1;
@@ -931,16 +935,15 @@ HotelState ReadHotel(const Reader& m)
     return v;
 }
 
-CheckInState ReadCheckIn(const Reader& m, u32 S)
+CheckInState ReadCheckIn(const Reader& m, u32 S, const HotelState& hotel)
 {
     const auto& h = kEU.hotel;
     CheckInState v;
     u32 G, mode, guest, flagOk;
-    u64 built;
-    GuestSlot slots[5];
-    if (!m.R32(kEU.gameBlock, G) || !m.R8(S + h.regMode, mode) || mode > 1 || !m.R8(S + h.regGuest, guest) || !Bits(m, G + h.builtBits, built) ||
-        !ReadSlots(m, G, slots) || !HotelScore(m, built, v.score))
-        return v;
+    if (!hotel.valid || !m.R32(kEU.gameBlock, G) || !m.R8(S + h.regMode, mode) || mode > 1 || !m.R8(S + h.regGuest, guest)) return v;
+    const u64 built = hotel.built;
+    const GuestSlot* slots = hotel.slots;
+    v.score = hotel.score;
     if (mode == 0 && guest >= kEU.town.maxSims) return v;
     flagOk = FlagSet(m, G, h.penthouseFlag);
     for (u32 i = 0; i < h.regRoomN; i++)
@@ -988,15 +991,13 @@ bool RoomCost(const Reader& m, u32 G, u32 place, int score, RoomInfoState& v)
     return true;
 }
 
-RoomInfoState ReadRoomInfo(const Reader& m, u32 S)
+RoomInfoState ReadRoomInfo(const Reader& m, u32 S, const HotelState& hotel)
 {
     const auto& h = kEU.hotel; const auto& x = kEU.x; const auto& q = kEU.menus;
     RoomInfoState v;
     u32 G, place, occupant, occupied, a, b, c, d;
-    u64 built;
-    int score;
-    if (!m.R32(kEU.gameBlock, G) || !m.R16(S + h.riPlace, place) || place >= (u32)kPlaces || !m.R16(S + h.riOccupant, occupant) || occupant >= kEU.town.maxSims ||
-        !m.R8(S + h.riOccupied, occupied) || occupied > 1 || !Bits(m, G + h.builtBits, built) || !HotelScore(m, built, score) || !RoomCost(m, G, place, score, v))
+    if (!hotel.valid || !m.R32(kEU.gameBlock, G) || !m.R16(S + h.riPlace, place) || place >= (u32)kPlaces || !m.R16(S + h.riOccupant, occupant) || occupant >= kEU.town.maxSims ||
+        !m.R8(S + h.riOccupied, occupied) || occupied > 1 || !RoomCost(m, G, place, hotel.score, v))
         return RoomInfoState{};
     if (!m.R8(S + h.riHint, a) || !m.R8(S + h.riHint + 1, b) || !m.R8(S + h.riHint + 2, c) || !m.R8(S + h.riHint + 3, d) || a > 1 || b > 1 || c > 1 || d > 1) return RoomInfoState{};
     v.hint = a && b && c;
@@ -1031,7 +1032,7 @@ MusicState ReadMusic(const Reader& m, u32 S, const HotelState& hotel)
     MusicState v;
     u32 count, scroll, playing, rows, G, song;
     if (!m.R32(S + h.muCount, count) || count > h.songN || !m.R32(S + h.muScroll, scroll) || !m.R32(S + h.muPlaying, playing) || !m.R32(S + h.muRows, rows) ||
-        rows != (count < 5 ? count : 5) || scroll > count - rows || (playing != 0xFF && playing >= count) || !m.R32(kEU.gameBlock, G))
+        rows != (count < h.muRowsMax ? count : h.muRowsMax) || scroll > count - rows || (playing != h.muNone && playing >= count) || !m.R32(kEU.gameBlock, G))
         return v;
     for (u32 i = 0; i < count; i++)
     {
@@ -1039,7 +1040,7 @@ MusicState ReadMusic(const Reader& m, u32 S, const HotelState& hotel)
         if (!m.R8(S + h.muList + i, idx) || idx >= h.songN) return MusicState{};
         const u32 e = h.songTable + h.songStride * idx;
         if (!m.R8(e, code) || code == h.songEnd || !m.R16(e + 2, name)) return MusicState{};
-        const int custom = code >= 0x2B && code < 0x2B + h.customN ? (int)code - 0x2B : -1;
+        const int custom = code >= h.customSong0 && code < h.customSong0 + h.customN ? (int)code - (int)h.customSong0 : -1;
         SongRow row {(int)idx, (int)code, custom < 0 ? (int)name : -1, custom};
         // A recorded song's name: the mixer's char[16] in G (the game's own text, up to its NUL).
         for (u32 k = 0; custom >= 0 && k < h.customStride; k++)
@@ -1050,7 +1051,7 @@ MusicState ReadMusic(const Reader& m, u32 S, const HotelState& hotel)
         }
         v.list.push_back(row);
     }
-    v.scroll = (int)scroll; v.playing = playing == 0xFF ? -1 : (int)playing;
+    v.scroll = (int)scroll; v.playing = playing == h.muNone ? -1 : (int)playing;
     if (hotel.valid && hotel.place >= 0 && m.R8(G + h.songs + (u32)hotel.place, song)) { v.place = hotel.place; v.roomSong = (int)song; }
     v.valid = true;
     return v;
@@ -1068,7 +1069,7 @@ BuildState ReadBuild(const Reader& m, u32 S)
     {
         u32 place;
         RoomRow r;
-        if (!m.R32(S + h.bdPlaces + 4 * i, place) || !RoomRowAt(m, place, r)) return BuildState{};
+        if (!m.R32(S + h.bdPlaces + 4 * i, place) || !RoomRowAt(m, place, r) || r.permit == 0) return BuildState{};   // a listed room always has a permit
         v.places.push_back({(int)place, r.permit, (int)(kEU.menus.hotelPlaceBase + r.parent), (int)money >= r.permit});
     }
     if (page == 1 && chosen >= count) return BuildState{};
@@ -1146,29 +1147,27 @@ CatalogueState ReadCatalogue(const Reader& m, u32 S)
     return v;
 }
 
-StatState ReadStat(const Reader& m, u32 S)
+StatState ReadStat(const Reader& m, u32 S, const HotelState& hotel)
 {
     const auto& h = kEU.hotel;
     StatState v;
     u32 G, page, tr, asp, level, points, thr = 0;
-    if (!m.R32(kEU.gameBlock, G) || !m.R32(S + h.stPage, page) || page > 4 || !m.R32(S + h.stTransition, tr) || tr > 2 || !m.R32(G + h.aspiration, asp) || asp > 3 ||
-        !m.R32(G + h.stLevel, level) || level > 3 || !m.R32(G + h.stPoints, points) || points > 9999)
+    if (!hotel.valid || !m.R32(kEU.gameBlock, G) || !m.R32(S + h.stPage, page) || page > h.stMaxPage || !m.R32(S + h.stTransition, tr) || tr > h.stMaxTransition || !m.R32(G + h.aspiration, asp) || asp > 3 ||
+        !m.R32(G + h.stLevel, level) || level > h.stMaxLevel || !m.R32(G + h.stPoints, points) || points > h.stMaxPoints)
         return v;
-    if (level < 3 && (!m.R32(h.stThresholds + 4 * level, thr) || thr == 0 || thr > 9999)) return v;
+    if (level < h.stMaxLevel && (!m.R32(h.stThresholds + 4 * level, thr) || thr == 0 || thr > h.stMaxPoints)) return v;
     for (u32 i = 0; i < h.stSkillN; i++)
     {
         u32 k;
         if (!m.R8(G + h.stSkills + i, k) || k > h.stMaxSkill) return StatState{};
         v.skills[i] = (int)k;
     }
-    u64 built;
-    u32 stayed, earned, spent, al, go, va, me;
-    if (!Bits(m, G + h.builtBits, built) || !HotelScore(m, built, v.score) || !m.R32(G + h.guestsStayed, stayed) || !m.R32(G + h.earned, earned) || !m.R32(G + h.spent, spent) ||
-        !m.R32(G + h.stAliens, al) || !m.R32(G + h.stGoons, go) || !m.R32(G + h.stVacuum, va) || !m.R32(G + h.stMetal, me))
+    u32 al, go, va, me;
+    if (!m.R32(G + h.stAliens, al) || !m.R32(G + h.stGoons, go) || !m.R32(G + h.stVacuum, va) || !m.R32(G + h.stMetal, me))
         return StatState{};
     v.page = (int)page; v.transition = (int)tr; v.aspiration = (int)asp; v.level = (int)level; v.points = (int)points;
-    v.gaugeFrame = level < 3 ? (int)std::min<u32>(h.stGauge, (h.stGauge * points + thr / 2) / thr) : (int)h.stGauge;
-    v.guestsStayed = (int)stayed; v.earned = (int)earned; v.spent = (int)spent;
+    v.gaugeFrame = level < h.stMaxLevel ? (int)std::min<u32>(h.stGauge, (h.stGauge * points + thr / 2) / thr) : (int)h.stGauge;
+    v.score = hotel.score; v.guestsStayed = hotel.guestsStayed; v.earned = hotel.earned; v.spent = hotel.spent;
     v.aliens = (int)al; v.goons = (int)go; v.vacuum = (int)va; v.metal = (int)me;
     v.valid = true;
     return v;
@@ -1269,10 +1268,10 @@ GameState ReadGameState(RamView ram)
     {
         const auto& h = kEU.hotel;
         const int ov = g.overlay;
-        if (vt == h.vtRegistry && ov == (int)h.ovRegistry) g.checkIn = ReadCheckIn(m, S);
-        else if (vt == h.vtRoomInfo && ov == (int)h.ovRoomInfo) g.roomInfo = ReadRoomInfo(m, S);
+        if (vt == h.vtRegistry && ov == (int)h.ovRegistry) g.checkIn = ReadCheckIn(m, S, g.hotel);
+        else if (vt == h.vtRoomInfo && ov == (int)h.ovRoomInfo) g.roomInfo = ReadRoomInfo(m, S, g.hotel);
         else if (vt == h.vtMusic && ov == (int)h.ovMusic) g.music = ReadMusic(m, S, g.hotel);
-        else if (vt == h.vtStat && ov == (int)h.ovStat) g.stat = ReadStat(m, S);
+        else if (vt == h.vtStat && ov == (int)h.ovStat) g.stat = ReadStat(m, S, g.hotel);
         else if (vt == h.vtPlacement && ov == -1) g.placement = ReadPlacement(m, S);
     }
     return g;

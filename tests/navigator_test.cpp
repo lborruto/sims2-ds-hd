@@ -1608,6 +1608,107 @@ static void view_modules_on_one_screen()
     CHECK(r.nav.Focus() == 1);
 }
 
+// A game popup over the Registry (Unknown, an own view of module 12; the popup reads as its own
+// screen, or on the same one): it wins the focus, and when it goes the Registry is back on the row
+// the focus was on, by id, in both cases; room info's view in between (module 13) starts at its
+// own first item, and the Registry's row is restored after it too.
+static void view_popup_over_the_registry()
+{
+    const ScreenState un {Screen::Unknown, Tab::None};
+    MenuView reg;
+    reg.valid = reg.own = true;
+    for (int i = 0; i < 5; i++)
+    {
+        ViewItem it;
+        it.rect = {200, 140 + 80 * i, 500, 70};
+        it.action = {TapStep(20, 39 + 33 * i)};
+        it.id = (12u << 24) + 0x100 + (u32)i;
+        reg.items.push_back(it);
+    }
+    MenuView pop;
+    pop.valid = pop.own = pop.popup = true;
+    ViewItem close;
+    close.rect = {490, 420, 300, 80};
+    close.action = {TapStep(132, 132)};
+    close.closes = true;
+    close.id = 0x700;
+    pop.items.push_back(close);
+    pop.back = close.action;
+    pop.backCloses = true;
+    for (bool own : {false, true})
+    {
+        const ScreenState during = own ? kPopup : un;   // (the popup as a screen of its own, or over the same one)
+        Rig r;
+        r.view = &reg;
+        r.Frame(un);
+        r.Press(un, &PadState::down);
+        r.Press(un, &PadState::down);
+        CHECK(r.nav.Focus() == 2);
+        r.view = &pop;
+        r.Frame(during);
+        CHECK(r.nav.Focus() == 0 && r.nav.ViewFocus());
+        r.Press(during, &PadState::a);
+        int x = -1, y = -1;
+        CHECK(r.Touched(x, y) && x == 132 && y == 132);
+        r.Drain();
+        r.view = &reg;
+        r.Frame(un);
+        CHECK(r.nav.Focus() == 2);
+        r.Press(un, &PadState::down);
+        CHECK(r.nav.Focus() == 3);
+    }
+}
+
+// A screen's page changing (Build Rooms' list, then its question): a question's focus starts on its
+// initial item, whatever index it had on the old page (it never opens on Yes because the focus was
+// on the list's second row), stays where the player moves it, and the list comes back on its room.
+static void view_page_change_restarts_the_focus()
+{
+    MenuView list;
+    list.valid = list.own = true;
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {200, 140 + 80 * i, 500, 70};
+        it.action = {TapStep(48, 68 + 35 * i)};
+        it.id = (11u << 24) + 0x100 + (u32)i;
+        list.items.push_back(it);
+    }
+    MenuView ask;
+    ask.valid = ask.own = true;
+    ask.page = 1;
+    ask.question = true;
+    for (int i = 0; i < 2; i++)
+    {
+        ViewItem it;
+        it.rect = {380 + 300 * i, 448, 220, 96};
+        it.action = {TapStep(96 + 62 * i, 130)};
+        it.id = (11u << 24) + 0x200 + (u32)i;
+        it.next[0] = it.next[1] = kNoMove;
+        ask.items.push_back(it);
+    }
+    ask.initial = 0;
+    Rig r;
+    r.view = &list;
+    r.Frame(kUnknown);
+    r.Press(kUnknown, &PadState::down);
+    r.Press(kUnknown, &PadState::down);
+    CHECK(r.nav.Focus() == 2);
+    r.view = &ask;
+    r.Frame(kUnknown);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(kUnknown, &PadState::right);
+    CHECK(r.nav.Focus() == 1);
+    r.Frame(kUnknown);
+    CHECK(r.nav.Focus() == 1); // (the same page: kept)
+    r.view = &list;
+    r.Frame(kUnknown);
+    CHECK(r.nav.Focus() == 2); // (back on the room the question was about)
+    r.view = &ask;
+    r.Frame(kUnknown);
+    CHECK(r.nav.Focus() == 0); // (a question always opens on its initial item, never on the last answer)
+}
+
 // A screen's own pages (the stat panel: Unknown, an own view): LB / RB run the view's LB / RB
 // actions (multi-step: a tap, a wait, a tap), held while unsettled and replayed; on the panel
 // they stay its tabs.
@@ -1688,6 +1789,8 @@ int main()
     view_item_x_asks();
     view_tab_change_disarms_and_menu_is_b();
     view_popup_resume_and_phone();
+    view_popup_over_the_registry();
+    view_page_change_restarts_the_focus();
     view_lb_rb_pages();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");

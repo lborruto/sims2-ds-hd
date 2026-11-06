@@ -444,7 +444,10 @@ int main()
     {
         const Composition m = BuildConsole({sc, Tab::None}, false, -1, SW, SH);
         CHECK(m.pieces.size() == 2 && !m.pieces[0].touch && m.pieces[1].src == Src::Bottom && m.pieces[1].to.x == kMenuTo.x && m.pieces[1].to.y == kMenuTo.y && m.pieces[1].to.w == SW * 3);
-        CHECK(m.overlays.size() == 2 && m.overlays[0].argb == kDimArgb && m.overlays[1].argb == kFrameArgb && m.overlays[1].to.x == kMenuTo.x - 6);
+        // (and the cursor's hint box under it, at the right clear of the HD status bar: how to leave)
+        CHECK(m.overlays.size() == 4 && m.overlays[0].argb == kDimArgb && m.overlays[1].argb == kFrameArgb && m.overlays[1].to.x == kMenuTo.x - 6);
+        const Rect hb = m.overlays[2].to;
+        CHECK(hb.x >= 720 && hb.x + hb.w <= kConsoleW && hb.y >= kMenuTo.y + kMenuTo.h && hb.y + hb.h <= kConsoleH);
     }
     // The menu: the dimmed world swallows clicks and the camera; the touch screen 3x is the stylus.
     for (ScreenState s : {ScreenState {Screen::Panel, Tab::Goals}, ScreenState {Screen::Popup, Tab::None}, ScreenState {Screen::Gift, Tab::None}})
@@ -1144,7 +1147,7 @@ int main()
                             }
                             else
                             {
-                                CHECK(v.items.size() == 2 && !v.backCloses && v.initial == 1 && MenuFirst(v) == 1);
+                                CHECK(v.items.size() == 2 && !v.backCloses && v.initial == 0 && MenuFirst(v) == 0);   // (the cross first: a spend is never one press away)
                                 CHECK(v.items[1].action.size() == 1 && v.items[1].action[0].x == kBdTickX && v.items[1].action[0].y == kBdConfirmY);
                                 CHECK(v.items[0].action[0].x == kBdCrossX && v.back[0].x == kBdCrossX && v.back[0].y == kBdConfirmY);
                                 CHECK(MenuMove(v, 1, 2) == 0 && MenuMove(v, 0, 3) == 1 && MenuMove(v, 1, 0) == 1);
@@ -1350,6 +1353,10 @@ int main()
                     CHECK(MenuMove(v, k, 2) == k && MenuMove(v, k, 3) == k);
                     if (k > 0) CHECK(MenuMove(v, k, 0) == k - 1);
                 }
+                // (the ids carry the room: another room's line is another item; a vacant room's lines close up)
+                CHECK(v.items[1].id == RoomInfoLineId(29, 1) && v.items[1].id != RoomInfoLineId(8, 1));
+                for (int k = 1; k < n; k++) CHECK(v.items[k].rect.y == v.items[k - 1].rect.y + 62 || k == 1);
+                CHECK(v.items[1].rect.y == RoomInfoLineRect(1).y && (occupied || v.items[2].rect.y == RoomInfoLineRect(1).y + 62));
                 CHECK(hints.count(occupied ? 2595 : 2596) == 1 && hints.count(2601) == (size_t)occupied && hints.count(2600) == 1);
                 CHECK(RoomInfoHintAt(kRiAwayX, kRiAwayY, occupied) < 0 && RoomInfoHintAt(40, 63, false) < 0);
                 for (int focus : {-1, 0, 1, n - 1})

@@ -97,8 +97,8 @@ MenuView LinesView(const GameState& game, const RomData* rom)
     {
         const int i = shown[k];
         ViewItem it;
-        it.rect = RoomInfoLineRect(i);
-        it.id = kRiLineId + (u32)i;
+        it.rect = RoomInfoLineRect(i, ri.occupied);
+        it.id = RoomInfoLineId(ri.place, i);
         it.action = {TapStep(kRiLineX, kRiLineY[i] + 6)};
         if (rom) it.word = MenuWords(*rom, kStrRiHints);
         it.next[0] = k == 0 ? kNoMove : (int)k - 1;
@@ -113,24 +113,16 @@ MenuView LinesView(const GameState& game, const RomData* rom)
     return v;
 }
 
-void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0)
-{
-    const FittedText f = FitLine(s, size, minSize, r.w, w);
-    UiItem t = TextItem(r, f.text, f.size, a, w);
-    t.wrap = false;
-    t.middle = true;
-    if (colour) t.colour = colour;
-    t.layer = 1;
-    c.ui.push_back(t);
-}
+void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0) { PanelText(c, r, s, size, minSize, a, w, colour); }
 // A line's label and value share its width: the value's own width first (at most half).
 int ValueWidth(const std::string& value, int w) { return value.empty() ? 0 : std::min(w / 2, (int)TextWidth(value, kRiValueSize, Weight::ExtraBold) + 4); }
 }
 
-Rect RoomInfoLineRect(int i)
+Rect RoomInfoLineRect(int i, bool occupied)
 {
     if (i <= 0) return {kRiTitle.x + 12, kRiTitle.y + 6, kRiClose.x - 16 - (kRiTitle.x + 12), kRiTitle.h - 12};
-    return {kRiLinesWell.x + 16, kRiLinesWell.y + 12 + (i - 1) * 62, kRiLinesWell.w - 32, 54};
+    const int slot = occupied || i < 2 ? i : i - 2;   // (a vacant room's costs follow "Vacant")
+    return {kRiLinesWell.x + 16, kRiLinesWell.y + 12 + (slot - 1) * 62, kRiLinesWell.w - 32, 54};
 }
 
 int RoomInfoHintAt(int x, int y, bool occupied)
@@ -149,7 +141,7 @@ bool RoomHintUp(const GameState& game) { return game.valid && game.roomInfo.vali
 
 MenuView RoomInfoView(ScreenState s, const GameState* game, const RomData* rom)
 {
-    if (!game || !rom || rom->StringCount() <= kStrRiHints || rom->StringCount() <= kRiHint[7]) return {};
+    if (!game || !rom || rom->StringCount() <= kStrRiHints || rom->StringCount() <= kRiHintMax) return {};
     return RoomInfoViewOf(s, *game, rom);
 }
 
@@ -206,8 +198,9 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
     // Layer 1: the lines (the name in the title band), the focus, the hints.
     for (size_t k = 0; k < v.items.size(); k++)
     {
-        const int i = (int)(v.items[k].id - kRiLineId);
-        if (i < 0 || i >= kRiLines) continue;
+        if ((v.items[k].id & 0xFFF00000u) != kRiLineId) continue;
+        const int i = (int)(v.items[k].id & 0xFF);
+        if (i >= kRiLines) continue;
         const Rect r = v.items[k].rect;
         const bool focused = focus == (int)k;
         if (i == 0)
@@ -274,16 +267,9 @@ void BuildRoomHint(Composition& c, const MenuView&, int focus, const GameState& 
 
 void MeasureRoomInfo(const RomData& rom, BlockMeasure& m)
 {
-    auto note = [&](int id, bool shrunk, bool fits, int lines = 0) {
-        m.checked++;
-        if (shrunk) m.shrunk++;
-        if (lines > m.tallestLines) { m.tallestLines = lines; m.tallestId = id; }
-        if (!fits && std::find(m.cutIds.begin(), m.cutIds.end(), id) == m.cutIds.end()) { m.cut++; m.cutIds.push_back(id); }
-    };
-    auto line = [&](int id, const std::string& text, float size, float minSize, int width, Weight w = Weight::ExtraBold) {
-        const FittedText f = FitLine(text, size, minSize, width, w);
-        note(id, f.size < size, f.fits);
-    };
+    const Measurer tally {m};
+    auto note = [&](int id, bool shrunk, bool fits, int lines = 0) { tally.Note(id, shrunk, fits, lines); };
+    auto line = [&](int id, const std::string& text, float size, float minSize, int width, Weight w = Weight::ExtraBold) { tally.Line(id, text, size, minSize, width, w); };
     // Every line of every room in every state the game can put it in, at the widest values: every
     // guest's name, every mood, a check-out 12/31 in 400 days, §65,535 (the formulas' u16 range).
     const Rect r = RoomInfoLineRect(1);

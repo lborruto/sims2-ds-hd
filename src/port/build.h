@@ -69,7 +69,7 @@ constexpr u32 kBdRowId = kModBuild + 0x100, kBdCrossId = kModBuild + 0x200, kBdT
 
 // The view (valid when RAM's Build Rooms reads and the game's strings are there). Page 0: one item
 // per row shown (none when the game lists nothing), Up / Down past them the game's scroll; page 1:
-// the cross and the tick (the first focus). Never replayed; B the game's X (page 0) or cross.
+// the cross (the first focus: No) and the tick. Never replayed; B the game's X (page 0) or cross.
 MenuView BuildRoomsView(ScreenState s, const GameState* game, const RomData* rom);
 // The same without the strings' check (tests; rom null leaves the words empty).
 MenuView BuildRoomsViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);

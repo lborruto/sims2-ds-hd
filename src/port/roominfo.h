@@ -37,6 +37,7 @@ constexpr int kRiLines = 8;
 constexpr int kRiLineY[kRiLines] = {13, 37, 57, 77, 97, 117, 137, 157};
 constexpr int kRiHint[kRiLines] = {2594, 2595, 2601, 2603, 2597, 2598, 2599, 2600};
 constexpr int kRiHintVacant = 2596;   // line 1 on a vacant room
+constexpr int kRiHintMax = 2603;      // the largest string id the screen uses (the strings guard)
 // The game's portrait on the touch screen (the live crop).
 constexpr Rect kRiPortraitFrom {172, 36, 70, 86};
 
@@ -52,12 +53,15 @@ constexpr Rect kRiTitle {200, 44, 880, 64};
 constexpr Rect kRiClose {1016, 48, 56, 56};
 constexpr Rect kRiPortrait {200, 124, 256, 300};
 constexpr Rect kRiLinesWell {472, 124, 608, 454};
-// Line i's HD rectangle (line 0, the name: the title band's text).
-Rect RoomInfoLineRect(int i);
+// Line i's HD rectangle (line 0, the name: the title band's text). A vacant room has no lines 2 and 3
+// (the mood, the check-out date): its cost lines close up under "Vacant".
+Rect RoomInfoLineRect(int i, bool occupied = true);
 constexpr float kRiLabelSize = 26, kRiValueSize = 28, kRiMin = 18;
 
-// Item ids: the kind in bits 20-23 (1 a line, 2 the hint box's Close), the line below.
+// Item ids: the kind in bits 20-23 (1 a line, 2 the hint box's Close); a line's id carries its room
+// (bits 8-13, so the focus never lands on another room's line) and its line (bits 0-7).
 constexpr u32 kRiLineId = kModRoomInfo | (1u << 20), kRiHintCloseId = kModRoomInfo | (2u << 20);
+constexpr u32 RoomInfoLineId(int place, int line) { return kRiLineId | ((u32)place << 8) | (u32)line; }
 
 // Which hint the game opens for a stylus-down at DS (x, y) on the room info (its own rectangles,
 // research m4 §3), -1 none: what the frame loop fills RoomInfoState::hintId with.

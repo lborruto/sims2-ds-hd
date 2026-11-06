@@ -85,6 +85,18 @@ struct FittedText
     bool fits = true;
 };
 FittedText FitLine(const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::Bold);
+// One fitted line of text in `r` (no wrap, centred vertically), on layer 1; colour 0: the theme's.
+void PanelText(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour = 0);
+// (A check, --measure-menu) what a screen's measure tallies: a line or block fitted (its size
+// shrunk or not, its ellipsis, its lines), each cut id once.
+struct BlockMeasure;
+struct Measurer
+{
+    BlockMeasure& m;
+    void Note(int id, bool shrunk, bool fits, int lines = 0) const;
+    void Line(int id, const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::ExtraBold) const;
+    void Block(int id, const std::string& text, float size, float minSize, Rect box) const;
+};
 // A touchable, invisible piece mapping the HD rectangle `to` onto the touch screen's `from`.
 void AddMousePiece(Composition& c, Rect from, Rect to);
 // A row's focus ring (UI items, layer 1): a green halo 4 pixels around `r`, drawn before the row.

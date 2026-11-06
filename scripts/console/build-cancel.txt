@@ -1,10 +1,10 @@
 # From BD-list, CONSOLE: Down (the Art Gallery, §1,000 of §2,000), A (the game's knob: "Are you
-# sure you want to buy this room?" for it), B (the game's cross: back to the list, nothing
-# bought), A again (the question), Left (the cross), A (back to the list), B (the X: the panel).
+# sure you want to buy this room?" for it, the focus on its cross), B (the game's cross: back to
+# the list, nothing bought), A again (the question), A on the cross (back to the list), B (the X:
+# the panel).
 20 2 pad down
 40 2 pad a
 80 2 pad b
 120 2 pad a
-160 2 pad left
 180 2 pad a
 220 2 pad b

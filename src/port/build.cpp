@@ -23,7 +23,6 @@ constexpr u32 kRowFill = 0xFF6A72B8, kRowFocusFill = 0xFF9AA2E3;   // (Interact'
 constexpr u32 kWhereColour = 0xFFD8DAF4;                           // a room's place: a pale lavender
 constexpr u32 kPriceColour = 0xFFFFE9A0;                           // a warm white: money (the catalogue's)
 constexpr u32 kPoorColour = 0xFFFF6A6A;                            // the game's red for a permit the money does not cover
-constexpr u32 kDim = 0x80FFFFFF, kDimShadow = 0x40383869;
 constexpr Rect kNoRect {};
 
 // A button's hit area on the DS: the game's circles of radius 16 around its point.
@@ -33,21 +32,18 @@ std::string Money(const RomData& rom, int amount) { return amount >= 0 ? MenuWor
 std::string RoomName(const RomData& rom, int place) { return MenuWords(rom, kStrBdPlaceBase + place); }
 std::string Where(const RomData& rom, int nameId) { return nameId >= 0 ? MenuWordsWith(rom, kStrBdWhere, MenuWords(rom, nameId)) : std::string(); }
 
-// The sum, one line: "§2,000 - §1,000 = §1,000" (the money, the permit, what is left; numbers
-// only: the game has no words for them).
-std::string Sum(const RomData& rom, int money, int price) { return Money(rom, money) + " - " + Money(rom, price) + " = " + Money(rom, money - price); }
-
-void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0, bool dim = false)
+// What is left after the permit, signed like InfoSum's receipt: "= §1,000", or "= -§500" when short.
+std::string Left(const RomData& rom, int money, int price)
 {
-    const FittedText f = FitLine(s, size, minSize, r.w, w);
-    UiItem t = TextItem(r, f.text, f.size, a, w);
-    t.wrap = false;
-    t.middle = true;
-    if (colour) t.colour = colour;
-    if (dim) { t.colour = kDim; t.shadowArgb = kDimShadow; }
-    t.layer = 1;
-    c.ui.push_back(t);
+    const int left = money - price;
+    return (left < 0 ? "= -" : "= ") + Money(rom, std::abs(left));
 }
+
+// The sum, one line: "§2,000 - §1,000 = §1,000" (the money, the permit, what is left, "= -§500"
+// when short; numbers only: the game has no words for them).
+std::string Sum(const RomData& rom, int money, int price) { return Money(rom, money) + " - " + Money(rom, price) + " " + Left(rom, money, price); }
+
+void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0) { PanelText(c, r, s, size, minSize, a, w, colour); }
 
 // A room's name over its place, left in `r` (a row or the chosen plate), its permit at the right.
 void RoomLines(Composition& c, const RomData& rom, const BuildEntry& e, Rect r, int priceW, bool focused = false)
@@ -109,8 +105,7 @@ void InfoSum(Composition& c, const RomData& rom, const BuildEntry& e, int money)
     rule.layer = 1;
     c.ui.push_back(rule);
     // What is left; short (the game refuses the room): the shortfall, red.
-    const int left = money - e.price;
-    Text(c, {x, y + 112, w, 48}, (left < 0 ? "= -" : "= ") + Money(rom, std::abs(left)), 32, 20, Align::Right, Weight::ExtraBold, left < 0 ? kPoorColour : kPriceColour);
+    Text(c, {x, y + 112, w, 48}, Left(rom, money, e.price), 32, 20, Align::Right, Weight::ExtraBold, money < e.price ? kPoorColour : kPriceColour);
 }
 
 // A page-1 button: a raised plate, the game's sprite 2x and its word.
@@ -144,6 +139,8 @@ MenuView BuildRoomsViewOf(ScreenState s, const GameState& game, const RomData* r
     const BuildState& b = game.build;
     if (s.screen != Screen::Build || !game.valid || !b.valid) return v;
     if (rom) v.title = MenuWords(*rom, kStrBdTitle);
+    v.page = b.page;
+    v.question = b.page == 1;
     const int count = (int)b.places.size();
     if (b.page == 0)
     {
@@ -176,7 +173,8 @@ MenuView BuildRoomsViewOf(ScreenState s, const GameState& game, const RomData* r
     }
     else
     {
-        // "Are you sure you want to buy this room?": the cross, the tick (the first focus).
+        // "Are you sure you want to buy this room?": the cross, the tick; the first focus the cross
+        // (No): a spend is never one press from the question.
         ViewItem cross;
         cross.rect = kBdCross;
         cross.id = kBdCrossId;
@@ -191,7 +189,7 @@ MenuView BuildRoomsViewOf(ScreenState s, const GameState& game, const RomData* r
         tick.next[0] = tick.next[1] = kNoMove;
         if (rom) tick.word = MenuWords(*rom, kStrBdYes);
         v.items.push_back(tick);
-        v.initial = 1;
+        v.initial = 0;
         v.back = cross.action; // (back to the list: not a close)
     }
     v.replay = false; // (a late press could buy: never replayed)
@@ -318,20 +316,10 @@ void BuildBuildRooms(Composition& c, const MenuView& v, int focus, const GameSta
 
 void MeasureBuild(const RomData& rom, BlockMeasure& m)
 {
-    auto note = [&](int id, bool shrunk, bool fits, int lines = 0) {
-        m.checked++;
-        if (shrunk) m.shrunk++;
-        if (lines > m.tallestLines) { m.tallestLines = lines; m.tallestId = id; }
-        if (!fits && std::find(m.cutIds.begin(), m.cutIds.end(), id) == m.cutIds.end()) { m.cut++; m.cutIds.push_back(id); }
-    };
-    auto line = [&](int id, const std::string& text, float size, float minSize, int width, Weight w = Weight::ExtraBold) {
-        const FittedText f = FitLine(text, size, minSize, width, w);
-        note(id, f.size < size, f.fits);
-    };
-    auto block = [&](int id, const std::string& text, float size, float minSize, Rect box) {
-        const FittedBlock f = FitBlock(text, size, minSize, box);
-        note(id, f.size < size, f.fits, f.lines);
-    };
+    const Measurer tally {m};
+    auto note = [&](int id, bool shrunk, bool fits, int lines = 0) { tally.Note(id, shrunk, fits, lines); };
+    auto line = [&](int id, const std::string& text, float size, float minSize, int width, Weight w = Weight::ExtraBold) { tally.Line(id, text, size, minSize, width, w); };
+    auto block = [&](int id, const std::string& text, float size, float minSize, Rect box) { tally.Block(id, text, size, minSize, box); };
     // Every room the game can list (the static room table's fourteen with a permit, in RAM:
     // kBdBuildable) in a row, the chosen plate and the sum; "(@1)" with every place's name (the
     // table's parents are the Atrium, the Basement and the 2nd Floor Lobby; any place is measured).
@@ -345,14 +333,14 @@ void MeasureBuild(const RomData& rom, BlockMeasure& m)
             const Rect r = priceW == 150 ? BuildRowRect(0) : kBdChosen;
             const int w = r.w - 84 - priceW - 16;
             if (room) line(id, name, kBdNameSize, kBdNameMin, w);
-            line(kStrBdWhere, where, kBdWhereSize, kBdWhereMin, w, Weight::Bold);
+            line(id, where, kBdWhereSize, kBdWhereMin, w, Weight::Bold);   // (noted under the place: each "(@1)" differs)
         }
         if (room)
         {
             const FittedBlock f = NameBlock(name, {0, 0, kBdInfo.w - 40, 84});
             note(id, f.size < kBdNameSize, f.fits, f.lines);
         }
-        block(kStrBdWhere, where, kBdWhereSize, kBdWhereMin, {0, 0, kBdInfo.w - 40, 64});
+        block(id, where, kBdWhereSize, kBdWhereMin, {0, 0, kBdInfo.w - 40, 64});
     }
     // The title beside the widest money (999,999, the game's cap); the prices (a permit is a u16);
     // the sums; the question; the buttons and the hints.

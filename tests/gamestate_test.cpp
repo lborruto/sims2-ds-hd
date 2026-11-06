@@ -778,6 +778,9 @@ static void hotel_block()
     GameState g = ReadGameState(hotel_ram(0x0213203C, -1).View());
     CHECK(g.hotel.valid && !g.checkIn.valid && !g.roomInfo.valid && !g.music.valid && !g.build.valid && !g.catalogue.valid && !g.stat.valid && !g.placement.valid);
 }
+static const u32 kGuestRooms[6] = {8, 29, 17, 15, 18, 20};   // the furniture records' place ids
+static const u32 kSongCodes[4] = {0x2B, 1, 3, 0x2A};
+
 static void registry_and_room()
 {
     Ram r = hotel_ram(0x0214A804, 4);
@@ -800,7 +803,7 @@ static void registry_and_room()
 
     // Room info: Small Guest Room (29) occupied by Sim 45 until day 3 of a made-up date, furniture 557 -> 2
     Ram q = hotel_ram(0x0214A9BC, 12);
-    for (u32 i = 0; i < 6; i++) q.W32(0x0211F9D4 + 4 * i, (u32[]){8, 29, 17, 15, 18, 20}[i]);
+    for (u32 i = 0; i < 6; i++) q.W32(0x0211F9D4 + 4 * i, kGuestRooms[i]);
     const u32 room1 = kGb + 0x41F8 + 0x58 * 1;
     q.W32(room1 + 0x54, 2); q.W8(room1, 86); q.W8(room1 + 4, 114);
     const u32 p86 = 0x02122A00 + 0x12 * (86 + 0x3B), p114 = 0x02122A00 + 0x12 * (114 + 0x3B);
@@ -825,7 +828,7 @@ static void registry_and_room()
 static void music_build_placement()
 {
     Ram r = hotel_ram(0x0214ABA8, 5);
-    for (u32 i = 0; i < 4; i++) { r.W8(0x0214ABBC + 4 * i, (u32[]){0x2B, 1, 3, 0x2A}[i]); r.W16(0x0214ABBC + 4 * i + 2, 100 + i); }
+    for (u32 i = 0; i < 4; i++) { r.W8(0x0214ABBC + 4 * i, kSongCodes[i]); r.W16(0x0214ABBC + 4 * i + 2, 100 + i); }
     r.W32(kS + 0x6C, 3); r.W32(kS + 0x74, 3); r.W32(kS + 0x28, 0); r.W32(kS + 0x70, 2);
     r.W8(kS + 0x2C, 0); r.W8(kS + 0x2D, 1); r.W8(kS + 0x2E, 2);
     r.W32(0x0213E580, 0x021A1000); r.W32(0x021A1000 + 0xF4, 4); r.W8(kGb + 0x449C + 4, 3);
@@ -852,6 +855,8 @@ static void music_build_placement()
     b.W32(kS + 0x3C, 0);
     b.W32(kS + 0x4C, 33); CHECK(!ReadGameState(b.View()).build.valid);
     b.W32(kS + 0x4C, 4); b.W32(kS + 0x40, 34); CHECK(!ReadGameState(b.View()).build.valid);
+    b.W32(kS + 0x40, 2); b.W16(0x0211F9EC + 4 * 4, 0); CHECK(!ReadGameState(b.View()).build.valid);   // a listed room always has a permit
+    b.W16(0x0211F9EC + 4 * 4, 1500); CHECK(ReadGameState(b.View()).build.valid);
 
     Ram p = hotel_ram(0x021351A8, -1);
     p.W32(kS + 8, 1); p.W32(kS + 0x24, 1); p.W32(kS + 0x5C, 1); p.W8(kS + 0x59, 0); p.W8(kS + 0x5A, 1); p.W32(kS + 0x6C, 3);
@@ -919,7 +924,7 @@ static void hotel_random()
     {
         const Kind k = kinds[round % 7];
         Ram r = hotel_ram(k.vt, k.ov);
-        for (u32 i = 0; i < 6; i++) r.W32(0x0211F9D4 + 4 * i, (u32[]){8, 29, 17, 15, 18, 20}[i]);
+        for (u32 i = 0; i < 6; i++) r.W32(0x0211F9D4 + 4 * i, kGuestRooms[i]);
         for (int i = 0; i < 300; i++)
         {
             const u32 areas[] = {kS, kS + 0x200, kGb + 0x41F8, kGb + 0x2BC0, kGb + 0x4400, kGb, kGb + 0x21DC, 0x0211F9EC, 0x0214ABBC, 0x0214A7A0};

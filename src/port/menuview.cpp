@@ -93,6 +93,7 @@ u64 MenuView::Hash() const
     MixAction(h, scrollDown);
     Mix(h, (u64)(u32)scrollGroup);
     Mix(h, ((u64)(u32)initial << 32) | (u32)selected);
+    Mix(h, ((u64)(u32)page << 1) | (u64)question);
     MixText(h, title);
     Mix(h, ((u64)own << 2) | ((u64)popup << 1) | (u64)backCloses);
     Mix(h, passKeys);

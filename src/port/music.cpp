@@ -23,16 +23,7 @@ constexpr u32 kIconWell = 0xFF5961A2;                              // the game's
 
 int Rows(const MusicState& m) { return std::min((int)m.list.size(), kMuRows); }
 
-void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0)
-{
-    const FittedText f = FitLine(s, size, minSize, r.w, w);
-    UiItem t = TextItem(r, f.text, f.size, a, w);
-    t.wrap = false;
-    t.middle = true;
-    if (colour) t.colour = colour;
-    t.layer = 1;
-    c.ui.push_back(t);
-}
+void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0) { PanelText(c, r, s, size, minSize, a, w, colour); }
 }
 
 std::string SongName(const RomData& rom, const SongRow& s)
@@ -178,20 +169,10 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
 
 void MeasureMusic(const RomData& rom, BlockMeasure& m)
 {
-    auto note = [&](int id, bool shrunk, bool fits, int lines = 0) {
-        m.checked++;
-        if (shrunk) m.shrunk++;
-        if (lines > m.tallestLines) { m.tallestLines = lines; m.tallestId = id; }
-        if (!fits && std::find(m.cutIds.begin(), m.cutIds.end(), id) == m.cutIds.end()) { m.cut++; m.cutIds.push_back(id); }
-    };
-    auto line = [&](int id, const std::string& text, float size, float minSize, int width, Weight w = Weight::ExtraBold) {
-        const FittedText f = FitLine(text, size, minSize, width, w);
-        note(id, f.size < size, f.fits);
-    };
-    auto block = [&](int id, const std::string& text, float size, float minSize, Rect box) {
-        const FittedBlock f = FitBlock(text, size, minSize, box);
-        note(id, f.size < size, f.fits, f.lines);
-    };
+    const Measurer tally {m};
+    auto note = [&](int id, bool shrunk, bool fits, int lines = 0) { tally.Note(id, shrunk, fits, lines); };
+    auto line = [&](int id, const std::string& text, float size, float minSize, int width, Weight w = Weight::ExtraBold) { tally.Line(id, text, size, minSize, width, w); };
+    auto block = [&](int id, const std::string& text, float size, float minSize, Rect box) { tally.Block(id, text, size, minSize, box); };
     const Rect row = MusicRowRect(0);
     const int iw = kMuInfo.w - 40;
     line(kStrMuTitle, MenuWords(rom, kStrMuTitle), kPmTitleSize, kPmTextMin, kMuClose.x - 16 - (kMuTitle.x + 24));

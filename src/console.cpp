@@ -108,6 +108,19 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
     c.overlays[box].to.h = std::min(y - kHintGap + kHintPad - kHintBox.y, kHintBox.h);
 }
 
+// The cursor's hint box at y: the text with its shadow (TextRect) and, on each side, the padding
+// and the box's 4-pixel border; centred, or (right) at the canvas's right edge, clear of the HD
+// status bar under the touch screen. Kept on the canvas.
+static void AddCursorHint(Composition& c, int y, bool right = false)
+{
+    constexpr int border = 4;
+    const Rect t = TextRect(0, 0, kFrontHint, 3);
+    const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset, bx = right ? kConsoleW - bw - 24 : (kConsoleW - bw) / 2;
+    y = std::min(y, kConsoleH - bh - 4);
+    c.overlays.push_back({{bx, y, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
+    c.overlays.push_back(Text(bx + inset, y + inset, kFrontHint, 3));
+}
+
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
                          const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed)
 {
@@ -130,13 +143,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.overlays.push_back(FrameAround(kFrontBottomTo, 0));
         c.pieces.push_back({Src::Top, {0, 0, topW, topH}, topTo});
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kFrontBottomTo));
-        // The hint's box: the text with its shadow (TextRect) and, on each side, the padding and
-        // the box's 4-pixel border, centred.
-        constexpr int border = 4;
-        const Rect t = TextRect(0, 0, kFrontHint, 3);
-        const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset, bx = (kConsoleW - bw) / 2;
-        c.overlays.push_back({{bx, kFrontHintY, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
-        c.overlays.push_back(Text(bx + inset, kFrontHintY + inset, kFrontHint, 3));
+        AddCursorHint(c, kFrontHintY);
     }
     else if (MenuView v = ConsoleView(s, game, rom); v.valid && (v.own || (s.screen == Screen::Panel && menuOpen)))
     {
@@ -188,7 +195,11 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         world.touch = false;
         c.pieces.push_back(world);
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
-        if (cursorScreen) c.overlays.push_back(FrameAround(kMenuTo, 1));
+        if (cursorScreen)
+        {
+            c.overlays.push_back(FrameAround(kMenuTo, 1));
+            AddCursorHint(c, kMenuTo.y + kMenuTo.h + 10, true);   // (a controller player: how to leave, as on the title)
+        }
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
         // Not dimmed: the game keeps its status bar up while the touch screen is used.
         if (bar) AddStatusBar(c, *hud, *strings);

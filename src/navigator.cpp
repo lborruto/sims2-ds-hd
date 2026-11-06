@@ -48,13 +48,6 @@ Mode ModeOf(Screen s, bool menuOpen)
 }
 
 bool Up(const PadState& p) { return p.up || p.ly < -kStick; }
-// Whether a view holds an item of the module `tag` (an id's top bits).
-bool HasModule(const MenuView& v, u32 tag)
-{
-    for (const ViewItem& it : v.items)
-        if (it.id >> 24 == tag) return true;
-    return false;
-}
 bool Down(const PadState& p) { return p.down || p.ly > kStick; }
 bool Left(const PadState& p) { return p.left || p.lx < -kStick; }
 bool Right(const PadState& p) { return p.right || p.lx > kStick; }
@@ -244,6 +237,14 @@ void Navigator::Move(ScreenState s, int dx, int dy)
     focus_ = index[Neighbour(list, from, dx, dy)];
 }
 
+// Whether a view holds an item of the module `tag` (an id's top bits).
+static bool HasModule(const MenuView& v, u32 tag)
+{
+    for (const ViewItem& it : v.items)
+        if (it.id >> 24 == tag) return true;
+    return false;
+}
+
 int Navigator::Arrive(const MenuView& v) const
 {
     // Another screen module on the same screen (the Registry and its room info, both Unknown):
@@ -300,6 +301,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         running_.clear(); // (and an action running)
         pendingDir_ = -1;
         viewHash_ = 0;
+        viewPage_ = 0;
+        viewQuestion_ = false;
+        pageKeptId_ = 0;
         armed_ = 0; // (an armed X belongs to the screen or tab it was pressed on)
         for (u32& id : moduleId_) id = 0; // (the modules' last focus belongs to their screen)
     }
@@ -319,9 +323,17 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     const bool viewChanged = useView && viewHash != viewHash_;
     if (useView && viewChanged && viewHash_ != 0 && focus_ >= 0)
     {
-        // Another screen module on the same screen, no popup coming or going (the Registry's room
-        // info): the focus starts again there (below: its last item, else its first).
-        if (!popupNow && !popupUp_ && !view_->items.empty() && !HasModule(*view_, focusId_ >> 24)) focus_ = -1;
+        // Another page of the screen (Build Rooms' question), or another screen module on the same
+        // screen (the Registry's room info), no popup coming or going: the focus starts again there
+        // (below: the page's first item; the module's last item, else its first).
+        if (!popupNow && !popupUp_ && view_->page != viewPage_)
+        {
+            if (!viewQuestion_) pageKeptId_ = focusId_;
+            focus_ = -1;
+            for (int i = 0; i < (int)view_->items.size() && !view_->question && pageKeptId_; i++)
+                if (view_->items[i].id == pageKeptId_ && view_->items[i].enabled) focus_ = i;
+        }
+        else if (!popupNow && !popupUp_ && !view_->items.empty() && !HasModule(*view_, focusId_ >> 24)) focus_ = -1;
         else focus_ = MenuKeep(*view_, focusId_, focus_);
     }
     if (!useView && viewFocus_) focus_ = -1; // (an index of the view means nothing to HotspotsFor)
@@ -514,6 +526,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             focusId_ = focus_ >= 0 ? view_->items[focus_].id : 0;
             if ((focusId_ >> 24) < 16) moduleId_[focusId_ >> 24] = focusId_;
             viewHash_ = view_->Hash();
+            viewPage_ = view_->page;
+            viewQuestion_ = view_->question;
         }
         else if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);
         break;
@@ -542,6 +556,9 @@ void Navigator::Leave(TouchScript& touch)
     view_ = nullptr;
     viewFocus_ = false;
     viewHash_ = 0;
+    viewPage_ = 0;
+    viewQuestion_ = false;
+    pageKeptId_ = 0;
     armed_ = 0;
     popupUp_ = resumeMenu_ = resumeValid_ = restore_ = false;
     screen_ = ScreenState();

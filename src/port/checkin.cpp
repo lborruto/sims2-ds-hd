@@ -56,16 +56,7 @@ std::string Status(const RomData& rom, const RegistryRow& r)
 // Whether A performs on the row: the game's own rule per mode.
 bool Takes(const CheckInState& ci, const RegistryRow& r) { return ci.mode == 1 ? r.infoOk : r.available; }
 
-void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0)
-{
-    const FittedText f = FitLine(s, size, minSize, r.w, w);
-    UiItem t = TextItem(r, f.text, f.size, a, w);
-    t.wrap = false;
-    t.middle = true;
-    if (colour) t.colour = colour;
-    t.layer = 1;
-    c.ui.push_back(t);
-}
+void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0) { PanelText(c, r, s, size, minSize, a, w, colour); }
 
 // A room's picture in `box`: the occupant's portrait (the game's own row button, live) at `scale`,
 // else the game's key (frame 0) or its silhouette (frame 1, not built).
@@ -248,20 +239,10 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
 
 void MeasureCheckIn(const RomData& rom, BlockMeasure& m)
 {
-    auto note = [&](int id, bool shrunk, bool fits, int lines = 0) {
-        m.checked++;
-        if (shrunk) m.shrunk++;
-        if (lines > m.tallestLines) { m.tallestLines = lines; m.tallestId = id; }
-        if (!fits && std::find(m.cutIds.begin(), m.cutIds.end(), id) == m.cutIds.end()) { m.cut++; m.cutIds.push_back(id); }
-    };
-    auto line = [&](int id, const std::string& text, float size, float minSize, int width, Weight w = Weight::ExtraBold) {
-        const FittedText f = FitLine(text, size, minSize, width, w);
-        note(id, f.size < size, f.fits);
-    };
-    auto block = [&](int id, const std::string& text, float size, float minSize, Rect box) {
-        const FittedBlock f = FitBlock(text, size, minSize, box);
-        note(id, f.size < size, f.fits, f.lines);
-    };
+    const Measurer tally {m};
+    auto note = [&](int id, bool shrunk, bool fits, int lines = 0) { tally.Note(id, shrunk, fits, lines); };
+    auto line = [&](int id, const std::string& text, float size, float minSize, int width, Weight w = Weight::ExtraBold) { tally.Line(id, text, size, minSize, width, w); };
+    auto block = [&](int id, const std::string& text, float size, float minSize, Rect box) { tally.Block(id, text, size, minSize, box); };
     const Rect row = CheckInRowRect(0);
     const int rowW = row.w - 88 - 16, ix = kCiInfo.w - 40;
     // The title beside the widest score (100 %); a check-in's title with every guest's name.

@@ -315,4 +315,33 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     // layer 1 items above), each layer in the order given; the images after them.
     SortUi(c.ui, first);
 }
+
+void PanelText(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour)
+{
+    const FittedText f = FitLine(s, size, minSize, r.w, w);
+    ui::UiItem t = ui::TextItem(r, f.text, f.size, a, w);
+    t.wrap = false;
+    t.middle = true;
+    if (colour) t.colour = colour;
+    t.layer = 1;
+    c.ui.push_back(t);
+}
+
+void Measurer::Note(int id, bool shrunk, bool fits, int lines) const
+{
+    m.checked++;
+    if (shrunk) m.shrunk++;
+    if (lines > m.tallestLines) { m.tallestLines = lines; m.tallestId = id; }
+    if (!fits && std::find(m.cutIds.begin(), m.cutIds.end(), id) == m.cutIds.end()) { m.cut++; m.cutIds.push_back(id); }
+}
+void Measurer::Line(int id, const std::string& text, float size, float minSize, int width, ui::Weight w) const
+{
+    const FittedText f = FitLine(text, size, minSize, width, w);
+    Note(id, f.size < size, f.fits);
+}
+void Measurer::Block(int id, const std::string& text, float size, float minSize, Rect box) const
+{
+    const FittedBlock f = FitBlock(text, size, minSize, box);
+    Note(id, f.size < size, f.fits, f.lines);
+}
 }

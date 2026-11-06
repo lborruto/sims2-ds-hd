@@ -658,6 +658,8 @@ int main(int argc, char** argv)
             }
             {   // room info's hint: which line the stylus opened it on (not in RAM), kept while it is up
                 RoomInfoState& ri = app.game.roomInfo;
+                // (a touch before the room info rose opened it, or something else: never a line's)
+                if (ri.valid && !before.roomInfo.valid) lastTouchX = lastTouchY = -1;
                 if (ri.valid && ri.hint)
                     ri.hintId = before.roomInfo.valid && before.roomInfo.hint && before.roomInfo.hintId >= 0 ? before.roomInfo.hintId
                                 : lastTouchX >= 0 ? RoomInfoHintAt(lastTouchX, lastTouchY, ri.occupied) : -1;

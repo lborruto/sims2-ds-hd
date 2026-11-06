@@ -102,6 +102,12 @@ struct MenuView
     int scrollGroup = 0;
     // The item focused when the screen opens (an index; -1: the first enabled one).
     int initial = -1;
+    // The screen's page (Build Rooms' list / its question). When it changes, a `question` page's
+    // focus starts on `initial` (never on the old index: a question must not open on Yes because
+    // the list's second row was focused), and any other page's goes back to the item it was left
+    // on (by id: the room the question was about), else `initial`.
+    int page = 0;
+    bool question = false;
     // A selection the game owns (Relationships' Sim, the phone's row): when >= 0 and enabled, the
     // focus is held on that item while it is in the list (scrollGroup), and every Up / Down there
     // performs scrollUp / scrollDown (the game's own buttons move its selection; the rebuilt view

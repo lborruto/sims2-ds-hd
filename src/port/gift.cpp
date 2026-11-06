@@ -156,7 +156,7 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
 
     // Images: the items, the bow (the game's sprite), the portrait (live).
     for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++)
-        AddSpriteIcon(c, icons, inv.slots[i].iconRes, 0, 3, SlotRect(i), v.items[i].enabled ? 0 : 0x60000000);
+        AddSpriteIcon(c, icons, inv.slots[i], 3, SlotRect(i), v.items[i].enabled ? 0 : 0x60000000);
     AddSpriteIcon(c, icons, kSprBow, 0, 2, kGiftBowIcon, canGive ? 0 : 0x60000000);
     if (bottom)
     {
