@@ -21,18 +21,25 @@ struct Video
     struct OverlayTex { Overlay o; int w, h; SDL_Texture* tex; };
     std::vector<OverlayTex> overlayTex;
     SDL_Texture* OverlayTexture(const Overlay& o, int w, int h);
-    // The composition's UI (ui/kit.h) at output size: the still items' layer over their bounds,
-    // made again only when its hash (items, size, place) changes; the pictures (live crops) each
-    // over their own bounds in their own texture, made again when that picture's pixels change.
-    // The UI's still layers (ui::LayersAt), each kept until its own items change.
-    struct StillTex { SDL_Texture* tex; int w, h; u64 hash; };
-    std::vector<StillTex> uiStill;
-    struct ImageTex { SDL_Texture* tex; int w, h; u64 hash; };
-    std::vector<ImageTex> uiImages;
-    // The shell's (shell.h) layers, kept apart from the game's.
-    std::vector<StillTex> shellStill;
-    std::vector<ImageTex> shellImages;
-    void DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, std::vector<StillTex>& still, std::vector<ImageTex>& images);
+    // The composition's UI (ui/kit.h) at output size: each layer of ui::LayersAt kept by a
+    // ui::LayerCache (a still layer drawn again only where its items changed, a picture when its
+    // pixels change) in a texture of its own, uploaded where it was drawn again. The live crops of
+    // the touch screen at a whole factor (the HD menus' portraits, the phone) are drawn by the GPU
+    // from `cropTex` (nearest: the same pixels the kit's scaler gives there), not rastered.
+    struct UiTexture { SDL_Texture* tex = nullptr; int w = 0, h = 0; };
+    struct UiCache
+    {
+        ui::LayerCache layers;
+        std::vector<std::pair<u64, UiTexture>> tex; // by LayerCache::Entry::id
+    };
+    UiCache uiCache, shellCache; // the game's UI; the shell's, kept apart
+    SDL_Texture* cropTex = nullptr;
+    void DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, UiCache& cache, const u32* bottom);
+    // The composition last shown (Present): what the mouse reads (TouchAt, OverTop) until the
+    // next one, rather than composing it again per event.
+    Composition lastShown;
+    bool haveLastShown = false;
+    const Composition& ShownComposition(const App& app, Composition& scratch) const;
     bool smooth = false;
     // A short HD message over the picture (a controller connected: how to pause), at the top of
     // the canvas in the kit's panel and Nunito, until toastUntil (SDL ticks).

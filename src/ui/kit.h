@@ -127,6 +127,16 @@ void Layers(const std::vector<UiItem>& items, std::vector<UiItem>& still, std::v
 // on argb pixel ((cx - ox) * scale, (cy - oy) * scale). scale: output pixels per canvas pixel.
 // The still items first, then the images (Layers).
 void Rasterise(const std::vector<UiItem>& items, float scale, u32* argb, int w, int h, float ox = 0, float oy = 0);
+// The same raster's pixels inside `clip` alone (the others left as they are): byte for byte what
+// the whole raster gives there. Drawn in bands on a few threads (the bands are independent: the
+// same bytes on any number of threads); the font's part (text masks, kept by what makes them) on
+// the calling thread first.
+void Rasterise(const std::vector<UiItem>& items, float scale, u32* argb, int w, int h, float ox, float oy, Rect clip);
+// The raster's threads: 0 as many as the machine has (8 at most), 1 the calling thread alone (the
+// checks compare the two).
+void SetRasterThreads(int n);
+// Forgets the text masks kept (the checks: a mask drawn again is the same bytes).
+void ClearTextMasks();
 
 // What the window and --compose both draw: each still layer (by `layer`, ascending) over its
 // bounds, then each image over its own, as whole output pixels (x, y, w, h) for a canvas whose origin is output pixel
@@ -142,6 +152,39 @@ struct LayerAt
     float ox, oy;
 };
 std::vector<LayerAt> LayersAt(const std::vector<UiItem>& items, float scale, float originX, float originY);
+
+// What the window keeps of LayersAt between frames (Video::DrawUi; tests/ui_bench.cpp measures
+// it): each layer's pixels, made again only when what draws them changes. No SDL here.
+struct LayerCache
+{
+    struct Entry
+    {
+        u64 id = 0;                 // this layer's, for its life (a new one: drawn whole)
+        bool still = true;
+        int layer = 0;              // a still layer's number (UiItem::layer)
+        int x = 0, y = 0, w = 0, h = 0;
+        u64 hash = 0;               // its items, place, size and scale (0: nothing drawn yet)
+        std::vector<u32> px;        // w x h, straight alpha (empty when `direct`)
+        bool changed = false;       // drawn again by the last Update: the window uploads `dirty`
+        std::vector<Rect> dirty;    // what the last Update drew again (layer pixels)
+        bool direct = false;        // a picture the caller draws itself (`image`; no pixels here)
+        UiItem image;               // (a picture's item)
+        float ox = 0, oy = 0;       // the layer's canvas origin (LayerAt::ox / oy)
+        float scale = 0;
+        std::vector<u64> itemHash;  // each item's hash as drawn: what the next Update compares
+        std::vector<Rect> itemBox;  // each item's pixels (layer pixels, with room for its shadow)
+    };
+    std::vector<Entry> entries;     // in drawing order, as LayersAt gives them
+    // direct: whether the caller draws this picture itself (the window: a live crop at a whole
+    // factor, from its own texture); null: every picture rastered here.
+    using Direct = bool (*)(const UiItem& image, const LayerAt& at, void* user);
+    void Update(const std::vector<UiItem>& items, float scale, float originX, float originY, Direct direct = nullptr, void* user = nullptr);
+};
+
+// Whether a picture (an image layer of LayersAt at `scale`) is drawn by the kit's scaler as
+// nearest alone: opaque, its rectangle inside the picture, scaled by a whole factor to whole
+// pixels. The window draws such a live crop with the GPU (nearest) rather than rastering it.
+bool WholeFactorCrop(const UiItem& image, const LayerAt& at, float scale);
 
 // A demonstration of the kit (--ui-demo): a panel, text, every chip and a live crop of `bottom`
 // (the DS's touch screen, 256 x 192; null: none).
