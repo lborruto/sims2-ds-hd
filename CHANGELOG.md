@@ -75,6 +75,17 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The hotel's vacuum: AUTO shows its bowl big, with the world beside it, clogged or not; the
   blow key (M) clears its clogged filter.
 
+- Every minigame on the controller, in an HD frame of its own: the game's name, its numbers
+  (the cards' score board, the vacuum's earnings, the Alien Autopsy's organs, the Metal Detector's
+  charge, signal and depth, the painting's tool and colour, Moogoo Monkey's round and fruit, the
+  Super Drencher's water and pressure, the lottery ticket's boxes, the music mixer's song and tracks)
+  and a bar of the buttons' hints in the game's five languages that follows what the game asks.
+  The Alien Autopsy, the Metal Detector and the Art Gallery have a pointer on the sticks (LT slows
+  it, A holds the stylus down); Moogoo Monkey a green ring on what A touches; the Drencher, the
+  Rat-A-Rang, the lottery, the mixer and its save page their own buttons. Every one can be left
+  with a button. New checks: `--print-minigame`, the minigames' reader from memory, `MAX_SIMS`
+  (the emulators a check runs at once, 4).
+
 ### Fixed
 
 - A quick click or a trackpad tap on the touch screen was often lost (the button went down and

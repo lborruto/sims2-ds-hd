@@ -164,7 +164,7 @@ hangs up. **A conversation** goes on with A. **Popups** (tips, goals, Game Pause
 B; a question (Quit?) takes A for yes and B for no; when a popup opens over the menu, the menu
 comes back on the same row after it. A note closes on A or B.
 
-**The activities** are played on the buttons too, with a box of hints beside them:
+**The activities** are all played on the buttons, each in its own HD frame with the buttons' hints in a bar below (they follow what the game asks):
 
 | Activity | Key | Controller | Does |
 |---|---|---|---|
@@ -186,21 +186,21 @@ comes back on the same row after it. A note closes on A or B.
 | | Q | LB | carry the organ to the tray (the parasite to the flask) |
 | | Z twice | B twice | quit (the game pays nothing then) |
 | Metal Detector | Arrows | left stick or D-pad | walk |
-| | X / Z | A / B | dig / switch it off |
+| | X / Z | A / B | dig / switch it off (the "Found" card goes by itself) |
 | | Q / W | LB / RB, right stick | depth |
 | Painting | Q / W | LB / RB | the previous / next tool |
 | | S / A | X / Y | the next color / undo |
 | | Z | B | done (then X / A: yes, Z / B: no) |
 | Moogoo Monkey | Left / Right | D-pad or left stick | on your turn: choose the monkey to bet on, the card to play, the monkey a special card goes on (a green ring shows it) |
 | | X | A | bet, play the card; otherwise go on (the rules, the banners, the number of players) |
-| | Z | B | take the bet or the special card back; else quit (then X / A: yes, Z / B: no) |
+| | Z | B | take the bet or the special card back; else quit (then X / A: yes, Z / B: no); a bet placed or a card picked: undo |
 | | Enter | Start | quit |
 | Super Drencher | Arrows | left stick or D-pad | walk |
 | | X (hold) | A (hold) | fire |
 | | S (hold) | X (hold) | pump |
 | | A / W | Y / RB | target / refill |
 | | Q | LB | run |
-| | Z | B | put it away |
+| | Z | B | put it away (if you opened the game's help with the mouse: any button closes its text, B leaves help) |
 | Rat-A-Rang | Arrows | left stick or D-pad | walk |
 | | S / A | X / Y | scare / subdue |
 | | X (hold) + arrows | A (hold) + a stick or the D-pad | aim; let go to throw |
@@ -222,8 +222,9 @@ comes back on the same row after it. A note closes on A or B.
 | | A / Z | Y / B | erase a letter / back to the mixer |
 
 <p align="center">
-  <img src="docs/screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big at the left, the world small at the top right, the buttons' hints below it" width="440">
-  <img src="docs/screenshots/console-vacuum.webp" alt="CONSOLE: the hotel's vacuum big, with its hints" width="440">
+  <img src="docs/screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big in its frame, the world small at the top right with the score board under it, the buttons' hints in a bar below" width="440">
+  <img src="docs/screenshots/console-autopsy.webp" alt="CONSOLE: the Alien Autopsy big with its pointer, the organs' health at the right, the buttons' hints in a bar below" width="440">
+  <img src="docs/screenshots/console-vacuum.webp" alt="CONSOLE: the hotel's vacuum big in its frame, its earnings at the right, the hints below" width="440">
 </p>
 
 The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another

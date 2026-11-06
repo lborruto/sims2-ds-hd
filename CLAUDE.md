@@ -162,6 +162,15 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   sessions, 20 a run, 200 in all. It writes nothing on another ROM and, headless, nothing without
   `--record-dir`. A capture's `.st` holds the game's memory: never commit or attach one; the
   `.png` is what a player sends.
+- Known limits of the minigames (milestone 6): (1) MooGoo Monkey, the crime game, the Scratch lottery, the mixer and
+  its save page were reached on the research's patched states only (the casino's Monkey Day, the Ratticator costume
+  and the lounge's keyboard are not in the complete save), and no goon was near in any state: a hit, the lit crime
+  buttons and the subdue are the game's own code only. (2) The pointer's feel on a real stick (the curve, 5 pixels
+  a frame, LT slow) is untested on hardware. (3) The social game has no part in RAM: its answers' words are live
+  crops, its title plate none. (4) The wireless lobby (trading) needs a second DS: a note only. (5) The painting's
+  palette page arrows and the Drencher's help are the mouse's. (6) The wide frame's top screen of the cards keeps
+  the game's 4:3 with black sides (the game draws it so). (7) A mouse click on an animation's row of the HD menu does not also close the menu (the controller's A does). (8) The hints are the port's own translations of five
+  languages, short; a word that does not fit shrinks, then is cut (`--measure-menu` reports the lines).
 - Known limits of CONSOLE's RAM-led screen: (1) quitting the cards shows about 10 frames of the
   cards' layout over black (the pixels go black before RAM leaves Cards); (2) a goal popup over
   the Options tab reads Unknown (the stick cursor) only without its HD view (`--no-romdata`): with it, every popup over
@@ -554,11 +563,15 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   game's D-pad (the hero walks); A taps dig (180,152), B power (78,152: off, then the panel); LB /
   RB (`kKnobStep` 1.5 a frame) or the right stick (`kKnobStick` 3) press the slider's knob where
   RAM puts it (x 195, y 33 + 88 × value / 4096), 2 frames still, then move it, and let go when
-  released (no pointer drawn). Painting: LB / RB tap the previous / next of the ten tool buttons
+  released (no pointer drawn). The "Found:" card (state 5) ends by itself after about 125 frames (checked
+  in game: A, B, a touch and walking change nothing but the dig and power buttons), so no button is bound to it;
+  the game leaves the card flag set in state 3, so `DetectorState::card` is read in state 5 only. Painting: LB / RB tap the previous / next of the ten tool buttons
   (`ArtTool`: 14, 14 + 26 b for b < 6, else 241, 66 + 26 (b − 6)), X the next swatch of the page
   (`ArtSwatch`: 55 + 25 i, 165 for i < 7, else 43 + 25 (i − 7), 187), Y undo (241,40), B the game's
   X (241,14) → its popup "Are you done painting?" (kind 2, read by `GameState::town.popup`), on
-  which A taps the tick and B the cross (`PopupButton`), the rest waiting. Checked in game by
+  which A taps the tick and B the cross (`PopupButton`), the rest waiting (`ActivityRam::askUp`: the question is up,
+  opening, shown or closing, and the painting waits; `ask`: shown, the buttons live and tapped). The palette page
+  arrows stay the mouse's. Checked in game by
   `console_check.sh`'s `mg-*` runs (below). The pointer's feel on a real stick is not checked on
   hardware.
 - The timing minigames (`activities.cpp`, milestone 6; `Screen::MooGoo`, `Drencher`, `Crime`, from RAM
@@ -573,14 +586,16 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   monkey alive with a free slot (`MooGooMonkeyRect`), sub 3 a card of the hand (from the game's
   selected one; `MooGooCardRect`), sub 5 a monkey's pile (alive; one with cards first: King
   Gorilla's needs one; `MooGooPileRect`); Left / Right skip the others, A taps the middle; B is the
-  game's own in 3 and 5 (the bet undone, the card put back), else the game's X (241,177) like Start:
+  game's own in 2 to 5 of a human's turn (the bet undone, the card put back; the focus restarts at each step:
+  the hand from the game's selected card, a monkey from the first), else the game's X (241,177) like Start (also when
+  MooGoo's part does not read: the controller can always leave):
   its question "Are you sure you want to quit?" (A Yes 96,96, B No 160,96). A full round on A alone
   (every 30 frames) takes about 5400 frames: the AI's 30-frame steps. The Super Drencher (Pockets'
   hand): the game's D-pad walks, its A fires (water -0.1, pressure -0.5 a tick: 125 to 25 in 400
   frames), LB its B (run); X held pumps: the stylus on row 120 swept 8 pixels a frame between 52 and
   228 (the game adds |dx| / 10 a tick past 5 pixels): 25 to 125 in about 140 frames; Y the target
   (locks the nearest: the casino's cards table, object 29), RB refill, B its X (the panel); its help
-  (?) is left to the mouse. The crime game (the panel's Ratarang button with the Ratticator's
+  (?) opens with the mouse only: while it is up B taps the "?" (88,176) to leave, and a help text closes on any press. The crime game (the panel's Ratarang button with the Ratticator's
   costume: reached only on the research's patched states, and no goon near in any state, so a hit,
   the lit buttons and the subdue are the game's code only): A held presses the centre rat (128,96),
   then a stick or the D-pad (the pointer's `MovePointer`, at most 3 pixels a frame) slides it along
