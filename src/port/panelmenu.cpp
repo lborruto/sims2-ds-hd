@@ -5,9 +5,12 @@
 #include <cmath>
 
 #include "hotspots.h"
+#include "port/goals.h"
 #include "port/icons.h"
 #include "port/interact.h"
+#include "port/options.h"
 #include "port/pockets.h"
+#include "port/relations.h"
 #include "port/statusbar.h"
 #include "romdata.h"
 
@@ -178,7 +181,19 @@ MenuView PanelMenuViewOf(ScreenState s, const GameState& game, const RomData* ro
         if (!game.town.inventory.valid || !game.town.pockets.valid) return v;
         AddPocketsView(v, game.town.inventory, game.town.pockets, rom);
         break;
-    default: return v; // (the other tabs: milestone 1's composition until they are redrawn)
+    case Tab::Goals:
+        if (!game.town.goals.valid) return v;
+        AddGoalsView(v, game.town.goals, rom);
+        break;
+    case Tab::Relationships:
+        if (!game.town.relations.valid) return v;
+        AddRelationsView(v, game.town.relations, rom);
+        break;
+    case Tab::Options:
+        if (!game.town.options.valid) return v;
+        AddOptionsView(v, game.town.options, rom);
+        break;
+    default: return v; // (no tab: milestone 1's composition)
     }
     // The phone button, after the tab's own items (the first focus is the tab's), linked to them
     // explicitly: the geometry alone puts it at the edge of the 60° cone from the rows.
@@ -257,6 +272,9 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     // The tab's content.
     if (s.tab == Tab::Interact) BuildInteract(c, v, focus, game, rom, icons, bottom);
     else if (s.tab == Tab::Pockets) BuildPockets(c, v, focus, game, rom, icons, bottom);
+    else if (s.tab == Tab::Goals) BuildGoals(c, v, focus, game, rom, bottom);
+    else if (s.tab == Tab::Relationships) BuildRelations(c, v, focus, game, rom, bottom);
+    else if (s.tab == Tab::Options) BuildOptions(c, v, focus, game, rom);
 
     // The hints: A (the focused item's own word when it has one), B closes.
     int right = kPmHints.x + kPmHints.w - 8;
@@ -269,8 +287,11 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     if (MenuFocusable(v, focus) && !v.items[focus].buttonX.empty())
     {
         const FittedText x = FitLine(v.items[focus].xWord, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
-        AddHint(c, right, Button::X, x.text);
+        right = AddHint(c, right, Button::X, x.text);
     }
+    // The D-pad, its chip alone, while Up / Down move a selection the game owns (Goals,
+    // Relationships: the game's own arrows).
+    if (MenuFocusable(v, v.selected) && (!v.scrollUp.empty() || !v.scrollDown.empty())) AddHint(c, right, Button::DPad, "");
 
     // The icons (images: drawn above the still layers): the five tabs, the selected one green.
     if (icons)

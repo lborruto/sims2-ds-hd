@@ -1161,9 +1161,74 @@ static void view_item_x_and_gift()
     CHECK(q.Touched(x, y) && x == 235 && y == 19);
 }
 
+// The HD Save slots (a valid view, no menu to open): a focus screen, not the stick cursor's; A
+// taps the focused slot's tick, B the game's X. Without a view: the cursor's, as before. Options'
+// slider: Left / Right drag the game's knob (its own actions), not a focus move.
+static void view_save_slots_and_slider()
+{
+    const ScreenState slots {Screen::SaveSlots, Tab::None};
+    MenuView v;
+    v.valid = true;
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {200, 124 + i * 156, 880, 142};
+        it.action = {TapStep(232, 67 + 46 * i)};
+        it.id = 0x610 + (u32)i;
+        v.items.push_back(it);
+    }
+    v.back = {TapStep(232, 22)};
+    v.initial = 2;
+    Rig r;
+    r.view = &v;
+    r.Frame(slots);
+    CHECK(r.nav.Focus() == 2 && !r.nav.CursorScreen());
+    r.Press(slots, &PadState::up);
+    CHECK(r.nav.Focus() == 1);
+    r.Press(slots, &PadState::a);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 232 && y == 113);
+    r.Drain();
+    r.Frame(slots);
+    r.Press(slots, &PadState::b);
+    CHECK(r.Touched(x, y) && x == 232 && y == 22);
+    Rig c; // no view: the stick cursor's screen, A stays the DS's without a cursor
+    c.Frame(slots);
+    CHECK(c.nav.CursorScreen());
+
+    const ScreenState opt {Screen::Panel, Tab::Options};
+    MenuView o;
+    o.valid = true;
+    ViewItem save;
+    save.rect = {200, 206, 432, 80};
+    save.action = {TapStep(57, 44)};
+    o.items.push_back(save);
+    ViewItem music;
+    music.rect = {200, 302, 880, 130};
+    music.left = {DragStep(232, 121, 216, 121)};
+    music.next[0] = 0;
+    o.items.push_back(music);
+    save.next[1] = 1;
+    o.items[0].next[1] = 1;
+    Rig q;
+    q.view = &o;
+    q.Frame(opt);
+    q.Press(opt, &PadState::menu);
+    q.Press(opt, &PadState::down);
+    CHECK(q.nav.Focus() == 1);
+    q.Press(opt, &PadState::left);
+    int x0, y0, x1, y1;
+    CHECK(q.Path(x0, y0, x1, y1) && x0 == 232 && y0 == 121 && x1 == 216 && y1 == 121);
+    q.Drain();
+    q.Frame(opt);
+    q.Press(opt, &PadState::right); // nothing to drag that way: no touch, the focus stays
+    CHECK(!q.touch.Owns() && q.nav.Focus() == 1);
+}
+
 int main()
 {
     menu_opens_and_closes();
+    view_save_slots_and_slider();
     dpad_moves_focus();
     a_taps_focused();
     lb_rb_tap_tabs();

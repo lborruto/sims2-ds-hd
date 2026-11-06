@@ -20,7 +20,9 @@
 #   top right, the hints' box; s2, s3, s4 (the main menu, Create-a-Sim, Keep this Sim?: no HUD):
 #   the front end's view, the top screen framed at the left at its shape and the touch screen
 #   2.5x framed at the right, the buttons' hint below, never SIDE; slots (sit-store, Options >
-#   Save: the save slots, from RAM): the touch screen 3x, framed, over the dimmed world; load
+#   Save: the save slots, from RAM): the HD slot list (src/port/options.*, three "No Data" rows),
+#   never the touch screen 3x; slots-hd (B-cas-opt-save): the current slot's number green;
+#   goals-menu, rel-menu (and --wide), opt-menu: the HD Goals, Relationships and Options tabs; load
 #   (act-cards quitting, frame 119: RAM between screens, both screens black): the bare backdrop. (The pictures pin the menu and the focus with
 #   --console-focus / --console-menu: the navigator does not move them.)
 # Then the navigator, driven by the scripts' "pad" events (scripts/console/), from what
@@ -66,11 +68,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2) cp "$complete_save" "$save" || return ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2) cp "$complete_save" "$save" ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -111,11 +113,17 @@ run pockets-menu A-pk-cnt3-slot1 "${late[@]}" --console-menu --console-focus 0 &
 run gift-items A-gift2-base "${town[@]}" --console-focus 0 &
 run gift-items-2x A-gift2-base "${town[@]}" --console-focus 0 --compose-scale 2 &
 run gift-items-wide A-gift2-base "${town[@]}" --console-focus 0 --wide &
+run goals-menu B-pg8-goals "${town[@]}" --console-menu --console-focus 0 &
+run rel-menu B-cas-rel "${late[@]}" --console-menu --console-focus 0 &
+run rel-menu-wide B-cas-rel "${late[@]}" --console-menu --console-focus 0 --wide &
+run opt-menu B-cas-opt "${late[@]}" --console-menu --console-focus 2 &
+run slots-hd B-cas-opt-save "${late[@]}" --console-focus 2 &
 wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
-    menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu gift-items gift-items-2x gift-items-wide; do
+    menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu gift-items gift-items-2x gift-items-wide \
+    goals-menu rel-menu rel-menu-wide opt-menu slots-hd; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -482,10 +490,56 @@ elif case == "load":
                 break
         if errors:
             break
-elif case == "slots":
-    big_over_dim()
-    expect("touch screen frame", C(252, 300), OUTLINE)
-    expect("touch screen frame top", C(640, 68), OUTLINE)
+elif case in ("slots", "slots-hd"):
+    # The Save slots in HD (src/port/options.*): the panel, three rows, never the touch screen 3x;
+    # slots (sit-store, three empty): "No Data" in the light lavender in each row; slots-hd (the
+    # complete save, Jun's slot the game's current one): its number green, the focus ring on it.
+    expect("panel outline", C(176, 300), OUTLINE)
+    same = sum(1 for y in range(8, 184, 16) for x in range(8, 248, 16) if C(256 + 3 * x + 1, 72 + 3 * y + 1) == bottom(x, y))
+    if same > 100: errors.append(f"the touch screen 3x is drawn ({same} of 165 samples)")
+    rows = [124 + 156 * i for i in range(3)]
+    if case == "slots":
+        for i, y0 in enumerate(rows):
+            pale = sum(1 for y in range(y0 + 40, y0 + 100, 2) for x in range(348, 560, 2) if (lambda p: p[0] > 190 and p[2] > 230)(C(x, y)))
+            if pale < 40: errors.append(f"row {i + 1}: no \"No Data\" ({pale})")
+    else:
+        green = lambda y0: sum(1 for y in range(y0 + 30, y0 + 112, 2) for x in range(230, 310, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 60)(C(x, y)))
+        if green(rows[2]) < 40 or green(rows[0]) or green(rows[1]): errors.append(f"current slot's green number {[green(r) for r in rows]}")
+        r, g, b = C(197, rows[2] + 70)
+        if not (g > r + 80 and g > b + 60): errors.append("no focus ring around slot 3")
+        if (255, 255, 255) not in [C(x, y) for y in range(rows[2] + 30, rows[2] + 70) for x in range(348, 460)]:
+            errors.append("no name in slot 3")
+elif case == "goals-menu":
+    # Goals in HD (src/port/goals.*): the Goals tab's icon green, the giver's portrait the touch
+    # screen's pixels 3x (DS 47,88 30 x 30 at 219,225), the focus ring on the first goal (the
+    # game's selection), white text in the list; never the touch screen 3x.
+    expect("panel outline", C(176, 300), OUTLINE)
+    piece("giver", 47, 88, 30, 30, 219, 225, 3, step=3)
+    r, g, b = C(355, 240)
+    if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the first goal")
+    if sum(1 for y in range(220, 400, 2) for x in range(390, 1000, 2) if min(C(x, y)) > 235) < 300:
+        errors.append("no goal text")
+    same = sum(1 for y in range(8, 184, 16) for x in range(8, 248, 16) if C(256 + 3 * x + 1, 72 + 3 * y + 1) == bottom(x, y))
+    if same > 100: errors.append(f"the touch screen 3x is drawn ({same} of 165 samples)")
+elif case in ("rel-menu", "rel-menu-wide"):
+    # Relationships in HD (src/port/relations.*): the big portrait the touch screen's pixels 3x
+    # (DS 84,37 69 x 84 at 474,222), the first row's portrait 2x (DS 43,28 28 x 28 at 214,220),
+    # the focus ring on the first row (the game's selection), the mood in white.
+    expect("panel outline", C(176, 300), OUTLINE)
+    piece("big portrait", 84, 37, 69, 84, 474, 222, 3, step=4)
+    piece("row 1 portrait", 43, 28, 28, 28, 214, 220, 2, step=3)
+    r, g, b = C(197, 248)
+    if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the first Sim")
+    if (255, 255, 255) not in [C(x, y) for y in range(240, 280) for x in range(728, 900)]:
+        errors.append("no mood word")
+elif case == "opt-menu":
+    # Options in HD (src/port/options.*): both knobs at 100 % (the track's right end, x 1012), the
+    # music's focused (lighter) with the focus ring around its well.
+    expect("panel outline", C(176, 300), OUTLINE)
+    expect("music knob (focused)", C(1012, 390), hexrgb("9AA2E3"))
+    expect("SFX knob", C(1012, 536), FRAME)
+    r, g, b = C(197, 360)
+    if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the music volume")
 for e in errors[:5]:
     print(f"  {case}: {e}")
 sys.exit(1 if errors else 0)
@@ -523,6 +577,11 @@ pad_late pad-drencher A-pk-slot1-key2 pockets-drencher 200 &
 pad_late pad-bin A-pk-slot1-key2 pockets-bin 240 &
 pad pad-give A-gift2-base gift-give 200 &
 pad pad-gift-close sit-gift gift-close 150 &
+pad pad-goals B-pg8-goals goals-scroll 230 &
+pad_late pad-rel B-cas-rel relations-select 230 &
+pad_late pad-volume B-cas-opt options-volume 330 &
+pad_late pad-save B-cas-opt options-save 330 &
+pad pad-slot B-st-opt-save saveslots-save 300 &
 pad pad-tabs s7 tabs 320 &
 pad pad-popup s6 popup 120 &
 pad pad-opening s6 popup-opening 200 &
@@ -591,6 +650,28 @@ check_pad pad-drencher drencher
 check_pad pad-bin bin_twice
 check_pad pad-give give
 check_pad pad-gift-close gift_close
+# Goals, Relationships, Options and the Save slots (src/port/goals.*, relations.*, options.*):
+# from B-pg8-goals, MENU, Down x3, Up → the game's selection 1, 2, 3 (its scroll first=1), 2,
+# the HD focus following; from B-cas-rel, Down x5, Up → the game's Sim 1..5 (its portraits
+# scrolled), 4; from B-cas-opt, Down, Left, Left, Right, Down, Left → the music 90 %, 80 %, 90 %,
+# the SFX 90 % read back from RAM; A on Save → the game's slot screen, B → its X, the panel (the
+# game goes back to Interact); from B-st-opt-save (a scratch save), Down, A → the game saves into
+# slot 2 ("Saving"), the slot used and current.
+goals() { in_order pad-goals 'goals sel=0 first=0' 'console menu open' 'goals sel=1 ' 'goals sel=2 ' 'goals sel=3 first=1' 'goals sel=2 first=1' 'focus 1'; }
+rel() { in_order pad-rel 'relations first=0 sel=0' 'console menu open, focus 0' 'sel=1 ' 'focus 1' 'sel=4 ' 'first=2 sel=5' 'first=2 sel=4' 'focus 2'; }
+volume() {
+    in_order pad-volume 'options music=4096 sfx=4096' 'console menu open, focus 0' 'focus 2' 'options music=3686 sfx=4096' \
+        'options music=3277 sfx=4096' 'options music=3686 sfx=4096' 'focus 3' 'options music=3686 sfx=3686'
+}
+save_open() { in_order pad-save 'console menu open, focus 0' 'game SaveSlots' 'console menu closed, focus 2' 'game Panel/'; }
+slot_save() {
+    in_order pad-slot 'saves current=-1 0=empty 1=empty 2=empty' 'game SaveSlots' 'focus 1' 'popup state=1 kind=3' 'saves current=1 0=empty 1=Sim'
+}
+check_pad pad-goals goals
+check_pad pad-rel rel
+check_pad pad-volume volume
+check_pad pad-save save_open
+check_pad pad-slot slot_save
 
 # The activities on buttons (src/activities.*): act NAME STATE SCRIPT FRAMES SHOTS CLOCK, a
 # CONSOLE run with --print-screen and shots of the two screens at SHOTS (NAME/f*.png).

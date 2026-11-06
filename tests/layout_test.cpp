@@ -16,6 +16,9 @@
 #include "layout.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
+#include "port/goals.h"
+#include "port/options.h"
+#include "port/relations.h"
 #include "port/interact.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
@@ -906,6 +909,161 @@ int main()
             bad.town.gift.valid = false;
             CHECK(!GiftMenuViewOf(gs, bad).valid && PanelMenuViewOf(pk, bad).valid);
             CHECK(!GiftMenuView(gs, &bad, &rom).valid); // no strings: milestone 1's
+        }
+        // Goals, Relationships, Options (port/goals.h, relations.h, options.h) and the Save slots
+        // on made-up states: the game's selection held (Up / Down its arrows), Options' moves
+        // explicit and its sliders' Left / Right the knob's drag by a tenth, the Save slots' A its
+        // tick and B its X; every enabled item reachable (the phone too, but where the game owns
+        // the selection: the focus stays on it); every item inside the panel, layers ascending,
+        // the mouse pieces round trip and land on the game's own targets.
+        {
+            auto check = [&](ScreenState st, const MenuView& v, const GameState& h, int focus) {
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                world.touch = false;
+                comp.pieces.push_back(world);
+                std::vector<u32> pic(SW * SH, 0xFF808080);
+                if (st.screen == Screen::SaveSlots) BuildSaveSlots(comp, v, focus, h, rom);
+                else BuildPanelMenu(comp, st, v, focus, h, rom, nullptr, pic.data());
+                int layer = 0;
+                for (const ui::UiItem& u : comp.ui)
+                {
+                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                    if (u.kind == ui::UiItem::Image) continue;
+                    CHECK(u.layer >= layer);
+                    layer = u.layer;
+                }
+                for (const ViewItem& it : v.items)
+                    CHECK(it.rect.x >= kPmPanel.x && it.rect.y >= kPmPanel.y && it.rect.x + it.rect.w <= kPmPanel.x + kPmPanel.w &&
+                          it.rect.y + it.rect.h <= kPmPanel.y + kPmPanel.h);
+                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                    TestConsoleRoundtrip(st, true, 256, 192, o.first, o.second, true, &comp);
+                return comp;
+            };
+            auto inside = [](int x, int y, Rect a) { return x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h; };
+            const CanvasFit fit = CanvasFit::For(kConsoleW, kConsoleH, 1280, 720);
+            int tx, ty;
+            // Goals: 8 goals of 1-3 DS lines (14 lines), the selection and the game's scroll.
+            const ScreenState gs {Screen::Panel, Tab::Goals};
+            for (int n : {0, 1, 8})
+                for (int sel : {-1, 0, 3, 7})
+                    for (bool footer : {false, true})
+                    {
+                        if (sel >= n) continue;
+                        GameState h;
+                        h.valid = true;
+                        GoalsState& g = h.town.goals;
+                        g.valid = true;
+                        int line = 0;
+                        for (int i = 0; i < n; i++)
+                        {
+                            const int lines = 1 + i % 3;
+                            g.entries.push_back({true, i, 1627 + i, -1, -1, line, lines});
+                            line += lines;
+                        }
+                        g.lines = line;
+                        g.selected = sel;
+                        g.first = sel <= 0 ? 0 : std::max(0, g.entries[sel].firstLine + g.entries[sel].nLines - 7);
+                        g.footer = footer;
+                        g.footerId = 1843;
+                        g.score = 100;
+                        const MenuView v = PanelMenuViewOf(gs, h);
+                        CHECK(v.valid && AllReachable(v));
+                        CHECK(v.scrollUp.size() == 1 && v.scrollUp[0].x == kGoalsUpX && v.scrollDown[0].y == kGoalsDownY);
+                        if (sel >= 0)
+                        {
+                            CHECK(MenuFocusable(v, v.selected) && v.items[v.selected].id == kGoalsId + (u32)sel);
+                        }
+                        const Rect list = footer ? kGoalsListFooter : kGoalsList;
+                        for (int i = 0; i + 1 < (int)v.items.size(); i++)
+                            CHECK(v.items[i].rect.y >= list.y && v.items[i].rect.y + v.items[i].rect.h <= list.y + list.h);
+                        const Composition comp = check(gs, v, h, v.selected >= 0 ? v.selected : 0);
+                        // A goal the touch screen shows: its bar lands on its lines.
+                        for (int i = 0; i + 1 < (int)v.items.size(); i++)
+                        {
+                            const GoalEntry& e = g.entries[v.items[i].id - kGoalsId];
+                            if (e.firstLine < g.first || e.firstLine >= g.first + 7) continue;
+                            const Rect r = v.items[i].rect;
+                            CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + 2.5f, tx, ty));
+                            CHECK(inside(tx, ty, {kGoalsLineX, kGoalsLineY0 + 16 * (e.firstLine - g.first), kGoalsLineW, 16}));
+                        }
+                    }
+            // Relationships: 0, 1, 5 or 23 Sims, the game's first shown and selection.
+            const ScreenState rs {Screen::Panel, Tab::Relationships};
+            for (int n : {0, 1, 5, 23})
+                for (int sel : {0, 2, 4, 22})
+                {
+                    if (sel >= std::max(n, 1)) continue;
+                    GameState h;
+                    h.valid = true;
+                    RelState& r = h.town.relations;
+                    r.valid = true;
+                    for (int i = 0; i < n; i++) r.sims.push_back({i, 323 + i, 389 + i, 184, 195, -1, false});
+                    r.selected = n ? sel : -1;
+                    r.first = std::max(0, std::min(sel - 3, n - 4));
+                    const MenuView v = PanelMenuViewOf(rs, h);
+                    CHECK(v.valid && (int)v.items.size() == std::min(4, n) + 1);
+                    if (n)
+                    {
+                        CHECK(MenuFocusable(v, v.selected) && v.selected == sel - r.first);
+                        CHECK(v.scrollUp[0].x == kRelPrevX && v.scrollUp[0].y == kRelPrevY && v.scrollDown[0].y == kRelNextY);
+                    }
+                    const Composition comp = check(rs, v, h, v.selected);
+                    for (int i = 0; i < std::min(4, n); i++)
+                    {
+                        const Rect q = v.items[i].rect;
+                        CHECK(TouchFromComposition(comp, fit, q.x + q.w / 2.0f, q.y + q.h / 2.0f, tx, ty));
+                        CHECK(inside(tx, ty, HotspotsFor(rs)[1 + i].area));
+                    }
+                }
+            // Options: both volumes at each end and between.
+            const ScreenState os {Screen::Panel, Tab::Options};
+            for (int vol : {0, 1229, 4096})
+            {
+                GameState h;
+                h.valid = true;
+                h.town.options = {true, vol, 4096 - vol};
+                const MenuView v = PanelMenuViewOf(os, h);
+                CHECK(v.valid && v.items.size() == 5 && AllReachable(v));
+                CHECK(v.items[0].action[0].x == kOptSaveX && v.items[1].action[0].y == kOptQuitY);
+                CHECK(MenuMove(v, 0, 1) == 2 && MenuMove(v, 1, 1) == 2 && MenuMove(v, 2, 0) == 0 && MenuMove(v, 2, 1) == 3);
+                CHECK(MenuMove(v, 0, 0) == 4 && MenuMove(v, 4, 1) == 0); // the phone above Save
+                const int k = VolumeNotch(vol);
+                const ViewItem& m = v.items[2];
+                CHECK(m.left.empty() == (k == 0) && m.right.empty() == (k == 10));
+                if (k > 0) CHECK(m.left[0].kind == MenuStep::Drag && m.left[0].x == 72 + 16 * k && m.left[0].x2 == 72 + 16 * (k - 1) && m.left[0].y == 121);
+                if (k < 10) CHECK(m.right[0].x2 == 72 + 16 * (k + 1));
+                if (VolumeNotch(4096 - vol) < 10) CHECK(v.items[3].right[0].y == 171);
+                const Composition comp = check(os, v, h, 2);
+                CHECK(TouchFromComposition(comp, fit, kOptSaveBtn.x + kOptSaveBtn.w / 2.0f, kOptSaveBtn.y + kOptSaveBtn.h / 2.0f, tx, ty));
+                CHECK(inside(tx, ty, HotspotsFor(os)[1].area));
+            }
+            CHECK(VolumeNotch(0) == 0 && VolumeNotch(1229) == 3 && VolumeNotch(3686) == 9 && VolumeNotch(4096) == 10);
+            // The Save slots: used, empty, the current one.
+            const ScreenState ss {Screen::SaveSlots, Tab::None};
+            for (int cur : {-1, 1})
+            {
+                GameState h;
+                h.valid = true;
+                SaveSlots& sv = h.town.saves;
+                sv.valid = true;
+                sv.current = cur;
+                sv.used[1] = sv.slot[1].used = true;
+                sv.slot[1] = {true, 9150, 0x14, 0, "Jun"};
+                const MenuView v = SaveSlotsViewOf(ss, h);
+                CHECK(v.valid && v.items.size() == 3 && AllReachable(v) && MenuFirst(v) == (cur < 0 ? 0 : cur));
+                CHECK(v.back.size() == 1 && v.back[0].x == kSlotCloseX && v.back[0].y == kSlotCloseY);
+                for (int i = 0; i < 3; i++) CHECK(v.items[i].action[0].x == kSlotTickX && v.items[i].action[0].y == kSlotTickY[i]);
+                const Composition comp = check(ss, v, h, 1);
+                const Rect q = v.items[2].rect;
+                CHECK(TouchFromComposition(comp, fit, q.x + q.w / 2.0f, q.y + q.h / 2.0f, tx, ty));
+                CHECK(inside(tx, ty, {kSlotTickX - 12, kSlotTickY[2] - 12, 24, 24}));
+                CHECK(!SaveSlotsViewOf({Screen::Panel, Tab::Options}, h).valid);
+                CHECK(!SaveSlotsView(ss, &h, &rom).valid); // no strings: the stick cursor's screen
+                h.town.saves.valid = false;
+                CHECK(!SaveSlotsViewOf(ss, h).valid);
+            }
         }
         // BuildConsole: without the game's strings, milestone 1's menu (the touch screen 3x).
         const HudState hud = TestHud();

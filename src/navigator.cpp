@@ -95,10 +95,17 @@ int CloseOf(const std::vector<Hotspot>& h)
 }
 }
 
+// The screen's mode, the HD Save slots (a valid view) a focus screen instead of the cursor's.
+static Mode ModeWith(ScreenState s, bool menuOpen, const MenuView* view)
+{
+    if (s.screen == Screen::SaveSlots && view && view->valid) return Mode::Focus;
+    return ModeOf(s.screen, menuOpen);
+}
+
 // Mirrors the taps of Update's Mode::Focus and Mode::Popup cases: change one, change the other.
 bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
 {
-    const Mode mode = ModeOf(s.screen, menuOpen_);
+    const Mode mode = ModeWith(s, menuOpen_, view_);
     if (mode == Mode::Popup) return b == &PadState::a || b == &PadState::b;
     if (mode != Mode::Focus) return false;
     if (UsesView(s))
@@ -189,8 +196,9 @@ const MenuAction* Navigator::DirAction(const MenuView& v, int dir, bool& scroll)
 
 bool Navigator::UsesView(ScreenState s) const
 {
-    // The panel's menu while open; Give Gift whenever it is up (port/gift.h).
-    return view_ && view_->valid && ((s.screen == Screen::Panel && menuOpen_) || s.screen == Screen::Gift);
+    // The panel's menu while open; Give Gift and the Save slots whenever they are up (port/gift.h,
+    // port/options.h).
+    return view_ && view_->valid && ((s.screen == Screen::Panel && menuOpen_) || s.screen == Screen::Gift || s.screen == Screen::SaveSlots);
 }
 
 void Navigator::Move(ScreenState s, int dx, int dy)
@@ -242,7 +250,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     // bottom slot is switching (the RAM leads the pixels) and is replayed on the first settled
     // frame; the latest one wins, and after kHoldFrames it is dropped. Focus moves and the DS's
     // own buttons never wait.
-    const Mode mode = ModeOf(s.screen, menuOpen_);
+    const Mode mode = ModeWith(s, menuOpen_, view_);
     // The HD menu: rebuilt this frame; the focus follows its item's id when the content changed.
     const bool useView = mode == Mode::Focus && UsesView(s);
     const u64 viewHash = useView ? view_->Hash() : 0;
@@ -275,7 +283,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     };
 
     const std::vector<Hotspot>& h = HotspotsFor(s);
-    cursorScreen_ = h.empty();
+    cursorScreen_ = h.empty() && !useView; // (the HD Save slots: no cursor)
     cursorPress_ = blow_ = false;
     handDx_ = handDy_ = 0;
     // A tap only when nothing else touches: a press while a tap or a drag runs is dropped.
@@ -404,8 +412,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     Step(touch, dsKeys);
 
     // Where the focus shows: on the targets of a focus screen and on a popup's X.
-    viewFocus_ = ModeOf(s.screen, menuOpen_) == Mode::Focus && UsesView(s);
-    switch (ModeOf(s.screen, menuOpen_))
+    const Mode after = ModeWith(s, menuOpen_, view_); // (B may have closed the menu)
+    viewFocus_ = after == Mode::Focus && UsesView(s);
+    switch (after)
     {
     case Mode::Focus: case Mode::Popup:
         if (viewFocus_)

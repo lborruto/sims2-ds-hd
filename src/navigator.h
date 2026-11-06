@@ -22,7 +22,8 @@
 //   Dialogue: every button is the DS's (A is the game's own "next").
 //   FrontEnd, CreateASim (from RAM), None: touch-only (the DS's buttons change nothing there),
 //     no table yet: as Unknown.
-//   SaveSlots, ItemHand (from RAM; no table yet): as Unknown.
+//   SaveSlots: in HD (port/options.h) whenever its view is valid, as Give Gift (A the slot's tick,
+//     B its back: the X); else, like ItemHand (from RAM; no table yet): as Unknown.
 //   Loading (a black load): every button is the DS's.
 //   Unknown: the DS's buttons, but A presses the stick cursor when there is one (the fallback for
 //     unmeasured screens); without a controller A stays the DS's.

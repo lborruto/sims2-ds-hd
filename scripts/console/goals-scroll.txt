@@ -1,0 +1,8 @@
+# From B-pg8-goals (the town, Goals, 8 goals listed, the first selected), CONSOLE: MENU, then Down
+# three times: the game's own arrow each time, its selection 0 -> 3 (the HD list follows RAM),
+# then Up once: 2.
+20 2 pad menu
+50 2 pad down
+90 2 pad down
+130 2 pad down
+170 2 pad up

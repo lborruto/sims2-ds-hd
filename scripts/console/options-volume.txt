@@ -1,0 +1,10 @@
+# From B-cas-opt (the complete save, Options, both volumes 100 %), CONSOLE: MENU, Down (the music
+# slider), Left twice (the game's knob dragged a tenth each time: 90 %, 80 %), Right (90 %), Down
+# (the SFX slider), Left (90 %).
+20 2 pad menu
+50 2 pad down
+80 2 pad left
+140 2 pad left
+200 2 pad right
+260 2 pad down
+290 2 pad left
