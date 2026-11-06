@@ -91,7 +91,7 @@ constexpr const char* kWords[][5] = {
     {"Take it back", "Reprendre", "Zurücknehmen", "Riprendi", "Recuperar"},
     {"Players", "Joueurs", "Spieler", "Giocatori", "Jugadores"},
     {"OK", "OK", "OK", "OK", "Aceptar"},
-    {"Round @1 of 3", "Manche @1 sur 3", "Runde @1 von 3", "Turno @1 di 3", "Ronda @1 de 3"},
+    {"Round @1 of 3", "Manche @1 sur 3", "Runde @1 von 3", "Round @1 di 3", "Ronda @1 de 3"},
     {"Cards left", "Cartes restantes", "Karten übrig", "Carte rimaste", "Cartas restantes"},
     // The Super Drencher
     {"Hold: fire", "Maintenir : tirer", "Halten: spritzen", "Tieni: spara", "Mantén: disparar"},

@@ -365,7 +365,7 @@ static void minigame_frame()
                 if (sc == Screen::Mixer && variant == 2) pv.mark = MixerRowRect(7);
                 const size_t overlays0 = 3;   // (the backdrop and the two pictures' frames)
                 Composition c {kConsoleW, kConsoleH, {}, {}};
-                BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom, nullptr, &pv, sc == Screen::MixerSave ? 27 : -1);
+                BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom, nullptr, &pv, sc == Screen::MixerSave ? (variant == 1 ? 30 : 27) : -1);
                 CHECK(c.pieces.size() == 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
                       c.pieces[0].to.w == kActivityBottomTo.w && c.pieces[0].to.h == kActivityBottomTo.h);
                 const Rect topTo = c.pieces[1].to;

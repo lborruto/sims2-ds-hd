@@ -1,6 +1,8 @@
 #include "hotspots.h"
 
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 
 namespace sims2wide
 {
@@ -285,5 +287,11 @@ int Neighbour(const std::vector<Hotspot>& h, int from, int dx, int dy)
         }
     }
     return best;
+}
+
+int SaveSlotAt(int focus)
+{
+    const std::vector<Hotspot>& h = HotspotsFor({Screen::MixerSave, Tab::None});
+    return focus >= 0 && focus < (int)h.size() && !strncmp(h[focus].name, "slot ", 5) ? atoi(h[focus].name + 5) - 1 : -1;
 }
 }

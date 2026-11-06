@@ -234,10 +234,10 @@ void Detector(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityStat
 void Art(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap)
 {
     st.pointer = true;
-    if (st.ram.ask)
+    if (st.ram.askUp)
     {
         // "Are you done painting?": A its tick, B its cross; the rest waits.
-        if (!canTap) return;
+        if (!canTap || !st.ram.ask) return;   // (opening and closing: nothing to tap)
         if (Pressed(pad, st, &PadState::a)) { touch.Tap(st.ram.askYes.x, st.ram.askYes.y); st.latch = true; }
         else if (Pressed(pad, st, &PadState::b)) { touch.Tap(st.ram.askNo.x, st.ram.askNo.y); st.latch = true; }
         return;
@@ -312,12 +312,14 @@ void MooGoo(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState&
     if (!turn)
     {
         // The players' prompt, the banners, the AI's turns: the game's own A, Left and Right; B and
-        // Start its X.
+        // Start its X. A human's bet placed or card picked (sub 2, 4): B the game's own too (it undoes).
         st.lastSub = -1;
         set(pad.a, kA);
         set(Left(pad), kLeft);
         set(Right(pad), kRight);
-        if ((b || start) && canTap) tap(kMooGooX);
+        const bool undo = r.mooGooHuman && (r.mooGooPhase == 6 || r.mooGooPhase == 0xD) && (sub == 2 || sub == 4);
+        if (undo) set(pad.b, kB);
+        if (((b && !undo) || start) && canTap) tap(kMooGooX);
         return;
     }
     // The player's turn: the focus over what the game wants touched.
@@ -326,8 +328,8 @@ void MooGoo(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState&
     auto rect = [&](int i) { return sub == 1 ? MooGooMonkeyRect(i) : sub == 3 ? MooGooCardRect(i) : MooGooPileRect(i); };
     if (sub != st.lastSub)
     {
-        // A new step: the hand from the game's selected card, a monkey from the one it was on.
-        if (sub == 3 && ok(r.mooGooSelected)) st.focus = r.mooGooSelected;
+        // A new step: the hand from the game's selected card, a monkey from the first.
+        st.focus = sub == 3 && ok(r.mooGooSelected) ? r.mooGooSelected : -1;
         // A special card's target: a monkey with cards under it first (King Gorilla's needs one).
         if (sub == 5 && !(ok(st.focus) && r.mooGooPile[st.focus]))
             for (int i = 0; i < n; i++)
@@ -461,7 +463,7 @@ void Scratch(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState
     {
         st.rubBox = -1;
         if (st.quitArmed > 0 && canTap) { Tap(touch, ScratchX(r.scratchTier)); st.quitArmed = 0; }
-        else st.quitArmed = kQuitWindow;
+        else if (st.quitArmed == 0) st.quitArmed = kQuitWindow;   // (a second press while a touch runs keeps the arm)
         return;
     }
     if (Pressed(pad, st, &PadState::a) || Pressed(pad, st, &PadState::x)) st.quitArmed = 0;
@@ -553,14 +555,14 @@ void Mixer(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& 
     if (x) Tap(touch, kMixPlay);
     else if (Pressed(pad, st, &PadState::rb)) Tap(touch, kMixRecord);
     else if (Pressed(pad, st, &PadState::lb) && phase == 0) Tap(touch, kMixGenre);
-    else if (b) Tap(touch, phase == 1 ? kMixPlay : phase == 2 ? kMixRecord : kMixQuit);
+    else if (b) Tap(touch, phase == 1 ? kMixPlay : phase == 2 ? kMixRecord : phase == 5 ? kMixVox : kMixQuit);
 }
 
 void MixerSave(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap)
 {
     const std::vector<Hotspot>& h = HotspotsFor({Screen::MixerSave, Tab::None});
     if (st.focus < 0 || st.focus >= (int)h.size()) st.focus = 0;
-    const int slot = !strncmp(h[st.focus].name, "slot ", 5) ? atoi(h[st.focus].name + 5) - 1 : -1;
+    const int slot = SaveSlotAt(st.focus);
     if (slot != st.armedSlot) st.armedSlot = -1; // (a move forgets the question)
     if (!canTap) return;
     if (Pressed(pad, st, &PadState::a))

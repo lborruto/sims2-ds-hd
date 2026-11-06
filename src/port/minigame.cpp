@@ -119,13 +119,6 @@ HdHint SlowHint(const RomData& rom) { return {{C(Button::LT)}, Own(rom, OwnWordI
 // A popup of the game's is up (opening, shown or closing: it holds the stylus).
 bool GamePopup(const GameState& game) { const PopupState& p = game.town.popup; return p.valid && p.state >= 1 && p.state <= 3; }
 
-// The save page's slot under the focus (HotspotsFor's "slot 1".."slot 3"), or -1.
-int SaveSlotAt(int focus)
-{
-    const std::vector<Hotspot>& h = HotspotsFor({Screen::MixerSave, Tab::None});
-    return focus >= 0 && focus < (int)h.size() && !strncmp(h[focus].name, "slot ", 5) ? atoi(h[focus].name + 5) - 1 : -1;
-}
-
 std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, bool quitArmed = false, int focus = -1)
 {
     auto own = [&](OwnWordId w) { return std::string(Own(rom, w)); };
@@ -196,7 +189,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     {
         const ArtWords w(rom);
         const PopupState& p = game.town.popup;
-        if (p.valid && p.state == 2 && p.kind == 2) return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
+        if (p.valid && p.state >= 1 && p.state <= 3 && p.kind == 2) return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
         return {PointHint(rom), SlowHint(rom), {{C(Button::A)}, w.paint}, {{C(Button::LB), C(Button::RB)}, w.tool},
                 {{C(Button::X)}, w.colour}, {{C(Button::Y)}, w.undo}, {{C(Button::B)}, w.done}};
     }
@@ -223,7 +216,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     case Screen::Drencher:
     {
         const DrencherState& d = game.minigame.drencher;
-        const bool low = d.valid && d.pressure < kDrencherPressureLow;
+        const bool low = d.valid && DrencherLow(d.pressure);
         // Help (opened with the mouse): its text closes on any press; its mode leaves with B.
         if (d.valid && d.helpText) return {{{C(Button::A)}, Own(rom, OwnWordId::Close)}};
         if (d.valid && d.help) return {{{C(Button::B)}, Own(rom, OwnWordId::MixerHelp)}};
@@ -425,10 +418,6 @@ std::string FindName(const RomData& rom, int type)
     return empty(b) ? a : a + " " + b;
 }
 
-// A stat panel line ("Vacuum Earnings: $@1", "Metal Detector Earnings: $@1"): the label beside
-// its value, or above it when it does not fit there.
-int EarningsValues(Composition& c, int y, int index, int amount, const RomData& rom);
-
 // The detector's values: the charge (the game's gauge), the signal (a find in range: how well
 // the depth matches, the scope's calm), the depth (the slider), what the card found, the earnings.
 int DetectorValues(Composition& c, int y, const DetectorState& d, const RomData& rom)
@@ -455,6 +444,22 @@ int DetectorValues(Composition& c, int y, const DetectorState& d, const RomData&
     return h + 8 + EarningsValues(c, y + h + 8, 3, d.earnings, rom);
 }
 
+// The painting's 256 colours (resource 6028), decoded once per ROM (the panel is built every frame).
+const std::vector<u32>& ArtPalette(const RomData& rom)
+{
+    static const RomData* owner = nullptr;
+    static std::vector<u32> pal;
+    if (owner != &rom || pal.empty())
+    {
+        std::vector<u8> res = rom.Resource(kResArtColours), raw;
+        if (Decompress(res, 0, raw)) res = raw;
+        pal.clear();
+        if (!ReadPalette(res, pal)) pal.clear();
+        owner = &rom;
+    }
+    return pal;
+}
+
 // The painting's values: the tool (and its size), the colour (a swatch of it, from the page's
 // colours) and the palette page.
 int ArtValues(Composition& c, int y, const ArtState& a, const RomData& rom)
@@ -469,12 +474,10 @@ int ArtValues(Composition& c, int y, const ArtState& a, const RomData& rom)
     PanelText(c, {ix + kArtLabelW, yy, iw - kArtLabelW, kMgRow}, tool, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, kValueColour);
     yy += kMgRow;
     // The colour: the page's colour swatch + 1 (resource 6028: 16 pages of 16).
-    std::vector<u8> res = rom.Resource(kResArtColours), raw;
-    if (Decompress(res, 0, raw)) res = raw;
-    std::vector<u32> pal;
+    const std::vector<u32>& pal = ArtPalette(rom);
     const int index = std::clamp(a.page, 0, 15) * 16 + std::clamp(a.swatch, 0, 14) + 1;
     int sx = ix;
-    if (ReadPalette(res, pal) && index < (int)pal.size())
+    if (index < (int)pal.size())
     {
         UiItem sw = PanelItem({ix, yy + 3, 40, kMgRow - 6});
         sw.fill = pal[index] | 0xFF000000;
@@ -506,6 +509,14 @@ std::string DrencherTargetName(const RomData& rom, const DrencherState& d)
     return "";
 }
 
+// A player's fruit as the game words it (the plural: "coconuts"); in English one is singular.
+std::string Fruit(const RomData& rom, int player, int count)
+{
+    std::string w = Words(rom, kStrMgMooFruit + player);
+    if (count == 1 && rom.Language() <= 1 && w.size() > 1 && w.back() == 's') w.pop_back();
+    return w;
+}
+
 // MooGoo's values: the round, the players (name, their fruit on the monkeys still in: the score
 // the game shows; the player whose turn it is raised), the cards left in the deck.
 int MooGooValues(Composition& c, int y, const MooGooState& g, const RomData& rom)
@@ -535,7 +546,7 @@ int MooGooValues(Composition& c, int y, const MooGooState& g, const RomData& rom
         PanelText(c, {ix + 6, yy, iw - scoreW - 12, row}, name.empty() ? Words(rom, kStrMgMooPlayer1 + p) : name, kMgValueSize - 2, kMgValueMin, Align::Left,
              Weight::ExtraBold, 0xFFFFFFFF);
         // The score and its fruit (the game's words: coconuts, watermelons, pineapples).
-        PanelText(c, {ix + iw - scoreW, yy, scoreW - 8, row}, std::to_string(pl.score) + " " + Words(rom, kStrMgMooFruit + p), kMgValueSize - 4,
+        PanelText(c, {ix + iw - scoreW, yy, scoreW - 8, row}, std::to_string(pl.score) + " " + Fruit(rom, p, pl.score), kMgValueSize - 4,
              kMgValueMin - 2, Align::Right, Weight::ExtraBold, kValueColour);
     }
     yy += 6;
@@ -555,7 +566,7 @@ int DrencherValues(Composition& c, int y, const DrencherState& d, const RomData&
     MeterRow(c, ix, yy, iw, Own(rom, OwnWordId::DrencherWater), water, 0xFF4FA8E8, Percent(d.water, 100), 0xFFFFFFFF);
     yy += kMgRow;
     MeterRow(c, ix, yy, iw, Own(rom, OwnWordId::DrencherPressure), pressure, Health(pressure), Percent(d.pressure, kDrencherPressureMax),
-             d.pressure < kDrencherPressureLow ? kBadColour : 0xFFFFFFFF);
+             DrencherLow(d.pressure) ? kBadColour : 0xFFFFFFFF);
     yy += kMgRow;
     const std::string target = DrencherTargetName(rom, d);
     // (The target's name on a line of its own: objects' names are long.)
@@ -874,8 +885,11 @@ ActivityRam MinigameRam(const GameState* game)
         for (int j = 0; j < kMixerSaveSlots; j++) r.mixerSaveUsed[j] = m.mixerSave.used[j];
     }
     const PopupState& p = game->town.popup;
-    if (p.valid && p.state == 2 && p.kind == 2 && PopupButton(p, 1, r.askYes.x, r.askYes.y) && PopupButton(p, 0, r.askNo.x, r.askNo.y))
-        r.ask = true;
+    if (p.valid && p.kind == 2 && p.state >= 1 && p.state <= 3)
+    {
+        r.askUp = true;
+        r.ask = p.state == 2 && PopupButton(p, 1, r.askYes.x, r.askYes.y) && PopupButton(p, 0, r.askNo.x, r.askNo.y);
+    }
     return r;
 }
 
@@ -1001,8 +1015,8 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     for (const auto& [sc, g] : states) bars.push_back(Hints(sc, g, rom));
     bars.push_back(Hints(Screen::Autopsy, states.back().second, rom, true));   // the autopsy's quit asked
     bars.push_back(Hints(Screen::Scratch, states.back().second, rom, true));   // the lottery's
-    for (int f : {0, 28}) bars.push_back(Hints(Screen::MixerSave, states.back().second, rom, false, f));   // a key, a slot
-    bars.push_back(Hints(Screen::MixerSave, states.back().second, rom, true, 28));   // a slot's overwrite asked
+    for (int f : {0, 30}) bars.push_back(Hints(Screen::MixerSave, states.back().second, rom, false, f));   // a key, a slot
+    bars.push_back(Hints(Screen::MixerSave, states.back().second, rom, true, 30));   // a slot's overwrite asked
     for (const std::vector<HdHint>& hs : bars) me.Note(kOwn, total(hs, kMgHintSize) > avail, total(hs, kMgHintMin) <= avail);
     // The side panels' own words (their boxes as the Build functions give them).
     const float vs = kMgValueSize - 2;
@@ -1049,9 +1063,8 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
         if (f.size < vs) m.shrunk++;
         if (!f.fits) { m.namesCut++; if (std::find(m.cutIds.begin(), m.cutIds.end(), n) == m.cutIds.end()) m.cutIds.push_back(n); }
     }
-    for (const std::string& w : {std::string(Own(rom, OwnWordId::CrimeScare)), Words(rom, kStrMgRatARang), std::string(Own(rom, OwnWordId::CrimeSubdue)),
-                                 std::string(Own(rom, OwnWordId::CrimeAimLabel))})
-        me.Line(id(OwnWordId::CrimeScare), w, vs, kMgValueMin, iw - 110, Weight::Bold);
+    for (OwnWordId w : {OwnWordId::CrimeScare, OwnWordId::CrimeSubdue, OwnWordId::CrimeAimLabel}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, iw - 110, Weight::Bold);
+    me.Line(kStrMgRatARang, Words(rom, kStrMgRatARang), vs, kMgValueMin, iw - 110, Weight::Bold);
     for (OwnWordId w : {OwnWordId::CrimeReady, OwnWordId::CrimeHit}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, 110);
     // The lottery's, the mixer's, its save page's and the lobby's panels.
     me.Line(id(OwnWordId::ScratchTopPrize), Own(rom, OwnWordId::ScratchTopPrize), vs, kMgValueMin, iw - 130, Weight::Bold);

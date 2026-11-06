@@ -23,6 +23,8 @@
 // mixer (the song, tempo, instrument, octave, tracks, what it does now) and its save page (the
 // title typed, the three slots), and the wireless lobby (out of scope: a note, B its X).
 #pragma once
+#include <algorithm>
+#include <cmath>
 #include <string>
 
 #include "compose.h"
@@ -57,7 +59,8 @@ constexpr int kMgFindTypes = 9, kResArtColours = 6028;
 constexpr int kStrMgMooGoo = 493, kStrMgDrencher = 1969, kStrMgRatARang = 733, kStrMgMooScore = 1749, kStrMgMooFruit = 1750, kStrMgMooPlayer1 = 1758;
 constexpr int kStrMgSimName0 = 323, kStrMgObjectName0 = 463;
 constexpr int kStrMgDrencherObjectEnd = 822;   // (the objects' names end where their descriptions begin: --measure-menu measures them all)
-constexpr int kDrencherPressureMax = 125, kDrencherPressureLow = 30;   // the gauge's top; under it the pump's hint is lit
+constexpr int kDrencherPressureMax = 125, kDrencherLowPercent = 25;   // the gauge's top; under it (as the panel shows it, in %) the pump's hint is lit
+inline bool DrencherLow(int pressure) { return std::lround(100.0 * std::clamp(pressure, 0, kDrencherPressureMax) / kDrencherPressureMax) < kDrencherLowPercent; }
 // The Scratch lottery: the tickets' names (314 + tier: "Cash Mummy!", "Milking For Moo-lah", "The
 // Emperor's Coffers"), the game's results ("Congratulations, you won $@1!" 317, "Sorry, better luck
 // next time!" 318), its popups' "Close" 1866. The music mixer: "Music Mixer" 491, the songs (1770 +

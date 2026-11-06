@@ -914,6 +914,19 @@ static void moogoo_scheme()
     b.Frame(kMooGoo);
     b.Press(kMooGoo, &PadState::start);
     CHECK(b.Touched(x, y) && x == kMooGooX.x && y == kMooGooX.y);
+    b.Drain();
+    // The human's bet placed (sub 2): B is the game's own (no tap); the next step starts its focus afresh.
+    ram.mooGooPhase = 0xD;
+    ram.mooGooSub = 2;
+    b.nav.SetActivityRam(ram);
+    bb.b = true;
+    CHECK(b.Frame(kMooGoo, bb) & (1u << kB));
+    b.Frame(kMooGoo);
+    CHECK(!b.touch.Owns());
+    ram.mooGooSub = 1;
+    b.nav.SetActivityRam(ram);
+    b.Frame(kMooGoo);
+    CHECK(b.nav.Mark().x == MooGooMonkeyRect(2).x);   // (the first monkey that takes a bet, not the hand's index)
 }
 
 // The Super Drencher: walk on the stick / D-pad, A held fires, LB runs (the game's B); X held pumps
@@ -1146,6 +1159,11 @@ static void mixer_scheme()
     ram.mixerPhase = 2;
     r.nav.SetActivityRam(ram);
     CHECK(tapped(&PadState::b, kMixRecord));
+    ram.mixerPhase = 5;
+    r.nav.SetActivityRam(ram);
+    CHECK(tapped(&PadState::b, kMixVox));   // (the voice recording: B stops it, never quits)
+    ram.mixerPhase = 2;
+    r.nav.SetActivityRam(ram);
     PadState st;
     st.start = true;
     CHECK(!(r.Frame(kMixer, st) & (1u << kStart)));
@@ -1270,12 +1288,16 @@ static void art_scheme()
     // The buttons the game draws: the ten tools in two columns, the fifteen swatches in two rows.
     CHECK(ArtTool(0).x == 14 && ArtTool(5).y == 144 && ArtTool(6).x == 241 && ArtTool(6).y == 66 && ArtTool(9).y == 144);
     CHECK(ArtSwatch(5).x == 180 && ArtSwatch(5).y == 165 && ArtSwatch(7).x == 43 && ArtSwatch(14).y == 187);
-    ram.ask = true;
+    ram.askUp = true;
     ram.askYes = {164, 116};
     ram.askNo = {92, 116};
     r.nav.SetActivityRam(ram);
     r.Press(kArt, &PadState::y);
     CHECK(!r.touch.Owns());
+    CHECK(!tapped(&PadState::a, ram.askYes));   // (opening or closing: not yet / no more)
+    ram.ask = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kArt);
     CHECK(tapped(&PadState::a, ram.askYes));
     CHECK(tapped(&PadState::b, ram.askNo));
     PadState a;

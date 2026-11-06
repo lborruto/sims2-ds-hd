@@ -1498,7 +1498,7 @@ pad_mg mg-autopsy-quit G-X-autopsy autopsy-quit 150 &
 pad_mg mg-autopsy-stay G-X-autopsy autopsy-quit-once 200 &
 pad_mg mg-autopsy-payout G-A-payout-base autopsy-wait 120 &
 wait
-pad_mg mg-detector-dig G-A-md-walk detector-dig 150 &
+pad_mg mg-detector-dig G-A-md-walk detector-dig 220 &
 pad_mg mg-detector-quit G-X-metal detector-quit 120 &
 pad_mg mg-art-play G-X-artgal art-play 200 &
 pad_mg mg-art-done G-X-artgal art-done 200 &
@@ -1529,10 +1529,11 @@ autopsy_payout() {
 check_pad mg-autopsy-payout autopsy_payout
 # The detector: RB holds the depth slider's knob from where RAM has it and moves it deeper (the
 # game's value follows), A digs the find in range: the card shows it (find=0, a lead rock), the
-# earnings 2020 -> 2045, a pocket filled (item 300); B powers it off: the panel.
+# earnings 2020 -> 2045, a pocket filled (item 300), and the card goes by itself (state 5 lasts about
+# 125 frames, then state 3, no card: no button is needed); B powers it off: the panel.
 detector_dig() {
     in_order mg-detector-dig 'pointer down at 195,77' 'minigame detector .*slider=(3[5-9]|40)[0-9][0-9] ' 'pointer up' \
-        'minigame detector state=5 .*card=1 find=0 .*earnings=2045' &&
+        'minigame detector state=5 .*card=1 find=0 .*earnings=2045' 'minigame detector state=3 .*card=0 find=-1 ' &&
         in_order mg-detector-dig 'inventory slots=171:[0-9/]+,300:'
 }
 check_pad mg-detector-dig detector_dig

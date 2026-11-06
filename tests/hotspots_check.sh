@@ -137,7 +137,7 @@ run() {
 }
 
 # Every run once (the bases too), a few at a time.
-jobs_max=${JOBS:-8}
+jobs_max=${JOBS:-$max_sims}
 runs=()
 for c in "${cases[@]}"; do
     IFS=: read -r name state frames expect <<< "$c"

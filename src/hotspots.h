@@ -23,6 +23,8 @@ struct Hotspot
 // The targets of a screen, the tab's own first (the navigator's first focus), then for the
 // panel the five tab icons and the phone. Empty for None, Unknown and Vacuum (the stick).
 const std::vector<Hotspot>& HotspotsFor(ScreenState s);
+// The mixer's save page: the slot (0..2) under hotspot `focus`, or -1 (a key, a page, the backspace, the X).
+int SaveSlotAt(int focus);
 
 // The nearest target from `from` in the direction (dx, dy), by the distance between the areas'
 // centres, among those within 60 degrees of that direction; `from` when there is none.

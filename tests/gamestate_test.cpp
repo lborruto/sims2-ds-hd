@@ -1326,6 +1326,25 @@ static void minigame_random()
         CHECK(!m.art.valid || g.screen == GScreen::ArtGallery);
         CHECK(!m.cards.valid || (g.screen == GScreen::Cards && m.cards.deck <= m.cards.total && m.cards.hand <= 10 && m.cards.opponent <= 10));
         CHECK(!m.vacuum.valid || g.screen == GScreen::Vacuum);
+        // The fields of a part that reads are inside the game's own ranges.
+        if (m.detector.valid)
+            CHECK(m.detector.state <= 5 && m.detector.slider >= 0 && m.detector.slider <= kDetectorSliderMax && m.detector.mismatch >= 0 && m.detector.mismatch <= 128 &&
+                  m.detector.charge >= 0 && m.detector.charge <= 2 * kDetectorFull && m.detector.earnings >= 0 && (!m.detector.card || m.detector.state == 5));
+        if (m.autopsy.valid)
+        {
+            for (const AutopsyOrgan& o : m.autopsy.organs) CHECK(o.damage >= 0 && o.damage <= kAutopsyDestroyed && o.kind >= 0 && o.kind <= kAutopsyKindGone);
+            CHECK(m.autopsy.phase <= 6 && m.autopsy.tool <= 2 && m.autopsy.earnings >= 0);
+        }
+        if (m.mooGoo.valid && !m.mooGoo.intro)
+        {
+            CHECK(m.mooGoo.phase <= 0x17 && m.mooGoo.sub <= 9 && m.mooGoo.current >= 0 && m.mooGoo.current < kMooGooPlayers && m.mooGoo.round <= 3 && m.mooGoo.deckNext <= m.mooGoo.deckSize);
+            for (const MooGooMonkey& k : m.mooGoo.monkeys) CHECK(k.count >= 0 && k.count <= kMooGooCards && k.slots >= 0);
+        }
+        if (m.scratch.valid) CHECK(m.scratch.tier <= 2 && m.scratch.state >= 1 && m.scratch.state <= 3 && m.scratch.revealed <= kScratchBoxes);
+        if (m.drencher.valid) CHECK(m.drencher.pump >= 0 && m.drencher.pump <= kDrencherPumpMax && m.drencher.water >= 0 && m.drencher.pressure >= 0);
+        if (m.mixer.valid) CHECK(m.mixer.octave >= -1 && m.mixer.octave <= 1 && m.mixer.song <= 8 && m.mixer.sliderA <= 26 && m.mixer.sliderB <= 26);
+        if (m.mixerSave.valid) CHECK(m.mixerSave.slot >= -1 && m.mixerSave.slot < kMixerSaveSlots);
+        if (m.art.valid) CHECK(m.art.button <= 9 && m.art.tool <= 5 && m.art.swatch <= 14 && m.art.page <= 15 && m.art.brush <= 2);
         (void)MinigameLine(g);
     }
 }

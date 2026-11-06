@@ -148,7 +148,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
         if (ev.key.repeat) return;
         if (a == MENU) wantMenu = true;
         else if (a == SAVESTATE) wantSave = true;
-        else if (a == LOADSTATE) wantLoad = true;
+        else if (a == LOADSTATE) { wantLoad = true; lastMoney_ = -1; }
         else if (a == SWAP) app.mainIsTop = !app.mainIsTop;
         else if (a >= 0) {}
         else if (k == SDLK_0) wantLayout = (int)Layout::Auto;
@@ -283,7 +283,7 @@ void Input::Poll(const App& app, bool menuOpen)
         return;
     }
     if (PadPressed(s, SAVESTATE)) wantSave = true;
-    if (PadPressed(s, LOADSTATE)) wantLoad = true;
+    if (PadPressed(s, LOADSTATE)) { wantLoad = true; lastMoney_ = -1; }
 }
 
 PadState Input::Actions(const Settings& s) const
@@ -337,7 +337,9 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
                               navigator.Mark()};
         // The money's last change, shown on the panel's world for kPayoutFrames frames (an
         // animation's payout: the slot machine's coin then its win; a ticket's prize).
-        if (game && game->valid && game->hud.valid)
+        // (Only on the panel and the activities: the front end, Create-a-Sim and a load show another save's money.)
+        if (screen.screen == Screen::FrontEnd || screen.screen == Screen::CreateASim || screen.screen == Screen::Loading) lastMoney_ = -1;   // (None is the animations: the slot machine's payout shows there)
+        else if (game && game->valid && game->hud.valid)
         {
             if (lastMoney_ >= 0 && game->hud.money != lastMoney_) { app.consolePayout = game->hud.money - lastMoney_; payoutFrames_ = kPayoutFrames; }
             lastMoney_ = game->hud.money;

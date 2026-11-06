@@ -136,8 +136,9 @@ struct ActivityRam
     int mixerPhase = 0, mixerSongs = 0;
     bool mixerSave = false;
     bool mixerSaveUsed[3] = {};
-    // A question of the game's popup is up over the minigame (kind 2 shown): its tick and cross.
-    bool ask = false;
+    // A question of the game's popup is up over the minigame (kind 2, opening, shown or closing: the
+    // painting waits); it takes taps once shown: its tick and cross.
+    bool askUp = false, ask = false;
     Point askYes {0, 0}, askNo {0, 0};
 };
 
@@ -240,10 +241,10 @@ constexpr int kDetectorKnobX = 195, kDetectorKnobTop = 33, kDetectorKnobSpan = 8
 constexpr float kKnobStep = 1.5f, kKnobStick = 3.0f;
 // The Art Gallery's buttons (24 x 24, tapped in their middle): the ten tools (pencil sizes 0-2,
 // eraser sizes 0-2 at the left; bucket, line, rectangle, filled rectangle at the right), the
-// game's X and undo, the page arrows, the fifteen swatches (7 above, 8 below).
+// game's X and undo, the fifteen swatches (7 above, 8 below).
 Point ArtTool(int button);
 Point ArtSwatch(int swatch);
-constexpr Point kArtDone {241, 14}, kArtUndo {241, 40}, kArtPagePrev {17, 182}, kArtPageNext {241, 182};
+constexpr Point kArtDone {241, 14}, kArtUndo {241, 40};
 constexpr int kArtTools = 10, kArtSwatches = 15;
 
 // MooGoo Monkey (the game's rectangles, research/m6 code-B 1.3): the intro's play arrow; monkey m

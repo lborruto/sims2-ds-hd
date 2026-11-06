@@ -1300,7 +1300,8 @@ DetectorState ReadDetector(const Reader& m, u32 S)
         return v;
     // (The finds' count is the place's table: a dig with none in it, the casino's empty table in the
     // research's states, leaves it at -1. It says nothing of the screen: 0 then, the part still read.)
-    if (finds > 150) finds = 0;
+    if (finds == 0xFFFFFFFFu) finds = 0;
+    else if (finds > 150) return v;
     const int charge = m.S32(S + q.mdCharge);
     if (charge < 0 || charge > 2 * kDetectorFull) return DetectorState{};
     v.state = (int)state; v.charge = charge; v.inRange = range == 1; v.slider = (int)sliderVal; v.mismatch = (int)mismatch;
@@ -1320,7 +1321,7 @@ MooGooState ReadMooGoo(const Reader& m, u32 S, bool intro)
 {
     const auto& q = kEU.mg;
     MooGooState v;
-    if (intro) { v.intro = v.valid = true; return v; }
+    if (intro) { v.intro = v.valid = m.In(S, 8); return v; }   // (the object is in RAM)
     u32 phase, sub, cur, choice, round, flags, quit, ask, deckNext, deckSize;
     if (!m.In(S, 0x214) || !m.R32(S + q.mgPhase, phase) || phase > 0x17 || !m.R32(S + q.mgSub, sub) || sub > 9 || !m.R8(S + q.mgCurrent, cur) || cur >= (u32)kMooGooPlayers ||
         !m.R8(S + q.mgChoice, choice) || choice >= (u32)kMooGooPlayers || !m.R8(S + q.mgRound, round) || round > 3 || !m.R8(S + q.mgFlags, flags) || !m.R8(S + q.mgQuit, quit) || quit > 1 ||
