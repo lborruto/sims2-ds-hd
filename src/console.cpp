@@ -259,14 +259,18 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(World(topW, worldRows, bar));
         if (ConsoleView(s, game, rom).valid)
         {
-            // The HD menu has the tabs: no rail, a small chip says how to open it, level with the bar.
+            // The HD menu has the tabs: no rail. A small kit panel level with the status bar says
+            // how to open it: the TOUCH MENU's button as the device used last prints it (the pad's
+            // Back / View, Share, -; the keyboard's key, E by default: ui::ChipLook) and the word.
             const char* word = OwnWord(rom, OwnWordId::Menu);
-            const int tw = TextRect(0, 0, word, 2).w, bw = TextRect(0, 0, "BACK", 2).w + 14, h = kHintChipH;
-            const int w = 8 + bw + 10 + tw + 12, x = kConsoleW - 16 - w, y = kStatusBarY + (kStatusBarH - h - 8) / 2;
-            c.overlays.push_back({{x, y, w, h + 8}, kFrameArgb, 14, 3, kOutlineArgb});
-            c.overlays.push_back({{x + 8, y + 4 + 0, bw, h}, kPanelArgb, 9, 3, kOutlineArgb});
-            c.overlays.push_back(Text(x + 8 + 8, y + 4 + (h - 14) / 2, "BACK", 2));
-            c.overlays.push_back(Text(x + 8 + bw + 10, y + 4 + (h - 14) / 2, word, 2));
+            constexpr float kSize = 24;
+            constexpr int kPad = 14;
+            const Rect chip = ui::ChipRect(0, 0, ui::Button::Back, word, kSize);
+            const Rect box {kConsoleW - 16 - (chip.w + 2 * kPad), kStatusBarY, chip.w + 2 * kPad, kStatusBarH};
+            const size_t first = c.ui.size();
+            c.ui.push_back(ui::PanelItem(box));
+            c.ui.push_back(ui::ChipItem(box.x + kPad, box.y + (box.h - chip.h) / 2, ui::Button::Back, word, kSize));
+            for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
         }
         else
         {

@@ -28,8 +28,10 @@ enum class Align { Left, Centre, Right };
 // Up / Down (Left / Right) do something there.
 // DPadL / DPadU / DPadR / DPadD: one arm lit (that direction alone). LStick / RStick: the sticks
 // (a round chip with a ring, "L" / "R"). LT: the left trigger (a pill, as LB).
-enum class Button { A, B, X, Y, LB, RB, Start, DPad, DPadV, DPadH, DPadL, DPadU, DPadR, DPadD, LStick, RStick, LT };
-constexpr int kButtonCount = (int)Button::LT + 1;
+// Back: the Select-type button (Xbox's Back / View, PlayStation's Share, Nintendo's -: a pill),
+// the TOUCH MENU's on a pad.
+enum class Button { A, B, X, Y, LB, RB, Start, DPad, DPadV, DPadH, DPadL, DPadU, DPadR, DPadD, LStick, RStick, LT, Back };
+constexpr int kButtonCount = (int)Button::Back + 1;
 
 // How the chips are printed: the device the player used last (input.cpp sets it every frame;
 // ChipItem / ChipRect copy the current look into the item, so the raster stays a function of

@@ -245,7 +245,8 @@ ui::ChipLook ChipLookFor(bool keyboard, int style, const Bindings& b, bool ninte
     using ui::Button;
     ui::ChipLook look;
     look.face = keyboard ? ui::Face::Keyboard : style == PLAYSTATION ? ui::Face::PlayStation : style == NINTENDO ? ui::Face::Nintendo : ui::Face::Xbox;
-    // The action each chip stands for (the navigator's PadState: the DS's buttons); LT is the
+    // The action each chip stands for (the navigator's PadState: the DS's buttons, and Back the
+    // TOUCH MENU); LT is the
     // trigger itself, the D-pad and the sticks are drawn as they are.
     auto action = [](Button k) {
         switch (k)
@@ -257,6 +258,7 @@ ui::ChipLook ChipLookFor(bool keyboard, int style, const Bindings& b, bool ninte
         case Button::LB: return (int)L;
         case Button::RB: return (int)R;
         case Button::Start: return (int)START;
+        case Button::Back: return (int)PANEL; // the town's menu hint: TOUCH MENU (Back on a pad, E)
         default: return -1;
         }
     };

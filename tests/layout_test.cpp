@@ -2362,7 +2362,9 @@ int main()
                 g.front.boot.valid = false;
                 CHECK(!FrontViewOf(at, g).valid);
             }
-        CHECK(!FrontViewOf(fe, front(-1, 0)).valid && !FrontViewOf(none, front(0, -1)).valid);
+        // The boot's splash on the FrontEnd screen is the legal splash's (GScreen FrontEnd): its
+        // view; the title's object on None is no view.
+        CHECK(FrontViewOf(fe, front(-1, 0)).valid && !FrontViewOf(none, front(0, -1)).valid);
         GameState bad = front(3, -1);
         bad.valid = false;
         CHECK(!FrontViewOf(fe, bad).valid);

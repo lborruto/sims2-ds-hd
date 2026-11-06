@@ -307,6 +307,7 @@ static void types_and_looks()
     CHECK(look.face == ui::Face::Xbox);
     CHECK(look.glyph[(int)Button::A] == "a" && look.glyph[(int)Button::LB] == "lb" && look.glyph[(int)Button::Start] == "start");
     CHECK(look.glyph[(int)Button::LT] == "lt" && look.glyph[(int)Button::DPad].empty());
+    CHECK(look.glyph[(int)Button::Back] == "back"); // TOUCH MENU's button (the town's menu hint)
     ui::SetChipLook(look);
     const ui::UiItem xa = ui::ChipItem(0, 0, Button::A, "", 24);
     CHECK(xa.face == ui::Face::Xbox && xa.glyph.empty());
@@ -320,6 +321,7 @@ static void types_and_looks()
     CHECK(pa.face == ui::Face::PlayStation && pa.glyph == "a");
     CHECK(ui::Hash({pa}) != ui::Hash({xa}));
     CHECK(ui::ChipRect(0, 0, Button::Start, "", 24).w > startXbox); // "OPTIONS" is longer than "START"
+    const int backPs = ui::ChipRect(0, 0, Button::Back, "Menu", 24).w;   // "SHARE"
     {
         // The cross is drawn in its blue, no green A.
         std::vector<u32> px(48 * 48);
@@ -343,6 +345,7 @@ static void types_and_looks()
     CHECK(look.glyph[(int)Button::LB] == "lb");
     ui::SetChipLook(look);
     CHECK(ui::ChipRect(0, 0, Button::Start, "", 24).w < startXbox); // "+"
+    CHECK(ui::ChipRect(0, 0, Button::Back, "Menu", 24).w < backPs);   // "-"
     CHECK(PrintedInput(IN_A, NINTENDO, false) == IN_B);
     CHECK(PrintedInput(IN_A, NINTENDO, true) == IN_A);
     CHECK(PrintedInput(IN_A, PLAYSTATION, false) == IN_A);
@@ -358,6 +361,7 @@ static void types_and_looks()
     CHECK(look.face == ui::Face::Keyboard);
     CHECK(look.glyph[(int)Button::A] == KeyName(b.Key(A)));
     CHECK(look.glyph[(int)Button::Start] == "ENTER");
+    CHECK(look.glyph[(int)Button::Back] == KeyName(b.Key(PANEL))); // E on QWERTY once the keymap is known
     CHECK(look.glyph[(int)Button::LT].empty() && look.glyph[(int)Button::DPad].empty());
     ui::SetChipLook(look);
     const ui::UiItem ka = ui::ChipItem(0, 0, Button::Start, "", 24);

@@ -42,6 +42,7 @@ const char* DefaultGlyph(Button b)
     case Button::RB: return "rb";
     case Button::LT: return "lt";
     case Button::Start: return "start";
+    case Button::Back: return "back";
     case Button::LStick: return "ls";
     case Button::RStick: return "rs";
     default: return "";
