@@ -176,7 +176,7 @@ MenuView SettingsViewOf(ScreenState s, const GameState& game, const RomData* rom
     return v;
 }
 
-void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom, int topW, int topH)
+void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom, IconCache* icons, int topW, int topH)
 {
     const Theme& th = GameTheme();
     const SettingsState& st = game.front.settings;
@@ -332,6 +332,9 @@ void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState
     SeHint(c, right, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) SeHint(c, right, Button::A, "");
     for (UiItem& im : images) c.ui.push_back(im);
+    // The game's X (B), the mouse onto its own.
+    AddSpriteIcon(c, icons, kSprX, 0, 2, kSeX);
+    AddMousePiece(c, {kSeCloseX - 14, kSeCloseY - 14, 28, 28}, kSeX);
     SortUi(c.ui, first);
 }
 
@@ -347,7 +350,8 @@ MenuView LoadViewOf(ScreenState s, const GameState& game, const RomData* rom)
 {
     MenuView v;
     const LoadScreen& ld = game.front.load;
-    if (!FrontScreenState(s) || !game.valid || !ld.valid) return v;
+    // DS Wireless (the same slot list) keeps milestone 1's view: its tick opens the wireless lobby.
+    if (!FrontScreenState(s) || !game.valid || !ld.valid || ld.wireless) return v;
     if (rom) v.title = MenuWords(*rom, kStrLdTitle);
     // A popup over the slots (the game's "Loading"): the slots wait under it (port/popup.h).
     const bool popup = game.town.popup.valid && game.town.popup.state >= 1 && game.town.popup.state <= 3;
@@ -359,8 +363,9 @@ MenuView LoadViewOf(ScreenState s, const GameState& game, const RomData* rom)
         // The game shows a slot's tick only when the slot is used.
         it.enabled = ld.rows[i].used && !popup;
         if (it.enabled) it.action = {TapStep(kLdTickX, kLdTickY[i])};
+        it.closes = true; // (the game loads: the screen goes)
         it.next[2] = it.next[3] = kNoMove;
-        if (rom) it.word = MenuWords(*rom, ld.wireless ? kStrWireless : kStrLdTitle);
+        if (rom) it.word = MenuWords(*rom, kStrLdTitle);
         v.items.push_back(it);
     }
     if (!popup)
@@ -374,7 +379,7 @@ MenuView LoadViewOf(ScreenState s, const GameState& game, const RomData* rom)
             for (int i = kLoadRows - 1; i >= 0; i--)
                 if (ld.rows[i].used) v.initial = i;
     }
-    v.page = ld.wireless ? 0x21 : 0x20;
+    v.page = 0x20;
     // A press held while the game was not settled is dropped: here a late A loads.
     v.replay = false;
     v.own = true;
@@ -382,7 +387,7 @@ MenuView LoadViewOf(ScreenState s, const GameState& game, const RomData* rom)
     return v;
 }
 
-void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, int topW, int topH)
+void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons, int topW, int topH)
 {
     const Theme& th = GameTheme();
     const LoadScreen& ld = game.front.load;
@@ -457,6 +462,12 @@ void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& ga
             AddHint(c, right, Button::A, a.text);
         }
     }
+    // The game's X (B, while no popup is up), the mouse onto its own.
+    if (!popup)
+    {
+        AddSpriteIcon(c, icons, kSprX, 0, 2, kLdX);
+        AddMousePiece(c, {kLdCloseX - 14, kLdCloseY - 14, 28, 28}, kLdX);
+    }
     SortUi(c.ui, first);
 }
 
@@ -475,7 +486,7 @@ void MeasureFrontMenus(const RomData& rom, BlockMeasure& m)
     const int tw = 880 - 148 - 32;
     tally.Line(kStrLdNoData, MenuWords(rom, kStrLdNoData), 32, 22, tw);
     const int mw = (int)TextWidth(MenuWords(rom, kStrLdMoney, 99999999), 32, Weight::ExtraBold) + 8;
-    tally.Line(kStrLdMoney, "WWWWWWW", 34, 22, tw - mw - 24); // (the widest name the game's keyboard makes)
+    tally.Line(-1, "WWWWWWW", 34, 22, tw - mw - 24); // (the widest name the game's keyboard makes: no string)
     // The widest time: two-digit month and day, 12:59 or 23:59, am / pm.
     LoadRow r;
     r.timeKnown = true;
@@ -489,6 +500,6 @@ void MeasureFrontMenus(const RomData& rom, BlockMeasure& m)
         if (p.empty() || p == "Dummy" || p == "Empty String") continue;
         tally.Line(kStrLdPlace0 + place, p, 28, 20, tw - timeW - 24, Weight::Bold);
     }
-    for (int id : {kStrLdTitle, kStrWireless, kStrClose}) tally.Line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, 300);
+    for (int id : {kStrLdTitle, kStrClose}) tally.Line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, 300);
 }
 }

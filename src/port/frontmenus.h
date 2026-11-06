@@ -55,18 +55,19 @@ constexpr int kSeTabX = 21, kSeTabY0 = 54, kSeTabDy = 40, kSeTabs = 4;     // ta
 constexpr Rect kSeTabFrom {6, 40, 30, 28};                                  // tab i's picture: + dy i (its plate when selected)
 constexpr int kSeTrackX0 = 84, kSeTrackW = 128, kSeMusicY = 96, kSeSfxY = 114;
 constexpr int kSeCells = 12, kSeCellX0 = 56, kSeCellY0 = 72, kSeCellDx = 48, kSeCellDy = 40, kSeCellW = 40, kSeCellH = 32;
+constexpr int kSprX = 7683;                                                 // the game's blue X (as the note's, the catalogue's)
 constexpr int kLdTickX = 231, kLdTickY[3] = {66, 112, 158}, kLdCloseX = 231, kLdCloseY = 22;
 // The game's strings.
 constexpr int kStrSeTitle = 39, kStrSePage0 = 40;                           // + page: Music Volume, SFX Volume, Concept Art, Credits
 constexpr int kStrCredits0 = 2665, kCreditsLines = 436;
 constexpr int kStrLdTitle = 10, kStrLdNoData = 11, kStrLdMoney = 28, kStrLdPlace0 = 67, kStrLdTime = 2432, kStrLdAm = 178, kStrLdPm = 179;
-constexpr int kStrWireless = 9;
 // The game's colours for the credits' headings (sampled on F-opt-credits-400).
 constexpr u32 kCreditsPink = 0xFFF35961, kCreditsGreen = 0xFF79FB00;
 
 // HD geometry (canvas). Settings: the panel at the right of the top screen (port/front.h's main
 // menu: kFrTopBox, kFrPanel), its title, tab bar, the page's name, its content and hints.
-constexpr Rect kSeTitle {840, 64, 392, 56};
+constexpr Rect kSeX {840, 60, 64, 64};                                     // the game's X (7683 2x), the title beside it
+constexpr Rect kSeTitle {912, 64, 320, 56};
 constexpr Rect kSeTabBar {840, 132, 392, 76};
 constexpr int kSeTabCell = 64, kSeTabsX = 1036 - 2 * kSeTabCell;
 constexpr Rect kSeLabel {840, 222, 392, 44};
@@ -79,7 +80,8 @@ constexpr Rect kSeHints {840, 608, 392, 40};
 constexpr Rect SettingsTabRect(int i) { return {kSeTabsX + i * kSeTabCell, kSeTabBar.y + 6, kSeTabCell, kSeTabBar.h - 12}; }
 constexpr Rect SettingsCellRect(int i) { return {kSeGridX + (i & 3) * (kSeHdCellW + kSeCellGapX), kSeGridY + (i >> 2) * (kSeHdCellH + kSeCellGapY), kSeHdCellW, kSeHdCellH}; }
 // Load: the in-game Save slots' panel (port/panelmenu.h's kPmPanel), its rows.
-constexpr Rect kLdTitle {200, 44, 880, 64};
+constexpr Rect kLdTitle {200, 44, 808, 64};
+constexpr Rect kLdX {1016, 44, 64, 64};                                    // the game's X (7683 2x)
 constexpr int kLdRowY0 = 124, kLdRowH = 142, kLdRowGap = 14;
 constexpr Rect LoadRowRect(int i) { return {200, kLdRowY0 + i * (kLdRowH + kLdRowGap), 880, kLdRowH}; }
 
@@ -106,8 +108,9 @@ MenuView SettingsViewOf(ScreenState s, const GameState& game, const RomData* rom
 MenuView LoadView(ScreenState s, const GameState* game, const RomData* rom);
 MenuView LoadViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);
 // The screen drawn into c (empty: the whole canvas is this screen's), the focus on item `focus`.
-void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom, int topW, int topH);
-void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, int topW, int topH);
+// The game's X drawn (icons null: not drawn) and mapped onto its own for the mouse.
+void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom, IconCache* icons, int topW, int topH);
+void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons, int topW, int topH);
 // (A check, --measure-menu) Settings' and Load's words in their boxes: the titles, the pages'
 // names, every credits line, "No Data", the places, the widest name, money and time.
 void MeasureFrontMenus(const RomData& rom, BlockMeasure& m);

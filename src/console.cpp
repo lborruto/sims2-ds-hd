@@ -136,10 +136,12 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     if (s.screen == Screen::FrontEnd || s.screen == Screen::None || s.screen == Screen::Loading)
         if (const MenuView v = ConsoleView(s, game, rom); v.valid)
         {
-            const bool front = FrontView(s, game, rom).valid;
+            // The module by the front end's kind (FrontView takes the boot, title and main menu,
+            // which win over Settings and Load in FrontState::kind).
+            const FrontKind kind = game->front.kind;
             auto screen = [&](const MenuView& view, int f) {
-                if (!front && game->front.settings.valid) BuildSettings(c, view, f, *game, *rom, bottom, topW, topH);
-                else if (!front && game->front.load.valid) BuildLoad(c, view, f, *game, *rom, topW, topH);
+                if (kind == FrontKind::Settings) BuildSettings(c, view, f, *game, *rom, bottom, icons, topW, topH);
+                else if (kind == FrontKind::Load) BuildLoad(c, view, f, *game, *rom, icons, topW, topH);
                 else BuildFront(c, view, f, *game, *rom, icons, topW, topH);
             };
             if (v.popup)

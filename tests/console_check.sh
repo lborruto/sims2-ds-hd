@@ -70,6 +70,7 @@ trap 'rm -rf "$tmp"' EXIT
 # At most MAX_SIMS (default 4) emulators at once, whatever the cases started in the background:
 # "$bin" is this function, which takes one of the slots (a directory each) for the run.
 max_sims=${MAX_SIMS:-4}
+[ "$max_sims" -ge 1 ] 2>/dev/null || max_sims=1
 real_bin=$bin
 sims2wide_slot() {
     local i slot=
@@ -1629,7 +1630,7 @@ check_pad pad-front-boot-a front_boot pad-front-boot-a
 check_pad pad-front-boot-start front_boot pad-front-boot-start
 # Settings and Load-a-Sim (src/port/frontmenus.*, --print-front, copies of the complete save):
 # from F-mm-opt-150, Left, Left, Right → the game's music 90, 80, 90 % read back from RAM, RB →
-# the SFX page, Left → SFX 90 %, B → the title at phase 0; from F-copt-concept-80, A → the unlocked
+# the SFX page, Left → SFX 90 %, Right → SFX 100 % (the top end), B → the title at phase 0; from F-copt-concept-80, A → the unlocked
 # picture on the top screen (art=1), Left, A on a locked one → nothing, RB → Credits, RB → Music
 # (the ring), LB, LB → Concept Art, B → the title; from F-cload-150, Down, Up, A → slot 1 loaded:
 # the game's "Loading" popup (HD), then the town (Panel/Interact, the arrival's Dialogue); a fresh
@@ -1644,7 +1645,7 @@ pad_fm() {
         --layout console --print-game --print-front --print-town "${late[@]}" --input "$input" "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
-pad_fm pad-settings-volume F-mm-opt-150 settings-volume 330 &
+pad_fm pad-settings-volume F-mm-opt-150 settings-volume 380 &
 pad_fm pad-settings-pages F-copt-concept-80 settings-pages 400 &
 pad_fm pad-load-slot F-cload-150 load-slot 360 &
 pad_fm pad-boot-keys - boot-keys 1000 &
@@ -1655,6 +1656,7 @@ settings_volume() {
     awk -v F=105 '$1=="frame" && ($2+0)<=F && /settings page/{l=$0} END{print l}' "$tmp/pad-settings-volume.log" | grep -q 'page=0 music=3[23][0-9][0-9] sfx=4096' || { echo "  music not 80 % after Left"; return 1; }
     awk -v F=155 '$1=="frame" && ($2+0)<=F && /settings page/{l=$0} END{print l}' "$tmp/pad-settings-volume.log" | grep -q 'page=0 music=3[67][0-9][0-9] sfx=4096' || { echo "  music not 90 % after Right"; return 1; }
     awk -v F=255 '$1=="frame" && ($2+0)<=F && /settings page/{l=$0} END{print l}' "$tmp/pad-settings-volume.log" | grep -q 'page=1 music=3[67][0-9][0-9] sfx=3[67][0-9][0-9]' || { echo "  SFX not 90 % on its page"; return 1; }
+    awk -v F=305 '$1=="frame" && ($2+0)<=F && /settings page/{l=$0} END{print l}' "$tmp/pad-settings-volume.log" | grep -q 'page=1 music=3[67][0-9][0-9] sfx=4096' || { echo "  SFX not 100 % after Right"; return 1; }
     in_order pad-settings-volume 'settings page=1' 'front Title' 'title phase=0'
 }
 settings_pages() {

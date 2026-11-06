@@ -65,7 +65,7 @@ bool PopupOver(ScreenState s, const GameState& game)
     return s.screen == Screen::Gift || s.screen == Screen::SaveSlots || s.screen == Screen::Phone || s.screen == Screen::Catalogue || s.screen == Screen::Build ||
            (s.screen == Screen::Unknown && (NoteUp(game) || game.checkIn.valid || game.roomInfo.valid || game.music.valid || game.stat.valid)) ||
            // The front end's Load-a-Sim ("Loading", kind 3; port/frontmenus.h).
-           ((s.screen == Screen::None || s.screen == Screen::FrontEnd) && game.front.load.valid);
+           ((s.screen == Screen::None || s.screen == Screen::FrontEnd) && game.front.load.valid && !game.front.load.wireless);
 }
 
 MenuView PopupView(ScreenState s, const GameState* game, const RomData* rom)

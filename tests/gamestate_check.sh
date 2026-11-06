@@ -22,6 +22,7 @@ trap 'rm -rf "$tmp"' EXIT
 # At most MAX_SIMS (default 4) emulators at once: "$bin" is this function, which takes one of
 # the slots (a directory each) for the run.
 max_sims=${MAX_SIMS:-4}
+[ "$max_sims" -ge 1 ] 2>/dev/null || max_sims=1
 real_bin=$bin
 sims2wide_slot() {
     local i slot=

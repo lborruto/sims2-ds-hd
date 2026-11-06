@@ -2148,6 +2148,8 @@ int main()
                 CHECK(v.valid == (mode != 4));
                 if (!v.valid) continue;
                 CHECK(v.own && !v.replay && v.items.size() == (mode == 0 ? 1u : 0u));
+                // The splashes that take no touch pass the DS's own Start and A on; the last one takes them itself.
+                CHECK(v.passKeys == (mode == 0 ? 0u : (1u << kStart) | (1u << kA)));
                 if (mode == 0)
                 {
                     CHECK(v.items[0].id == kFrBootId && v.items[0].action.size() == 1 && v.buttons[(int)MenuButton::Start] == v.items[0].action);
@@ -2269,7 +2271,7 @@ int main()
                         for (int focus : {-1, 0, 3})
                         {
                             Composition comp {kConsoleW, kConsoleH, {}, {}};
-                            BuildSettings(comp, v, focus, g, rom, bottom.data(), topW, 192);
+                            BuildSettings(comp, v, focus, g, rom, bottom.data(), nullptr, topW, 192);
                             layers(comp);
                             if (focus != 0 || topW != 256 || vol != 1296) continue;
                             for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
@@ -2282,6 +2284,11 @@ int main()
                                 int tx, ty;
                                 CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
                                 CHECK(std::abs(tx - kSeTabX) <= 12 && std::abs(ty - (kSeTabY0 + kSeTabDy * i)) <= 12);
+                            }
+                            {   // The X onto the game's.
+                                int tx, ty;
+                                CHECK(TouchFromComposition(comp, fit, kSeX.x + kSeX.w / 2.0f, kSeX.y + kSeX.h / 2.0f, tx, ty));
+                                CHECK(std::abs(tx - kSeCloseX) <= 14 && std::abs(ty - kSeCloseY) <= 14);
                             }
                             if (page == 2)
                                 for (int i = 0; i < kSeCells; i++)
@@ -2352,6 +2359,8 @@ int main()
                     {
                         const GameState g = load((u8)used, green, popup, wireless);
                         const MenuView v = LoadViewOf(none, g);
+                        // DS Wireless keeps milestone 1's view (its tick opens the wireless lobby).
+                        if (wireless) { CHECK(!v.valid && !LoadView(none, &g, &rom).valid); continue; }
                         CHECK(v.valid && v.own && !v.replay && AllReachable(v) && (int)v.items.size() == kLoadRows);
                         CHECK(!LoadViewOf({Screen::Panel, Tab::Interact}, g).valid && !LoadView(none, &g, &rom).valid);
                         CHECK(v.back.empty() == popup);
@@ -2363,7 +2372,7 @@ int main()
                             CHECK((it.id >> 24) == (kModFrontMenus >> 24));
                             CHECK(it.enabled == ((used & (1 << i)) && !popup));
                             CHECK(it.action.empty() != it.enabled);
-                            if (it.enabled) CHECK(it.action.size() == 1 && it.action[0].x == kLdTickX && it.action[0].y == kLdTickY[i]);
+                            if (it.enabled) CHECK(it.action.size() == 1 && it.action[0].x == kLdTickX && it.action[0].y == kLdTickY[i] && it.closes);
                         }
                         const int first = MenuFirst(v);
                         if (!popup && used)
@@ -2375,7 +2384,7 @@ int main()
                         for (int topW : {256, 341})
                         {
                             Composition comp {kConsoleW, kConsoleH, {}, {}};
-                            BuildLoad(comp, v, first, g, rom, topW, 192);
+                            BuildLoad(comp, v, first, g, rom, nullptr, topW, 192);
                             layers(comp);
                             for (const Piece& q : comp.pieces)
                                 if (q.src == Src::Top) CHECK(!q.touch);
@@ -2391,6 +2400,10 @@ int main()
                                 CHECK(hit == (bool)(used & (1 << i)));
                                 if (hit) CHECK(std::abs(tx - kLdTickX) <= 12 && std::abs(ty - kLdTickY[i]) <= 12);
                             }
+                            // The X onto the game's.
+                            int tx, ty;
+                            CHECK(TouchFromComposition(comp, fit, kLdX.x + kLdX.w / 2.0f, kLdX.y + kLdX.h / 2.0f, tx, ty));
+                            CHECK(std::abs(tx - kLdCloseX) <= 14 && std::abs(ty - kLdCloseY) <= 14);
                         }
                     }
         CHECK(lids.size() == (size_t)kLoadRows);
