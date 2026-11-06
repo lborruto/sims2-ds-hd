@@ -69,6 +69,10 @@ constexpr Rect kFrontTopBox {24, 72, 568, SH * 5 / 2};
 constexpr int kFrontHintY = 600, kFrontHintPad = 14;
 constexpr const char* kFrontHint = "STICK: CURSOR - A: TOUCH";
 
+// The top picture's rows without the game's status bar (its last 16 of 192, whatever the
+// picture's size): the world CONSOLE shows wherever the HD bar or a conversation's box replaces it.
+constexpr int HudCropRows(int topH) { return topH * 176 / 192 > 1 ? topH * 176 / 192 : 1; }
+
 // The hints' box for an activity, at kHintBox's top, as high as its rows (at most kHintBox's):
 // a row per hint, its button in a chip of the panel's colour (round for one letter), what it
 // does beside it at 3x; a hint without a button is a note across the box.

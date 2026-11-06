@@ -146,8 +146,9 @@ add_executable(gamestate_test EXCLUDE_FROM_ALL tests/gamestate_test.cpp src/game
 target_include_directories(gamestate_test PRIVATE melonDS/src src)
 
 # Checks of the ROM's archive and string tables on a synthetic ROM (not built by default): ninja -C build romdata_test && ./build/romdata_test
-add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp)
+add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp src/port/statusbar.cpp)
 target_include_directories(romdata_test PRIVATE melonDS/src src)
+target_link_libraries(romdata_test PRIVATE uikit)
 
 # Checks of the UI kit (wrap, the raster's pixels and determinism; not built by default): ninja -C build uikit_test && ./build/uikit_test
 add_executable(uikit_test EXCLUDE_FROM_ALL tests/uikit_test.cpp)

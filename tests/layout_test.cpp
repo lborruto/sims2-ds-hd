@@ -228,16 +228,20 @@ int main()
         const HudStrings strings = TestStrings();
         for (const auto& top : {std::pair<int, int> {SW, SH}, {341, 192}, {682, 384}})
         {
-            const int rows = top.second * 176 / 192;
+            const int rows = HudCropRows(top.second);
             for (ScreenState st : {ScreenState {Screen::Panel, Tab::Goals}, ScreenState {Screen::Phone, Tab::None}, ScreenState {Screen::Popup, Tab::None},
                                    ScreenState {Screen::Gift, Tab::None}, ScreenState {Screen::SaveSlots, Tab::None}})
                 for (bool menuOpen : {false, true})
                 {
                     const Composition c = BuildConsole(st, menuOpen, -1, top.first, top.second, &hud, &strings);
                     const Piece& w = c.pieces[0];
-                    CHECK(w.src == Src::Top && w.from.y == 0 && w.from.h == rows && w.to.h == kConsoleH);
-                    // Its shape kept (within a pixel's rounding, or cropped at the sides).
+                    // The whole width of the picture (the crop never cuts its sides), at its shape
+                    // (within a pixel's rounding): 720 high at 4:3, the canvas's width and
+                    // top-aligned when wider (widescreen: 1280 x 661), the bar below it.
+                    CHECK(w.src == Src::Top && w.from.x == 0 && w.from.y == 0 && w.from.w == top.first && w.from.h == rows);
                     CHECK(std::abs(w.to.w * w.from.h - w.to.h * w.from.w) <= w.from.h + w.from.w);
+                    CHECK(w.to.y == 0 && w.to.x >= 0 && w.to.x + w.to.w <= kConsoleW && w.to.h <= kConsoleH);
+                    CHECK(top.first * 3 == top.second * 4 ? w.to.h == kConsoleH : (w.to.w == kConsoleW && w.to.h == 661));
                     CHECK(!c.ui.empty());
                     const Rect b = c.ui[0].to;
                     CHECK(b.y == kStatusBarY && b.h == kStatusBarH && b.x >= std::max(w.to.x, 0) && b.x + b.w <= std::min(w.to.x + w.to.w, kConsoleW));

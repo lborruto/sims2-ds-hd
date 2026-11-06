@@ -19,11 +19,15 @@ Overlay FrameAround(Rect r, int before) { return {{r.x - 6, r.y - 6, r.w + 12, r
 // The world (the top picture's first `rows` rows) 720 high: centred when narrower than the
 // canvas (the DS's own 4:3), its sides cropped to 16:9 when wider (a conversation's rows of the
 // widescreen world). A picture within 8 pixels of the canvas's width at that height fills it,
-// stretched by under 1 % (the widescreen world: 341 x 192 is 1279 wide at 720).
-Piece World(int topW, int rows)
+// stretched by under 1 % (the widescreen world: 341 x 192 is 1279 wide at 720). keepSides (the
+// world cropped for the HD status bar): never cut its sides to make room for the crop; wider
+// than the canvas, it is fitted to the canvas's width instead, top-aligned (the widescreen town
+// without its bar: 1280 x 661), the bar in the strip freed below.
+Piece World(int topW, int rows, bool keepSides = false)
 {
     const int w = (int)std::lround(720.0 * topW / rows);
     if (w < kConsoleW - 8) return {Src::Top, {0, 0, topW, rows}, {(kConsoleW - w) / 2, 0, w, kConsoleH}};
+    if (keepSides && w > kConsoleW + 8) return {Src::Top, {0, 0, topW, rows}, {0, 0, kConsoleW, (int)std::lround((double)kConsoleW * rows / topW)}};
     const int fw = w <= kConsoleW + 8 ? topW : std::min(topW, (int)std::lround(rows * 16.0 / 9.0));
     return {Src::Top, {(topW - fw) / 2, 0, fw, rows}, kCanvas};
 }
@@ -93,7 +97,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
     const bool bar = hud && strings && strings->ok;
-    const int worldRows = bar ? std::max(1, topH * 176 / 192) : topH;
+    const int worldRows = bar ? HudCropRows(topH) : topH;
     // A black load (both screens black, RAM between screens): the bare backdrop.
     if (s.screen == Screen::Loading) return c;
     const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::ItemHand || s.screen == Screen::Unknown;
@@ -121,7 +125,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     {
         // The world dimmed behind the touch screen: not playable, the mouse does nothing there.
         // The stick cursor's screens (no table: SaveSlots, ItemHand, Unknown) get a frame.
-        Piece world = World(topW, worldRows);
+        Piece world = World(topW, worldRows, bar);
         world.touch = false;
         c.pieces.push_back(world);
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
@@ -132,7 +136,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     }
     else if (s.screen == Screen::Panel)
     {
-        c.pieces.push_back(World(topW, worldRows));
+        c.pieces.push_back(World(topW, worldRows, bar));
         c.overlays.push_back(Frame(kRailFrame, 1));
         c.pieces.push_back(Bottom(kRailPhoneFrom, kRailPhoneTo));
         c.pieces.push_back(Bottom(kRailTabsFrom, kRailTabsTo));
@@ -141,7 +145,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     else if (s.screen == Screen::Dialogue)
     {
         // Without the status bar (its last 16 of 192 rows).
-        c.pieces.push_back(World(topW, std::max(1, topH * 176 / 192)));
+        c.pieces.push_back(World(topW, HudCropRows(topH)));
         c.overlays.push_back(Frame(kDialogueFrame, 1));
         c.overlays.push_back({kDialogueTextBox, kPanelArgb, 8, 2, kOutlineArgb, 1});
         c.pieces.push_back(Bottom(kDialogueTextFrom, kDialogueTextTo));

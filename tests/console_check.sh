@@ -70,6 +70,7 @@ hotel=(--clock "2026-01-01 14:00")
 late=(--clock "2026-11-05 12:05")
 run s7 s7 --clock "2026-01-01 15:37" &
 run cityhall sit-cityhall "${town[@]}" &
+run cityhall-wide sit-cityhall "${town[@]}" --wide &
 run s7-menu s7 "${town[@]}" --console-focus 0 &
 run cityhall-menu sit-cityhall "${town[@]}" --console-menu &
 run gift sit-gift "${town[@]}" &
@@ -90,7 +91,7 @@ run casino-2x sit-casino "${late[@]}" --print-hud --compose-scale 2 &
 wait
 
 fails=0
-for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots load casino casino-2x; do
+for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots load casino casino-2x; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -160,21 +161,33 @@ def hud_values():
             found = tuple(int(v) for v in m.groups())
     return found
 
-def status_bar(values=None):
-    """The HD status bar at the bottom left (rows 660-708): white text with its dark shadow; with
-    values (from --print-hud), the meter: its body in the tier's colour, filled cur / max of the
-    track (the well's inside less 2 pixels a side) within 2 pixels."""
-    region = [C(x, y) for y in range(662, 706) for x in range(110, 760)]
-    if (255, 255, 255) not in region or OUTLINE not in region:
+def status_bar(values=None, left=132):
+    """The HD status bar: its panel from x `left` (the 4:3 world's left + 16), rows 660-707, found
+    by its frame band (#6171B2) at both ends of row 684; inside it, and only there, white text;
+    with values (from --print-hud), the meter: its body in the tier's colour, filled cur / max of
+    the track (the well's inside less 2 pixels a side) within 2 pixels."""
+    BAND = hexrgb("6171B2")
+    x0, y0, y1 = left, 660, 708
+    expect("status bar band, top", C(x0 + 18, y0 + 2), BAND)
+    expect("status bar band, left", C(x0 + 2, 684), BAND)
+    band = [x for x in range(x0, 1160) if C(x, 684) == BAND]
+    if not band or band[0] > x0 + 3:
+        errors.append("no status bar panel")
+        return
+    x1 = band[-1] + 2
+    if x1 - x0 < 200 or C(x1 - 1, 684) != OUTLINE:
+        errors.append(f"status bar panel {x0}..{x1}: no right edge")
+        return
+    inside = [C(x, y) for y in range(y0 + 4, y1 - 4) for x in range(x0 + 4, x1 - 4)]
+    if inside.count((255, 255, 255)) < 40:
         errors.append("no status bar text")
-    expect("status bar band", C(150, 662), hexrgb("6171B2"))
     if values is None:
         return
     money, hh, mm, cur, mx, tier = values
     body = BODY[tier]
     rows = {}
-    for y in range(660, 709):
-        xs = [x for x in range(100, 1170) if C(x, y) == body]
+    for y in range(y0, y1):
+        xs = [x for x in range(x0, x1) if C(x, y) == body]
         if xs:
             rows[y] = xs
     if not rows:
@@ -182,7 +195,7 @@ def status_bar(values=None):
         return
     y = sorted(rows)[len(rows) // 2 + 1] if len(rows) > 2 else sorted(rows)[0]
     xs = rows[y]
-    wells = [x for x in range(100, 1170) if C(x, y) == WELL]
+    wells = [x for x in range(x0, x1) if C(x, y) == WELL]
     if not wells:
         errors.append("no meter well")
         return
@@ -249,6 +262,18 @@ if case == "cityhall":
     expect("canvas", comp.size, (1280, 720))
     rail()
     status_bar()
+elif case == "cityhall-wide":
+    # Widescreen: the world without the game's bar keeps its sides (never cut to make room for
+    # the crop): 341 x 176 fitted to the canvas's width, 1280 x 661, top-aligned; the backdrop
+    # in the strip below, where the bar sits.
+    big = Image.open(raw_path.replace(".png", "-top.png")).convert("RGB")
+    expect("wide picture", big.size, (341, 192))
+    for cx, cy in ((0, 300), (1279, 100), (640, 400), (300, 655), (1000, 660)):
+        expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * 341 // 1280, cy * 176 // 661)))
+    for cx, cy in ((1000, 680), (1270, 715), (700, 700)):
+        expect(f"backdrop below the world at {cx},{cy}", C(cx, cy), (16, 18, 24))
+    expect("rail outline", C(1170, 360), OUTLINE)
+    status_bar(left=16)
 elif case == "s7":
     big_over_dim()
     status_bar()
