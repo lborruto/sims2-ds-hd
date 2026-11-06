@@ -114,6 +114,9 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp"
     COMMENT "Embedding the UI's font" VERBATIM)
 add_library(uikit STATIC src/ui/kit.cpp src/ui/font.cpp "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp")
 target_include_directories(uikit PUBLIC melonDS/src src PRIVATE src/thirdparty)
+# (The raster draws in bands on a few threads: ui/kit.cpp.)
+find_package(Threads REQUIRED)
+target_link_libraries(uikit PUBLIC Threads::Threads)
 
 # The controllers (src/pads.*) and their mappings: SDL_GameControllerDB (assets/controllers,
 # zlib licence, LICENSE.txt beside it), this platform's lines only, embedded like the font.
@@ -194,6 +197,14 @@ add_executable(layout_test EXCLUDE_FROM_ALL tests/layout_test.cpp src/layout.cpp
     src/port/statusbar.cpp src/romdata.cpp)
 target_include_directories(layout_test PRIVATE melonDS/src src)
 target_link_libraries(layout_test PRIVATE uikit)
+
+# What a press costs on the HD panel menu at the window's scale (a measure, not a check; not built
+# by default): ninja -C build ui_bench && ./build/ui_bench [scale]
+add_executable(ui_bench EXCLUDE_FROM_ALL tests/ui_bench.cpp src/layout.cpp src/activities.cpp src/compose.cpp src/console.cpp src/hotspots.cpp src/screens.cpp
+    src/touchscript.cpp src/ui.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp
+    src/port/statusbar.cpp src/romdata.cpp)
+target_include_directories(ui_bench PRIVATE melonDS/src src)
+target_link_libraries(ui_bench PRIVATE uikit)
 
 # Checks of the synthesised touches (not built by default): ninja -C build touchscript_test && ./build/touchscript_test
 add_executable(touchscript_test EXCLUDE_FROM_ALL tests/touchscript_test.cpp src/touchscript.cpp)

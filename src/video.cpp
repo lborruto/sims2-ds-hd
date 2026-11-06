@@ -99,10 +99,13 @@ void Video::Close()
     win = nullptr;
     for (SDL_Texture*& t : tex) t = nullptr;
     overlayTex.clear();
-    uiStill.clear();
-    uiImages.clear();
-    shellStill.clear();
-    shellImages.clear();
+    for (UiCache* c : {&uiCache, &shellCache})
+    {
+        c->tex.clear();
+        c->layers.entries.clear();
+    }
+    cropTex = nullptr;
+    haveLastShown = false;
 }
 
 void Video::TextInput(bool on)
@@ -309,9 +312,11 @@ void Video::Present(const App& app, const Marks& marks, const std::vector<ui::Ui
         SDL_RenderCopy(ren, t, &f, &d);
     }
     overlaysBefore((int)comp.pieces.size());
-    if (!comp.ui.empty()) DrawUi(comp.ui, fit, uiStill, uiImages);
-    if (!over.empty()) DrawUi(over, CanvasFit::For(1280, 720, ow, oh), shellStill, shellImages);
+    DrawUi(comp.ui, fit, uiCache, app.Bottom());
+    DrawUi(over, CanvasFit::For(1280, 720, ow, oh), shellCache, nullptr);
     Finish(ow, oh);
+    lastShown = std::move(comp);
+    haveLastShown = true;
 }
 
 void Video::PresentUi(const std::vector<ui::UiItem>& shell)
@@ -320,8 +325,9 @@ void Video::PresentUi(const std::vector<ui::UiItem>& shell)
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     SDL_SetRenderDrawColor(ren, 16, 18, 24, 255);
     SDL_RenderClear(ren);
-    DrawUi(shell, CanvasFit::For(1280, 720, ow, oh), shellStill, shellImages);
+    DrawUi(shell, CanvasFit::For(1280, 720, ow, oh), shellCache, nullptr);
     Finish(ow, oh);
+    haveLastShown = false; // (no game shown)
 }
 
 void Video::Finish(int ow, int oh)
@@ -361,62 +367,134 @@ SDL_Texture* Video::OverlayTexture(const Overlay& o, int w, int h)
     return t;
 }
 
-void Video::DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, std::vector<StillTex>& uiStill, std::vector<ImageTex>& uiImages)
+namespace
 {
-    auto texture = [&](SDL_Texture*& t, int& tw, int& th, int w, int h) {
-        if (t && tw == w && th == h) return t;
-        if (t) SDL_DestroyTexture(t);
-        t = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
-        if (t)
-        {
-            SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
-            SDL_SetTextureScaleMode(t, SDL_ScaleModeNearest); // (drawn at its own size)
-        }
-        tw = w;
-        th = h;
-        return t;
-    };
-    std::vector<u32> px;
-    size_t image = 0, still = 0;
-    for (const ui::LayerAt& l : ui::LayersAt(items, fit.scale, fit.ox, fit.oy))
+// A live crop of the touch screen the GPU draws as the kit would (ui::WholeFactorCrop).
+struct CropCheck
+{
+    const u32* bottom;
+    float scale;
+};
+bool DirectCrop(const ui::UiItem& im, const ui::LayerAt& at, void* user)
+{
+    const CropCheck& c = *(const CropCheck*)user;
+    return c.bottom && im.src == c.bottom && ui::WholeFactorCrop(im, at, c.scale);
+}
+}
+
+void Video::DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, UiCache& cache, const u32* bottom)
+{
+    CropCheck check {bottom, fit.scale};
+    cache.layers.Update(items, fit.scale, fit.ox, fit.oy, bottom ? &DirectCrop : nullptr, &check);
+    // The textures follow the cache's entries (by id); the others go.
+    std::vector<std::pair<u64, UiTexture>> kept;
+    bool crops = false;
+    for (const ui::LayerCache::Entry& e : cache.layers.entries)
     {
-        SDL_Texture* t = nullptr;
-        bool draw = true;
-        if (l.still)
+        if (e.direct)
         {
-            if (still == uiStill.size()) uiStill.push_back({nullptr, 0, 0, 0});
-            StillTex& e = uiStill[still++];
-            u64 hash = ui::Hash(l.items);
-            for (u64 v : {(u64)(u32)l.x, (u64)(u32)l.y, (u64)l.w, (u64)l.h, (u64)std::lround(fit.scale * 65536)}) hash = (hash ^ v) * 0x100000001B3ull;
-            draw = !e.tex || hash != e.hash || e.w != l.w || e.h != l.h;
-            t = texture(e.tex, e.w, e.h, l.w, l.h);
-            e.hash = t ? hash : 0;
+            crops = true;
+            continue;
         }
-        else
+        UiTexture t;
+        for (auto& [id, old] : cache.tex)
+            if (id == e.id) { t = old; old.tex = nullptr; break; }
+        bool whole = false;
+        if (!t.tex || t.w != e.w || t.h != e.h)
         {
-            if (image == uiImages.size()) uiImages.push_back({nullptr, 0, 0, 0});
-            ImageTex& e = uiImages[image++];
-            u64 hash = ui::HashImage(l.items[0]);
-            for (u64 v : {(u64)(u32)l.x, (u64)(u32)l.y, (u64)l.w, (u64)l.h, (u64)std::lround(fit.scale * 65536)}) hash = (hash ^ v) * 0x100000001B3ull;
-            draw = !e.tex || hash != e.hash || e.w != l.w || e.h != l.h;
-            t = texture(e.tex, e.w, e.h, l.w, l.h);
-            e.hash = t ? hash : 0;
+            if (t.tex) SDL_DestroyTexture(t.tex);
+            t.tex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, e.w, e.h);
+            if (t.tex)
+            {
+                SDL_SetTextureBlendMode(t.tex, SDL_BLENDMODE_BLEND);
+                SDL_SetTextureScaleMode(t.tex, SDL_ScaleModeNearest); // (drawn at its own size)
+            }
+            t.w = e.w;
+            t.h = e.h;
+            whole = true;
         }
-        if (!t) continue;
-        if (draw)
+        if (t.tex)
         {
-            px.assign((size_t)l.w * l.h, 0);
-            ui::Rasterise(l.items, fit.scale, px.data(), l.w, l.h, l.ox, l.oy);
-            SDL_UpdateTexture(t, nullptr, px.data(), l.w * 4);
+            // What was drawn again, alone (a focus move: the old and the new ring's pixels).
+            if (whole) SDL_UpdateTexture(t.tex, nullptr, e.px.data(), e.w * 4);
+            else
+                for (const Rect& r : e.dirty)
+                {
+                    const SDL_Rect d {r.x, r.y, r.w, r.h};
+                    SDL_UpdateTexture(t.tex, &d, &e.px[(size_t)r.y * e.w + r.x], e.w * 4);
+                }
         }
-        const SDL_Rect d {l.x, l.y, l.w, l.h};
-        SDL_RenderCopy(ren, t, nullptr, &d);
+        kept.push_back({e.id, t});
     }
+    for (auto& [id, old] : cache.tex)
+        if (old.tex) SDL_DestroyTexture(old.tex);
+    cache.tex = std::move(kept);
+    if (crops)
+    {
+        if (!cropTex)
+        {
+            cropTex = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, SW, SH);
+            if (cropTex)
+            {
+                SDL_SetTextureScaleMode(cropTex, SDL_ScaleModeNearest);
+                SDL_SetTextureBlendMode(cropTex, SDL_BLENDMODE_BLEND);
+            }
+        }
+        if (cropTex) SDL_UpdateTexture(cropTex, nullptr, bottom, SW * 4);
+    }
+    // Drawn in the layers' order: the still layers, then the pictures.
+    size_t ti = 0;
+    for (const ui::LayerCache::Entry& e : cache.layers.entries)
+    {
+        if (e.direct)
+        {
+            if (!cropTex) continue;
+            const ui::UiItem& im = e.image;
+            const SDL_Rect f {im.from.x, im.from.y, im.from.w, im.from.h};
+            const SDL_Rect d {e.x, e.y, (int)(im.to.w * fit.scale), (int)(im.to.h * fit.scale)};
+            SDL_SetTextureAlphaMod(cropTex, im.fill ? (Uint8)(im.fill >> 24) : 255);
+            SDL_RenderCopy(ren, cropTex, &f, &d);
+            continue;
+        }
+        const UiTexture& t = cache.tex[ti++].second;
+        if (!t.tex) continue;
+        const SDL_Rect d {e.x, e.y, e.w, e.h};
+        SDL_RenderCopy(ren, t.tex, nullptr, &d);
+    }
+}
+
+void Video::Event(const SDL_Event& ev)
+{
+    if (ev.type == SDL_RENDER_TARGETS_RESET || ev.type == SDL_RENDER_DEVICE_RESET) ForgetTextures();
+}
+
+void Video::ForgetTextures()
+{
+    for (UiCache* c : {&uiCache, &shellCache})
+    {
+        for (auto& [id, t] : c->tex)
+            if (t.tex) SDL_DestroyTexture(t.tex);
+        c->tex.clear();
+        c->layers.entries.clear(); // (every layer drawn and uploaded whole again)
+    }
+    if (cropTex) SDL_DestroyTexture(cropTex);
+    cropTex = nullptr;
+    FreeSharp(); // (Sharp's targets: made again on the next picture)
+    for (OverlayTex& e : overlayTex) SDL_DestroyTexture(e.tex);
+    overlayTex.clear();
+}
+
+const Composition& Video::ShownComposition(const App& app, Composition& scratch) const
+{
+    if (haveLastShown) return lastShown;
+    scratch = Composed(app);
+    return scratch;
 }
 
 bool Video::TouchAt(const App& app, int wx, int wy, int& tx, int& ty, int* pieceIndex) const
 {
-    const Composition c = Composed(app);
+    Composition scratch;
+    const Composition& c = ShownComposition(app, scratch);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     float px, py;
@@ -426,7 +504,8 @@ bool Video::TouchAt(const App& app, int wx, int wy, int& tx, int& ty, int* piece
 
 bool Video::TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& tx, int& ty) const
 {
-    const Composition c = Composed(app);
+    Composition scratch;
+    const Composition& c = ShownComposition(app, scratch);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     float px, py;
@@ -436,7 +515,8 @@ bool Video::TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& 
 
 bool Video::OverTop(const App& app, int wx, int wy) const
 {
-    const Composition c = Composed(app);
+    Composition scratch;
+    const Composition& c = ShownComposition(app, scratch);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     float px, py;
