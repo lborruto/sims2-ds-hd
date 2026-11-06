@@ -1232,7 +1232,8 @@ SettingsState ReadSettings(const Reader& m, u32 S)
     int page = -1;
     for (int i = 0; i < 4; i++) if (vt == f.vtPages[i]) page = i;
     u32 obj[4];
-    for (int i = 0; i < 4; i++) if (!m.R32(S + f.oPages + 4 * (u32)i, obj[i]) || !m.In(obj[i], 0x18)) return v;
+    // Only the current page's object must exist: the others are not built yet (null or stale).
+    for (int i = 0; i < 4; i++) if (!m.R32(S + f.oPages + 4 * (u32)i, obj[i])) return v;
     if (page < 0 || obj[page] != cur) return v;
     if (!m.R32(kEU.gameBlock, G) || !m.R32(G + kEU.town.optMusic, music) || !m.R32(G + kEU.town.optSfx, sfx) || music > f.volMax || sfx > f.volMax || !m.R8(S + f.oArt, art) || art > 1) return v;
     v.page = page; v.music = (int)music; v.sfx = (int)sfx; v.art = art == 0;
@@ -1304,7 +1305,7 @@ LoadScreen ReadLoad(const Reader& m, u32 S, bool wireless)
         if (!r.used) continue;
         const u32 h = t.saveHeader + t.saveHeaderSize * (u32)i;
         u32 money, time, place;
-        if (!m.R32(h + t.saveMoney, money) || !m.R32(h + t.saveTime, time) || !m.R8(h + t.savePlace, place) || f.ldPlace + place >= kEU.menus.stringMax) return LoadScreen{};
+        if (!m.R32(h + t.saveMoney, money) || money > 999999 || !m.R32(h + t.saveTime, time) || !m.R8(h + t.savePlace, place) || f.ldPlace + place >= kEU.menus.stringMax) return LoadScreen{};
         r.money = (int)money; r.place = (int)place; r.placeNameId = (int)(f.ldPlace + place);
         std::string name;
         bool ok = ReadCString(m, h + t.saveName, t.saveNameMax, name);
@@ -1334,8 +1335,10 @@ CasState ReadCas(const Reader& m, u32 S)
     // flight (the old object closed, the new one made on a later update): the page reads, its
     // fields do not (`switching`).
     const bool switching = N == 0 || vt != f.vtCas[idx] || !m.In(N, f.sizeCas[idx]);
-    if (!m.R32(kEU.gameBlock, G) || !ReadCString(m, G + kEU.simName, kEU.simNameMax, c.simName) || c.simName.size() > (size_t)kCasName) return CasState{};
-    for (char ch : c.simName) if (!GameTextByte((unsigned char)ch)) return CasState{};
+    // The committed name (G+0x53) is a field of its own: unreadable or not yet text (a fresh game's
+    // block), it reads empty and the part stays valid.
+    if (!m.R32(kEU.gameBlock, G) || !ReadCString(m, G + kEU.simName, kEU.simNameMax, c.simName) || c.simName.size() > (size_t)kCasName) c.simName.clear();
+    for (char ch : c.simName) if (!GameTextByte((unsigned char)ch)) { c.simName.clear(); break; }
     c.simName = GameTextToUtf8(c.simName);
     u32 H;
     if (m.R32(S + f.casHero + 4 * gender, H) && H != 0 && m.In(H, f.heroSize))

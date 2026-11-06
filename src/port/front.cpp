@@ -33,15 +33,6 @@ FrontScreen ScreenOf(ScreenState s, const GameState& game)
     return FrontScreen::None;
 }
 
-// `w` x `h` fitted in box at its shape, centred.
-Rect Fit(Rect box, int w, int h)
-{
-    if (w <= 0 || h <= 0) return box;
-    const double k = std::min((double)box.w / w, (double)box.h / h);
-    const int fw = std::min(box.w, (int)std::lround(w * k)), fh = std::min(box.h, (int)std::lround(h * k));
-    return {box.x + (box.w - fw) / 2, box.y + (box.h - fh) / 2, fw, fh};
-}
-
 // A framed piece: its 6-pixel frame just outside it (as CONSOLE's front end), not touchable (the
 // top screen: no camera here).
 void FramedPiece(Composition& c, Piece p)
@@ -61,7 +52,14 @@ Rect TopFrom(int topW, int topH)
 std::string Label(const RomData& rom, int i) { return MenuWords(rom, kStrFrMenu[i]); }
 }
 
-Rect FrontFit(Rect box, int w, int h) { return Fit(box, w, h); }
+// `w` x `h` fitted in box at its shape, centred (shared: CONSOLE's top screen, the HD screens').
+Rect FrontFit(Rect box, int w, int h)
+{
+    if (w <= 0 || h <= 0) return box;
+    const double k = std::min((double)box.w / w, (double)box.h / h);
+    const int fw = std::min(box.w, (int)std::lround(w * k)), fh = std::min(box.h, (int)std::lround(h * k));
+    return {box.x + (box.w - fw) / 2, box.y + (box.h - fh) / 2, fw, fh};
+}
 Rect FrontTopFrom(int topW, int topH) { return TopFrom(topW, topH); }
 void FrontFramed(Composition& c, Piece p) { FramedPiece(c, p); }
 
@@ -135,15 +133,15 @@ MenuView FrontViewOf(ScreenState s, const GameState& game, const RomData* rom)
     return v;
 }
 
-void BuildFront(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons, int topW, int topH)
+void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, const GameState& game, const RomData& rom, IconCache* icons, int topW, int topH)
 {
     const size_t first = c.ui.size();
-    const FrontScreen at = v.page == 1 ? FrontScreen::Boot : v.page == 2 ? FrontScreen::Title : v.page == 3 ? FrontScreen::Menu : FrontScreen::None;
+    const FrontScreen at = ScreenOf(s, game);
     if (at == FrontScreen::Title)
     {
         // The game's top screen (its backdrop and logo) as large as the canvas holds it.
         const Rect from = TopFrom(topW, topH);
-        Piece top {Src::Top, from, Fit({0, 0, kConsoleW, kConsoleH}, from.w, from.h)};
+        Piece top {Src::Top, from, FrontFit({0, 0, kConsoleW, kConsoleH}, from.w, from.h)};
         top.touch = false;
         c.pieces.push_back(top);
         // The whole canvas is the game's big button for the mouse.
@@ -164,7 +162,7 @@ void BuildFront(Composition& c, const MenuView& v, int focus, const GameState& g
     }
     else if (at == FrontScreen::Menu)
     {
-        FramedPiece(c, {Src::Top, TopFrom(topW, topH), Fit(kFrTopBox, TopFrom(topW, topH).w, topH), 255, false});
+        FramedPiece(c, {Src::Top, TopFrom(topW, topH), FrontFit(kFrTopBox, TopFrom(topW, topH).w, topH), 255, false});
         UiItem panel = PanelItem(kFrPanel);
         panel.radius = 22;
         c.ui.push_back(panel);
@@ -209,7 +207,7 @@ void BuildFront(Composition& c, const MenuView& v, int focus, const GameState& g
     else if (at == FrontScreen::Boot)
     {
         // The video (top) large at the left and the game's splash (the touch screen) beside it.
-        FramedPiece(c, {Src::Top, TopFrom(topW, topH), Fit(kFrTopBox, TopFrom(topW, topH).w, topH), 255, false});
+        FramedPiece(c, {Src::Top, TopFrom(topW, topH), FrontFit(kFrTopBox, TopFrom(topW, topH).w, topH), 255, false});
         FramedPiece(c, {Src::Bottom, {0, 0, SW, SH}, kFrSplash});
         // Where the game waits for a touch: A and START, under the splash.
         if (!v.items.empty())
@@ -224,7 +222,6 @@ void BuildFront(Composition& c, const MenuView& v, int focus, const GameState& g
             c.ui.push_back(s);
         }
     }
-    (void)game;
     SortUi(c.ui, first);
 }
 

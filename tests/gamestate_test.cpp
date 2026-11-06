@@ -1026,6 +1026,10 @@ static void front_settings()
     r.W32(kS + 0x38, kFH); CHECK(!ReadGameState(r.View()).front.settings.valid); r.W32(kS + 0x38, kFH + 0x300);
     r.W32(kGb + 0x2F70, 0x1001); CHECK(!ReadGameState(r.View()).front.settings.valid); r.W32(kGb + 0x2F70, 0x1000);
     r.W32(kFH + 0x300, 0x1234); CHECK(!ReadGameState(r.View()).front.settings.valid);
+    r.W32(kFH + 0x300, 0x02131BD4);
+    // the other pages not built yet (null or stale pointers): the current page still reads
+    r.W32(kS + 0x2C, 0); r.W32(kS + 0x30, 0xDEADBEEF);
+    g = ReadGameState(r.View()); CHECK(g.front.settings.valid && g.front.settings.page == 3 && g.front.settings.creditsKnown);
 }
 static void front_load()
 {
@@ -1054,6 +1058,8 @@ static void front_load()
     r.W32(h + 0x14, 0xFFFFFFFFu); CHECK(ReadGameState(r.View()).front.load.rows[1].timeKnown && ReadGameState(r.View()).front.load.rows[1].month == 1);   // 2068-01-19
     put_text(r, h + 0x1C, ""); put_text(r, 0x0214B1F4, "Sim");
     CHECK(ReadGameState(r.View()).front.load.rows[1].name == "Sim");
+    r.W32(h + 0x18, 1000000); CHECK(!ReadGameState(r.View()).front.load.valid);   // past the game's money range
+    r.W32(h + 0x18, 999999); CHECK(ReadGameState(r.View()).front.load.valid);
     r.W8(0x0213D848, 2); CHECK(!ReadGameState(r.View()).front.load.valid);
     r.W8(0x0213D848, 0); r.W32(0x0213D84C, 3); CHECK(!ReadGameState(r.View()).front.load.valid);
     Ram w2 = front_ram(0x0214B190, 8); for (u32 i = 0; i < 3; i++) w2.W8(0x0213D848 + i, 0);
@@ -1129,7 +1135,10 @@ static void front_cas()
     setpage(0, 0); r.W32(kS + 0x58, 0); g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.switching && !g.front.cas.nameKnown);   // a page change in flight
     // the committed name never exceeds the game's 7 + NUL
     r.W32(kS + 0x58, kFN); put_text(r, kGb + 0x53, "ABCDEFG"); CHECK(ReadGameState(r.View()).front.cas.simName == "ABCDEFG");
-    for (u32 i = 0; i < 8; i++) r.W8(kGb + 0x53 + i, 'A'); CHECK(!ReadGameState(r.View()).front.cas.valid);
+    // a name that is not text (or no NUL within 8): the part still reads, the committed name empty
+    for (u32 i = 0; i < 8; i++) r.W8(kGb + 0x53 + i, 'A');
+    g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.simName.empty());
+    r.W8(kGb + 0x53, 0x01); r.W8(kGb + 0x54, 0); g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.simName.empty());
     // no hero: the page still reads, the hero's fields stay -1
     put_text(r, kGb + 0x53, "Sim"); r.W32(kS + 0x48, 0); g = ReadGameState(r.View()); r.W16(kS + 0x76, 0);
     g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.skin == -1 && g.front.cas.hairColour == -1);

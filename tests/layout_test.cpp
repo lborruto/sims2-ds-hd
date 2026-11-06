@@ -2107,7 +2107,7 @@ int main()
                 for (int focus : {-1, 0, 3})
                 {
                     Composition comp {kConsoleW, kConsoleH, {}, {}};
-                    BuildFront(comp, v, focus, g, rom, nullptr, topW, 192);
+                    BuildFront(comp, v, focus, fe, g, rom, nullptr, topW, 192);
                     layers(comp);
                     for (const Piece& q : comp.pieces)
                         if (q.src == Src::Top) CHECK(!q.touch && q.from.w == 256 && q.from.x == (topW - 256) / 2); // (the 2D part)
@@ -2156,11 +2156,13 @@ int main()
                     CHECK(v.items[0].action[0].x == kFrSplashX && v.items[0].action[0].y == kFrSplashY);
                 }
                 Composition comp {kConsoleW, kConsoleH, {}, {}};
-                BuildFront(comp, v, MenuFirst(v), g, rom, nullptr, 256, 192);
+                BuildFront(comp, v, MenuFirst(v), at, g, rom, nullptr, 256, 192);
                 layers(comp);
                 int splash = 0;
                 for (const Piece& q : comp.pieces) splash += q.src == Src::Bottom && q.touch && q.to.x == kFrSplash.x && q.to.w == kFrSplash.w;
                 CHECK(splash == 1);
+                // The splash's mouse piece lands anywhere in the splash on the DS's touch screen.
+                if (mode == 0) lands(comp, kFrSplash, 0, 0, SW, SH);
                 if (mode == 0 && at.screen == Screen::None)
                     for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
                         TestConsoleRoundtrip(none, false, 256, 192, o.first, o.second, false, &comp);
@@ -2497,7 +2499,7 @@ int main()
             }
             CHECK(here.size() == v.items.size());
             // X / Y turn the model off the Name page (there the keyboard's page and the backspace).
-            CHECK(v.xyTurns == (page != 0));
+            CHECK(v.xyTurns == (page != 0 && !g.front.cas.switching));
             if (page != 0) CHECK(v.buttons[(int)MenuButton::X].empty() && v.buttons[(int)MenuButton::Y].empty());
             if (g.front.cas.switching) CHECK(v.items.empty() && v.buttons[(int)MenuButton::LB].empty() && v.buttons[(int)MenuButton::Start].empty());
             else

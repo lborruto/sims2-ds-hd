@@ -72,7 +72,7 @@ MenuView FrontView(ScreenState s, const GameState* game, const RomData* rom);
 // The same without the strings' check (tests): rom null leaves the words empty.
 MenuView FrontViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);
 // The screen drawn into c (empty: the whole canvas is this screen's), the focus on item `focus`.
-void BuildFront(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons, int topW, int topH);
+void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, const GameState& game, const RomData& rom, IconCache* icons, int topW, int topH);
 // Shared with port/frontmenus.h: `w` x `h` fitted in box at its shape, centred; the top picture's
 // 2D part (the DS's 4:3: the widescreen looks' black sides left out); a piece with its 6-pixel
 // frame just outside it.
