@@ -1703,6 +1703,7 @@ relaunch:
         app.hudStrings = HudStrings();
         app.game = GameState();
         app.consoleHold.Reset();
+        app.consolePrompt = {};
         app.topBig.clear();
         app.topBigW = app.topBigH = 0;
         app.screens = ScreenTracker();

@@ -13,7 +13,7 @@ Composition ConsoleFresh(const App& app, int topW, int topH, ConsoleBranch* bran
     return BuildConsole(app.ConsoleScreen(), app.consoleMenu, app.consoleFocus, topW, topH, app.Hud(), &app.hudStrings,
                         app.portSupported ? &app.game : nullptr, app.rom.get(), app.Bottom(), app.icons.get(), app.consoleArmed,
                         &app.consolePointer, app.consolePayout, app.consolePictureClosed, app.consoleVeiled, app.consoleWorldOnly, branch,
-                        app.consolePrompt.frames);
+                        &app.consolePrompt);
 }
 
 bool ConsoleM1ByDesign(const App& app)
@@ -52,6 +52,7 @@ void ConsoleHold::Frame(const App& app)
         // Kept for a hold: its live crops' pixels copied (the DS draws the next frame over them),
         // nothing of it touchable.
         last_ = c;
+        DropWorldPrompt(last_);   // (a held picture never says what A does: the target may be gone)
         lastBranch_ = b;
         bool topUsed = false;
         for (const ui::UiItem& it : last_.ui) topUsed |= it.kind == ui::UiItem::Image && it.src == top && top != bottom;

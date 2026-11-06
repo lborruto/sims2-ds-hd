@@ -169,7 +169,7 @@ credits the game shows after the story are still the game's own picture.
 
 **In town** the buttons are the DS's. Near someone or something you can use, a small plate at
 the bottom says what A does there ("A Buy", and who or what): tap A to do it, hold A for the other
-actions (Up / Down choose, let go to do it), Left / Right for the next thing nearby. **The menu** (phone, tabs, shop, the rest of the touch
+actions (Up / Down choose, let go to do it); hold A, then Left / Right for the next thing nearby. **The menu** (phone, tabs, shop, the rest of the touch
 screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes. On the
 Interact tab, A does the highlighted action and Left / Right pick the next thing or person nearby.
 In Pockets, A uses the highlighted item and X throws it away (press X twice: the first only asks,

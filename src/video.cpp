@@ -165,7 +165,7 @@ void Video::Present(const App& app, const Marks& marks, const std::vector<ui::Ui
     SDL_UpdateTexture(tex[1], nullptr, app.Bottom(), SW * 4);
     Composition comp = Composed(app);
     // Paused under the shell: the game's picture without the world's prompt (port/prompt.h).
-    if (shell) std::erase_if(comp.ui, [](const ui::UiItem& it) { return it.kind != ui::UiItem::Image && it.layer == kPromptLayer; });
+    if (shell) DropWorldPrompt(comp);
     // The shell's items, and a toast over the shell when it is open (else over the game).
     std::vector<ui::UiItem> over;
     if (shell) over = *shell;

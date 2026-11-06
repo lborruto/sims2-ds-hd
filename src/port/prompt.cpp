@@ -31,7 +31,8 @@ std::vector<Hint> HintsOf(const WorldPrompt& p, const RomData* rom)
 {
     std::vector<Hint> h;
     if (p.more) h.push_back(p.held ? Hint {Button::DPadV, OwnWord(rom, OwnWordId::PromptChoose)} : Hint {Button::A, OwnWord(rom, OwnWordId::PromptMore)});
-    if (p.others) h.push_back({Button::DPadH, OwnWord(rom, OwnWordId::PromptOther)});
+    // (Left / Right switch targets with A held; without it the D-pad walks the hero.)
+    if (p.others && p.held) h.push_back({Button::DPadH, OwnWord(rom, OwnWordId::PromptOther)});
     return h;
 }
 
@@ -70,7 +71,7 @@ PromptLayout LayOut(const WorldPrompt& p, const RomData* rom)
 
 int PromptSteady::Update(const InteractState* in)
 {
-    if (!in || !in->valid)
+    if (!in || !in->valid || in->target.kind == TargetRef::None)
     {
         *this = PromptSteady {};
         return 0;
@@ -109,10 +110,17 @@ WorldPrompt WorldPromptOf(const InteractState& in, const RomData* rom)
     return p;
 }
 
-bool PromptUp(ScreenState s, const GameState& game, int steadyFrames)
+bool PromptUp(ScreenState s, const GameState& game, const PromptSteady& steady)
 {
+    const InteractState& in = game.town.interact;
     return s.screen == Screen::Panel && s.tab == Tab::Interact && game.valid && game.screen == GScreen::Panel && game.tab == 0 &&
-           game.settled && game.town.interact.valid && steadyFrames >= kPromptSteadyFrames;
+           game.settled && in.valid && steady.had && steady.frames >= kPromptSteadyFrames && steady.target == in.target &&
+           steady.actions == in.actions;
+}
+
+void DropWorldPrompt(Composition& c)
+{
+    std::erase_if(c.ui, [](const UiItem& it) { return it.kind != UiItem::Image && it.layer == kPromptLayer; });
 }
 
 Rect WorldPromptRect(const WorldPrompt& p, const RomData* rom)
@@ -161,9 +169,9 @@ void BuildWorldPrompt(Composition& c, const WorldPrompt& p, const RomData* rom)
     for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kPromptLayer;
 }
 
-void AddWorldPrompt(Composition& c, ScreenState s, const GameState& game, const RomData& rom, int steadyFrames)
+void AddWorldPrompt(Composition& c, ScreenState s, const GameState& game, const RomData& rom, const PromptSteady& steady)
 {
-    if (!PromptUp(s, game, steadyFrames)) return;
+    if (!PromptUp(s, game, steady)) return;
     BuildWorldPrompt(c, WorldPromptOf(game.town.interact, &rom), &rom);
 }
 

@@ -1293,9 +1293,9 @@ elif case == "opt-menu":
     r, g, b = C(197, 360)
     if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the music volume")
 elif case.startswith("prompt-"):
-    # The world's prompt: a kit plate (the panel's fill) centred at the world's foot, above the
-    # status bar's row 650, white words in it; none without a target or on another tab.
-    cols = [x for x in range(16, 1264) if any(C(x, y) == FRAME for y in range(562, 646, 6))]
+    # The world's prompt: a kit plate (the panel's fill) centred at the world's foot, it and its
+    # shadow above row 650, white words in it; none without a target or on another tab.
+    cols = [x for x in range(16, 1264) if any(C(x, y) == FRAME for y in range(556, 640, 6))]
     if case in ("prompt-store", "prompt-concierge"):
         if not cols:
             errors.append("no prompt plate")
@@ -1304,8 +1304,15 @@ elif case.startswith("prompt-"):
             if abs((lo + hi) / 2 - 640) > 12: errors.append(f"the plate not centred: {lo}..{hi}")
             if case == "prompt-store" and not 120 < hi - lo < 320: errors.append(f"the store's plate (A Buy, the clerk): {lo}..{hi}")
             if case == "prompt-concierge" and hi - lo < 340: errors.append(f"no hint beside the concierge's verb: {lo}..{hi}")
-            if (255, 255, 255) not in [C(x, y) for y in range(600, 640) for x in range(lo, hi)]: errors.append("no verb")
-        if any(C(x, 652) == FRAME for x in range(500, 780)): errors.append("the plate below row 650")
+            if (255, 255, 255) not in [C(x, y) for y in range(594, 634) for x in range(lo, hi)]: errors.append("no verb")
+            # Nothing of it from row 650 down, its drop shadow neither: the world's own pixels there
+            # (to row 657: the status bar's own soft edge reaches rows 658-659).
+            w = world_full(176)
+            for y in range(650, 658):
+                bad = [x for x in range(lo - 8, hi + 9, 4) if C(x, y) != w(x, y)]
+                if bad:
+                    errors.append(f"the plate or its shadow at {bad[0]},{y}: {C(bad[0], y)} (the world {w(bad[0], y)})")
+                    break
     elif len(cols) > 20:
         errors.append(f"a prompt plate where none belongs ({len(cols)} columns)")
     status_bar()
