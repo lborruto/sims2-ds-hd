@@ -1,0 +1,5 @@
+# From F-cas-kbs4-140 (the name emptied by backspace), CONSOLE: Y twice → still empty (the game's
+# backspace at empty does nothing), A → "A".
+10 2 pad y
+30 2 pad y
+60 2 pad a

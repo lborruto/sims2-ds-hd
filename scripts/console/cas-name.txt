@@ -1,0 +1,15 @@
+# From s3 (Create-a-Sim's Name page, "Sim", the ABC keyboard; the focus on A), CONSOLE: Y → "Si"
+# (backspace), A → "SiA", X → the abc keyboard, Right, A → "SiAb", X → 123!, A x5 → "SiAb111"
+# (the game's seven: the last two A do nothing), Start → the Hair page, the name committed (G+0x53).
+10 2 pad y
+30 2 pad a
+50 2 pad x
+70 2 pad right
+80 2 pad a
+100 2 pad x
+120 2 pad a
+140 2 pad a
+160 2 pad a
+180 2 pad a
+200 2 pad a
+220 2 pad start

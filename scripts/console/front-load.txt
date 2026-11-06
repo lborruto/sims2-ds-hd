@@ -1,0 +1,5 @@
+# From s2 (the main menu), CONSOLE: Down, A → Load-a-Sim; B (the game's own, passed on) → the
+# title at phase 0.
+10 2 pad down
+20 2 pad a
+200 2 pad b

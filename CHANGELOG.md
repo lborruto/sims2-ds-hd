@@ -19,6 +19,24 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
+- Every minigame on the controller, in an HD frame of its own: the game's name, its numbers
+  (the cards' score board, the vacuum's earnings, the Alien Autopsy's organs, the Metal Detector's
+  charge, signal and depth, the painting's tool and colour, Moogoo Monkey's round and fruit, the
+  Super Drencher's water and pressure, the lottery ticket's boxes, the music mixer's song and tracks)
+  and a bar of the buttons' hints in the game's five languages that follows what the game asks.
+  The Alien Autopsy, the Metal Detector and the Art Gallery have a pointer on the sticks (LT slows
+  it, A holds the stylus down); Moogoo Monkey a green ring on what A touches; the Drencher, the
+  Rat-A-Rang, the lottery, the mixer and its save page their own buttons. Every one can be left
+  with a button. New checks: `--print-minigame`, the minigames' reader from memory, `MAX_SIMS`
+  (the emulators a check runs at once, 4).
+- The front end in HD, played with a controller: the intro's splashes (the video big, the game's
+  last splash with A and Start chips), the title, the main menu (the four buttons big, in the
+  game's order and words), Settings (the volume, the concept art, the credits' roll) and
+  Load-a-Sim (the three slots: name, money, place, date), and Create-a-Sim (your Sim big, the
+  name on the game's keyboard, gender, skin, hair, face, clothes, aspiration). Everything is the
+  game's own taps, read from its memory and your ROM; the end credits after the story stay the
+  game's picture. Checks and flags: `--print-front`, `--print-game` for the front end,
+  `tests/gamestate_check.sh`'s front-end states and `tests/console_check.sh`'s pad scripts.
 - The whole town in HD, played with a controller: the touch screen's menu opens big over the
   town with its five tabs in the game's own look and words. Interact lists what the object or
   person can do (D-pad and A, Left / Right for the next one nearby); Pockets shows the six
@@ -74,17 +92,6 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   Y on Q, L on A and R on Z, the same places as on QWERTY.
 - The hotel's vacuum: AUTO shows its bowl big, with the world beside it, clogged or not; the
   blow key (M) clears its clogged filter.
-
-- Every minigame on the controller, in an HD frame of its own: the game's name, its numbers
-  (the cards' score board, the vacuum's earnings, the Alien Autopsy's organs, the Metal Detector's
-  charge, signal and depth, the painting's tool and colour, Moogoo Monkey's round and fruit, the
-  Super Drencher's water and pressure, the lottery ticket's boxes, the music mixer's song and tracks)
-  and a bar of the buttons' hints in the game's five languages that follows what the game asks.
-  The Alien Autopsy, the Metal Detector and the Art Gallery have a pointer on the sticks (LT slows
-  it, A holds the stylus down); Moogoo Monkey a green ring on what A touches; the Drencher, the
-  Rat-A-Rang, the lottery, the mixer and its save page their own buttons. Every one can be left
-  with a button. New checks: `--print-minigame`, the minigames' reader from memory, `MAX_SIMS`
-  (the emulators a check runs at once, 4).
 
 ### Fixed
 

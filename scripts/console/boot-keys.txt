@@ -1,0 +1,11 @@
+# A fresh boot (no state, the complete save), CONSOLE: Start and A during the splashes that take
+# no touch (the legal text, EA, Maxis: modes 3, 2, 1, from frames 52, 314, 584) are the DS's own
+# (passed on: the game ignores them); the boot goes on to "Touch the Touch Screen to continue."
+# (mode 0, frame 832), where A takes the touch → the title.
+120 2 pad start
+126 2 pad a
+400 2 pad a
+406 2 pad start
+650 2 pad start
+656 2 pad a
+900 2 pad a

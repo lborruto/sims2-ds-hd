@@ -5,7 +5,8 @@
 // game typesets its pages from G when it opens and G does not change while it is up):
 //   Main (page 0): the game's four buttons (Aspirations, Hotel Info, Skills, Game Stats: 1990..1993
 //     under their pictures);
-//   Aspirations (1): the aspiration's picture (362, frame = G+0x68) and name (1994 + it), the
+//   Aspirations (1): the aspiration's picture (362: its frames in the game's on-screen order,
+//   Fortune, Popularity, Romance, Party, so frame = kStAspFrame[G+0x68]) and name (1994 + it), the
 //     gauge (383, frame = the game's round(20 · points / threshold), full at the top level) and the
 //     level's stars (401, frame = the level), both in the level's palette as the game loads it,
 //     what the aspiration gives (1998 + it) and how to level it (2002 + it);
@@ -50,7 +51,10 @@ constexpr int kStFadeWait = 40, kStSwitchWait = 44;
 // The game's sprites (descriptor ids).
 constexpr int kSprStMain = 7630;                                             // the Stat Panel object's own picture (the Main tab)
 constexpr int kSprStNav[kStPages] = {kSprStMain, 398, 4100, 7488, 7636};     // Main's buttons (frame 0)
-constexpr int kSprStAspiration = 362;                                        // frame = the aspiration
+constexpr int kSprStAspiration = 362;                                        // frame = kStAspFrame[the aspiration]
+// Sprite 362's frame for aspiration a (0 Fortune, 1 Romance, 2 Popularity, 3 Party): its frames are
+// Fortune, Popularity (the group), Romance (the couple), Party (the balloons), as the ROM draws them.
+constexpr int kStAspFrame[4] = {0, 2, 1, 3};
 constexpr int kSprStGauge = 383, kSprStStars = 401;                          // frame = the gauge's fill / the level
 // The level's palettes (resource ids), j = {0, 1, 1, 2}[level] (the game's 0x0214B2AC).
 constexpr int kStGaugePal[4] = {0x18C, 0x186, 0x183, 0x189}, kStStarsPal[4] = {0x19E, 0x198, 0x195, 0x19B};

@@ -57,9 +57,9 @@ Before opening a pull request:
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
     ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens (the HD menu, popups and the phone included)
     ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
-    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts (the shop's buys and sells, Build Rooms' buy, cancel and double press, the Registry, check-in, room info, the music and stat pages), the HD conversation (its page follows the game's, A turns two pages, every language's conversations fit the box, every language's HD menu words fit theirs, no character missing from the font, no game text: milestone 1's box) (ROM, shots/, the complete save, Pillow)
+    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts (the shop's buys and sells, Build Rooms' buy, cancel and double press, the Registry, check-in, room info, the music and stat pages, the front end: boot, title, main menu, Settings, Load-a-Sim and Create-a-Sim, including the Start and A pressed during the splashes that take no touch), the HD conversation (its page follows the game's, A turns two pages, every language's conversations fit the box, every language's HD menu words fit theirs, no character missing from the font, no game text: milestone 1's box) (ROM, shots/, the complete save, Pillow)
     ninja -C build gamestate_test && ./build/gamestate_test   # the RAM reader and its screen names on a synthetic RAM (the menus' lists and the hotel's and shops' screens too, fuzzed: the tabs, the phone, Give Gift, notes, the catalogue, Build Rooms, the Registry, room info, music, the stat panel never crash or run past their caps)
-    bash tests/gamestate_check.sh            # each save state's game state read from RAM, the minigames' parts (`--print-minigame`), the recorder's captures (ROM, shots/, the complete save)
+    bash tests/gamestate_check.sh            # each save state's game state read from RAM (the front end's included), the minigames' parts (`--print-minigame`), the recorder's captures (ROM, shots/, the complete save)
     ninja -C build romdata_test && ./build/romdata_test       # the ROM's archive and string tables, the compressions, the sprites and the icon cache on a synthetic ROM: decoded, and every broken table refused (also once under UBSan and libc++'s hardened mode, not ASan)
     ninja -C build uikit_test && ./build/uikit_test           # the UI kit: text wrapping, the raster's determinism and hash, panels, text and chips (no ROM, no window)
     bash tests/romdata_check.sh              # the game's strings read from the ROM in its five languages, its compressed resources and sprites (ROM; RESEARCH= the decoded lines to compare with, else that part is skipped)
@@ -132,6 +132,7 @@ The headless mode runs the game without a window, about four times faster than r
 | `--record-dir DIR` | where unmapped screens are recorded (a window run records by default; headless only with this) |
 | `--strings-count`, `--dump-string ID`, `--language N` | the game's own strings read from the ROM (`romdata.h`), printed; they stop the run; `--language` also picks the HD interface's words |
 | `--print-town` | print the town's state read from RAM when it changes (pockets, options, the popup, the save slots, and the HD menu's lists: Interact's actions, Goals, Relationships, the phone, Give Gift, a note) |
+| `--print-front` | print the front end read from RAM when it changes (`frame N: front Title\|MainMenu\|Settings\|Load\|Wireless\|CreateASim\|KeepSim\|Boot\|Video`, `title phase=..`, `boot mode=..`, the Settings page and volumes, the Load rows, the Create-a-Sim page, name and picks); the front end's pad scripts in `scripts/console/front-*.txt`, `boot-keys.txt`, `settings-*.txt`, `load-slot.txt` and `cas-*.txt` drive it from `tests/console_check.sh` |
 | `--print-hotel` | print the hotel block read from RAM (built, unlocked and building rooms, the score, the five guest slots, the money, the stat totals, the songs, the place) and the hotel's and shops' screens when they change: `checkin` (the Registry, the guest's check-in), `roominfo`, `music`, `build`, `placement`, `catalogue`, `stat` |
 | `--print-hud` | print the status bar's values and the conversation read from RAM when they change (`frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..`, `frame N: dialogue ..`) |
 | `--measure-string ID\|all` | lay a string out in the HD conversation's box (lines, size, fits); `all` every page of the game's conversations (from a `--state-load`); exit 2 for an overflow, a placeholder left in the text or a character the font lacks; stops the run |
@@ -200,9 +201,10 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   the save slots, the item in hand and unknown screens, where the stick cursor works); a
   conversation the world without its status bar and the dialogue's name, text, portrait and
   arrow (2x) in a wide frame; activities the touch screen 3x at the left, the world small at the
-  top right and the hints' box; no HUD (title, main menu, Create-a-Sim) the top screen framed at
-  the left at its own shape and the touch screen 2.5x framed at the right, with the buttons' hint
-  below; a black load between screens (Loading) only the dark backdrop. The focus ring frames a hotspot's area (`hotspots.*`) where the
+  top right and the hints' box; the front end (boot, title, main menu, Settings, Load-a-Sim,
+  Create-a-Sim) its own HD screens (`port/front.*`, `frontmenus.*`, `cas.*`), and without them (no
+  HUD, no view) the top screen framed at the left at its own shape and the touch screen 2.5x
+  framed at the right, with the buttons' hint below; a black load between screens (Loading) only the dark backdrop. The focus ring frames a hotspot's area (`hotspots.*`) where the
   piece showing it draws it. The navigator (below) opens the menu and moves the ring;
   `--console-menu` and `--console-focus N` pin them for the checks' pictures (`tests/console_check.sh`); `tests/layout_test.cpp` maps every pixel of every piece
   of every CONSOLE composition back to itself.

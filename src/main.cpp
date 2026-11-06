@@ -38,6 +38,9 @@
 #include "picker.h"
 #include "romdata.h"
 #include "ui/font.h"
+#include "port/front.h"
+#include "port/frontmenus.h"
+#include "port/cas.h"
 #include "port/build.h"
 #include "port/checkin.h"
 #include "port/roominfo.h"
@@ -96,6 +99,7 @@ static void Usage()
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
         "  --print-hotel                 print the hotel block (rooms, score, guests, songs) and the hotel's and shops' screens (registry, room info, music, build rooms, placement, catalogue, stat panel), read from RAM, when they change\n"
         "  --print-minigame              print the minigame the bottom screen shows (Alien Autopsy, Metal Detector, MooGoo Monkey, scratch lottery, Super Drencher, Crime, Music Mixer and its save menu, Art Gallery), read from RAM, when it changes\n"
+        "  --print-front                 print the front end (title, Settings, Load-a-Sim, Create-a-Sim, boot screens, video), read from RAM, when it changes\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
         "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
@@ -110,7 +114,7 @@ static void Usage()
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
-        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms, the Registry, room info) can show fitted to its box, in --language's\n"
+        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms, the Registry, room info, the main menu, Settings, Load-a-Sim, Create-a-Sim) can show fitted to its box, in --language's\n"
         "                                words: how many shrink, how many need an ellipsis or a character the font lacks (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load; exit 2 on an overflow or a character the font lacks), and stop\n"
@@ -153,7 +157,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
     bool uiDemo = false;
@@ -195,6 +199,7 @@ int main(int argc, char** argv)
         else if (a == "--print-town") printTown = true;
         else if (a == "--print-hotel") printHotel = true;
         else if (a == "--print-minigame") printMinigame = true;
+        else if (a == "--print-front") printFront = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -470,10 +475,28 @@ int main(int argc, char** argv)
         printf("minigame: %d words, %d shrunk, %d cut", mg.checked, mg.shrunk, mg.cut);
         for (int id : mg.cutIds) printf(" %d", id);
         printf("\n");
+        // The front end's main menu: the four buttons' labels.
+        BlockMeasure fe;
+        MeasureFront(*app.rom, fe);
+        printf("front: %d words, %d shrunk, %d cut", fe.checked, fe.shrunk, fe.cut);
+        for (int id : fe.cutIds) printf(" %d", id);
+        printf("\n");
+        // Settings and Load-a-Sim: the titles, the pages, every credits line, the slots' words.
+        BlockMeasure fm;
+        MeasureFrontMenus(*app.rom, fm);
+        printf("frontmenus: %d words, %d shrunk, %d cut", fm.checked, fm.shrunk, fm.cut);
+        for (int id : fm.cutIds) printf(" %d", id);
+        printf("\n");
+        // Create-a-Sim: the pages' titles, the aspirations, Yes / No, the hints, every key.
+        BlockMeasure ca;
+        MeasureCas(*app.rom, ca);
+        printf("cas: %d words, tallest %d (%d lines), %d shrunk, %d cut", ca.checked, ca.tallestId, ca.tallestLines, ca.shrunk, ca.cut);
+        for (int id : ca.cutIds) printf(" %d", id);
+        printf("\n");
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || mg.cut > 0 ||
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || mg.cut > 0 || fe.cut > 0 || fm.cut > 0 || ca.cut > 0 ||
                        !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
@@ -921,6 +944,77 @@ int main(int argc, char** argv)
                     else
                         fprintf(stderr, "frame %ld: stat page=%d transition=%d aspiration=%d level=%d points=%d gauge=%d skills=%d,%d,%d,%d,%d score=%d stayed=%d earned=%d spent=%d aliens=%d goons=%d vacuum=%d metal=%d\n", frame, v.page,
                                 v.transition, v.aspiration, v.level, v.points, v.gaugeFrame, v.skills[0], v.skills[1], v.skills[2], v.skills[3], v.skills[4], v.score, v.guestsStayed, v.earned, v.spent, v.aliens, v.goons, v.vacuum, v.metal);
+                }
+            }
+            if (app.portSupported && printFront)
+            {   // the front end (gamestate.h): one line per part when it changes
+                const FrontState& v = app.game.front;
+                const FrontState& b = before.front;
+                auto num = [](int n) { return std::to_string(n); };
+                if (!(v == b) || frame == 0)
+                {
+                    fprintf(stderr, "frame %ld: front %s\n", frame, FrontKindName(v.kind));
+                    if (!(v.title == b.title) || frame == 0)
+                    {
+                        if (v.title.valid) fprintf(stderr, "frame %ld: title phase=%d menu=%d button=%d\n", frame, v.title.phase, v.title.menu ? 1 : 0, v.title.button);
+                        else fprintf(stderr, "frame %ld: title none\n", frame);
+                    }
+                    if (!(v.settings == b.settings) || frame == 0)
+                    {
+                        const SettingsState& s = v.settings;
+                        if (!s.valid) fprintf(stderr, "frame %ld: settings none\n", frame);
+                        else fprintf(stderr, "frame %ld: settings page=%d music=%d sfx=%d art=%d concept=%s credits=%s\n", frame, s.page, s.music, s.sfx, s.art ? 1 : 0,
+                                     s.conceptKnown ? num(s.conceptBits).c_str() : "?", s.creditsKnown ? (num(s.creditsPos) + "/" + num(s.creditsLine)).c_str() : "?");
+                    }
+                    if (!(v.load == b.load) || frame == 0)
+                    {
+                        const LoadScreen& l = v.load;
+                        if (!l.valid) fprintf(stderr, "frame %ld: load none\n", frame);
+                        else
+                        {
+                            std::string rows;
+                            for (const LoadRow& r : l.rows)
+                            {
+                                std::string e;
+                                if (!r.used) e = "-";
+                                else
+                                {
+                                    char t[40] = "?";
+                                    if (r.timeKnown) snprintf(t, sizeof t, "%d/%d %d:%02d%s", r.month, r.day, r.hour12, r.minute, r.pm ? "pm" : "am");
+                                    e = r.name + ":" + num(r.money) + ":" + num(r.placeNameId) + ":" + t;
+                                }
+                                rows += (rows.empty() ? "" : ",") + e;
+                            }
+                            fprintf(stderr, "frame %ld: load wireless=%d green=%d tapped=%d rows=%s\n", frame, l.wireless ? 1 : 0, l.green, l.tapped, rows.c_str());
+                        }
+                    }
+                    if (!(v.cas == b.cas) || frame == 0)
+                    {
+                        const CasState& c = v.cas;
+                        if (!c.valid) fprintf(stderr, "frame %ld: cas none\n", frame);
+                        else
+                        {
+                            fprintf(stderr, "frame %ld: cas page=%d gender=%d simname=%s skin=%d haircolour=%d", frame, c.page, c.gender, c.simName.c_str(), c.skin, c.hairColour);
+                            if (c.nameKnown) fprintf(stderr, " name=%s len=%d keyboard=%d", c.name.c_str(), c.nameLength, c.keyboard);
+                            if (c.hairKnown) fprintf(stderr, " hair=%d scroll=%d", c.hairStyle, c.hairScroll);
+                            if (c.face >= 0) fprintf(stderr, " face=%d", c.face);
+                            if (c.clothesKnown) fprintf(stderr, " category=%d clothespage=%d item=%d", c.category, c.clothesPage, c.item);
+                            if (c.keepKnown) fprintf(stderr, " aspiration=%d answer=%d", c.aspiration, c.answer);
+                            if (c.switching) fprintf(stderr, " switching");
+                            fprintf(stderr, "\n");
+                            if (c.arrowsKnown) fprintf(stderr, "frame %ld: cas-sprites left=%d right=%d cell=%d pos=%d\n", frame, c.canLeft ? 1 : 0, c.canRight ? 1 : 0, c.clothesCell, c.hairPos);
+                        }
+                    }
+                    if (!(v.boot == b.boot) || frame == 0)
+                    {
+                        if (v.boot.valid) fprintf(stderr, "frame %ld: boot mode=%d count=%d duration=%d top=%d\n", frame, v.boot.mode, v.boot.countdown, v.boot.duration, v.boot.top ? 1 : 0);
+                        else fprintf(stderr, "frame %ld: boot none\n", frame);
+                    }
+                    if (!(v.video == b.video) || frame == 0)
+                    {
+                        if (v.video.valid) fprintf(stderr, "frame %ld: video movie=%d\n", frame, v.video.movie);
+                        else fprintf(stderr, "frame %ld: video none\n", frame);
+                    }
                 }
             }
             if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());

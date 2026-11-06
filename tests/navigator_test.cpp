@@ -2565,8 +2565,242 @@ static void view_lb_rb_pages()
     CHECK(!q.touch.Owns());
 }
 
+// The front end's own views (port/front.h): Start runs the view's Start action (the boot's and the
+// title's touch) as A runs the item's; a press while the game is not settled is held and, the
+// view never replaying, dropped; disabled items (the menu fading in): A does nothing; without a
+// Start action Start does nothing on a view.
+static void view_front_start()
+{
+    MenuView v;
+    v.valid = v.own = true;
+    v.replay = false;
+    ViewItem it;
+    it.rect = {0, 0, 1280, 720};
+    it.id = 0x10000001;
+    it.action = {TapStep(128, 105)};
+    v.items.push_back(it);
+    v.buttons[(int)MenuButton::Start] = it.action;
+    int x = -1, y = -1;
+    {
+        Rig r;
+        r.view = &v;
+        r.Frame(kFrontEnd);
+        r.Press(kFrontEnd, &PadState::start);
+        CHECK(r.Touched(x, y) && x == 128 && y == 105);
+    }
+    {
+        Rig r;
+        r.view = &v;
+        r.Frame(kFrontEnd);
+        r.Press(kFrontEnd, &PadState::a);
+        CHECK(r.Touched(x, y) && x == 128 && y == 105);
+    }
+    {
+        Rig r; // unsettled: held, then dropped (never replayed)
+        r.view = &v;
+        r.Frame(kFrontEnd);
+        PadState st;
+        st.start = true;
+        r.Frame(kFrontEnd, st, false);
+        r.Frame(kFrontEnd, {}, false);
+        r.Frame(kFrontEnd, {}, true);
+        r.Frame(kFrontEnd, {}, true);
+        CHECK(!r.touch.Owns());
+    }
+    {
+        MenuView m = v; // the menu fading in: its buttons dead
+        m.buttons[(int)MenuButton::Start].clear();
+        m.items[0].enabled = false;
+        m.items[0].action.clear();
+        Rig r;
+        r.view = &m;
+        r.Frame(kFrontEnd);
+        r.Press(kFrontEnd, &PadState::a);
+        r.Press(kFrontEnd, &PadState::start);
+        CHECK(!r.touch.Owns() && r.nav.Focus() < 0);
+    }
+}
+
+// Create-a-Sim (port/cas.h) on its own screen: the right stick holds the DS's L / R while
+// deflected (stickTurns; none without it, none from LB / RB, which are the view's page taps), Y and
+// X the view's own taps (backspace, the keyboard's next page), Start its next page, A a key's tap.
+static void view_cas()
+{
+    const ScreenState cas {Screen::CreateASim, Tab::None};
+    MenuView v;
+    v.valid = v.own = true;
+    v.replay = false;
+    v.stickTurns = true;
+    ViewItem key;
+    key.rect = {731, 352, 50, 50};
+    key.id = 0x12000200;
+    key.action = {TapStep(88, 85)};
+    v.items.push_back(key);
+    v.buttons[(int)MenuButton::Y] = {TapStep(165, 168)};
+    v.buttons[(int)MenuButton::X] = {TapStep(58, 145)};
+    v.buttons[(int)MenuButton::Start] = {TapStep(18, 60)};
+    v.buttons[(int)MenuButton::LB] = {TapStep(18, 171)};
+    v.buttons[(int)MenuButton::RB] = {TapStep(18, 60)};
+    int x, y;
+    {
+        Rig r;
+        r.view = &v;
+        r.Frame(cas);
+        PadState left;
+        left.rx = -0.9f;
+        CHECK((r.Frame(cas, left) & ((1u << kL) | (1u << kR))) == (1u << kL));
+        PadState right;
+        right.rx = 0.9f;
+        CHECK((r.Frame(cas, right) & ((1u << kL) | (1u << kR))) == (1u << kR));
+        PadState slight;
+        slight.rx = 0.3f;
+        CHECK((r.Frame(cas, slight) & ((1u << kL) | (1u << kR))) == 0);
+        PadState lb;
+        lb.lb = true;
+        CHECK((r.Frame(cas, lb) & ((1u << kL) | (1u << kR))) == 0 && r.Touched(x, y) && x == 18 && y == 171);
+        r.Drain();
+        r.Frame(cas);
+        CHECK(!r.touch.Owns());
+        r.Press(cas, &PadState::y);
+        CHECK(r.Touched(x, y) && x == 165 && y == 168);
+        r.Drain();
+        r.Press(cas, &PadState::x);
+        CHECK(r.Touched(x, y) && x == 58 && y == 145);
+        r.Drain();
+        r.Press(cas, &PadState::a);
+        CHECK(r.Touched(x, y) && x == 88 && y == 85);
+        r.Drain();
+        r.Press(cas, &PadState::start);
+        CHECK(r.Touched(x, y) && x == 18 && y == 60);
+    }
+    {
+        // X / Y holding L / R (the keyboard's turn, off the Name page): held, not tapped.
+        MenuView w = v;
+        w.xyTurns = true;
+        w.buttons[(int)MenuButton::X].clear();
+        w.buttons[(int)MenuButton::Y].clear();
+        Rig r;
+        r.view = &w;
+        r.Frame(cas);
+        PadState x;
+        x.x = true;
+        CHECK((r.Frame(cas, x) & ((1u << kL) | (1u << kR))) == (1u << kL));
+        CHECK((r.Frame(cas, x) & (1u << kL)) != 0 && !r.touch.Owns());
+        PadState y;
+        y.y = true;
+        CHECK((r.Frame(cas, y) & ((1u << kL) | (1u << kR))) == (1u << kR));
+        CHECK((r.Frame(cas) & ((1u << kL) | (1u << kR))) == 0);
+    }
+    {
+        MenuView w = v;
+        w.stickTurns = false;
+        Rig r;
+        r.view = &w;
+        r.Frame(cas);
+        PadState left;
+        left.rx = -0.9f;
+        CHECK((r.Frame(cas, left) & (1u << kL)) == 0);
+    }
+}
+
+// The boot's splashes that take no touch (port/front.h): a view with no item passes the DS's own
+// Start and A on (passKeys) while they are held; Settings and Load-a-Sim (port/frontmenus.h) on the
+// front end's None screen: LB / RB the view's page taps, a slider's Left / Right its drag, B its
+// back tap then the closing wait, an unsettled A dropped (never replayed).
+static void view_front_menus()
+{
+    const ScreenState none {Screen::None, Tab::None};
+    {
+        MenuView v;
+        v.valid = v.own = true;
+        v.replay = false;
+        v.passKeys = (1u << kStart) | (1u << kA);
+        Rig r;
+        r.view = &v;
+        r.Frame(none);
+        PadState st;
+        st.start = true;
+        CHECK((r.Frame(none, st) & (1u << kStart)) != 0);
+        PadState a;
+        a.a = true;
+        CHECK((r.Frame(none, a) & (1u << kA)) != 0 && !r.touch.Owns());
+        PadState b;
+        b.b = true;
+        CHECK((r.Frame(none, b) & (1u << kB)) == 0);
+    }
+    MenuView v;
+    v.valid = v.own = true;
+    v.replay = false;
+    ViewItem slider;
+    slider.rect = {840, 320, 392, 180};
+    slider.id = 0x11000100;
+    slider.left = {DragStep(212, 96, 199, 96)};
+    for (int& n : slider.next) n = kNoMove;
+    v.items.push_back(slider);
+    v.buttons[(int)MenuButton::LB] = {TapStep(21, 174)};
+    v.buttons[(int)MenuButton::RB] = {TapStep(21, 94)};
+    v.back = {TapStep(19, 17)};
+    v.backCloses = true;
+    int x0, y0, x1, y1;
+    {
+        Rig r;
+        r.view = &v;
+        r.Frame(none);
+        r.Press(none, &PadState::left);
+        CHECK(r.Path(x0, y0, x1, y1) && x0 == 212 && x1 == 199 && y0 == 96 && y1 == 96);
+        r.Press(none, &PadState::right); // (nothing that way: the focus stays)
+        CHECK(!r.touch.Owns() && r.nav.Focus() == 0);
+        r.Press(none, &PadState::rb);
+        CHECK(r.Touched(x0, y0) && x0 == 21 && y0 == 94);
+        r.Drain();
+        r.Frame(none);
+        r.Press(none, &PadState::lb);
+        CHECK(r.Touched(x0, y0) && x0 == 21 && y0 == 174);
+        r.Drain();
+        r.Frame(none);
+        r.Press(none, &PadState::b);
+        CHECK(r.Touched(x0, y0) && x0 == 19 && y0 == 17);
+    }
+    // Load-a-Sim: A taps the slot's tick; held while unsettled, dropped.
+    MenuView ld;
+    ld.valid = ld.own = true;
+    ld.replay = false;
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {200, 124 + 156 * i, 880, 142};
+        it.id = 0x11000300u + (u32)i;
+        it.enabled = i != 1;
+        if (it.enabled) it.action = {TapStep(231, 66 + 46 * i)};
+        ld.items.push_back(it);
+    }
+    {
+        Rig r;
+        r.view = &ld;
+        r.Frame(none);
+        r.Press(none, &PadState::down); // (past the empty slot)
+        CHECK(r.nav.Focus() == 2);
+        r.Press(none, &PadState::a);
+        CHECK(r.Touched(x0, y0) && x0 == 231 && y0 == 158);
+    }
+    {
+        Rig r;
+        r.view = &ld;
+        r.Frame(none);
+        PadState a;
+        a.a = true;
+        r.Frame(none, a, false);
+        r.Frame(none, {}, false);
+        r.Frame(none, {}, true);
+        r.Frame(none, {}, true);
+        CHECK(!r.touch.Owns());
+    }
+}
+
 int main()
 {
+    view_front_menus();
+    view_cas();
     view_modules_on_one_screen();
     view_catalogue_spends_once();
     menu_opens_and_closes();
@@ -2620,6 +2854,7 @@ int main()
     view_popup_over_the_registry();
     view_page_change_restarts_the_focus();
     view_lb_rb_pages();
+    view_front_start();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;
