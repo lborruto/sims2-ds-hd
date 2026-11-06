@@ -27,7 +27,7 @@ struct EUTable
     u32 dlgMaxPages, dlgSpeakers;                           // bounds: pages per speech, Sim records
     u32 simNameMax;                                         // name field bytes incl. the NUL (assumed)
     VtScreen plain[5];
-    OvScreen overlays[8];
+    OvScreen overlays[9];
     struct Town
     {
         u32 recTable, recSize, simRow0, itemRow0;           // rows of 0x12 bytes: Sim k = row 2 + k, item id = row 0x3B + id
@@ -198,6 +198,7 @@ constexpr EUTable kEU = {
         {2, 0x0214C194, GScreen::Catalogue}, {1, 0x0214B1D0, GScreen::Build},
         {17, 0x0214C658, GScreen::Vacuum},   {3, 0x021509B0, GScreen::CreateASim},
         {8, 0x0214B1C4, GScreen::SaveSlots}, {18, 0x0214B8BC, GScreen::Drencher},
+        {-1, 0x02131A70, GScreen::FrontEnd},   // the boot's legal splash (CBGDisplayMenu's vtable, overlay -1)
     },
     {
         0x02122A00, 0x12, 2, 0x3B,

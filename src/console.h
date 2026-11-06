@@ -1,7 +1,7 @@
 // CONSOLE: the game on one 16:9 screen. Per recognised bottom screen (screens.h), a composition
 // of pieces of the two DS screens on a 1280 x 720 canvas, as in the approved mockup: in town (the
-// panel) the world fills the canvas with a rail of the touch screen's tab icons and phone at the
-// right; the menu, the phone, popups and Give Item are the whole touch screen 3x over the dimmed
+// panel) the world fills the canvas (a small hint for the HD menu; milestone 1: a rail of the touch
+// screen's tab icons and phone at the right); the menu, the phone, popups and Give Item are the whole touch screen 3x over the dimmed
 // world (framed for SaveSlots and Unknown); a black load is the bare backdrop; without a
 // HUD (the front end) the top screen at the left and the touch screen 2.5x at the right, each in its frame; a conversation is the world with the
 // game's dialogue redrawn in HD at the bottom (port/dialogue.h; without the game's text, its own box rebuilt wide); an activity is the touch screen 3x at the left
@@ -25,8 +25,10 @@ constexpr u32 kFrameArgb = 0xFF828ACB, kPanelArgb = 0xFF5961A2, kOutlineArgb = 0
 // The world behind the menu.
 constexpr u32 kDimArgb = 0x8C000000;
 
-// Town: the rail, at the canvas's right edge, vertically centred: the phone icon above the tab
-// column, both 2x, in a frame.
+// Town with the game's words (RomData and RAM reading): no rail, the HD menu (Back / E) has the
+// tabs; a hint chip (the button, the word) sits at the canvas's right edge level with the status bar.
+// Without them (milestone 1) the rail stays, the only way to see the tabs: at the canvas's right
+// edge, vertically centred, the phone icon above the tab column, both 2x, in a frame.
 constexpr Rect kRailFrame {1168, 130, 88, 460};
 constexpr Rect kRailPhoneFrom {222, 4, 30, 30}, kRailPhoneTo {1182, 144, 60, 60};
 // (The tab column is x 0-34: the selected icon's ring takes all 35 columns.)
