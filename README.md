@@ -22,10 +22,15 @@
   (Back, or E) opens the touch screen's menu big over the town; conversations are redrawn in
   HD over the whole world (the speaker's name, the game's own words in large type, their
   portrait; A turns the page); popups and the games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
-- **HD where it counts.** The status bar, the conversations, the menu's five tabs (Interact,
-  Pockets, Goals, Relationships, Options), Give Gift, the save slots, the popups, the phone and
-  the notes are redrawn sharp, in the game's own style, with its own icons, and in the game's language (the words come from your copy of the game; with another
-  version of it, the old pictures stay). Everything else is still the game's own picture.
+- **The whole town is HD, and played with a controller.** The status bar, the conversations,
+  the menu's five tabs (Interact, Pockets, Goals, Relationships, Options), Give Gift, the save
+  slots, the popups, the phone and the notes are redrawn sharp, in the game's own style, with
+  its own icons and in the game's language (the words come from your copy of the game; with
+  another version of it, the old pictures stay). Each has a focus the D-pad moves and buttons
+  that say what A, X and B do: do an action, use or throw away an item, give a gift, read your
+  goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend. The
+  games (cards, vacuum, the social reactions) and the shop's catalogue are still the game's own
+  picture, laid out big. No mouse needed, though it works.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
   nothing to set, and it never falls back to the bare two-screen layout. Title, menus and
@@ -51,7 +56,12 @@ It runs the game on the [melonDS](https://melonds.kuribo64.net/) emulator core, 
 It is an early version: see [Good to know](#good-to-know).
 
 <p align="center">
-  <img src="docs/screenshots/console-menu.webp" alt="CONSOLE: the touch screen's menu opened big over the dimmed town" width="440">
+  <img src="docs/screenshots/console-menu.webp" alt="CONSOLE: the menu's Interact tab in HD over the dimmed casino: the object's actions as big rows, the tabs on top" width="440">
+  <img src="docs/screenshots/console-pockets.webp" alt="CONSOLE: the Pockets tab in HD: the six slots, the tools, the counted items, the highlighted item's name and words, Use and Trash" width="440">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/console-phone.webp" alt="CONSOLE: the phone in HD over the dimmed town: the game's green LCD, its Up, OK and Down buttons, the hints below" width="440">
   <img src="docs/screenshots/console-dialogue.webp" alt="CONSOLE: a conversation in HD, the speaker's name on a plate, the words in large type, their portrait" width="440">
 </p>
 

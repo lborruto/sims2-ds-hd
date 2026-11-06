@@ -55,14 +55,14 @@ Before opening a pull request:
     ninja -C build screens_test && ./build/screens_test   # the HUD rule on synthetic top screens
     ninja -C build hotspots_test && ./build/hotspots_test   # the touch targets' tables and focus moves
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
-    ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens
+    ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens (the HD menu, popups and the phone included)
     ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
-    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts, the HD conversation (its page follows the game's, A turns two pages, every language's conversations fit the box, no game text: milestone 1's box) (ROM, shots/, the complete save, Pillow)
-    ninja -C build gamestate_test && ./build/gamestate_test   # the RAM reader and its screen names on a synthetic RAM
+    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts, the HD conversation (its page follows the game's, A turns two pages, every language's conversations fit the box, every language's HD menu words fit theirs, no character missing from the font, no game text: milestone 1's box) (ROM, shots/, the complete save, Pillow)
+    ninja -C build gamestate_test && ./build/gamestate_test   # the RAM reader and its screen names on a synthetic RAM (the menus' lists too, fuzzed: the tabs, the phone, Give Gift and notes never crash or run past their caps)
     bash tests/gamestate_check.sh            # each save state's game state read from RAM, the recorder's captures (ROM, shots/, the complete save)
-    ninja -C build romdata_test && ./build/romdata_test       # the ROM's archive and string tables on a synthetic ROM: decoded, and every broken table refused
+    ninja -C build romdata_test && ./build/romdata_test       # the ROM's archive and string tables, the compressions, the sprites and the icon cache on a synthetic ROM: decoded, and every broken table refused (also once under UBSan and libc++'s hardened mode, not ASan)
     ninja -C build uikit_test && ./build/uikit_test           # the UI kit: text wrapping, the raster's determinism and hash, panels, text and chips (no ROM, no window)
-    bash tests/romdata_check.sh              # the game's strings read from the ROM in its five languages (ROM; RESEARCH= the decoded lines to compare with, else that part is skipped)
+    bash tests/romdata_check.sh              # the game's strings read from the ROM in its five languages, its compressed resources and sprites (ROM; RESEARCH= the decoded lines to compare with, else that part is skipped)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
 states of the situations it touches (below). A change to the menu, the mouse or the keys is
@@ -131,8 +131,15 @@ The headless mode runs the game without a window, about four times faster than r
 | `--print-game` | print what the game says is up, read from its RAM (European ROM only), at frame 0 and whenever it changes: `frame N: game X` |
 | `--record-dir DIR` | where unmapped screens are recorded (a window run records by default; headless only with this) |
 | `--strings-count`, `--dump-string ID`, `--language N` | the game's own strings read from the ROM (`romdata.h`), printed; they stop the run; `--language` also picks the HD interface's words |
+| `--print-town` | print the town's state read from RAM when it changes (pockets, options, the popup, the save slots, and the HD menu's lists: Interact's actions, Goals, Relationships, the phone, Give Gift, a note) |
 | `--print-hud` | print the status bar's values and the conversation read from RAM when they change (`frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..`, `frame N: dialogue ..`) |
-| `--measure-string ID\|all` | lay a string out in the HD conversation's box (lines, size, fits); `all` every page of the game's conversations (from a `--state-load`); stops the run |
+| `--measure-string ID\|all` | lay a string out in the HD conversation's box (lines, size, fits); `all` every page of the game's conversations (from a `--state-load`); exit 2 for an overflow, a placeholder left in the text or a character the font lacks; stops the run |
+| `--measure-menu` | every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes) can show, in `--language`'s words, fitted to its box: how many shrink, how many are cut; exit 2 for a cut word (a neighbour's name in the strip may end in an ellipsis) or a character Nunito lacks (it would be drawn `?`); stops the run |
+| `--dump-resource ID FILE` | write resource ID of the game's archive to FILE, its compression undone (it says when the header was a stored one, or the resource not compressed); stops the run (`tests/romdata_check.sh`) |
+| `--dump-sprite ID FRAME FILE` | write frame FRAME of the sprite whose descriptor is resource ID (tiles ID - 1, palette ID + 1) as a PNG; stops the run |
+| `--console-menu`, `--console-focus N` | (checks) pin CONSOLE's menu open and its focus on item N of the HD view, for a picture; `-1` none |
+| `--dialogue-string ID` | (checks) the HD conversation shows string ID on every page (the longest strings' pictures) |
+| `--game-unknown-after N` | (checks) fake a new unmapped screen every 200 frames from frame N, to drive the recorder |
 | `--no-romdata` | do not read the game's text: CONSOLE as in milestone 1 (the old status bar and conversation) |
 | `--compose-scale N` | `--compose` pictures N times the canvas (1 to 4), the UI drawn at that size |
 | `--ui-demo` | the UI kit's demonstration drawn over the picture |
