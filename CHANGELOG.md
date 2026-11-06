@@ -7,6 +7,16 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+### Docs
+
+- The README is short and for players; the full manual (every control, the settings, the
+  layouts, what is still rough) moves to `docs/manual.md`.
+
+### Added
+
+- The Steam Controller and the Steam Deck work through Steam's default Gamepad layout (added as
+  a non-Steam game); without Steam, the Steam Controller needs `SDL_JOYSTICK_HIDAPI_STEAM=1`.
+
 ### Changed
 
 - CONSOLE is now the default layout (the other layouts stay in the pause menu's Settings).
