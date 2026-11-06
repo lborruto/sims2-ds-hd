@@ -125,7 +125,7 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
         dt.layer = 1;
         c.ui.push_back(dt);
     }
-    // The bow: the game's own button (live) on a bar with A and the game's "Give Gift".
+    // The bow: the game's own button on a bar with A and the game's "Give Gift".
     const bool canGive = MenuFocusable(v, focus);
     {
         UiItem b = PanelItem(kGiftBow);
@@ -153,21 +153,17 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
         AddHint(c, right, Button::A, a.text);
     }
 
-    // Images: the items, the bow (live), the portrait (live).
+    // Images: the items, the bow (the game's sprite), the portrait (live).
     for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++)
         AddSpriteIcon(c, icons, inv.slots[i].iconRes, 0, 3, SlotRect(i), v.items[i].enabled ? 0 : 0x60000000);
+    AddSpriteIcon(c, icons, kSprBow, 0, 2, kGiftBowIcon, canGive ? 0 : 0x60000000);
     if (bottom)
     {
-        const int bw = kGiftBowFrom.w * 2, bh = kGiftBowFrom.h * 2;
-        c.ui.push_back(ImageItem({kGiftBow.x + 16, kGiftBow.y + (kGiftBow.h - bh) / 2, bw, bh}, bottom, SW, SH, kGiftBowFrom));
         const int w = kGiftPortraitFrom.w * 3, h = kGiftPortraitFrom.h * 3;
         c.ui.push_back(ImageItem({kGiftPortrait.x + (kGiftPortrait.w - w) / 2, kGiftPortrait.y + (kGiftPortrait.h - h) / 2, w, h}, bottom, SW,
                                  SH, kGiftPortraitFrom));
     }
 
-    std::stable_sort(c.ui.begin() + (long)first, c.ui.end(), [](const UiItem& a, const UiItem& b) {
-        const int ka = a.kind == UiItem::Image ? 1 << 20 : a.layer, kb = b.kind == UiItem::Image ? 1 << 20 : b.layer;
-        return ka < kb;
-    });
+    SortUi(c.ui, first);
 }
 }

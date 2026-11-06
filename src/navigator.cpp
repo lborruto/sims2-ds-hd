@@ -114,7 +114,7 @@ bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
         const int f = MenuFocusable(v, focus_) ? focus_ : MenuFirst(v);
         if (b == &PadState::a) return f >= 0 && !v.items[f].action.empty();
         if (b == &PadState::b) return !v.back.empty();
-        if (b == &PadState::x) return !(MenuFocusable(v, f) && !v.items[f].buttonX.empty() ? v.items[f].buttonX : v.buttons[(int)MenuButton::X]).empty();
+        if (b == &PadState::x) return !XAction(v, f).empty();
         if (b == &PadState::y) return !v.buttons[(int)MenuButton::Y].empty();
         return s.screen == Screen::Panel && (b == &PadState::lb || b == &PadState::rb); // (the panel's tabs)
     }
@@ -123,6 +123,16 @@ bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
     if (s.screen == Screen::Panel) return b == &PadState::lb || b == &PadState::rb; // B / MENU close the menu, no tap
     if (s.screen == Screen::Phone) return b == &PadState::b || b == &PadState::menu;
     return b == &PadState::b && CloseOf(h) >= 0;
+}
+
+const MenuAction& Navigator::XAction(const MenuView& v, int f) const
+{
+    if (MenuFocusable(v, f) && !v.items[f].buttonX.empty())
+    {
+        const ViewItem& it = v.items[f];
+        return it.xAsks && armed_ != it.id ? it.xArm : it.buttonX;
+    }
+    return v.buttons[(int)MenuButton::X];
 }
 
 bool Navigator::Run(const MenuAction& a, const TouchScript& touch)
@@ -345,7 +355,14 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             }
             if (pressed(&PadState::a) && MenuFocusable(v, focus_)) Run(v.items[focus_].action, touch);
             if (pressed(&PadState::x))
-                Run(MenuFocusable(v, focus_) && !v.items[focus_].buttonX.empty() ? v.items[focus_].buttonX : v.buttons[(int)MenuButton::X], touch);
+            {
+                // An asking X (Pockets' bin): the first press arms the item (and runs its xArm),
+                // the second performs it.
+                const bool asks = MenuFocusable(v, focus_) && v.items[focus_].xAsks && !v.items[focus_].buttonX.empty();
+                const MenuAction& a = XAction(v, focus_);
+                if (asks && armed_ != v.items[focus_].id) { if (a.empty() || Run(a, touch)) armed_ = v.items[focus_].id; }
+                else if (Run(a, touch) && asks) armed_ = 0;
+            }
             if (pressed(&PadState::y)) Run(v.buttons[(int)MenuButton::Y], touch);
             const int t = s.tab == Tab::None ? -1 : (int)s.tab - (int)Tab::Interact;
             if (s.screen == Screen::Panel && pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
@@ -428,6 +445,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     case Mode::Activity: break; // (ActivityInput sets it: -1 in the vacuum)
     default: focus_ = -1; break;
     }
+    // An armed X lasts while its item keeps the focus on the same HD view (a move, a tab change,
+    // the item going, the menu closing: disarmed).
+    if (!viewFocus_ || focusId_ != armed_) armed_ = 0;
     prev_ = pad;
     view_ = nullptr; // (the caller's view lives for this call only)
 }
@@ -446,6 +466,7 @@ void Navigator::Leave(TouchScript& touch)
     view_ = nullptr;
     viewFocus_ = false;
     viewHash_ = 0;
+    armed_ = 0;
     screen_ = ScreenState();
     fresh_ = true;
 }

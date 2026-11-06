@@ -317,9 +317,6 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
 
     // The still items in ascending layers (the tab's wells on layer 0 come after the frame's
     // layer 1 items above), each layer in the order given; the images after them.
-    std::stable_sort(c.ui.begin() + (long)first, c.ui.end(), [](const UiItem& a, const UiItem& b) {
-        const int ka = a.kind == UiItem::Image ? 1 << 20 : a.layer, kb = b.kind == UiItem::Image ? 1 << 20 : b.layer;
-        return ka < kb;
-    });
+    SortUi(c.ui, first);
 }
 }

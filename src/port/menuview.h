@@ -19,6 +19,7 @@
 
 #include "common.h"
 #include "layout.h"
+#include "ui/kit.h"
 
 namespace sims2wide
 {
@@ -53,6 +54,12 @@ struct ViewItem
     // screen-wide X; empty: as without.
     MenuAction buttonX;
     std::string xWord;    // its hint's word (the frame shows X with it while the item has the focus)
+    // X asks first (a destructive X the game itself does not confirm: Pockets' bin): the first X
+    // on the item only arms it (and runs xArm: the game's selection tapped there), the second X
+    // on the armed item runs buttonX; a focus move, a tab change, the item going or the menu
+    // closing disarms it (the navigator's Armed()).
+    bool xAsks = false;
+    MenuAction xArm;
     // Explicit focus moves, item indices for Up, Down, Left, Right (-1: the nearest by geometry,
     // MenuNeighbour): a link the geometry would leave to chance (the panel's phone button above
     // the tab's first row and back).
@@ -85,6 +92,9 @@ struct MenuView
     int selected = -1;
     // The tab's title, in the game's words (the frame draws it).
     std::string title;
+    // (Drawing only, not hashed: set by CONSOLE from the navigator) the id of the item whose X is
+    // armed (xAsks), 0 none.
+    u32 armed = 0;
 
     // What the player sees and what the items do (rects, actions, enabled, ids, moves, words,
     // buttons, the selection, the title): a press held by the gate is dropped when this changes
@@ -105,6 +115,9 @@ int MenuMove(const MenuView& v, int from, int dir);
 // the nearest enabled one, the one before before the one after at the same distance; -1 when
 // none is enabled.
 int MenuKeep(const MenuView& v, u32 id, int old);
+// The UI items from `first` on in ascending still layers, each layer in the order given, the
+// images after them (as LayersAt draws them): what every HD screen does last.
+void SortUi(std::vector<ui::UiItem>& items, size_t first = 0);
 // Whether `i` is a focusable item of v.
 inline bool MenuFocusable(const MenuView& v, int i) { return i >= 0 && i < (int)v.items.size() && v.items[i].enabled; }
 }

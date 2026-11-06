@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "hotspots.h"
+#include "port/gift.h"
 #include "port/icons.h"
 #include "port/panelmenu.h"
 #include "romdata.h"
@@ -105,16 +106,21 @@ void AddPocketsView(MenuView& v, const InventoryState& inv, const PocketsSel& se
     {
         ViewItem it;
         it.rect = SlotRect(i);
-        it.id = kPkSlotId + (u32)i;
         it.enabled = i < (int)inv.slots.size();
+        // Its id carries the item (another item in the slot is another item: the focus and an
+        // armed bin do not stay on it).
+        it.id = kPkSlotId + (u32)i + (it.enabled ? (u32)(inv.slots[i].id & 0xFFFF) << 8 : 0);
         const DsPoint p = SlotPoint(i);
         if (it.enabled)
         {
             it.action = {TapStep(p.x, p.y), hand};
             it.word = use;
-            // The bin: the game throws its selected slot's item away; a slot it has not selected
-            // is selected first (the HD menu's question: the bin turns green).
-            it.buttonX = {sel.slot == i ? TapStep(kPkBinX, kPkBinY) : TapStep(p.x, p.y)};
+            // The bin: the game throws its selected slot's item away at once, so X asks: the first
+            // X selects the slot in the game (its ring, the HD bin green), the second taps the
+            // slot again and the bin.
+            it.xAsks = true;
+            it.xArm = {TapStep(p.x, p.y)};
+            it.buttonX = {TapStep(p.x, p.y), TapStep(kPkBinX, kPkBinY)};
             if (rom) it.xWord = MenuWords(*rom, kStrTrash);
         }
         v.items.push_back(it);
@@ -147,6 +153,15 @@ void AddPocketsView(MenuView& v, const InventoryState& inv, const PocketsSel& se
         return -1;
     };
     const int k0 = first + kSlots;
+    // Right from a slot: the next enabled slot of its row, else its row's key item (the cone
+    // alone sends the first slot to the counted row when the rest of its row is empty).
+    for (int i = 0; i < kSlots; i++)
+    {
+        int to = k0 + i / 3;
+        for (int j = i + 1; j < (i / 3 + 1) * 3; j++)
+            if (v.items[first + j].enabled) { to = first + j; break; }
+        v.items[first + i].next[3] = to;
+    }
     v.items[k0].next[2] = lastIn(0);
     v.items[k0 + 1].next[2] = lastIn(1) >= 0 ? lastIn(1) : lastIn(0);
     v.items[k0 + 2].next[2] = first + kSlots + kKeys + kCounted - 1;
@@ -223,11 +238,12 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
         dt.layer = 1;
         c.ui.push_back(dt);
     }
-    // The hand: usable for the focused item (a slot, an owned key item); the bin: for a slot,
-    // green when the game has that slot selected (one more X throws it away).
-    const bool canUse = MenuFocusable(v, focus) && !v.items[focus].action.empty();
-    const bool canBin = focus >= 0 && focus < kSlots && MenuFocusable(v, focus);
-    const bool armed = canBin && sel.slot == focus;
+    // The hand: usable for the focused item (a slot, an owned key item; not the phone); the bin:
+    // for a slot, green when its X is armed (one more X throws it away).
+    const bool onItem = MenuFocusable(v, focus) && focus < kSlots + kKeys + kCounted;
+    const bool canUse = onItem && !v.items[focus].action.empty();
+    const bool canBin = onItem && focus < kSlots;
+    const bool armed = canBin && v.armed != 0 && v.armed == v.items[focus].id;
     auto button = [&](Rect r, const std::string& label, bool on, bool green) {
         UiItem b = PanelItem(r);
         b.fill = green ? 0xFF8ACB9A : th.frame;
@@ -263,12 +279,7 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
     AddSpriteIcon(c, icons, kSprHand, 0, 2, handIcon, canUse ? 0 : 0x60000000);
     AddSpriteIcon(c, icons, armed ? kSprBinGreen : kSprBin, 0, 2, binIcon, canBin ? 0 : 0x60000000);
 }
-}
 
-#include "port/gift.h"
-
-namespace sims2wide
-{
 BlockMeasure MeasurePockets(const RomData& rom)
 {
     using namespace ui;
@@ -310,7 +321,7 @@ BlockMeasure MeasurePockets(const RomData& rom)
     // Every name and description: the items (any object may be in the pockets), the key items,
     // the counted items; in the Pockets info and the Give Gift info.
     std::vector<std::pair<int, int>> items;
-    for (int id = 0; id <= 330; id++) items.push_back({463 + id, 822 + id});
+    for (int id = 0; id <= kItemIdLast; id++) items.push_back({kItemNameBase + id, kItemDescBase + id});
     for (int k = 0; k < 3; k++) items.push_back({1968 + k, 1972 + k});
     for (int i = 0; i < 4; i++) items.push_back({1154 + i, 845 + i});
     for (auto [nameId, desc] : items)
@@ -326,9 +337,9 @@ BlockMeasure MeasurePockets(const RomData& rom)
     line(kStrTrash, MenuWords(rom, kStrTrash), 26, 18, kPkBinBtn.w - 92);
     line(kStrGive, MenuWords(rom, kStrGive), 30, 20, kGiftBow.w - 120);
     for (int id : {kStrUse, kStrTrash, kStrGive}) line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, 240);
-    for (int id = 321; id <= 368; id++)
+    for (int id = kSimNameUnknown; id <= kSimNameLast; id++)
     {
-        if (id == 322 || unused(id)) continue;
+        if ((id > kSimNameUnknown && id < kSimNameBase) || unused(id)) continue;
         const std::string n = MenuWords(rom, id);
         line(id, MenuWordsWith(rom, kStrGiftTitle, n), kPmTitleSize, kPmTextMin, kGiftTitle.w - 48);
         line(id, n, 26, 18, kGiftName.w - 32);

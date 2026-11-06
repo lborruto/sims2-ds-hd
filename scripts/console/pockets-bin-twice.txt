@@ -1,0 +1,4 @@
+# From A-pk-cnt3-slot1, CONSOLE: MENU, X (the bin asks), X again: the slot's item thrown away.
+20 2 pad menu
+60 2 pad x
+120 2 pad x

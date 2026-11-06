@@ -224,9 +224,9 @@ MenuMeasure MeasureInteract(const RomData& rom)
         if (w > m.widestW) { m.widestW = w; m.widestId = id; }
     }
     const StripBoxes sb = Strip();
-    std::vector<int> names {321};
-    for (int id = 323; id <= 368; id++) names.push_back(id);
-    for (int id = 463; id <= 793; id++) names.push_back(id);
+    std::vector<int> names {kSimNameUnknown};
+    for (int id = kSimNameBase; id <= kSimNameLast; id++) names.push_back(id);
+    for (int id = kItemNameBase; id <= kItemNameBase + kItemIdLast; id++) names.push_back(id);
     for (int id : names)
     {
         if (unused(id)) continue;

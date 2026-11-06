@@ -11,7 +11,7 @@
 #   the second only, the world dimmed); s7 (the phone): the touch screen 3x over the dimmed world; the same with
 #   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item, empty pockets)
 #   and gift-items (A-gift2-base; 1x, 2x, --wide): the HD Give Gift (src/port/gift.*: the portrait
-#   3x and the bow 2x as the touch screen's pixels, the focus around the selected slot);
+#   3x as the touch screen's pixels, the bow the game's sprite, the focus around the selected slot);
 #   pockets-menu (A-pk-cnt3-slot1, the complete save): the HD Pockets tab (src/port/pockets.*); s5 with --no-romdata (no game text: milestone 1's conversation): the dialogue
 #   rebuilt wide from the game's pieces; s5-hd (the HD conversation, src/port/dialogue.*): the
 #   world whole, the panel, the name plate's and the text's white pixels, the portrait as the
@@ -110,6 +110,7 @@ run casino-menu-2x sit-casino "${late[@]}" --console-menu --console-focus 1 --pr
 run casino-menu-wide sit-casino "${late[@]}" --console-menu --console-focus 0 --wide &
 wait
 run pockets-menu A-pk-cnt3-slot1 "${late[@]}" --console-menu --console-focus 0 &
+run pockets-armed A-pk-cnt3-slot1 "${late[@]}" --console-menu --console-focus 0 --input "$repo/scripts/console/pockets-bin-once.txt" &
 run gift-items A-gift2-base "${town[@]}" --console-focus 0 &
 run gift-items-2x A-gift2-base "${town[@]}" --console-focus 0 --compose-scale 2 &
 run gift-items-wide A-gift2-base "${town[@]}" --console-focus 0 --wide &
@@ -122,7 +123,7 @@ wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
-    menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu gift-items gift-items-2x gift-items-wide \
+    menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
@@ -376,12 +377,15 @@ elif case == "s7-menu":
     expect("inside the ring", C(256 + 36 + 1, 72 + 420 + 75), bottom(12, 165))
 elif case in ("gift", "gift-items", "gift-items-2x", "gift-items-wide"):
     # Give Item in HD (src/port/gift.*): the panel, the title's well, the recipient's portrait as
-    # the touch screen's own pixels 3x (DS 167,47 65 x 81), the bow 2x; never the touch screen 3x.
+    # the touch screen's own pixels 3x (DS 167,47 65 x 81), the bow the game's sprite; never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
     expect("panel band", C(180, 300), hexrgb("6171B2"))
     expect("title well", C(640, 50), hexrgb("6A72B8"))
     piece("portrait 3x", 167, 47, 65, 81, 862, 195, 3, step=4)
-    piece("bow 2x", 108, 67, 38, 38, 468, 476, 2, step=3)
+    # The bow: the game's sprite (3631, blue on its round button) in its bar.
+    bow = [C(x, y) for y in range(486, 546, 2) for x in range(470, 530, 2)]
+    if sum(1 for p in bow if p[2] > p[0] + 60 and p[2] > p[1] + 40) < 20:
+        errors.append("no bow in its bar")
     if C(256 + 3 * 120 + 1, 72 + 3 * 100 + 1) == bottom(120, 100) and C(256 + 3 * 30 + 1, 72 + 3 * 160 + 1) == bottom(30, 160):
         errors.append("the touch screen 3x is drawn")
     ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
@@ -394,7 +398,7 @@ elif case in ("gift", "gift-items", "gift-items-2x", "gift-items-wide"):
         # Slot 1's item: the game's own icon (not the cell's flat fill).
         cell = {C(x, y) for y in range(200, 290, 4) for x in range(215, 290, 4)}
         if len(cell) < 8: errors.append(f"slot 1 has no icon ({len(cell)} colours)")
-elif case == "pockets-menu":
+elif case in ("pockets-menu", "pockets-armed"):
     # Pockets in HD (src/port/pockets.*): the Pockets tab's icon green, the focus ring around slot
     # 1 (the Arcade-Pie Factory), the counted items' icons the touch screen's pixels 2x (DS 99 +
     # 29i, 155, 23 x 23), their counts in white, the item's name in the info; never the touch
@@ -415,6 +419,11 @@ elif case == "pockets-menu":
         errors.append("no count under the first counted item")
     if (255, 255, 255) not in [C(x, y) for y in range(222, 258) for x in range(692, 900)]:
         errors.append("no name in the info")
+    # The bin's button: green only once X asked (pockets-armed: one X), plain before.
+    r, g, b = C(1010, 550)
+    green = g > r + 40 and g > b + 20
+    if green != (case == "pockets-armed"):
+        errors.append(f"the bin's button {'not ' if case == 'pockets-armed' else ''}green: {(r, g, b)}")
     # (The panel's colours are the game's: a few pixels may match the touch screen 3x by chance.)
     same = sum(1 for y in range(8, 184, 16) for x in range(8, 248, 16) if C(256 + 3 * x + 1, 72 + 3 * y + 1) == bottom(x, y))
     if same > 100: errors.append(f"the touch screen 3x is drawn ({same} of 165 samples)")
@@ -575,6 +584,10 @@ pad_late pad-target D-cas-right2 interact-target 220 &
 pad pad-buy sit-store interact-buy 200 &
 pad_late pad-drencher A-pk-slot1-key2 pockets-drencher 200 &
 pad_late pad-bin A-pk-slot1-key2 pockets-bin 240 &
+wait
+pad_late pad-bin-once A-pk-cnt3-slot1 pockets-bin-once 240 &
+pad_late pad-bin-twice A-pk-cnt3-slot1 pockets-bin-twice 240 &
+pad_late pad-bin-cancel A-pk-cnt3-slot1 pockets-bin-cancel 240 &
 pad pad-give A-gift2-base gift-give 200 &
 pad pad-gift-close sit-gift gift-close 150 &
 pad pad-goals B-pg8-goals goals-scroll 230 &
@@ -644,10 +657,19 @@ bin_twice() {
     f=$(grep -m 1 'inventory slots=- ' "$tmp/pad-bin.log" | sed 's/frame \([0-9]*\):.*/\1/')
     [ -n "$f" ] && [ "$f" -ge 140 ] || { echo "  pad-bin: the pockets emptied at frame $f (before the second X)"; return 1; }
 }
+# From A-pk-cnt3-slot1 (the slot already the game's selection): one X never throws, two do, and a
+# focus move between them drops the question (the X after it asks again).
+not_thrown() { ! grep -q 'inventory slots=- ' "$tmp/$1.log" || { echo "  $1: thrown"; return 1; }; }
+bin_once() { in_order pad-bin-once 'console menu open, focus 0' && not_thrown pad-bin-once; }
+bin_twice_sel() { in_order pad-bin-twice 'console menu open, focus 0' 'inventory slots=- '; }
+bin_cancel() { in_order pad-bin-cancel 'console menu open, focus 0' 'focus 6' 'focus 0' && not_thrown pad-bin-cancel; }
 give() { in_order pad-give 'console menu closed, focus 1' 'inventory slots=171:[^,]* counted' 'game Panel/Interact'; }
 gift_close() { in_order pad-gift-close 'game Gift' 'game Panel/Interact'; }
 check_pad pad-drencher drencher
 check_pad pad-bin bin_twice
+check_pad pad-bin-once bin_once
+check_pad pad-bin-twice bin_twice_sel
+check_pad pad-bin-cancel bin_cancel
 check_pad pad-give give
 check_pad pad-gift-close gift_close
 # Goals, Relationships, Options and the Save slots (src/port/goals.*, relations.*, options.*):

@@ -10,9 +10,10 @@
 //   A on a slot or an owned key item: tap it (the game selects it), then tap the hand (191,107):
 //     the game uses it (the Super Drencher starts its game, overlay 18).
 //   X on a slot: the bin. The game's bin throws the selected slot's item away at once (no
-//     question): the HD menu asks first by the game's own means. X on a slot the game has not
-//     selected taps it (the game's ring moves there and its bin turns green, as the game shows
-//     an armed bin); X on the slot the game has selected taps the bin (67,167).
+//     question), so the HD menu asks (ViewItem::xAsks): one X never throws. The first X arms the
+//     slot (the navigator's Armed(); it taps the slot, so the game's ring is there too) and the
+//     HD bin turns green; a second X on it taps the slot and the bin (67,167). Moving the focus,
+//     changing tab or closing the menu disarms it.
 //   Counted items and key items not owned: the focus shows their name and description; A does
 //   nothing (the game's hand does nothing for them either).
 #pragma once

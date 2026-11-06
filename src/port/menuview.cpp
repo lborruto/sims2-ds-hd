@@ -1,5 +1,6 @@
 #include "port/menuview.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 
@@ -82,6 +83,8 @@ u64 MenuView::Hash() const
         for (int n : it.next) Mix(h, (u64)(u32)n);
         MixText(h, it.word);
         MixText(h, it.xWord);
+        Mix(h, it.xAsks);
+        MixAction(h, it.xArm);
     }
     for (const MenuAction& a : buttons) MixAction(h, a);
     MixAction(h, back);
@@ -91,6 +94,13 @@ u64 MenuView::Hash() const
     Mix(h, ((u64)(u32)initial << 32) | (u32)selected);
     MixText(h, title);
     return h;
+}
+
+void SortUi(std::vector<ui::UiItem>& items, size_t first)
+{
+    if (first >= items.size()) return;
+    auto key = [](const ui::UiItem& u) { return u.kind == ui::UiItem::Image ? 1 << 20 : u.layer; };
+    std::stable_sort(items.begin() + (long)first, items.end(), [&](const ui::UiItem& a, const ui::UiItem& b) { return key(a) < key(b); });
 }
 
 int MenuFirst(const MenuView& v)

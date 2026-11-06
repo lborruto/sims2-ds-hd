@@ -837,9 +837,11 @@ int main()
                     CHECK(p.items[i].enabled == (i < n));
                     if (i >= n) continue;
                     CHECK(p.items[i].action.size() == 2 && p.items[i].action[1].x == kPkHandX && p.items[i].action[1].y == kPkHandY);
-                    CHECK(p.items[i].buttonX.size() == 1);
-                    const MenuStep x = p.items[i].buttonX[0];
-                    CHECK(h.town.pockets.slot == i ? (x.x == kPkBinX && x.y == kPkBinY) : (x.x == p.items[i].action[0].x && x.y == p.items[i].action[0].y));
+                    // The bin asks, whatever the game's selection: arming taps the slot, the
+                    // second X the slot and the bin.
+                    const ViewItem& it = p.items[i];
+                    CHECK(it.xAsks && it.xArm.size() == 1 && it.xArm[0].x == it.action[0].x && it.xArm[0].y == it.action[0].y);
+                    CHECK(it.buttonX.size() == 2 && it.buttonX[0].x == it.action[0].x && it.buttonX[1].x == kPkBinX && it.buttonX[1].y == kPkBinY);
                 }
                 CHECK(p.items[6].action.empty() && !p.items[7].action.empty() && p.items[9].action.empty()); // a key item not owned, owned; counted
                 CHECK(MenuMove(p, 13, 1) == MenuFirst(p));
@@ -889,7 +891,7 @@ int main()
                             CHECK(tx >= a.x && tx < a.x + a.w && ty >= a.y && ty < a.y + a.h);
                         }
                         const Rect act = gift ? kGiftBow : kPkHandBtn;
-                        const Rect a = gift ? hs[6].area : hs[6].area;
+                        const Rect a = hs[6].area; // (the hand, or Give Item's bow: both 6th)
                         CHECK(TouchFromComposition(comp, fit, act.x + act.w / 2.0f, act.y + act.h / 2.0f, tx, ty));
                         CHECK(tx >= a.x && tx < a.x + a.w && ty >= a.y && ty < a.y + a.h);
                         if (!gift)

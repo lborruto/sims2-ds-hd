@@ -332,6 +332,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
+        app.consoleArmed = navigator.Armed();
         // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding).
         app.micBlow = navigator.Blow();
         app.micForce = navigator.Blow();
@@ -342,6 +343,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         navigator.Leave(touchScript);
         steering = false;
         if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
+        app.consoleArmed = 0;
         app.micBlow = false;
         app.micForce = false;
     }

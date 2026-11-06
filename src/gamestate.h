@@ -291,6 +291,12 @@ GameState ReadGameState(RamView ram);           // EU table
 // The shared record table's rows: Sim k (0..45) and item id (0..0x1FF); valid false out of range.
 RecordRow ReadSimRow(RamView ram, int k);
 RecordRow ReadItemRow(RamView ram, int id);
+// The record table's string ids (the same in every language): Sim k's name kSimNameBase + k (k
+// 0..45: up to kSimNameLast; kSimNameUnknown "???" for a target not met), item id's name
+// kItemNameBase + id and description kItemDescBase + id (ids 0..kItemIdLast: the names end at the
+// game's "end marker" 794). What the menus' measures (--measure-menu) walk.
+constexpr int kSimNameUnknown = 321, kSimNameBase = 323, kSimNameLast = 368;
+constexpr int kItemNameBase = 463, kItemDescBase = 822, kItemIdLast = 330;
 SimRecord ReadSimRecord(RamView ram, int k);    // k 0..45, from G
 // Every page's string id in the game's speech table (static data, any state of the European
 // ROM), in table order, repeats kept; empty when the table does not read. For checks: the

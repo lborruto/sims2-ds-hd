@@ -120,8 +120,8 @@ controllers are known by their own button names.
 **In town** the buttons are the DS's. **The menu** (phone, tabs, shop, the rest of the touch
 screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes. On the
 Interact tab, A does the highlighted action and Left / Right pick the next thing or person nearby.
-In Pockets, A uses the highlighted item and X throws it away (press X twice: the first marks it,
-the bin turns green). In Give Gift, A gives the highlighted item and B closes. In Goals and
+In Pockets, A uses the highlighted item and X throws it away (press X twice: the first only asks,
+the bin turns green; moving away cancels). In Give Gift, A gives the highlighted item and B closes. In Goals and
 Relationships, Up / Down move the game's own selection; in Options, Left / Right turn a volume
 up or down a notch, and A on Save opens the save slots (A saves into the highlighted one, B
 closes).

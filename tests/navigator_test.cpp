@@ -1225,6 +1225,62 @@ static void view_save_slots_and_slider()
     CHECK(!q.touch.Owns() && q.nav.Focus() == 1);
 }
 
+// An asking X (ViewItem::xAsks, Pockets' bin): the first X arms (its xArm runs, nothing else),
+// the second performs; a focus move, the menu closing or the item going disarm it.
+static void view_item_x_asks()
+{
+    MenuView v = ListView(4, -1);
+    for (int i : {0, 1})
+    {
+        v.items[i].xAsks = true;
+        v.items[i].xArm = {TapStep(60 + i, 89)};
+        v.items[i].buttonX = {TapStep(60 + i, 89), TapStep(67, 167)};
+    }
+    Rig r;
+    r.view = &v;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    int x = -1, y = -1;
+    r.Press(kInteract, &PadState::x); // armed: only the slot tapped
+    CHECK(r.nav.Armed() == v.items[0].id);
+    CHECK(r.Touched(x, y) && x == 60 && y == 89);
+    r.Drain();
+    for (int i = 0; i < 4; i++) r.Frame(kInteract);
+    CHECK(!r.touch.Owns() && r.nav.Armed() == v.items[0].id);
+    r.Press(kInteract, &PadState::x); // the second: the slot, then the bin
+    CHECK(r.nav.Armed() == 0);
+    CHECK(r.Touched(x, y) && x == 60);
+    r.Drain();
+    for (int i = 0; i < 4 && !r.touch.Owns(); i++) r.Frame(kInteract);
+    CHECK(r.Touched(x, y) && x == 67 && y == 167);
+    r.Drain();
+    r.Frame(kInteract);
+    // A move between the two presses disarms: the next X arms again, nothing thrown.
+    r.Press(kInteract, &PadState::x);
+    CHECK(r.nav.Armed() == v.items[0].id);
+    r.Drain();
+    r.Press(kInteract, &PadState::down);
+    CHECK(r.nav.Armed() == 0);
+    r.Press(kInteract, &PadState::up);
+    r.Press(kInteract, &PadState::x);
+    CHECK(r.nav.Armed() == v.items[0].id);
+    CHECK(r.Touched(x, y) && x == 60 && y == 89);
+    r.Drain();
+    for (int i = 0; i < 4 && !r.touch.Owns(); i++) r.Frame(kInteract);
+    CHECK(!r.touch.Owns());
+    // The menu closing disarms.
+    r.Press(kInteract, &PadState::b);
+    CHECK(r.nav.Armed() == 0);
+    // The item going (another id at its place) disarms.
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::x);
+    CHECK(r.nav.Armed() == v.items[0].id);
+    r.Drain();
+    v.items[0].id = 0x999;
+    r.Frame(kInteract);
+    CHECK(r.nav.Armed() == 0);
+}
+
 int main()
 {
     menu_opens_and_closes();
@@ -1257,6 +1313,7 @@ int main()
     view_selection_the_game_owns();
     view_item_left_right();
     view_item_x_and_gift();
+    view_item_x_asks();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

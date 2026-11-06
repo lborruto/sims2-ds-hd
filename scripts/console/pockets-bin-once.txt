@@ -1,0 +1,4 @@
+# From A-pk-cnt3-slot1 (the complete save, Pockets, slot 1 selected by the game: the tab opens on
+# it), CONSOLE: MENU, X: the bin only asks (the HD bin green), nothing thrown.
+20 2 pad menu
+60 2 pad x

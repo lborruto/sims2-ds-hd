@@ -293,10 +293,7 @@ void BuildSaveSlots(Composition& c, const MenuView& v, int focus, const GameStat
         AddHint(c, right, Button::A, a.text);
     }
 
-    std::stable_sort(c.ui.begin() + (long)first, c.ui.end(), [](const UiItem& a, const UiItem& b) {
-        const int ka = a.kind == UiItem::Image ? 1 << 20 : a.layer, kb = b.kind == UiItem::Image ? 1 << 20 : b.layer;
-        return ka < kb;
-    });
+    SortUi(c.ui, first);
 }
 
 void MeasureOptions(const RomData& rom, BlockMeasure& m)

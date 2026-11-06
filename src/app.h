@@ -30,7 +30,8 @@ struct App
     GameState game;                // what the game itself says is up, read from RAM every frame (gamestate.h)
     ScreenTracker screens;         // which screen the touch screen shows (screens.h), every frame
     bool consoleMenu = false;      // CONSOLE: the menu is up (the touch screen 3x over the dimmed world)
-    int consoleFocus = -1;         // CONSOLE: the focused target, an index in HotspotsFor (-1: none)
+    int consoleFocus = -1;
+    u32 consoleArmed = 0;          // CONSOLE: the HD view item whose X is armed (Navigator::Armed), 0 none         // CONSOLE: the focused target, an index in HotspotsFor (-1: none)
     // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
     // pinned them for a check's picture.
     bool consolePinned = false;

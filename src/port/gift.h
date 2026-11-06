@@ -2,8 +2,8 @@
 // (port/panelmenu.h), with the game's title "Give Item to @1" (2422, the recipient's name), the
 // pockets' six slots as a grid of the game's item icons (empty ones drawn, never focused; one the
 // game will not let this Sim have greyed and skipped), the focused item's name and description,
-// the bow ("Give Gift", 1850; a live crop of the game's button: its sprite is not one the port
-// decodes) and the recipient's portrait (a live crop of the game's well: Sims' pictures are
+// the bow ("Give Gift", 1850; the game's own sprite of its button, 3631)
+// and the recipient's portrait (a live crop of the game's well: Sims' pictures are
 // texture bundles). Everything from GameState::town.gift and .inventory (RAM).
 //
 // What performs: A on a slot taps it (the game selects it) and then the bow (127,85): the game
@@ -24,8 +24,11 @@ class IconCache;
 // The game's touch points (DS bottom pixels) and pictures.
 constexpr int kGiftSlotX0 = 37, kGiftSlotY0 = 50, kGiftSlotDx = 39, kGiftSlotDy = 37; // slot i: (x0 + dx (i % 2), y0 + dy (i / 2))
 constexpr int kGiftBowX = 127, kGiftBowY = 85, kGiftCloseX = 235, kGiftCloseY = 19;
-constexpr Rect kGiftBowFrom {108, 67, 38, 38};      // the bow's round button
 constexpr Rect kGiftPortraitFrom {167, 47, 65, 81}; // inside the portrait's well (outline x 162 / 235, rows 42 / 131)
+
+// The bow's button: the game's sprite (descriptor 3631: the bow actor's definition 0x0214AACC,
+// {0xE2E, 0xE2F, 0xE30}, read from RAM on A-gift2-base), 32 x 32.
+constexpr int kSprBow = 3631;
 
 // The game's strings.
 constexpr int kStrGiftTitle = 2422, kStrGive = 1850;
@@ -37,6 +40,7 @@ constexpr Rect kGiftInfo {436, 124, 388, 454};
 constexpr Rect kGiftPortrait {840, 179, 240, 276};
 constexpr Rect kGiftName {840, 467, 240, 56};
 constexpr Rect kGiftBow {kGiftInfo.x + 16, kGiftInfo.y + kGiftInfo.h - 112, kGiftInfo.w - 32, 96};
+constexpr Rect kGiftBowIcon {kGiftBow.x + 16, kGiftBow.y + 16, 64, 64}; // the bow's sprite 2x
 constexpr Rect kGiftDesc {kGiftInfo.x + 20, kGiftInfo.y + 60, kGiftInfo.w - 40, kGiftBow.y - 12 - (kGiftInfo.y + 60)};
 
 constexpr u32 kGiftSlotId = 0x300;

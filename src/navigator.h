@@ -88,6 +88,9 @@ public:
     int Focus() const { return focus_; }
     // The focus is over the last Update's MenuView.
     bool ViewFocus() const { return viewFocus_; }
+    // The id of the focused view item whose X is armed (ViewItem::xAsks: one more X performs it),
+    // 0 none.
+    u32 Armed() const { return armed_; }
     // An action of the view runs (its steps not all done).
     bool Running() const { return !running_.empty(); }
     // Unknown: A asks for the stick cursor's press.
@@ -116,6 +119,9 @@ private:
     const MenuAction* DirAction(const MenuView& v, int dir, bool& scroll) const;
     // The view given is valid and shown (the panel's menu open, or Give Gift): the focus is over it.
     bool UsesView(ScreenState s) const;
+    // What X runs on view item f: its own X (an asking one not armed yet: its xArm), else the
+    // view's.
+    const MenuAction& XAction(const MenuView& v, int f) const;
     // Whether a press of b would tap on s (the gate holds only those).
     bool WouldTap(ScreenState s, bool PadState::*b) const;
 
@@ -136,6 +142,7 @@ private:
     const MenuView* view_ = nullptr;
     bool viewFocus_ = false;
     u32 focusId_ = 0;
+    u32 armed_ = 0;      // the item (id) whose asking X was pressed once (ViewItem::xAsks)
     u64 viewHash_ = 0;
     std::vector<MenuStep> running_;
     int pendingDir_ = -1, pendingFrames_ = 0;
