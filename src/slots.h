@@ -58,7 +58,9 @@ struct DataDir
     std::string Undo(const std::string& code) const;              // the state before the last load
     std::string Suspend(const std::string& code) const;           // written on quitting
     std::string SuspendThumb(const std::string& code) const;
-    std::string SuspendMeta(const std::string& code) const;       // its StateMeta: the ROM it belongs to, the save's hash
+    std::string SuspendMeta(const std::string& code) const;
+    std::string Quick(const std::string& code) const;             // F5 / F7's state
+    std::string QuickMeta(const std::string& code) const;         // its StateMeta (F7 refuses another file's)       // its StateMeta: the ROM it belongs to, the save's hash
 
     // The recent ROMs, newest first (only files that still exist), at most kRecents.
     static constexpr int kRecents = 5;

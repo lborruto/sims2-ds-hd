@@ -307,6 +307,10 @@ constexpr const char* kWords[][5] = {
     {"Your place could not be loaded: the game starts from its own save.", "Votre partie n'a pas pu être chargée : le jeu reprend depuis sa sauvegarde.",
      "Dein Stand ließ sich nicht laden: das Spiel startet vom eigenen Spielstand.", "Impossibile caricare il punto: il gioco riparte dal suo salvataggio.",
      "No se pudo cargar tu sitio: el juego empieza desde su propia partida."},
+    // F7 refusing a quick state made with another file
+    {"Quick state made with another file (@1): not loaded. F5 saves over it.", "État rapide fait avec un autre fichier (@1) : non chargé. F5 l'écrase.",
+     "Schnellstand aus einer anderen Datei (@1): nicht geladen. F5 überschreibt ihn.", "Stato rapido fatto con un altro file (@1): non caricato. F5 lo sovrascrive.",
+     "Estado rápido hecho con otro archivo (@1): no se carga. F5 lo sobrescribe."},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

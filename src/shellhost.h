@@ -53,6 +53,9 @@ struct ShellHost
     void Say(Video& video, const std::string& text) const;
     // A state load with the save's copy first (beforeLoad).
     bool Load(App& app, const std::string& path);
+    // F5 / F7: the quick state with its maker (F7 refuses another ROM file's, by a toast).
+    bool QuickSave(App& app, Video& video);
+    bool QuickLoad(App& app, Video& video);
     // The suspend state, its picture and its ROM (quitting).
     bool WriteSuspend(App& app, const Video& video);
     // The composed picture of now, made small.

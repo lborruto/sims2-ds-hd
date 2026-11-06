@@ -141,7 +141,8 @@ std::string ActionLabel(int action, int language);
 enum class MainItem { Resume, Settings, Controls, States, ChangeGame, OpenFolder, Quit };
 std::vector<MainItem> MainEntries(const Model& m);
 // A shell press on a pad (now / before: PadRaw::btn): the action's own input, or the controller's
-// own button (fallback: Controls::IN_A south, IN_B east) when the action has none, so a cleared A
-// or B never locks the menu.
+// own button (fallback: Controls::IN_A south, IN_B east) when the action has none and no other
+// action owns that button, so a cleared A or B never locks the menu and one press is never two
+// actions (another action on that button keeps it: Enter / Esc and the other face buttons stay).
 bool PadPress(const Controls::Bindings& b, int action, int fallback, const bool* now, const bool* before);
 }

@@ -994,8 +994,16 @@ relaunch:
                 continue;
             }
             const int lang = host.model.language;
-            if (input.wantSave) host.Say(video, OwnWordIn(lang, SaveState(nds, quickState) ? OwnWordId::ToastStateSaved : OwnWordId::StFailed));
-            if (input.wantLoad) host.Say(video, OwnWordIn(lang, host.Load(app, quickState) ? OwnWordId::ToastStateLoaded : OwnWordId::ToastNoState));
+            if (input.wantSave)
+            {
+                if (host.data.Ok()) host.QuickSave(app, video);
+                else host.Say(video, OwnWordIn(lang, SaveState(nds, quickState) ? OwnWordId::ToastStateSaved : OwnWordId::StFailed));
+            }
+            if (input.wantLoad)
+            {
+                if (host.data.Ok()) host.QuickLoad(app, video);
+                else host.Say(video, OwnWordIn(lang, host.Load(app, quickState) ? OwnWordId::ToastStateLoaded : OwnWordId::ToastNoState));
+            }
             if (input.wantShot) { WriteShot(shotFile, app.Top(), app.Bottom()); host.Say(video, OwnWordIn(lang, OwnWordId::ToastShot)); }
             if (input.wantLayout >= 0) app.settings.layout = app.layout = (Layout)input.wantLayout;
             if (input.wantFullscreen)
@@ -1489,6 +1497,9 @@ relaunch:
         shellPage = -1;
         if (window) video.RememberSize(app.settings);
         app.nds.reset();
+        // (The 60 fps frames of the game before: never blended into the next one's first frame.)
+        melonDS::Looks3D.RawPrevious.clear();
+        melonDS::Looks3D.RawCurrent.clear();
         app.rom.reset();
         app.icons.reset();
         app.hudStrings = HudStrings();

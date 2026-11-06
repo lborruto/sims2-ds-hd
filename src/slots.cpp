@@ -120,6 +120,8 @@ std::string DataDir::Undo(const std::string& code) const { return In(GameDir(cod
 std::string DataDir::Suspend(const std::string& code) const { return In(GameDir(code), "suspend.st"); }
 std::string DataDir::SuspendThumb(const std::string& code) const { return In(GameDir(code), "suspend.thumb"); }
 std::string DataDir::SuspendMeta(const std::string& code) const { return In(GameDir(code), "suspend.meta"); }
+std::string DataDir::Quick(const std::string& code) const { return In(GameDir(code), "quick.st"); }
+std::string DataDir::QuickMeta(const std::string& code) const { return In(GameDir(code), "quick.meta"); }
 
 u64 HashBytes(const u8* p, size_t n)
 {
@@ -140,9 +142,18 @@ u64 HashFile(const std::string& path)
 bool WriteMeta(const std::string& path, const StateMeta& m)
 {
     if (path.empty()) return false;
-    std::ofstream out {fs::path(path)};
-    out << "rom=" << m.rom << "\nheader=" << m.header << "\nsave=" << m.save << "\n";
-    return out.good();
+    // Beside it first, then in its place: a cut never leaves half a maker.
+    const std::string tmp = path + ".tmp";
+    {
+        std::ofstream out {fs::path(tmp)};
+        out << "rom=" << m.rom << "\nheader=" << m.header << "\nsave=" << m.save << "\n";
+        out.flush();
+        if (!out.good()) return false;
+    }
+    std::error_code ec;
+    fs::rename(fs::path(tmp), fs::path(path), ec);
+    if (ec) fs::remove(fs::path(tmp), ec);
+    return !ec;
 }
 
 bool ReadMeta(const std::string& path, StateMeta& m)

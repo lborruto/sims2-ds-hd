@@ -284,7 +284,9 @@ std::vector<MainItem> MainEntries(const Model& m)
 
 bool PadPress(const Controls::Bindings& b, int action, int fallback, const bool* now, const bool* before)
 {
-    const int in = b.Pad(action) >= 0 ? b.Pad(action) : fallback;
+    // The fallback only while no action owns that button: else one press would be two (the
+    // other action's and this one's).
+    const int in = b.Pad(action) >= 0 ? b.Pad(action) : b.ActionOfPad(fallback) < 0 ? fallback : -1;
     return in >= 0 && in < Controls::IN_COUNT && now[in] && !before[in];
 }
 

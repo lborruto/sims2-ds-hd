@@ -379,6 +379,33 @@ static void pad_fallback()
     now[IN_B] = false;
     now[IN_X] = true;
     CHECK(PadPress(b, A, IN_A, now, before) && !PadPress(b, A, IN_A, before, before));
+    // X bound to south, A cleared: one press is one action (X's), never A's fallback too.
+    {
+        Bindings c;
+        c.pad[A] = kNone;
+        c.SetPad(X, IN_A);
+        bool n[IN_COUNT] = {}, p[IN_COUNT] = {};
+        n[IN_A] = true;
+        CHECK(PadPress(c, X, -1, n, p) && !PadPress(c, A, IN_A, n, p));
+    }
+    // A on east, B cleared: east is A's (the main page's entries still activate), never B's too.
+    {
+        Bindings c;
+        c.SetPad(A, IN_B);
+        c.pad[B] = kNone;
+        bool n[IN_COUNT] = {}, p[IN_COUNT] = {};
+        n[IN_B] = true;
+        CHECK(PadPress(c, A, IN_A, n, p) && !PadPress(c, B, IN_B, n, p));
+        Fixture f;
+        Shell sh;
+        sh.Open(Page::Main);
+        Input in;
+        in.a = PadPress(c, A, IN_A, n, p);
+        in.b = PadPress(c, B, IN_B, n, p);
+        sh.focus = 1;
+        sh.Update(in, f.m);
+        CHECK(sh.page == Page::Settings);
+    }
 }
 
 // A state made with another ROM file: the load question says so.
