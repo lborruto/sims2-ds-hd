@@ -1502,8 +1502,65 @@ static void view_popup_resume_and_phone()
     CHECK(!q.nav.Running());
 }
 
+// The HD catalogue's shape (port/catalogue.h): a screen of its own on the Catalogue screen (no
+// menu to open); A on a cell taps it; Pay with no action (the game would not pay) taps nothing; a
+// press held while unsettled is dropped, never replayed (a spend); B taps the X and then waits;
+// Down past the grid's last row the game's arrow.
+static void view_catalogue_spends_once()
+{
+    const ScreenState cat {Screen::Catalogue, Tab::None};
+    MenuView v;
+    v.valid = v.own = true;
+    v.replay = false;
+    v.backCloses = true;
+    for (int c = 0; c < 2; c++)
+    {
+        ViewItem it;
+        it.rect = {200 + 106 * c, 176, 96, 96};
+        it.action = {TapStep(22 + 39 * c, 88)};
+        it.group = 1;
+        it.id = 0x100 + (u32)c;
+        it.next[0] = it.next[1] = kNoMove;
+        v.items.push_back(it);
+    }
+    ViewItem pay;
+    pay.rect = {540, 466, 306, 96};
+    pay.id = 0x300; // (no action: the game would not pay)
+    v.items.push_back(pay);
+    v.scrollGroup = 1;
+    v.scrollDown = {TapStep(77, 168)};
+    v.back = {TapStep(235, 19)};
+    Rig r;
+    r.view = &v;
+    r.Frame(cat);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(cat, &PadState::a);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 22 && y == 88);
+    r.touch = TouchScript {};
+    r.Press(cat, &PadState::right);
+    r.Press(cat, &PadState::right);
+    CHECK(r.nav.Focus() == 2);
+    r.Press(cat, &PadState::a);
+    CHECK(!r.touch.Owns()); // (greyed Pay: nothing)
+    r.Press(cat, &PadState::left);
+    r.Press(cat, &PadState::down); // past the last row: the game's arrow
+    CHECK(r.Touched(x, y) && x == 77 && y == 168);
+    r.touch = TouchScript {};
+    PadState pa;
+    pa.a = true;
+    r.Frame(cat, pa, false); // unsettled: held...
+    r.Frame(cat, {}, false);
+    r.Frame(cat, {}, true);  // ...and dropped
+    r.Frame(cat, {}, true);
+    CHECK(!r.touch.Owns());
+    r.Press(cat, &PadState::b);
+    CHECK(r.Touched(x, y) && x == 235 && y == 19);
+}
+
 int main()
 {
+    view_catalogue_spends_once();
     menu_opens_and_closes();
     view_save_slots_and_slider();
     view_selection_phone_and_no_replay();

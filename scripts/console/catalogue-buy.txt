@@ -1,0 +1,10 @@
+# From sit-storebuy (the General Store's catalogue, §2,000, the Blue Oak Bed selected, the pockets
+# empty), CONSOLE: Right (the White Couch), A (the game selects it: "Buy §150"), Right, Right
+# (Pay), A: the game buys it, §2,000 -> §1,850, the couch in the pockets; A again (the focus
+# still on Pay): a second couch, §1,700.
+20 2 pad right
+40 2 pad a
+70 2 pad right
+90 2 pad right
+110 2 pad a
+150 2 pad a

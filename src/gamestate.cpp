@@ -322,7 +322,7 @@ RecordRow ReadRow(const Reader& m, u32 row)
         return r;
     r.valid = true;
     r.tilesRes = (int)tiles; r.descRes = (int)desc; r.palRes = (int)pal;
-    r.nameId = (int)name; r.iconRes = (int)icon; r.price = (int)price;
+    r.nameId = (int)name; r.iconRes = (int)icon; r.price = (int)(s16)price; // (signed: some records' prices are negative)
     return r;
 }
 
@@ -965,7 +965,7 @@ bool RoomCost(const Reader& m, u32 G, u32 place, int score, RoomInfoState& v)
         if (!m.R8(G + h.roomBlock + h.roomRec * r + h.roomItems + h.roomItemStride * i, id)) return false;
         RecordRow row = ReadRow(m, t.itemRow0 + id);
         if (!row.valid) return false;
-        sum += (int)(s16)row.price;
+        sum += row.price;
     }
     v.baseValue = base;
     v.serviceCharge = (sum * (int)h.serviceMul) >> h.serviceShift;   // truncated: the game's 20.12 product shifted back
@@ -1086,7 +1086,7 @@ bool ShopItemAt(const Reader& m, u32 row, ShopItem& it)
     const u32 id = row - h.caRowMin;
     RecordRow r = ReadRow(m, row);
     if (!r.valid || r.nameId != (int)(t.itemName + id)) return false;
-    it = {(int)row, (int)id, r.nameId, (int)(t.itemDesc + id), r.descRes, r.price * (int)h.caPriceMul, r.price};
+    it = {(int)row, (int)id, r.nameId, (int)(t.itemDesc + id), r.descRes, r.price * (int)h.caPriceMul, r.price, r.tilesRes, r.palRes};
     return true;
 }
 

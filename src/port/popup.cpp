@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "port/catalogue.h"
 #include "port/gift.h"
 #include "port/note.h"
 #include "port/options.h"
@@ -53,7 +54,7 @@ bool PopupOver(ScreenState s, const GameState& game)
     const PopupState& p = game.town.popup;
     if (!game.valid || !p.valid || p.state < 1 || p.state > 3) return false;
     if (game.screen == GScreen::Popup) return s.screen == Screen::Popup || s.screen == Screen::Unknown; // (Options > Quit: Unknown)
-    return s.screen == Screen::Gift || s.screen == Screen::SaveSlots || s.screen == Screen::Phone || (s.screen == Screen::Unknown && NoteUp(game));
+    return s.screen == Screen::Gift || s.screen == Screen::SaveSlots || s.screen == Screen::Phone || s.screen == Screen::Catalogue || (s.screen == Screen::Unknown && NoteUp(game));
 }
 
 MenuView PopupView(ScreenState s, const GameState* game, const RomData* rom)
@@ -117,6 +118,7 @@ MenuView ScreenView(ScreenState s, const GameState* game, const RomData* rom)
     case Screen::Gift: return GiftMenuView(s, game, rom);
     case Screen::SaveSlots: return SaveSlotsView(s, game, rom);
     case Screen::Phone: return PhoneView(s, game, rom);
+    case Screen::Catalogue: return CatalogueView(s, game, rom);
     case Screen::Unknown: return NoteView(s, game, rom);
     default: return {};
     }

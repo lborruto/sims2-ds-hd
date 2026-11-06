@@ -44,7 +44,10 @@ MenuStep WaitStep(int frames);
 // or screens (the navigator's armed X and the focus's resume are kept by id).
 constexpr u32 kModInteract = 1u << 24, kModPockets = 2u << 24, kModGift = 3u << 24, kModGoals = 4u << 24,
               kModRelations = 5u << 24, kModPhone = 6u << 24, kModOptions = 7u << 24, kModPopup = 8u << 24,
-              kModNote = 9u << 24;
+              kModNote = 9u << 24, kModCatalogue = 10u << 24;
+
+// ViewItem::next's "no move that way".
+constexpr int kNoMove = -2;
 
 struct ViewItem
 {
@@ -68,7 +71,8 @@ struct ViewItem
     MenuAction xArm;
     // Explicit focus moves, item indices for Up, Down, Left, Right (-1: the nearest by geometry,
     // MenuNeighbour): a link the geometry would leave to chance (the panel's phone button above
-    // the tab's first row and back).
+    // the tab's first row and back). kNoMove: none that way (the focus stays: past a list's
+    // edge, the list's own scroll).
     int next[4] = {-1, -1, -1, -1};
     // The word A's hint shows while it has the focus (the game's own, e.g. the row's verb); empty:
     // the chip alone.
@@ -132,7 +136,8 @@ int MenuFirst(const MenuView& v);
 // degrees of it, nearest first (greyed rows are skipped as if absent); `from` when none.
 int MenuNeighbour(const MenuView& v, int from, int dx, int dy);
 // The focused item after a Up (0), Down (1), Left (2) or Right (3) press: the item's explicit
-// `next` when it is focusable, else MenuNeighbour; `from` when nothing lies that way.
+// `next` when it is focusable (kNoMove: `from`), else MenuNeighbour; `from` when nothing lies
+// that way.
 int MenuMove(const MenuView& v, int from, int dir);
 // The focus after a rebuild: the enabled item with `id` when there is one; else, `old` clamped
 // to the list, the enabled item at that index (the one that took a removed item's place), else

@@ -38,6 +38,7 @@
 #include "picker.h"
 #include "romdata.h"
 #include "ui/font.h"
+#include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/interact.h"
 #include "port/goals.h"
@@ -102,7 +103,7 @@ static void Usage()
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
-        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes) can show fitted to its box, in --language's\n"
+        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue) can show fitted to its box, in --language's\n"
         "                                words: how many shrink, how many need an ellipsis or a character the font lacks (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load; exit 2 on an overflow or a character the font lacks), and stop\n"
@@ -419,12 +420,19 @@ int main(int argc, char** argv)
         printf("popups: %d words, tallest text %d (%d lines), %d shrunk, %d cut", q.checked, q.tallestId, q.tallestLines, q.shrunk, q.cut);
         for (int id : q.cutIds) printf(" %d", id);
         printf("\n");
+        // The shop's catalogue: every item's name and description, the shops' titles beside the
+        // widest money, the headers, Pay at the widest price.
+        BlockMeasure k;
+        MeasureCatalogue(*app.rom, k);
+        printf("catalogue: %d words, tallest description %d (%d lines), %d shrunk, %d cut, %d names cut", k.checked, k.tallestId, k.tallestLines, k.shrunk, k.cut, k.namesCut);
+        for (int id : k.cutIds) printf(" %d", id);
+        printf("\n");
         // A neighbour's name beside the plate may end in an ellipsis (the Italian table has a
         // sentence at an object's name, 463); every other box must hold its words.
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || !lacking.empty() ? 2 : 0;
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.

@@ -414,6 +414,7 @@ struct ShopItem
     int nameId = -1, descId = -1;
     int iconRes = -1;                 // the sprite descriptor resource (RecordRow::descRes)
     int buyPrice = 0, sellPrice = 0;  // two times the record's price, once
+    int tilesRes = -1, palRes = -1;   // the record's tiles and palette (not always the descriptor's neighbours: the Large Plant's palette is not 2484)
     bool operator==(const ShopItem&) const = default;
 };
 struct CatalogueState

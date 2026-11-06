@@ -145,6 +145,7 @@ int MenuMove(const MenuView& v, int from, int dir)
 {
     if (from < 0 || from >= (int)v.items.size() || dir < 0 || dir > 3) return from;
     const int to = v.items[from].next[dir];
+    if (to == kNoMove) return from;
     if (to != from && MenuFocusable(v, to)) return to;
     static const int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
     return MenuNeighbour(v, from, dx[dir], dy[dir]);

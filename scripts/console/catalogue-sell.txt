@@ -1,0 +1,6 @@
+# From BY-own4 (the catalogue, §1,040, six Blue Oak Beds owned, the fourth selected: Sell),
+# CONSOLE: the focus on it; Left (the third), Left (Pay: "Sell §80"), A: the game sells the
+# fourth bed, §1,040 -> §1,120, five beds left.
+20 2 pad left
+40 2 pad left
+60 2 pad a

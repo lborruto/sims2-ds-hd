@@ -15,6 +15,7 @@
 #include "console.h"
 #include "hotspots.h"
 #include "layout.h"
+#include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
 #include "port/goals.h"
@@ -917,6 +918,148 @@ int main()
             CHECK(!GiftMenuViewOf(gs, bad).valid && PanelMenuViewOf(pk, bad).valid);
             CHECK(!GiftMenuView(gs, &bad, &rom).valid); // no strings: milestone 1's
         }
+        // The shop's catalogue (port/catalogue.h) on made-up lists: the store's twelve items at
+        // every scroll, 0-6 owned, Buy or Sell or nothing selected, money enough or not; a
+        // vendor's six. Cells past the list and empty places disabled; Pay always focusable, its
+        // tap only when the game would pay (the money, the pockets' room, the quest items, a
+        // vendor's sale); every enabled item reachable; the game's arrows as the list's scroll;
+        // A on a cell / place its own tap, B the X, never replayed. Every item inside the panel,
+        // layers ascending, the mouse pieces round trip and land on the game's own hit boxes.
+        auto shop = [](bool vendor, int count, int scroll, int owned, bool sell, int sel, int money) {
+            GameState h;
+            h.valid = true;
+            h.screen = GScreen::Catalogue;
+            CatalogueState& ca = h.catalogue;
+            ca.valid = true;
+            ca.shop = vendor ? 0x30 : kCaStore;
+            ca.vendor = vendor;
+            for (int i = 0; i < count; i++) ca.items.push_back({100 + i + 0x3B, 100 + i, 563 + i, 922 + i, 1991, 2 * (50 + 10 * i), 50 + 10 * i});
+            for (int i = 0; i < owned; i++) ca.owned.push_back({i == 1 ? 0x22 + 0x3B : 106 + 0x3B, i == 1 ? 0x22 : 106, 569, 928, 1991, 160, 80});
+            ca.scroll = scroll;
+            ca.sell = sell;
+            ca.selected = sel;
+            ca.money = money;
+            ca.payEnabled = true;
+            ca.upEnabled = !vendor && scroll > 0;
+            ca.downEnabled = !vendor && scroll < count - 3;
+            return h;
+        };
+        const ScreenState cs {Screen::Catalogue, Tab::None};
+        for (bool vendor : {false, true})
+            for (int scroll : {0, 3, 6, 9})
+                for (int owned : {0, 2, 6})
+                    for (int mode : {0, 1, 2}) // nothing selected, Buy, Sell
+                        for (int money : {0, 5000})
+                        {
+                            if (vendor && (scroll > 0 || owned > 0 || mode == 2)) continue;
+                            const int count = vendor ? 6 : 12;
+                            const bool sell = mode == 2;
+                            const int sel = mode == 0 ? -1 : sell ? std::min(1, owned - 1) : scroll + 1;
+                            if (sell && owned == 0) continue;
+                            const GameState h = shop(vendor, count, scroll, owned, sell, sel, money);
+                            const MenuView v = CatalogueViewOf(cs, h);
+                            const size_t n = vendor ? 7 : 13;
+                            CHECK(v.valid && v.own && !v.replay && v.backCloses && v.items.size() == n && AllReachable(v));
+                            CHECK(v.back.size() == 1 && v.back[0].x == kCaCloseX && v.back[0].y == kCaCloseY);
+                            for (int c = 0; c < 6; c++)
+                            {
+                                CHECK(v.items[c].enabled == (scroll + c < count) && v.items[c].group == v.scrollGroup);
+                                if (!v.items[c].enabled) continue;
+                                const int x = vendor ? kCaVendorCellX0 + (c % 2) * kCaVendorCellDx : kCaStoreCellX0 + (c % 3) * kCaStoreCellDx;
+                                const int y = kCaCellY0 + (c / (vendor ? 2 : 3)) * kCaCellDy;
+                                CHECK(v.items[c].action.size() == 1 && v.items[c].action[0].x == x && v.items[c].action[0].y == y);
+                            }
+                            // Pay: focusable always; its tap only when the game would pay.
+                            const ViewItem& pay = v.items[6];
+                            CHECK(pay.enabled && pay.id == kCaPayId);
+                            bool pays = false;
+                            if (mode == 1) pays = money >= h.catalogue.items[sel].buyPrice && owned < 6;
+                            if (mode == 2) pays = sel != 1; // (place 1 holds a quest item: the game will not buy it back)
+                            CHECK(CataloguePays(h.catalogue) == pays && pay.action.empty() == !pays);
+                            if (pays) CHECK(pay.action.size() == 1 && pay.action[0].x == (vendor ? kCaVendorPayX : kCaPayX) && pay.action[0].y == kCaPayY);
+                            for (int i = 0; !vendor && i < 6; i++)
+                            {
+                                CHECK(v.items[7 + i].enabled == (i < owned));
+                                if (i < owned) CHECK(v.items[7 + i].action.size() == 1 && v.items[7 + i].action[0].x == kCaOwnedX0 + (i % 2) * kCaOwnedDx);
+                            }
+                            // The game's arrows: the list's scroll; Right from the grid's last column: Pay.
+                            CHECK(v.scrollUp.empty() == !h.catalogue.upEnabled && v.scrollDown.empty() == !h.catalogue.downEnabled);
+                            if (!v.scrollDown.empty()) CHECK(v.scrollDown[0].x == kCaDownX && v.scrollDown[0].y == kCaArrowY);
+                            if (!v.scrollUp.empty()) CHECK(v.scrollUp[0].x == kCaUpX);
+                            CHECK(MenuMove(v, vendor ? 1 : 2, 3) == 6 && MenuMove(v, 0, 0) == 0 && MenuMove(v, 6, 0) == 6 && MenuMove(v, 6, 1) == 6);
+                            if (v.items[5].enabled) CHECK(MenuMove(v, 5, 1) == 5); // (past the last row: the game's scroll, never Pay)
+                            if (!vendor && owned > 0) CHECK(MenuMove(v, 7, 2) == 6);
+                            if (mode == 1) CHECK(MenuFirst(v) == 1);
+                            if (mode == 2) CHECK(MenuFirst(v) == 7 + sel);
+                            // The drawing, for a few focuses.
+                            for (int focus : {-1, 0, 6, 7})
+                            {
+                                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                                Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                                world.touch = false;
+                                comp.pieces.push_back(world);
+                                BuildCatalogue(comp, v, focus, h, rom, nullptr);
+                                int layer = 0;
+                                for (const ui::UiItem& u : comp.ui)
+                                {
+                                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                                    if (u.kind == ui::UiItem::Image) continue;
+                                    CHECK(u.layer >= layer);
+                                    layer = u.layer;
+                                }
+                                if (focus != 0 || money != 5000 || (owned != 2 && !vendor)) continue;
+                                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                    TestConsoleRoundtrip(cs, false, 256, 192, o.first, o.second, true, &comp);
+                                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                                int tx, ty;
+                                // Every cell, place and Pay lands in the game's hit box around its point.
+                                for (int i = 0; i < (int)v.items.size(); i++)
+                                {
+                                    if (v.items[i].action.empty()) continue;
+                                    const Rect r = v.items[i].rect;
+                                    CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - v.items[i].action[0].x) <= 15 && std::abs(ty - v.items[i].action[0].y) <= 15);
+                                }
+                                const CatalogueGeometry g = CatalogueLayout(vendor);
+                                if (!vendor)
+                                {
+                                    CHECK(TouchFromComposition(comp, fit, g.down.x + g.down.w / 2.0f, g.down.y + g.down.h / 2.0f, tx, ty));
+                                    CHECK(tx >= 62 && tx <= 92 && ty >= 153 && ty <= 183);
+                                    CHECK(TouchFromComposition(comp, fit, g.up.x + g.up.w / 2.0f, g.up.y + g.up.h / 2.0f, tx, ty));
+                                    CHECK(tx >= 30 && tx <= 60 && ty >= 153 && ty <= 183);
+                                }
+                                CHECK(TouchFromComposition(comp, fit, kCaClose.x + kCaClose.w / 2.0f, kCaClose.y + kCaClose.h / 2.0f, tx, ty));
+                                CHECK(tx >= 220 && tx <= 250 && ty >= 4 && ty <= 34);
+                                CHECK(!TouchFromComposition(comp, fit, kCaTitle.x + 10.5f, kCaTitle.y + 10.5f, tx, ty)); // the title: nothing
+                                CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty));                          // the dimmed world: nothing
+                            }
+                        }
+        {
+            // A vendor never buys back; nothing selected (just after a sale): Pay does nothing;
+            // the pockets full: no purchase; no view off its screen, without RAM's part or the strings.
+            GameState h = shop(true, 6, 0, 0, true, 0, 100);
+            h.catalogue.owned.push_back({106 + 0x3B, 106, 569, 928, 1991, 160, 80});
+            CHECK(!CataloguePays(h.catalogue));
+            h = shop(false, 12, 0, 3, true, 3, 100);
+            CHECK(!CataloguePays(h.catalogue) && CatalogueViewOf(cs, h).items[6].action.empty());
+            h = shop(false, 12, 0, 6, false, 0, 99999);
+            CHECK(!CataloguePays(h.catalogue));
+            h = shop(false, 12, 0, 5, false, 0, 99999);
+            CHECK(CataloguePays(h.catalogue));
+            h.catalogue.money = h.catalogue.items[0].buyPrice - 1;
+            CHECK(!CataloguePays(h.catalogue));
+            CHECK(!CatalogueViewOf({Screen::Panel, Tab::Interact}, h).valid);
+            h.catalogue.valid = false;
+            CHECK(!CatalogueViewOf(cs, h).valid);
+            h.catalogue.valid = true;
+            CHECK(!CatalogueView(cs, &h, &rom).valid); // no strings: milestone 1's
+            // The ids: a re-rolled list is other items (the focus does not stay on a new item by its place).
+            GameState k = shop(false, 12, 0, 0, false, 0, 100);
+            const u32 before = CatalogueViewOf(cs, k).items[0].id;
+            k.catalogue.items[0].row += 1;
+            CHECK(CatalogueViewOf(cs, k).items[0].id != before);
+        }
         // Goals, Relationships, Options (port/goals.h, relations.h, options.h) and the Save slots
         // on made-up states: the game's selection held (Up / Down its arrows), Options' moves
         // explicit and its sliders' Left / Right the knob's drag by a tenth, the Save slots' A its
@@ -1178,8 +1321,10 @@ int main()
                     off.town.popup.state = 0;
                     CHECK(!PopupViewOf(on, off).valid);
                     off = h;
-                    off.screen = GScreen::Catalogue;
-                    CHECK(!PopupViewOf({Screen::Catalogue, Tab::None}, off).valid);
+                    off.screen = GScreen::Build; // (a screen the port does not redraw: milestone 1's popup)
+                    CHECK(!PopupViewOf({Screen::Build, Tab::None}, off).valid);
+                    off.screen = GScreen::Catalogue; // (over the HD catalogue: the HD popup)
+                    CHECK(PopupViewOf({Screen::Catalogue, Tab::None}, off).valid == PopupViewOf(on, h).valid);
                     off = h;
                     off.town.popup.boxW = 0;
                     CHECK(PopupViewOf(on, off).valid == (kind == 3));

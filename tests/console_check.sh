@@ -33,7 +33,9 @@
 # CONSOLE -> FOCUS -> CONSOLE with the menu open and A held: the menu closes on leaving, nothing
 # is tapped on coming back, MENU opens it again; the HD Interact tab: from sit-casino, MENU, Down
 # and A start Hotseat (Cards); from D-cas-right2, Left and Right switch the target (--print-town);
-# from sit-store, A on Buy opens the catalogue. In none of them do the pixels disagree with the
+# from sit-store, A on Buy opens the catalogue; the HD catalogue (src/port/catalogue.*, on copies of
+# the complete save): a couch bought twice, a bed sold, the list scrolled by the game's arrows and
+# closed, a purchase the game refuses not made. In none of them do the pixels disagree with the
 # game for long ("pixels disagree").
 # Then the activities on buttons (src/activities.*, scripts/console/): from act-social, RIGHT
 # answers with the right icon (it lights green; the game itself plays on for about 1600
@@ -128,11 +130,18 @@ run phone-msg C-cas-msg1 "${late[@]}" --console-focus 0 &
 run phone-contacts C-cas-pb1 "${late[@]}" --console-focus 0 &
 run phone-wide C-cas-msgs "${late[@]}" --console-focus 0 --wide &
 wait
+run shop sit-storebuy "${town[@]}" --console-focus 0 &
+run shop-2x sit-storebuy "${town[@]}" --console-focus 0 --compose-scale 2 &
+run shop-wide sit-storebuy "${town[@]}" --console-focus 0 --wide &
+run shop-sell BY-own4 "${town[@]}" --console-focus 10 &
+run shop-poor BY-dn2 "${town[@]}" --console-focus 6 &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
-    goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide; do
+    goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
+    shop shop-2x shop-wide shop-sell shop-poor; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -464,6 +473,29 @@ elif case in ("gift", "gift-items", "gift-items-2x", "gift-items-wide"):
         # Slot 1's item: the game's own icon (not the cell's flat fill).
         cell = {C(x, y) for y in range(200, 290, 4) for x in range(215, 290, 4)}
         if len(cell) < 8: errors.append(f"slot 1 has no icon ({len(cell)} colours)")
+elif case in ("shop", "shop-2x", "shop-wide", "shop-sell", "shop-poor"):
+    # The catalogue in HD (src/port/catalogue.*): the panel, the title's well, the money in its
+    # warm white, the game's mode lit (Buy: shop, shop-poor; Sell: shop-sell), the focus ring
+    # (cell 1; the fourth owned place; Pay), the first cell's icon the game's own, Pay's word
+    # white when the game would pay and dim when not (shop-poor: the XAM stereo, §3,000 > §2,000);
+    # never the touch screen 3x.
+    expect("panel outline", C(176, 300), OUTLINE)
+    expect("panel band", C(180, 300), hexrgb("6171B2"))
+    expect("title well", C(640, 50), hexrgb("6A72B8"))
+    warm = sum(1 for y in range(54, 100, 2) for x in range(840, 1010, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
+    if warm < 20: errors.append(f"no money in the title ({warm} warm pixels)")
+    white = lambda x0, y0, x1, y1: (255, 255, 255) in [C(x, y) for y in range(y0, y1) for x in range(x0, x1)]
+    sell = case == "shop-sell"
+    if white(210, 128, 526, 160) == sell: errors.append(f"the Buy header {'lit' if sell else 'dim'}")
+    if white(888, 128, 1070, 160) != sell: errors.append(f"the Sell header {'dim' if sell else 'lit'}")
+    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    at = {"shop-sell": (981, 330), "shop-poor": (537, 514)}.get(case, (197, 224)) # (cell 1; owned place 4; Pay)
+    if not ring(*at): errors.append(f"no focus ring at {at}")
+    if case != "shop-sell" and case != "shop-poor" and ring(313, 224): errors.append("a focus ring around cell 2")
+    cell = {C(x, y) for y in range(186, 266, 4) for x in range(210, 290, 4)}
+    if len(cell) < 8: errors.append(f"cell 1 has no icon ({len(cell)} colours)")
+    if white(630, 490, 840, 540) == (case == "shop-poor"): errors.append(f"Pay's word {'white' if case == 'shop-poor' else 'dim'}")
+    not_big()
 elif case in ("pockets-menu", "pockets-armed"):
     # Pockets in HD (src/port/pockets.*): the Pockets tab's icon green, the focus ring around slot
     # 1 (the Arcade-Pie Factory), the counted items' icons the touch screen's pixels 2x (DS 99 +
@@ -645,6 +677,20 @@ pad_late() {
         --layout console --print-screen --print-game --print-town "${late[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
+# pad_shop NAME STATE SCRIPT FRAMES: the catalogue's runs, on a copy of the complete save (the
+# research's states are the town's: its clock), with the shops' records (--print-hotel).
+pad_shop() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 file=$shots/$2.st
+    [ -f "$file" ] || file=$more_shots/$2.st
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$tmp/$name.sav" \
+        --layout console --print-screen --print-game --print-hotel "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_shop pad-shop-buy sit-storebuy catalogue-buy 220 &
+pad_shop pad-shop-sell BY-own4 catalogue-sell 120 &
+pad_shop pad-shop-scroll sit-storebuy catalogue-scroll 240 &
+pad_shop pad-shop-poor BY-dn2 catalogue-poor 140 &
 pad_late pad-hotseat sit-casino interact-hotseat 300 &
 pad_late pad-target D-cas-right2 interact-target 220 &
 pad pad-buy sit-store interact-buy 200 &
@@ -683,6 +729,20 @@ check_pad() {
         fails=$((fails + 1))
     elif "$@"; then echo "ok   $name"
     else echo "FAIL $name"; fails=$((fails + 1)); fi
+}
+# The catalogue: a couch bought twice (§2,000 -> §1,850 -> §1,700, two couches owned, no third),
+# a bed sold (§1,040 -> §1,120, five left), the list scrolled by the game's arrows and closed, a
+# purchase the game refuses (nothing bought).
+shop_buy() {
+    in_order pad-shop-buy 'catalogue .*sel=0 .*money=2000 ' 'catalogue .*sel=1 .*money=2000 ' 'catalogue .*money=1850 .*owned=132:[^,]*$' \
+        'catalogue .*money=1700 .*owned=132:[^,]*,132:[^,]*$' || return 1
+    ! grep -q 'money=1550' "$tmp/pad-shop-buy.log" || { echo "  pad-shop-buy: a third couch"; return 1; }
+}
+shop_sell() { in_order pad-shop-sell 'catalogue .*sell=1 .*money=1040 ' 'catalogue .*money=1120 .*owned=(106:[^,]*,){4}106:[^,]*$'; }
+shop_scroll() { in_order pad-shop-scroll 'catalogue .*scroll=0 ' 'catalogue .*scroll=3 ' 'catalogue .*scroll=6 ' 'catalogue .*scroll=3 ' 'game Panel/Interact'; }
+shop_poor() {
+    in_order pad-shop-poor 'catalogue .*sel=6 .*money=2000 ' 'console menu closed, focus 6' || return 1
+    ! grep -E 'catalogue .*money=' "$tmp/pad-shop-poor.log" | grep -qv 'money=2000 ' || { echo "  pad-shop-poor: money changed"; return 1; }
 }
 tabs() {
     in_order pad-tabs 'screen Phone' 'screen Panel/Interact' 'console menu open' 'screen Panel/Pockets' \
@@ -744,6 +804,10 @@ check_pad pad-bin-once bin_once
 check_pad pad-bin-twice bin_twice_sel
 check_pad pad-bin-cancel bin_cancel
 check_pad pad-give give
+check_pad pad-shop-buy shop_buy
+check_pad pad-shop-sell shop_sell
+check_pad pad-shop-scroll shop_scroll
+check_pad pad-shop-poor shop_poor
 check_pad pad-gift-close gift_close
 # Goals, Relationships, Options and the Save slots (src/port/goals.*, relations.*, options.*):
 # from B-pg8-goals, MENU, Down x3, Up → the game's selection 1, 2, 3 (its scroll first=1), 2,

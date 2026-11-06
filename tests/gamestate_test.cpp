@@ -867,6 +867,21 @@ static void catalogue_and_stat()
     r.W32(kS + 0x258, 1); r.W32(kS + 0x40, 5 + 0x3B); CHECK(!ReadGameState(r.View()).catalogue.valid);   // the row names another item
     r.W32(kS + 0x40, 132 + 0x3B); r.W8(kS + 0x264, 13); CHECK(!ReadGameState(r.View()).catalogue.valid);
     r.W8(kS + 0x264, 2); r.W8(kS + 0x25D, 2); CHECK(!ReadGameState(r.View()).catalogue.valid);
+    r.W8(kS + 0x25D, 1);
+    // The keeper's record index: Sim record rows 0..56 (0x260 = 57 is past them).
+    r.W32(kS + 0x260, 56); CHECK(ReadGameState(r.View()).catalogue.valid);
+    r.W32(kS + 0x260, 57); CHECK(!ReadGameState(r.View()).catalogue.valid);
+    // A vendor: layout 1, six fixed items.
+    r.W32(kS + 0x260, 0x30); r.W8(kS + 0x26C, 1); r.W8(kS + 0x264, 6);
+    for (u32 i = 0; i < 6; i++) r.W32(kS + 0x3C + 4 * i, (i % 2 ? 132 : 106) + 0x3B);
+    c = ReadGameState(r.View()).catalogue;
+    CHECK(c.valid && c.vendor && c.shop == 0x30 && c.items.size() == 6 && c.items[5].id == 132);
+    r.W8(kS + 0x26C, 2); CHECK(!ReadGameState(r.View()).catalogue.valid);
+    // A negative record price (s16, as the game reads it): never ~131,000.
+    r.W8(kS + 0x26C, 1); r.W16(kRec + 0x12 * (132 + 0x3B) + 0xE, 0xFFF6);
+    c = ReadGameState(r.View()).catalogue;
+    CHECK(c.valid && c.items[1].sellPrice == -10 && c.items[1].buyPrice == -20);
+    CHECK(ReadItemRow(r.View(), 132).price == -10);
 
     Ram s = hotel_ram(0x0214B5A4, 14);
     s.W32(kS + 0x38, 2); s.W32(kS + 0x3C, 0);
