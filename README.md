@@ -135,7 +135,7 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 | Q / W (AZERTY: A / Z) | LB / RB | L / R: turn the camera in town; switch tabs while the menu is open |
 | Enter / Right Shift | Start / left stick click | Start / Select |
 | E | Back (let go) | open the touch screen's menu (the PANEL); B closes it |
-| Esc | Guide, or Start + Back | the frontend's pause menu: save states, settings, quit |
+| Esc | Start + Back | the frontend's pause menu: save states, settings, quit |
 | M (hold) | | blow into the microphone |
 | Tab | right stick click | swap which screen is big (the old layouts) |
 | Space (hold) | RT | fast forward |
@@ -147,7 +147,9 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 
 Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND
 BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation and Switch
-controllers are known by their own button names.
+controllers are known by their own button names, and the hints on screen show the buttons of the
+controller you used last (A / B / X / Y, ✕ ○ □ △, or the Switch's), or your keys when you last
+typed.
 
 **Before the game** (the front end) the controller does it all: on the intro's last screen
 ("Touch the Touch Screen to continue.") A or Start take the touch, on the title A begins, and on
@@ -253,6 +255,27 @@ The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav`
 emulator or a flash cart works if you put it there. A copy is made in `backups/` beside it when
 the program starts and every half hour (the last eight are kept).
 
+## Controllers
+
+Plug in any controller, before or during the game: Xbox (and every XInput pad), PlayStation 3 / 4
+/ 5, Switch Pro and Joy-Cons, 8BitDo and the many others SDL knows, by USB or Bluetooth, on
+Windows, Mac and Linux. Several can be plugged in: whichever you touch last plays. The keyboard
+always works beside them. The pause menu is Start + Back (or Esc): the Guide / PS / Home button
+stays the system's.
+
+**Through Steam** (and on a **Steam Deck**): in Steam, *Add a Game > Add a Non-Steam Game*, pick
+`sims2wide.exe` (or `sims2wide` on Linux), and leave Steam Input on. To skip the file picker, put
+the ROM's path in its *Properties > Launch Options*, in quotes: `"C:\Games\Sims 2.nds"`. The Deck's
+own buttons then work as a controller; the game fills its 1280 × 800 screen with thin bars above
+and below.
+
+**A controller that does nothing** has no mapping yet: the program says which one on its console
+output. Make one with [SDL2 Gamepad Tool](https://generalarcade.com/gamepadtool/) or Steam's
+controller settings and put the line in `gamecontrollerdb.txt` in the settings folder (below); a
+mapping in the `SDL_GAMECONTROLLERCONFIG` environment variable (what Steam sets) wins over it.
+SETTINGS > CONTROLS also has the sticks' dead zone (raise it if the Sim walks on its own), how far
+the triggers go down to count, and rumble.
+
 ## Settings
 
 Esc opens the pause menu; SETTINGS has four pages:
@@ -262,7 +285,7 @@ Esc opens the pause menu; SETTINGS has four pages:
 | DISPLAY | fullscreen (F11), smooth scaling, layout |
 | GRAPHICS | 3D resolution, widescreen world, 60 fps |
 | SOUND | volume, sound during fast forward (muted, or at normal pitch skipping ahead) |
-| CONTROLS | stick touch cursor, microphone (off, the blow key, the real one), keys and buttons |
+| CONTROLS | stick touch cursor, stick dead zone, trigger press point, rumble, microphone (off, the blow key, the real one), keys and buttons |
 
 <p align="center">
   <img src="docs/screenshots/menu.webp" alt="The pause menu's settings page over the town: DISPLAY, GRAPHICS, SOUND, CONTROLS, with a hint for the chosen page" width="700">
@@ -360,7 +383,9 @@ GPLv3, see [LICENSE](LICENSE), as melonDS. Built on [melonDS](https://github.com
 1.1, [SDL2](https://www.libsdl.org/), [stb_image_write and stb_truetype](https://github.com/nothings/stb) and
 [tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/). The interface's font is
 [Nunito](https://github.com/googlefonts/nunito) (SIL Open Font License 1.1,
-[assets/fonts/OFL.txt](assets/fonts/OFL.txt)).
+[assets/fonts/OFL.txt](assets/fonts/OFL.txt)). The controller mappings are
+[SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB) (zlib licence,
+[assets/controllers/LICENSE.txt](assets/controllers/LICENSE.txt)).
 The idea comes from [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex), which does
 this for the DS Pokémon games; `src/platform.cpp`, the remappable controls (`src/controls.*`),
 the menu's drawing and font (`src/ui.*`) and the sound stretching (`src/audiostretch.h`) are

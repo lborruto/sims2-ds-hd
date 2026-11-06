@@ -19,7 +19,13 @@ and built by CMake (its archive's hash is checked); melonDS 1.1 is a git submodu
 On Linux, SDL needs its development packages. What CI installs on Ubuntu 24.04:
 
     sudo apt-get install libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
-      libxss-dev libxkbcommon-dev libwayland-dev wayland-protocols libasound2-dev libpulse-dev
+      libxss-dev libxkbcommon-dev libwayland-dev wayland-protocols libasound2-dev libpulse-dev \
+      libudev-dev
+
+(libudev-dev: SDL's HIDAPI controller drivers and hot-plug through udev; configuring warns without
+it.) Configuring prints `SDL controllers:` with the joystick drivers SDL compiled in, and stops
+when a platform's main ones are missing (Windows: XInput, RawInput, DirectInput, HIDAPI; a Mac:
+IOKit, GameController.framework, HIDAPI; Linux: evdev, HIDAPI).
 
 On a Mac, Xcode's command line tools are enough (plus CMake and Ninja, from Homebrew or
 `pip install cmake ninja`; CMake 3.21 to 4.x work).
@@ -57,6 +63,7 @@ Before opening a pull request:
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
     ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens (the HD menu, popups and the phone included)
     ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
+    ninja -C build pads_test && SDL_VIDEODRIVER=dummy ./build/pads_test   # the controllers on SDL's virtual joysticks: hot-plug, two pads, triggers, dead zones, a pad missing buttons, Steam's virtual pad, the chips' look per pad type, the mappings' order
     bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts (the shop's buys and sells, Build Rooms' buy, cancel and double press, the Registry, check-in, room info, the music and stat pages, the front end: boot, title, main menu, Settings, Load-a-Sim and Create-a-Sim, including the Start and A pressed during the splashes that take no touch), the HD conversation (its page follows the game's, A turns two pages, every language's conversations fit the box, every language's HD menu words fit theirs, no character missing from the font, no game text: milestone 1's box) (ROM, shots/, the complete save, Pillow)
     ninja -C build gamestate_test && ./build/gamestate_test   # the RAM reader and its screen names on a synthetic RAM (the menus' lists and the hotel's and shops' screens too, fuzzed: the tabs, the phone, Give Gift, notes, the catalogue, Build Rooms, the Registry, room info, music, the stat panel never crash or run past their caps)
     bash tests/gamestate_check.sh            # each save state's game state read from RAM (the front end's included), the minigames' parts (`--print-minigame`), the recorder's captures (ROM, shots/, the complete save)
@@ -79,7 +86,7 @@ gitleaks over the whole history, CodeQL on `src/` (once the repository is public
 scanning needs it on the free plan), and Release builds the way the release makes them: Linux
 (Ubuntu 24.04), the Mac app for both kinds of Mac (built on an Intel macOS 15 runner, as GitHub's Apple silicon
 ones are often out of capacity; the Intel half is run, the other checked present) and Windows (MSYS2,
-checked to need no DLL beyond Windows' own), each checked with `--version`. It has no ROM, so it
+checked to need no DLL beyond Windows' own, and `pads_test` run on Windows' own SDL build), each checked with `--version`. It has no ROM, so it
 cannot run the game. The one check to require
 is "CI result"; a docs-only pull request skips the build and still passes it.
 
@@ -238,8 +245,29 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
 - **Controls** (`controls.*`, `input.*`): each action (the 12 DS buttons, MENU, FAST FORWARD,
   SWAP SCREENS, SAVE STATE, LOAD STATE, BLOW, CURSOR PRESS, TOUCH MENU) has a key (an SDL keycode, so the
   key's label on any layout) and a controller input; giving an action a key another one had
-  swaps them. Controllers are read through SDL_GameController, labels by SDL's convention (A is
-  the button printed A). The right stick moves a cursor on the touch screen, pressed with
+  swaps them. Controllers (`pads.*`) are read through SDL_GameController, labels by SDL's convention (A is
+  the button printed A; with `SDL_GAMECONTROLLER_USE_BUTTON_LABELS=0` a Nintendo pad's A is its
+  bottom button, printed B: `PrintedInput`). `Pads` opens every controller (at start and on
+  `SDL_CONTROLLERDEVICEADDED`, closed on `…REMOVED`), and one drives: the last one whose button
+  went down or whose stick went past half way (a drifting stick never takes over), else the last
+  one connected; while Steam Input's virtual pad is open (a game Steam launched: Steam sets
+  `SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD`, and normally hides the physical pads with
+  `SDL_GAMECONTROLLER_IGNORE_DEVICES`), the physical ones are not read, so nothing acts twice.
+  `Pads::Read` gives the driving pad's buttons, its triggers as buttons past `trigger_threshold`
+  and its sticks zeroed inside the round `stick_dead_zone`. Mappings, lowest first: SDL's own,
+  the bundled SDL_GameControllerDB (`assets/controllers/gamecontrollerdb.txt`, mdqinc/SDL_GameControllerDB
+  at ff33382, zlib, `LICENSE.txt` beside it; this platform's lines embedded at build time by
+  `cmake/embed.cmake`), the player's `gamecontrollerdb.txt` in the settings folder, the file
+  `SDL_GAMECONTROLLERCONFIG_FILE` names, and `SDL_GAMECONTROLLERCONFIG` over all (SDL gives it
+  the user priority: nothing here overrides it). To update the database: download the file at a
+  newer commit at least two weeks old, replace it, say the commit here and in CLAUDE.md. The Guide
+  button is the system's (Steam, the Deck, Game Bar): no action has it by default; the pause
+  menu is Start + Back. The HD chips (`ui::ChipLook`, set each frame by `Input::Poll` through
+  `ChipLookFor`) print the driving pad's buttons for the actions they stand for (Xbox letters,
+  PlayStation's drawn symbols, Nintendo's letters and +, L, ZL), or the keyboard's keys on keycaps
+  when a key was pressed last (keys an input script pushes are marked and do not count); a chip
+  of the Xbox look with its default input is the item it always was (same pixels, same hash).
+  The right stick moves a cursor on the touch screen, pressed with
   CURSOR PRESS (LT). Over the world, the mouse wheel holds X or Y a few frames per notch (the
   game zooms in with X, out with Y) and a right-button drag holds L or R for a frame every
   three points moved (the game turns the camera continuously while they are held).
