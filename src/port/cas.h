@@ -32,8 +32,8 @@
 //   240,105: A pages; focusable only while the game shows them, the categories left of them);
 //   the cell holding the game's choice rimmed (its ring sprite, CasState::clothesCell). Medium:
 //   which item a cell holds is the game's table (not decoded), the HD shows its picture.
-// - Keep this Sim? (4): the four aspirations (live crops 2x of the game's icons, in its order on
-//   screen: Fortune, Popularity, Romance, Party; A taps them, 82 + 45 j, 44), the chosen one's
+// - Keep this Sim? (4): the four aspirations (the game's pictures, sprite 362, in its order on
+//   screen: Fortune, Popularity, Romance, Party, the others dimmed; A taps them, 82 + 45 j, 44), the chosen one's
 //   name (1994 + a) and text (1998 + a), the game's tick (974, "Yes" 48: A taps 116,170, the
 //   game then starts: never replayed) and cross (7683, "No" 49: A or B tap 176,170, the title at
 //   phase 0, as the game). Once one is pressed (C+0x11) nothing more is (the game counts down).
@@ -96,6 +96,9 @@ constexpr int kStrCasKeys[3] = {241, 267, 293};
 constexpr int kStrCasTitle0 = 2016;                           // + page 1..4: Hair Style, Face Style, Clothes, Confirm
 constexpr int kStrCasKeep = 2021, kStrAsp0 = 1994, kStrAspText0 = 1998, kStrCasYes = 48, kStrCasNo = 49;
 constexpr int kSprCasTick = 974, kSprCasCross = 7683;
+// The aspirations' picture (the stat panel's too): frames Fortune, Popularity, Romance, Party, the
+// game's order on this page (kCasAspOfSlot), 64 x 64, drawn kCasAspIcon wide.
+constexpr int kSprCasAsp = 362, kCasAspIcon = 96;
 // The keyboard pages' labels, as the game's own buttons show them (not words: the same in every language).
 constexpr const char* kCasKbLabel[3] = {"ABC", "abc", "123!"};
 

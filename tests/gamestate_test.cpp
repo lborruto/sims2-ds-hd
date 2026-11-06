@@ -1075,9 +1075,19 @@ static void front_cas()
     put_text(r, kFN + 0x70, "SimABCD"); CHECK(ReadGameState(r.View()).front.cas.name == "SimABCD" && ReadGameState(r.View()).front.cas.name.size() == 7);
     for (u32 i = 0; i < 8; i++) r.W8(kFN + 0x70 + i, 'A');   // 8 characters, no NUL: past the game's limit
     // (a buffer that does not read: the Name page's editor not filled yet, as a page change in flight)
-    auto making = [&]() { const CasState c = ReadGameState(r.View()).front.cas; return c.valid && c.switching && c.page == 0 && !c.nameKnown && c.name.empty(); };
+    // (a buffer that does not read: the page without its fields, never `switching`: its tabs and LB / RB stay)
+    auto making = [&]() { const CasState c = ReadGameState(r.View()).front.cas; return c.valid && !c.switching && c.page == 0 && !c.nameKnown && c.name.empty(); };
     CHECK(making());
     put_text(r, kFN + 0x70, "Si"); r.W8(kFN + 0x71, 0x07); CHECK(making());   // not printable
+    r.W8(kFN + 0x71, 0xB6); CHECK(making());   // a byte the charset leaves empty
+    // the keyboards' accented letters (the game's charset: 0xA3 é, 0x9E ä, 0x8F Ñ) as UTF-8, counted as one each
+    put_text(r, kFN + 0x70, "Ren"); r.W8(kFN + 0x73, 0xA3); r.W8(kFN + 0x74, 0x9E); r.W8(kFN + 0x75, 0x8F); r.W8(kFN + 0x76, 'e'); r.W8(kFN + 0x77, 0);
+    g = ReadGameState(r.View());
+    CHECK(g.front.cas.nameKnown && g.front.cas.nameLength == 7 && g.front.cas.name == "Ren\xC3\xA9\xC3\xA4\xC3\x91" "e");
+    put_text(r, kGb + 0x53, "Ana"); r.W8(kGb + 0x56, 0xA3); r.W8(kGb + 0x57, 0);
+    g = ReadGameState(r.View());
+    CHECK(g.front.cas.simName == "Ana\xC3\xA9");
+    put_text(r, kGb + 0x53, "Sim");
     put_text(r, kFN + 0x70, "Sim"); r.W16(kFN + 0x12, 3); CHECK(making()); r.W16(kFN + 0x12, 0);
     CHECK(!ReadGameState(r.View()).front.cas.switching);
     setpage(1, 1); r.W16(kFN + 0x3E, 2); r.W16(kFN + 0x38, 3); r.W16(kFN + 0x3A, 13);
@@ -1140,7 +1150,7 @@ static void front_random()
         for (u32 a = kFN; a < kFN + 0x100; a += 4) if (rnd() % 3) r.W32(a, rnd());
         for (u32 a = 0x0213D7B8; a < 0x0213D7B8 + 0x90; a += 4) r.W32(a, rnd());
         const GameState g = ReadGameState(r.View());   // no crash, no overrun
-        CHECK(g.front.cas.name.size() <= 7 && g.front.cas.simName.size() <= 7);
+        CHECK(g.front.cas.nameLength <= 7 && g.front.cas.name.size() <= 14 && g.front.cas.simName.size() <= 14);
         for (const LoadRow& x : g.front.load.rows) CHECK(x.name.size() <= 16);
     }
 }

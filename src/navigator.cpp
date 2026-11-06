@@ -462,6 +462,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             // The right stick turns what the game turns on L / R (Create-a-Sim's model).
             if (v.stickTurns && pad.rx < -kStick) dsKeys |= 1u << kL;
             else if (v.stickTurns && pad.rx > kStick) dsKeys |= 1u << kR;
+            // X / Y the same (the keyboard's way: no right stick).
+            if (v.xyTurns && pad.x) dsKeys |= 1u << kL;
+            if (v.xyTurns && pad.y) dsKeys |= 1u << kR;
             break;
         }
         if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);

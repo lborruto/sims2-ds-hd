@@ -5,6 +5,7 @@
 
 #include "console.h"
 #include "port/front.h"
+#include "port/icons.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -120,6 +121,9 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
     v.buttons[(int)MenuButton::LB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * ((cs.page + kCasPages - 1) % kCasPages))};
     v.buttons[(int)MenuButton::RB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * ((cs.page + 1) % kCasPages))};
     if (cs.page < 4) v.buttons[(int)MenuButton::Start] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page + 1))};
+    // X / Y turn the model on every page but the Name page (there the keyboard's page and the
+    // backspace): the keyboard's way, with no right stick.
+    v.xyTurns = cs.page != 0;
 
     switch (cs.page)
     {
@@ -135,7 +139,7 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
             if (p != kb) it.action = {Tap(kCasKbX, kCasKbY[p])};   // (the page shown: nothing to do)
             v.items.push_back(it);
         }
-        const bool full = (int)cs.name.size() >= kCasName;
+        const bool full = cs.nameLength >= kCasName;
         v.initial = (int)v.items.size();
         for (int i = 0; i < kCasKeys; i++)
         {
@@ -255,9 +259,15 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     const Rect top = FrontFit(kCasTopBox, topW, topH);
     FrontFramed(c, {Src::Top, {0, 0, topW, topH}, top});
     {
-        const Rect rs = ChipRect(0, 0, Button::RS, "", 28);
-        UiItem chip = ChipItem(top.x + (top.w - rs.w) / 2, top.y + top.h + 22, Button::RS, "", 28);
-        c.ui.push_back(chip);
+        // What turns it: RS; off the Name page X (left) and Y (right) too, either side of it.
+        const Rect rs = ChipRect(0, 0, Button::RS, "", 28), xr = ChipRect(0, 0, Button::X, "", 28);
+        const int y = top.y + top.h + 22, cx = top.x + top.w / 2;
+        c.ui.push_back(ChipItem(cx - rs.w / 2, y, Button::RS, "", 28));
+        if (v.xyTurns)
+        {
+            c.ui.push_back(ChipItem(cx - rs.w / 2 - 16 - xr.w, y + (rs.h - xr.h) / 2, Button::X, "", 28));
+            c.ui.push_back(ChipItem(cx + rs.w / 2 + 16, y + (rs.h - xr.h) / 2, Button::Y, "", 28));
+        }
     }
 
     // Layer 0: the panel, the tab bar and its LB / RB, the title's well.
@@ -311,7 +321,8 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         std::vector<std::string> chars;
         for (size_t i = 0; i < shown.size(); i++)
         {
-            const size_t n = (unsigned char)shown[i] >= 0xC0 ? 2 : 1;
+            const unsigned char b = (unsigned char)shown[i];
+            const size_t n = b >= 0xF0 ? 4 : b >= 0xE0 ? 3 : b >= 0xC0 ? 2 : 1;   // (a UTF-8 letter whole)
             chars.push_back(shown.substr(i, n));
             i += n - 1;
         }
@@ -368,7 +379,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         kbWell.radius = 16;
         kbWell.layer = 1;
         c.ui.push_back(kbWell);
-        const bool full = (int)cs.name.size() >= kCasName;
+        const bool full = cs.nameLength >= kCasName;
         for (int i = 0; i < kCasKeys; i++)
         {
             const int k = 9 + i;
@@ -458,7 +469,16 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         {
             const Rect from = Plus(kCasAspFrom, kCasAspDx * j, 0);
             Cell(c, v.items[j].rect, focused(j), cs.aspiration == kCasAspOfSlot[j], 16);
-            Crop(images, bottom, from, 2, v.items[j].rect);
+            // The game's aspiration picture (362, its frames in this order), 1.5x; the others dimmed,
+            // as the game shows them as silhouettes.
+            if (icons)
+                if (const SpriteFrame* f = icons->Scaled(SpriteRef::Of(kSprCasAsp), j, kCasAspIcon, kCasAspIcon))
+                {
+                    const Rect r = v.items[j].rect;
+                    UiItem im = ImageItem({r.x + (r.w - f->w) / 2, r.y + (r.h - f->h) / 2, f->w, f->h}, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h});
+                    im.fill = cs.aspiration == kCasAspOfSlot[j] ? 0 : 0xA0000000;
+                    images.push_back(im);
+                }
             mouse(j, from);
         }
         // The chosen aspiration's name and what it gives.
@@ -534,6 +554,6 @@ void MeasureCas(const RomData& rom, BlockMeasure& m)
     for (int id : {kStrCasYes, kStrCasNo}) tally.Line(id, MenuWords(rom, id), 32, 22, kCasTick.w - 92);
     for (int p = 0; p < 3; p++)
         for (int i = 0; i < kCasKeyCount[p]; i++) tally.Line(kStrCasKeys[p] + i, CasKeyText(rom, p, i), 30, 30, kCasKeyW - 4);
-    tally.Line(kStrCasNo, MenuWords(rom, kStrCasNo), kPmHintSize, kPmHintSize, 200);
+    for (int id : {kStrCasYes, kStrCasNo}) tally.Line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, 200);   // (the A / B hints)
 }
 }

@@ -973,7 +973,7 @@ int main(int argc, char** argv)
                         else
                         {
                             fprintf(stderr, "frame %ld: cas page=%d gender=%d simname=%s skin=%d haircolour=%d", frame, c.page, c.gender, c.simName.c_str(), c.skin, c.hairColour);
-                            if (c.nameKnown) fprintf(stderr, " name=%s len=%zu keyboard=%d", c.name.c_str(), c.name.size(), c.keyboard);
+                            if (c.nameKnown) fprintf(stderr, " name=%s len=%d keyboard=%d", c.name.c_str(), c.nameLength, c.keyboard);
                             if (c.hairKnown) fprintf(stderr, " hair=%d scroll=%d", c.hairStyle, c.hairScroll);
                             if (c.face >= 0) fprintf(stderr, " face=%d", c.face);
                             if (c.clothesKnown) fprintf(stderr, " category=%d clothespage=%d item=%d", c.category, c.clothesPage, c.item);

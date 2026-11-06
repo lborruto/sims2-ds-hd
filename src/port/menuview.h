@@ -133,6 +133,9 @@ struct MenuView
     // The right stick's horizontal holds the DS's L (left) / R (right) while deflected: Create-a-
     // Sim's model turns as the game turns it on L / R (LB / RB are the screen's pages there).
     bool stickTurns = false;
+    // X / Y hold the DS's L / R while held (the keyboard's way to turn Create-a-Sim's model; the
+    // view's X / Y actions then empty).
+    bool xyTurns = false;
     // (Drawing only, not hashed: set by CONSOLE from the navigator) the id of the item whose X is
     // armed (xAsks), 0 none.
     u32 armed = 0;

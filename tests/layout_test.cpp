@@ -2496,6 +2496,9 @@ int main()
                     }
             }
             CHECK(here.size() == v.items.size());
+            // X / Y turn the model off the Name page (there the keyboard's page and the backspace).
+            CHECK(v.xyTurns == (page != 0));
+            if (page != 0) CHECK(v.buttons[(int)MenuButton::X].empty() && v.buttons[(int)MenuButton::Y].empty());
             if (g.front.cas.switching) CHECK(v.items.empty() && v.buttons[(int)MenuButton::LB].empty() && v.buttons[(int)MenuButton::Start].empty());
             else
             {
@@ -2554,6 +2557,7 @@ int main()
                     CasState& c = g.front.cas;
                     c.nameKnown = true;
                     c.name = name;
+                    c.nameLength = (int)std::string(name).size();
                     c.keyboard = kb;
                     c.gender = gender;
                     const MenuView v = check(g, "name");

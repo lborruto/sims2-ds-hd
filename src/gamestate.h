@@ -507,12 +507,13 @@ struct CasState
     int page = -1;                    // S+0x74: 0 Name, 1 Hair, 2 Face, 3 Clothes, 4 Keep this Sim?; in game 5 Tan, 6 Hair, 7 Clothes
     bool switching = false;           // the page object is not yet the page's (a page change in flight, 2-4 frames): no page fields
     int gender = -1;                  // 0 female, 1 male
-    std::string simName;              // G+0x53, the committed name, at most 7 characters
+    std::string simName;              // G+0x53, the committed name, at most 7 characters, as UTF-8
     int skin = -1;                    // skin figure 0..3 (hero), -1 not read
     int hairColour = -1;              // 0..7 (hero), -1 not read
     // Name page
     bool nameKnown = false;
-    std::string name;                 // the live buffer, at most kCasName characters
+    std::string name;                 // the live buffer as UTF-8 (the game's charset: accented letters too)
+    int nameLength = 0;               // its characters, at most kCasName
     int keyboard = -1;                // 0 ABC, 1 abc, 2 123!
     // Hair page
     bool hairKnown = false;

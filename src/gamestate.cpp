@@ -1,4 +1,5 @@
 #include "gamestate.h"
+#include "romdata.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -291,17 +292,19 @@ HudState ReadHud(const Reader& m)
         !m.R32(G + kEU.sanMax, max) || !m.R32(G + kEU.sanTier, tier))
         return h;
     if (hour > 23 || minute > 59 || tier > 3 || max == 0 || cur > max || max > (999u << 12)) return h;
-    // The name field is assumed 8 bytes including the NUL (research: layout, not checked against
-    // the CAS limit): printable ASCII then a NUL within it. Anything else blanks the name only.
+    // The name field: 8 bytes including the NUL (the CAS editor's 7 + 1): letters of the game's
+    // charset (accented ones too: the keyboards of FR / DE / IT / ES have them) then a NUL within
+    // it, as UTF-8. Anything else blanks the name only.
     std::string name;
     bool terminated = false;
     for (u32 i = 0; i < kEU.simNameMax && !terminated; i++)
     {
         u32 ch;
-        if (!m.R8(G + kEU.simName + i, ch) || (ch != 0 && (ch < 0x20 || ch > 0x7E))) { name.clear(); break; }
+        if (!m.R8(G + kEU.simName + i, ch) || (ch != 0 && !GameTextByte((unsigned char)ch))) { name.clear(); break; }
         if (ch == 0) terminated = true; else name += (char)ch;
     }
     if (!terminated) name.clear();
+    name = GameTextToUtf8(name);
     h.valid = true;
     h.money = (int)money;
     h.hour = (int)hour; h.minute = (int)minute;
@@ -467,8 +470,8 @@ SaveSlots ReadSaves(const Reader& m)
         s.slot[i].money = (int)money; s.slot[i].time = time; s.slot[i].place = (int)place;
         std::string name;
         bool ok = ReadCString(m, h + t.saveName, t.saveNameMax, name);
-        for (char ch : name) if (ch < 0x20 || ch > 0x7E) ok = false;
-        s.slot[i].simName = ok ? name : std::string();
+        for (char ch : name) if (!GameTextByte((unsigned char)ch)) ok = false;
+        s.slot[i].simName = ok ? GameTextToUtf8(name) : std::string();
     }
     s.current = (int)cur;
     s.valid = true;
@@ -1306,8 +1309,8 @@ LoadScreen ReadLoad(const Reader& m, u32 S, bool wireless)
         std::string name;
         bool ok = ReadCString(m, h + t.saveName, t.saveNameMax, name);
         if (ok && name.empty()) ok = ReadCString(m, f.ldNameDefault, t.saveNameMax, name);
-        for (char ch : name) if (ch < 0x20 || ch > 0x7E) ok = false;
-        r.name = ok ? name : std::string();
+        for (char ch : name) if (!GameTextByte((unsigned char)ch)) ok = false;
+        r.name = ok ? GameTextToUtf8(name) : std::string();
         DecodeSlotTime(time, r);
     }
     v.green = (int)cur;
@@ -1332,7 +1335,8 @@ CasState ReadCas(const Reader& m, u32 S)
     // fields do not (`switching`).
     const bool switching = N == 0 || vt != f.vtCas[idx] || !m.In(N, f.sizeCas[idx]);
     if (!m.R32(kEU.gameBlock, G) || !ReadCString(m, G + kEU.simName, kEU.simNameMax, c.simName) || c.simName.size() > (size_t)kCasName) return CasState{};
-    for (char ch : c.simName) if (ch < 0x20 || ch > 0x7E) return CasState{};
+    for (char ch : c.simName) if (!GameTextByte((unsigned char)ch)) return CasState{};
+    c.simName = GameTextToUtf8(c.simName);
     u32 H;
     if (m.R32(S + f.casHero + 4 * gender, H) && H != 0 && m.In(H, f.heroSize))
     {
@@ -1365,11 +1369,13 @@ CasState ReadCas(const Reader& m, u32 S)
     {
         // The Name page's editor is filled a frame or two after its object is made (its buffer
         // garbage until then, seen on the way back from another page): a buffer that does not
-        // read (no NUL within the game's 7 + 1, a character out of range) is that page still
-        // being made, as a page change in flight.
+        // read (no NUL within the game's 7 + 1, a byte the game's charset does not draw) leaves
+        // the page without its fields (nameKnown false), the rest of the part valid.
         bool ok = m.R16(N + f.nameKb, a) && a <= 2 && ReadCString(m, N + f.nameBuf, kCasName + 1, c.name);
-        for (char ch : c.name) if (ch < 0x20 || ch > 0x7E) ok = false;
-        if (!ok) { c.name.clear(); c.page = (int)page; c.gender = (int)gender; c.switching = true; c.valid = true; return c; }
+        for (char ch : c.name) if (!GameTextByte((unsigned char)ch)) ok = false;
+        if (!ok) { c.name.clear(); break; }
+        c.nameLength = (int)c.name.size();
+        c.name = GameTextToUtf8(c.name);
         c.keyboard = (int)a; c.nameKnown = true;
         break;
     }

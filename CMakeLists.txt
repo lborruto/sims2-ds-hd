@@ -143,7 +143,7 @@ target_include_directories(controls_test PRIVATE melonDS/src src)
 target_link_libraries(controls_test PRIVATE SDL2::SDL2-static)
 
 # Checks of the screen manager reader on a synthetic RAM (not built by default): ninja -C build gamestate_test && ./build/gamestate_test
-add_executable(gamestate_test EXCLUDE_FROM_ALL tests/gamestate_test.cpp src/gamestate.cpp src/screens.cpp)
+add_executable(gamestate_test EXCLUDE_FROM_ALL tests/gamestate_test.cpp src/gamestate.cpp src/screens.cpp src/romdata.cpp)
 target_include_directories(gamestate_test PRIVATE melonDS/src src)
 
 # Checks of the ROM's archive, string tables, compression, sprites and the icon cache on synthetic data (not built by default): ninja -C build romdata_test && ./build/romdata_test

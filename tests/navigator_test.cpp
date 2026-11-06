@@ -1860,6 +1860,24 @@ static void view_cas()
         CHECK(r.Touched(x, y) && x == 18 && y == 60);
     }
     {
+        // X / Y holding L / R (the keyboard's turn, off the Name page): held, not tapped.
+        MenuView w = v;
+        w.xyTurns = true;
+        w.buttons[(int)MenuButton::X].clear();
+        w.buttons[(int)MenuButton::Y].clear();
+        Rig r;
+        r.view = &w;
+        r.Frame(cas);
+        PadState x;
+        x.x = true;
+        CHECK((r.Frame(cas, x) & ((1u << kL) | (1u << kR))) == (1u << kL));
+        CHECK((r.Frame(cas, x) & (1u << kL)) != 0 && !r.touch.Owns());
+        PadState y;
+        y.y = true;
+        CHECK((r.Frame(cas, y) & ((1u << kL) | (1u << kR))) == (1u << kR));
+        CHECK((r.Frame(cas) & ((1u << kL) | (1u << kR))) == 0);
+    }
+    {
         MenuView w = v;
         w.stickTurns = false;
         Rig r;

@@ -156,7 +156,7 @@ B goes back. On a music panel, A plays the highlighted song (the room keeps it),
 the list scroll it, B closes. On the stat panel, A opens a page, LB / RB (or Left / Right on a
 page) go to the previous / next one, B goes back to the first page, then closes.
 **In Create-a-Sim** LB / RB change page and Start goes to the next one; the right stick (or the
-mouse's right drag) turns your Sim. On the first page the D-pad and A type the name on the
+mouse's right drag) turns your Sim, and so do X / Y after the first page. On the first page the D-pad and A type the name on the
 game's keyboard (seven letters at most), Y erases a letter and X changes the letters (ABC, abc,
 123!); the gender and skin buttons are above it. Hair, face and clothes are picked with the D-pad
 and A (Left / Right past the edge show more, as the game's arrows do). On the last page pick an

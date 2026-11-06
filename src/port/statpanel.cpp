@@ -280,7 +280,7 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
     {
         const int asp = std::clamp(st.aspiration, 0, 3), level = std::clamp(st.level, 0, 3), j = kStLevelPal[level];
         Well(c, kAspIcon, kIconWell, 20);
-        images.push_back({SpriteRef::Of(kSprStAspiration), asp, 2, kAspIcon});
+        images.push_back({SpriteRef::Of(kSprStAspiration), kStAspFrame[asp], 2, kAspIcon});
         Text(c, kAspName, MenuWords(rom, kStrStAspName + asp), 44, 26, Align::Left, Weight::ExtraBold);
         images.push_back({{kSprStGauge - 1, kSprStGauge, kStGaugePal[j]}, std::clamp(st.gaugeFrame, 0, 20), 3, kAspGauge});
         images.push_back({{kSprStStars - 1, kSprStStars, kStStarsPal[j]}, level, 3, kAspStars});

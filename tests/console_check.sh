@@ -387,11 +387,18 @@ def front_cas(page, focus, raw_top=True):
                 expect(f"tab {i} DS {1 + dx},{8 + 37 * i + dy}", C(x0 + 2 * dx + 1, y0 + 2 * dy + 1), bottom(1 + dx, 8 + 37 * i + dy))
         if len(errors) > 4:
             return
-    # One live crop of the page: DS x, y, w, h, its scale, its HD box.
-    fx, fy, fw, fh, s, (bx, by, bw, bh) = {
-        0: (47, 7, 37, 37, 2, (750, 188, 84, 84)), 1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129)),
-        3: (188, 109, 38, 54, 3, (1084, 384, 120, 174)), 4: (60, 24, 44, 48, 2, (746, 186, 108, 112))}[page]
-    ox, oy = bx + (bw - fw * s) // 2, by + (bh - fh * s) // 2
+    # One live crop of the page: DS x, y, w, h, its scale, its HD box (Keep this Sim?: the game's
+    # aspiration pictures, sprite 362, their blue splash in each cell).
+    if page == 4:
+        for j in range(4):
+            blue = sum(1 for yy in range(190, 294, 2) for xx in range(750 + 120 * j, 850 + 120 * j, 2) if C(xx, yy)[2] > 200 and C(xx, yy)[0] < 140)
+            if blue < 100: errors.append(f"aspiration {j}: no picture ({blue})")
+        fw = fh = 0
+    else:
+        fx, fy, fw, fh, s, (bx, by, bw, bh) = {
+            0: (47, 7, 37, 37, 2, (750, 188, 84, 84)), 1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129)),
+            3: (188, 109, 38, 54, 3, (1084, 384, 120, 174))}[page]
+        ox, oy = bx + (bw - fw * s) // 2, by + (bh - fh * s) // 2
     for dy in range(0, fh, 4):
         for dx in range(0, fw, 4):
             expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), bottom(fx + dx, fy + dy))

@@ -214,7 +214,9 @@ part reads, so a caller falls back to the pixel front end). `--print-front` logs
   [9..14] the cells; Name [0] the skin ring, [1..3] the keyboard page's highlight, [4] / [5] the ♀ / ♂ icons; Confirm [0..3] the
   aspirations in screen order (Fortune 78, Popularity 123, Romance 168, Party 213), [4..7] the tick and cross. A page change takes 2-4
   frames in which `S+0x74` is the new page and `*(S+0x58)` the old object or 0; back on the Name page its buffer is garbage for a
-  frame (the editor not yet filled): both read as the page with no fields (`switching`). Name never above 7 characters.
+  frame (the editor not yet filled): the first reads as `switching` (the page, no fields), the second as the Name page without
+  its buffer (`nameKnown` false). Names are the game's 1-byte charset (accented letters from 0x7B: the FR / DE / IT / ES
+  keyboards' 123! pages type them), read as UTF-8. Name never above 7 characters.
 - **Boot and video**: `CBGDisplayMenu` 0x02131A70 in either slot, `u8 +0x28` mode (0 touch to continue, 1 Maxis, 2 EA, 3 legal,
   4 popup, 5 zoom, 6 blank), `s16 +0x24` countdown, `+0x26` duration; `CVideoScreenMenu` 0x02131E20 in the top slot, `u32 +0x2C` movie 0..3
   (the intro is 3), over a mode-0 BGDisplay.
