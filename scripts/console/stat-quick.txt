@@ -1,0 +1,7 @@
+# From SP-stat-base (Main), CONSOLE: A (Aspirations) and RB while the game still fades Main out
+# (the RB waits for the fade, then taps the X, then Hotel Info's button), RB again (Skills), B
+# while that runs (dropped: one action at a time).
+20 2 pad a
+30 2 pad rb
+220 2 pad rb
+226 2 pad b

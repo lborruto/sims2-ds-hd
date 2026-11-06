@@ -1608,6 +1608,48 @@ static void view_modules_on_one_screen()
     CHECK(r.nav.Focus() == 1);
 }
 
+// A screen's own pages (the stat panel: Unknown, an own view): LB / RB run the view's LB / RB
+// actions (multi-step: a tap, a wait, a tap), held while unsettled and replayed; on the panel
+// they stay its tabs.
+static void view_lb_rb_pages()
+{
+    const ScreenState us {Screen::Unknown, Tab::None};
+    MenuView v;
+    v.valid = v.own = true;
+    ViewItem it;
+    it.rect = {508, 42, 88, 88};
+    it.id = 0x0F100001;
+    v.items.push_back(it);
+    v.buttons[(int)MenuButton::RB] = {TapStep(228, 25), WaitStep(3), TapStep(176, 50)};
+    v.buttons[(int)MenuButton::LB] = {TapStep(228, 25)};
+    Rig r;
+    r.view = &v;
+    r.Frame(us);
+    r.Press(us, &PadState::rb);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 228 && y == 25);
+    r.Drain();
+    for (int i = 0; i < 12 && !r.touch.Owns(); i++) r.Frame(us);
+    CHECK(r.Touched(x, y) && x == 176 && y == 50);
+    r.Drain();
+    r.Frame(us);
+    PadState lb;
+    lb.lb = true;
+    r.Frame(us, lb, false); // unsettled: held
+    r.Frame(us, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(us, {}, true);
+    CHECK(r.Touched(x, y) && x == 228 && y == 25);
+    // Without the view's LB / RB: nothing.
+    MenuView w = v;
+    w.buttons[(int)MenuButton::RB].clear();
+    Rig q;
+    q.view = &w;
+    q.Frame(us);
+    q.Press(us, &PadState::rb);
+    CHECK(!q.touch.Owns());
+}
+
 int main()
 {
     view_modules_on_one_screen();
@@ -1646,6 +1688,7 @@ int main()
     view_item_x_asks();
     view_tab_change_disarms_and_menu_is_b();
     view_popup_resume_and_phone();
+    view_lb_rb_pages();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

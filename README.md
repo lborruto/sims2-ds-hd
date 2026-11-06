@@ -24,12 +24,12 @@
   portrait; A turns the page); popups and the games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
 - **The whole town is HD, and played with a controller.** The status bar, the conversations,
   the menu's five tabs (Interact, Pockets, Goals, Relationships, Options), Give Gift, the save
-  slots, the popups, the phone, the notes, the shop's catalogue, Build Rooms and the hotel's Registry and room pages are redrawn sharp, in the game's own style, with
+  slots, the popups, the phone, the notes, the shop's catalogue, Build Rooms, the hotel's Registry and room pages, its music panel and the stat panel are redrawn sharp, in the game's own style, with
   its own icons and in the game's language (the words come from your copy of the game; with
   another version of it, the old pictures stay). Each has a focus the D-pad moves and buttons
   that say what A, X and B do: do an action, use or throw away an item, give a gift, read your
   goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend, buy
-  and sell, build a hotel room, check a guest in. The games (cards, vacuum, the social reactions) are still the game's own picture,
+  and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions) are still the game's own picture,
   laid out big. No mouse needed, though it works.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
@@ -142,7 +142,9 @@ list scroll it, B closes. In Build Rooms, A on a room asks the game's question (
 the money left shown first), A again buys it, B goes back (B on the list closes). In the hotel's
 Registry, A on a room shows its page (who stays, their mood, when they leave, what the room earns
 a day; A on a line explains it), and when a guest checks in, A on a free room gives it to them;
-B goes back.
+B goes back. On a music panel, A plays the highlighted song (the room keeps it), Up / Down past
+the list scroll it, B closes. On the stat panel, A opens a page, LB / RB (or Left / Right on a
+page) go to the previous / next one, B goes back to the first page, then closes.
 The phone's Up / Down / A are the phone's own buttons (A on a row goes there and presses OK); B
 hangs up. **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or
 B; a question (Quit?) takes A for yes and B for no; when a popup opens over the menu, the menu

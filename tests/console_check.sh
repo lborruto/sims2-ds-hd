@@ -74,11 +74,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*) cp "$complete_save" "$save" || return ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*) cp "$complete_save" "$save" ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -155,13 +155,27 @@ run roominfo M-ci-occ-info "${hotel[@]}" --console-focus 1 &
 run roominfo-vacant M-ci-e-btn1 "${hotel[@]}" --console-focus 1 &
 run roominfo-hint M-ci-occ-info "${hotel[@]}" --input "$repo/scripts/console/roominfo-hint.txt" &
 wait
+run music M-music "${late[@]}" --console-focus 2 &
+run music-2x M-music "${late[@]}" --console-focus 2 --compose-scale 2 &
+run music-wide M-music "${late[@]}" --console-focus 2 --wide &
+run music-scrolled M-mu-down3 "${late[@]}" --console-focus 0 &
+run stat-main SP-stat-base "${late[@]}" --console-focus 0 &
+run stat-main-2x SP-stat-base "${late[@]}" --console-focus 0 --compose-scale 2 &
+run stat-main-wide SP-stat-base "${late[@]}" --console-focus 0 --wide &
+wait
+run stat-asp SP-asp-150 "${late[@]}" --console-focus 0 &
+run stat-hotel SP-hotel-150 "${late[@]}" --console-focus 0 &
+run stat-skills SP-skills "${late[@]}" --console-focus 0 &
+run stat-stats SP-stats "${late[@]}" --console-focus 0 &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
-    registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint; do
+    registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint \
+    music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -596,6 +610,58 @@ elif case in ("roominfo", "roominfo-vacant", "roominfo-hint"):
         warm = sum(1 for y in range(140, 570, 2) for x in range(880, 1060, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
         if warm < (200 if case == "roominfo" else 100): errors.append(f"too few values ({warm} warm pixels)")
     not_big()
+elif case in ("music", "music-2x", "music-wide", "music-scrolled"):
+    # The music panel in HD (src/port/music.*): the panel, the title's well; M-music: five rows,
+    # the third (Strange Day, playing) with the game's button green (frame 4) and the focus ring,
+    # the others blue, the song playing's button 3x beside the list; M-mu-down3 (scrolled by
+    # three): no green button in the rows (the song playing is off the list's view) and the ring
+    # around the first; never the touch screen 3x.
+    expect("panel outline", C(176, 300), OUTLINE)
+    expect("title well", C(640, 50), hexrgb("6A72B8"))
+    green = lambda x0, y0, w, h: sum(1 for y in range(y0, y0 + h, 2) for x in range(x0, x0 + w, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 100)(C(x, y)))
+    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    rows = [green(312, 143 + 86 * i, 64, 64) for i in range(5)]
+    playing = 2 if case != "music-scrolled" else None
+    for i, n in enumerate(rows):
+        if (n >= 20) != (i == playing): errors.append(f"row {i}'s button green pixels {n}")
+    focus = 2 if case != "music-scrolled" else 0
+    if not ring(301, 136 + 86 * focus + 39): errors.append(f"no focus ring around row {focus}")
+    if ring(301, 136 + 86 * ((focus + 1) % 5) + 39): errors.append("a focus ring around another row")
+    if green(892, 148, 112, 112) < (100 if playing is not None else 0): errors.append("no green button beside the list")
+    blue = {C(x, y) for y in range(150, 200, 3) for x in range(315, 375, 3)}
+    if len(blue) < 4: errors.append(f"no button in the first row ({len(blue)} colours)")
+    not_big()
+elif case.startswith("stat-"):
+    # The stat panel in HD (src/port/statpanel.*): the panel, the title's well, the tab bar's five
+    # pictures; Main: four buttons, the ring around Aspirations; a page: the ring around its tab,
+    # its content: Aspirations' gauge green (level 2's palette), Hotel Info's and Game Stats'
+    # values in warm white, Skills' star bars (2, 2, 1, 1, 6 filled); never the touch screen 3x.
+    expect("panel outline", C(176, 300), OUTLINE)
+    expect("title well", C(640, 146), hexrgb("6A72B8"))
+    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    colours = lambda x0, y0, w, h: len({C(x, y) for y in range(y0, y0 + h, 3) for x in range(x0, x0 + w, 3)})
+    for i in range(5):
+        if colours(420 + 88 * i + 12, 52, 64, 64) < 4: errors.append(f"no picture in tab {i}")
+    page = {"stat-asp": 1, "stat-hotel": 2, "stat-skills": 3, "stat-stats": 4}.get(case, 0)
+    warm = lambda x0, y0, w, h: sum(1 for y in range(y0, y0 + h, 2) for x in range(x0, x0 + w, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
+    if page == 0:
+        if not ring(209, 298): errors.append("no focus ring around Aspirations")
+        if ring(641, 298) or ring(209, 486): errors.append("a focus ring around another button")
+        for x, y in ((212, 210), (644, 210), (212, 398), (644, 398)):
+            if colours(x + 140, y + 10, 144, 108) < 6: errors.append(f"no picture on the button at {x},{y}")
+    else:
+        cell = 420 + 88 * page
+        if not ring(cell, 86): errors.append(f"no focus ring around tab {page}")
+        if ring(209, 298): errors.append("Main's ring on a page")
+        if page == 1:
+            g = sum(1 for y in range(296, 334, 2) for x in range(380, 800, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 60)(C(x, y)))
+            if g < 1000: errors.append(f"the gauge not green ({g})")
+        elif page in (2, 4):
+            if warm(880, 214, 180, 360) < 150: errors.append("too few values")
+        else:
+            lit = [colours(728, 214 + 72 * i + 16, 320, 32) for i in range(5)]
+            if min(lit) < 4: errors.append(f"a star bar missing {lit}")
+    not_big()
 elif case in ("pockets-menu", "pockets-armed"):
     # Pockets in HD (src/port/pockets.*): the Pockets tab's icon green, the focus ring around slot
     # 1 (the Arcade-Pie Factory), the counted items' icons the touch screen's pixels 2x (DS 99 +
@@ -814,6 +880,19 @@ pad_hotel() {
 pad_hotel pad-registry D-hotel-down registry-concierge 380 &
 pad_hotel pad-roominfo M-ci-early registry-info 330 &
 pad_hotel pad-checkin M-ci-g-base checkin-guest 260 &
+# pad_late_hotel NAME STATE SCRIPT FRAMES: the complete save's hotel screens (its clock, a copy of
+# the save), the hotel logged.
+pad_late_hotel() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 file=$shots/$2.st
+    [ -f "$file" ] || file=$more_shots/$2.st
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$tmp/$name.sav" \
+        --layout console --print-screen --print-game --print-hotel "${late[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_late_hotel pad-music M-music music-play 400 &
+pad_late_hotel pad-stat SP-stat-base stat-pages 1450 &
+pad_late_hotel pad-stat-quick SP-stat-base stat-quick 400 &
 pad_build pad-build-scroll BD-list build-scroll 260 &
 pad_build pad-build-cancel BD-list build-cancel 260 &
 pad_build pad-build-buy BD-list build-buy 330 &
@@ -984,6 +1063,26 @@ checkin_guest() {
 check_pad pad-registry registry
 check_pad pad-roominfo roominfo_hints
 check_pad pad-checkin checkin_guest
+# The music panel and the stat panel (src/port/music.*, statpanel.*; the complete save, the
+# research's states): from M-music, Up, A → Create-a-Sim plays and the casino keeps it (G+0x449C
+# + 4 = 3), Down x4 → the game's scroll 1, A → Edge of Town (code 7), A on it again nothing, B →
+# the panel; from SP-stat-base (the research's patched Music Panel: medium), A, RB, Right, LB,
+# B, LB, B, B → the pages 1, 2 (by Main), 3, 2, Main (the focus back on Hotel Info), 4, Main (on
+# Game Stats), the panel; A then RB during the fade (waited out) → 1, 2, RB → 3.
+music_play() {
+    in_order pad-music 'music scroll=0 playing=2 place=4 roomsong=42' 'songs=(42,){4}3,' 'music scroll=0 playing=1 place=4 roomsong=3' \
+        'music scroll=1 playing=1 ' 'music scroll=1 playing=5 place=4 roomsong=7' 'game Panel/Interact' || return 1
+    [ "$(grep -c 'music .*playing=' "$tmp/pad-music.log")" -eq 4 ] || { echo "  pad-music: a song changed more than asked"; return 1; }
+}
+stat_pages() {
+    in_order pad-stat 'stat page=0 transition=0' 'stat page=1 transition=0' 'stat page=0 ' 'stat page=2 transition=0' 'stat page=0 ' \
+        'stat page=3 transition=0' 'stat page=0 ' 'stat page=2 transition=0' 'stat page=0 transition=1' 'focus 1' 'stat page=4 transition=0' \
+        'stat page=0 transition=1' 'focus 3' 'game Panel/Interact'
+}
+stat_quick() { in_order pad-stat-quick 'stat page=1 transition=1' 'stat page=0 ' 'stat page=2 transition=0' 'stat page=0 ' 'stat page=3 transition=0'; }
+check_pad pad-music music_play
+check_pad pad-stat stat_pages
+check_pad pad-stat-quick stat_quick
 check_pad pad-gift-close gift_close
 # Goals, Relationships, Options and the Save slots (src/port/goals.*, relations.*, options.*):
 # from B-pg8-goals, MENU, Down x3, Up → the game's selection 1, 2, 3 (its scroll first=1), 2,

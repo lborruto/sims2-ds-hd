@@ -1,0 +1,11 @@
+# From SP-stat-base (the Stat Panel's Main page, the research's patched Music Panel), CONSOLE: A
+# (Aspirations), RB (Hotel Info: the game's X, then its button), Right (Skills), LB (Hotel Info),
+# B (Main, the focus on Hotel Info), LB (Game Stats from Main), B (Main), B (the X: the panel).
+20 2 pad a
+180 2 pad rb
+400 2 pad right
+620 2 pad lb
+840 2 pad b
+1000 2 pad lb
+1160 2 pad b
+1320 2 pad b

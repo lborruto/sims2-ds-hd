@@ -125,7 +125,12 @@ bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
         if (b == &PadState::menu) return v.own && !v.popup && !v.back.empty(); // (an own screen's MENU is B)
         if (b == &PadState::x) return !XAction(v, f).empty();
         if (b == &PadState::y) return !v.buttons[(int)MenuButton::Y].empty();
-        return s.screen == Screen::Panel && (b == &PadState::lb || b == &PadState::rb); // (the panel's tabs)
+        if (b == &PadState::lb || b == &PadState::rb)
+        {
+            if (s.screen == Screen::Panel) return true; // (the panel's tabs)
+            return !v.buttons[(int)(b == &PadState::lb ? MenuButton::LB : MenuButton::RB)].empty();
+        }
+        return false;
     }
     const std::vector<Hotspot>& h = HotspotsFor(s);
     if (b == &PadState::a) return First(h) >= 0;
@@ -430,6 +435,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             const int t = s.tab == Tab::None ? -1 : (int)s.tab - (int)Tab::Interact;
             if (s.screen == Screen::Panel && pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
             else if (s.screen == Screen::Panel && pressed(&PadState::lb)) tap(kTabIcon[t < 0 ? 4 : (t + 4) % 5]);
+            else if (s.screen != Screen::Panel && pressed(&PadState::rb)) Run(v.buttons[(int)MenuButton::RB], touch);
+            else if (s.screen != Screen::Panel && pressed(&PadState::lb)) Run(v.buttons[(int)MenuButton::LB], touch);
             const bool back = pressed(&PadState::b), menu = pressed(&PadState::menu);
             // MENU does what B does on a screen of its own (not a popup: its question is B's)
             const bool backKey = back || (menu && v.own && !v.popup);

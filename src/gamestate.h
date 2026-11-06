@@ -361,6 +361,7 @@ struct SongRow
     int code = -1;                    // the code G's per-room song byte holds
     int nameId = -1;                  // string id; -1 for a custom (recorded) song
     int custom = -1;                  // 0..2 for a recorded song, -1 otherwise
+    std::string customName;           // a recorded song's name, the game's raw text (GameTextToUtf8)
     bool operator==(const SongRow&) const = default;
 };
 struct MusicState

@@ -19,6 +19,8 @@
 #include "port/build.h"
 #include "port/checkin.h"
 #include "port/roominfo.h"
+#include "port/music.h"
+#include "port/statpanel.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
@@ -1406,6 +1408,191 @@ int main()
             CHECK(!RoomInfoView(us, &g, &rom).valid); // no strings: milestone 1's
             g.roomInfo.place = 40;
             CHECK(!RoomInfoViewOf(us, g).valid);
+        }
+        // The music panel and the stat panel (port/music.h, port/statpanel.h) on made-up states.
+        // Music: lists of 0, 1, 5, 21 and 27 songs at every scroll, the song playing in view, out
+        // of it or none: a row per row the game shows, A its play button but on the song playing
+        // (nothing), Up / Down past the rows the game's arrows only while it can scroll, B the X;
+        // ids distinct. The stat panel: every page and transition: Main's four buttons (A their
+        // taps), a page's one item (its tab, Main's button's id for it), the game's way between
+        // pages (StatPageAction: a wait first while the old page fades out; the X, a wait and
+        // the button from a page), B the X (closing from Main only). Both: every item reachable,
+        // inside the panel, layers ascending, the mouse round trips onto the game's buttons.
+        {
+            const ScreenState us {Screen::Unknown, Tab::None};
+            auto inside = [&](const Composition& comp) {
+                int layer = 0;
+                for (const ui::UiItem& u : comp.ui)
+                {
+                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                    if (u.kind == ui::UiItem::Image) continue;
+                    CHECK(u.layer >= layer);
+                    layer = u.layer;
+                }
+            };
+            auto lands = [&](const Composition& comp, Rect hd, int x, int y, int tol) {
+                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                int tx, ty;
+                CHECK(TouchFromComposition(comp, fit, hd.x + hd.w / 2.0f, hd.y + hd.h / 2.0f, tx, ty));
+                CHECK(std::abs(tx - x) <= tol && std::abs(ty - y) <= tol);
+            };
+            auto world = [&]() {
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                Piece w = ConsoleWorld(256, HudCropRows(192), true);
+                w.touch = false;
+                comp.pieces.push_back(w);
+                return comp;
+            };
+            for (int count : {0, 1, 5, 21, 27})
+            {
+                const int rows = std::min(count, kMuRows);
+                for (int scroll = 0; scroll <= count - rows; scroll += std::max(1, (count - rows) / 3))
+                    for (int playing : {-1, 0, 2, count - 1})
+                    {
+                        if (playing >= count) continue;
+                        GameState g;
+                        g.valid = true;
+                        MusicState& m = g.music;
+                        m.valid = true;
+                        for (int i = 0; i < count; i++) m.list.push_back({i, i + 1, 101 + i, -1});
+                        m.scroll = scroll;
+                        m.playing = playing;
+                        m.place = 4;
+                        const MenuView v = MusicViewOf(us, g);
+                        CHECK(v.valid && v.own && v.backCloses && (int)v.items.size() == rows && AllReachable(v));
+                        CHECK(v.back.size() == 1 && v.back[0].x == kMuCloseX && v.back[0].y == kMuCloseY);
+                        CHECK(v.scrollUp.empty() == (scroll == 0) && v.scrollDown.empty() == (scroll >= count - rows));
+                        if (!v.scrollUp.empty()) CHECK(v.scrollUp[0].x == kMuUpX && v.scrollUp[0].y == kMuUpY);
+                        if (!v.scrollDown.empty()) CHECK(v.scrollDown[0].x == kMuDownX && v.scrollDown[0].y == kMuDownY);
+                        std::set<u32> ids;
+                        for (int i = 0; i < rows; i++)
+                        {
+                            const ViewItem& it = v.items[i];
+                            ids.insert(it.id);
+                            CHECK((it.id >> 24) == (kModMusic >> 24) && it.enabled && it.group == v.scrollGroup);
+                            CHECK(it.action.empty() == (scroll + i == playing));
+                            if (!it.action.empty()) CHECK(it.action.size() == 1 && it.action[0].x == kMuRowX && it.action[0].y == kMuRowY0 + i * kMuRowDy);
+                            CHECK(MenuMove(v, i, 2) == i && MenuMove(v, i, 3) == i);
+                        }
+                        CHECK((int)ids.size() == rows);
+                        if (playing >= scroll && playing < scroll + rows) CHECK(v.initial == playing - scroll);
+                        for (int focus : {-1, 0, rows - 1})
+                        {
+                            Composition comp = world();
+                            BuildMusic(comp, v, focus, g, rom, nullptr);
+                            CHECK(!comp.ui.empty());
+                            inside(comp);
+                            if (focus != 0 || count != 21 || scroll == 0) continue;
+                            for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                TestConsoleRoundtrip(us, false, 256, 192, o.first, o.second, true, &comp);
+                            for (int i = 0; i < rows; i++) lands(comp, v.items[i].rect, kMuRowX, kMuRowY0 + i * kMuRowDy, 15);
+                            lands(comp, kMuClose, kMuCloseX, kMuCloseY, 15);
+                            lands(comp, kMuUp, kMuUpX, kMuUpY + 10, 15);
+                            lands(comp, kMuDown, kMuDownX, kMuDownY - 10, 15);
+                        }
+                    }
+            }
+            {
+                GameState g;
+                g.valid = true;
+                g.music.valid = true;
+                g.music.list = {{3, 1, 101, -1}};
+                CHECK(MusicViewOf(us, g).valid && !MusicViewOf({Screen::Panel, Tab::Interact}, g).valid);
+                CHECK(!MusicView(us, &g, &rom).valid); // no strings: milestone 1's
+                g.music.scroll = 1;
+                CHECK(!MusicViewOf(us, g).valid);
+                g.music.valid = false;
+                CHECK(!MusicViewOf(us, g).valid);
+            }
+            for (int page = 0; page < kStPages; page++)
+                for (int transition = 0; transition <= 2; transition++)
+                {
+                    GameState g;
+                    g.valid = true;
+                    StatState& st = g.stat;
+                    st.valid = true;
+                    st.page = page;
+                    st.transition = transition;
+                    st.aspiration = page % 4;
+                    st.level = page % 4;
+                    st.gaugeFrame = 7;
+                    for (int i = 0; i < 5; i++) st.skills[i] = 2 * i;
+                    // The game's way to every page.
+                    for (int to = 0; to < kStPages; to++)
+                    {
+                        const MenuAction a = StatPageAction(st, to);
+                        if (to == page) { CHECK(a.empty()); continue; }
+                        size_t k = 0;
+                        if (transition == 1) CHECK(a[k].kind == MenuStep::Wait && a[k++].frames == kStFadeWait);
+                        if (page == 0) CHECK(a.size() == k + 1 && a[k].kind == MenuStep::Tap && a[k].x == kStButtonX[to] && a[k].y == kStButtonY[to]);
+                        else
+                        {
+                            CHECK(a[k].kind == MenuStep::Tap && a[k].x == kStCloseX && a[k].y == kStCloseY);
+                            if (to == 0) CHECK(a.size() == k + 1);
+                            else CHECK(a.size() == k + 3 && a[k + 1].kind == MenuStep::Wait && a[k + 1].frames == kStSwitchWait && a[k + 2].x == kStButtonX[to] && a[k + 2].y == kStButtonY[to]);
+                        }
+                        // Every tap inside the game's own rectangle for it.
+                        for (const MenuStep& s : a)
+                            if (s.kind == MenuStep::Tap)
+                            {
+                                const Rect r = s.x == kStCloseX && s.y == kStCloseY ? kStCloseFrom : kStButtonFrom[to];
+                                CHECK(s.x >= r.x && s.x < r.x + r.w && s.y >= r.y && s.y < r.y + r.h);
+                            }
+                    }
+                    const MenuView v = StatPanelViewOf(us, g);
+                    CHECK(v.valid && v.own && AllReachable(v) && v.backCloses == (page == 0));
+                    CHECK(v.buttons[(int)MenuButton::LB] == StatPageAction(st, (page + 4) % 5) && v.buttons[(int)MenuButton::RB] == StatPageAction(st, (page + 1) % 5));
+                    if (page == 0)
+                    {
+                        CHECK(v.items.size() == 4 && v.buttons[(int)MenuButton::Left].empty() && v.buttons[(int)MenuButton::Right].empty());
+                        std::set<u32> ids;
+                        for (int p = 1; p < kStPages; p++)
+                        {
+                            const ViewItem& it = v.items[p - 1];
+                            ids.insert(it.id);
+                            CHECK(it.id == kStPageId + (u32)p && it.action == StatPageAction(st, p));
+                        }
+                        CHECK(ids.size() == 4 && v.back.back().x == kStCloseX && v.back.back().y == kStCloseY);
+                    }
+                    else
+                    {
+                        CHECK(v.items.size() == 1 && v.items[0].id == kStPageId + (u32)page && v.items[0].action.empty() && v.back == StatPageAction(st, 0));
+                        CHECK(v.buttons[(int)MenuButton::Left] == StatPageAction(st, page - 1) && v.buttons[(int)MenuButton::Right] == StatPageAction(st, (page + 1) % 5));
+                    }
+                    for (int focus : {-1, 0, (int)v.items.size() - 1})
+                    {
+                        Composition comp = world();
+                        BuildStatPanel(comp, v, focus, g, rom, nullptr);
+                        CHECK(!comp.ui.empty());
+                        inside(comp);
+                        if (focus != 0 || transition != 0) continue;
+                        for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                            TestConsoleRoundtrip(us, false, 256, 192, o.first, o.second, true, &comp);
+                        lands(comp, kStClose, kStCloseX, kStCloseY, 16);
+                        if (page == 0)
+                            for (int p = 1; p < kStPages; p++)
+                            {
+                                lands(comp, StatButtonRect(p), kStButtonX[p], kStButtonY[p], 30);
+                                lands(comp, StatTabRect(p), kStButtonX[p], kStButtonY[p], 30);
+                            }
+                        else lands(comp, StatTabRect(0), kStCloseX, kStCloseY, 16);
+                    }
+                }
+            {
+                GameState g;
+                g.valid = true;
+                g.stat.valid = true;
+                CHECK(StatPanelViewOf(us, g).valid && !StatPanelViewOf({Screen::Panel, Tab::Interact}, g).valid);
+                CHECK(!StatPanelView(us, &g, &rom).valid); // no strings: milestone 1's
+                g.stat.page = 5;
+                CHECK(!StatPanelViewOf(us, g).valid);
+                g.stat.page = 0;
+                g.stat.valid = false;
+                CHECK(!StatPanelViewOf(us, g).valid);
+            }
+            // Ids: the two modules' tags apart from each other and the others'.
+            CHECK((kMuRowId >> 24) != (kStPageId >> 24) && (kMuRowId >> 24) != (kRiLineId >> 24) && (kStPageId >> 24) != (kCiRowId >> 24));
         }
         // Goals, Relationships, Options (port/goals.h, relations.h, options.h) and the Save slots
         // on made-up states: the game's selection held (Up / Down its arrows), Options' moves

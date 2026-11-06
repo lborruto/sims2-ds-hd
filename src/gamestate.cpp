@@ -1040,7 +1040,15 @@ MusicState ReadMusic(const Reader& m, u32 S, const HotelState& hotel)
         const u32 e = h.songTable + h.songStride * idx;
         if (!m.R8(e, code) || code == h.songEnd || !m.R16(e + 2, name)) return MusicState{};
         const int custom = code >= 0x2B && code < 0x2B + h.customN ? (int)code - 0x2B : -1;
-        v.list.push_back({(int)idx, (int)code, custom < 0 ? (int)name : -1, custom});
+        SongRow row {(int)idx, (int)code, custom < 0 ? (int)name : -1, custom};
+        // A recorded song's name: the mixer's char[16] in G (the game's own text, up to its NUL).
+        for (u32 k = 0; custom >= 0 && k < h.customStride; k++)
+        {
+            u32 b;
+            if (!m.R8(G + h.customSongs + h.customStride * (u32)custom + k, b) || b == 0) break;
+            row.customName += (char)b;
+        }
+        v.list.push_back(row);
     }
     v.scroll = (int)scroll; v.playing = playing == 0xFF ? -1 : (int)playing;
     if (hotel.valid && hotel.place >= 0 && m.R8(G + h.songs + (u32)hotel.place, song)) { v.place = hotel.place; v.roomSong = (int)song; }

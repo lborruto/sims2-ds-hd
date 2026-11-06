@@ -831,6 +831,12 @@ static void music_build_placement()
     r.W32(0x0213E580, 0x021A1000); r.W32(0x021A1000 + 0xF4, 4); r.W8(kGb + 0x449C + 4, 3);
     MusicState m = ReadGameState(r.View()).music;
     CHECK(m.valid && m.list.size() == 3 && m.list[0].custom == 0 && m.list[0].nameId == -1 && m.list[1].nameId == 101 && m.playing == 2 && m.place == 4 && m.roomSong == 3);
+    CHECK(m.list[0].customName.empty() && m.list[1].customName.empty());
+    // A recorded song's name: the mixer's char[16] in G, up to its NUL, never past 16 bytes.
+    for (u32 k = 0; k < 16; k++) r.W8(kGb + 0x46AC + k, k < 5 ? (u32)"Tune1"[k] : 0);
+    CHECK(ReadGameState(r.View()).music.list[0].customName == "Tune1");
+    for (u32 k = 0; k < 17; k++) r.W8(kGb + 0x46AC + k, 'A');
+    CHECK(ReadGameState(r.View()).music.list[0].customName == std::string(16, 'A'));
     r.W32(kS + 0x70, 0xFF); CHECK(ReadGameState(r.View()).music.playing == -1);
     r.W32(kS + 0x70, 3); CHECK(!ReadGameState(r.View()).music.valid);
     r.W32(kS + 0x70, 2); r.W8(kS + 0x2E, 3); CHECK(!ReadGameState(r.View()).music.valid);   // the table's end marker

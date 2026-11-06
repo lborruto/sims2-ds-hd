@@ -41,6 +41,8 @@
 #include "port/build.h"
 #include "port/checkin.h"
 #include "port/roominfo.h"
+#include "port/music.h"
+#include "port/statpanel.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/interact.h"
@@ -438,9 +440,6 @@ int main(int argc, char** argv)
         printf("\n");
         // A neighbour's name beside the plate may end in an ellipsis (the Italian table has a
         // sentence at an object's name, 463); every other box must hold its words.
-        // Every character of those words must be in the font (else a '?' is drawn).
-        const std::vector<u32> lacking = ui::MissingGlyphs();
-        for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
         // The Registry and room info: the titles, the rooms, every guest, the lines, the hints.
         BlockMeasure ci;
         MeasureCheckIn(*app.rom, ci);
@@ -452,7 +451,21 @@ int main(int argc, char** argv)
         printf("roominfo: %d words, tallest %d (%d lines), %d shrunk, %d cut", ri.checked, ri.tallestId, ri.tallestLines, ri.shrunk, ri.cut);
         for (int id : ri.cutIds) printf(" %d", id);
         printf("\n");
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || !lacking.empty() ? 2 : 0;
+        // The hotel's music panel and the stat panel: the titles, every song, the pages' words.
+        BlockMeasure mu, sp;
+        MeasureMusic(*app.rom, mu);
+        printf("music: %d words, tallest %d (%d lines), %d shrunk, %d cut", mu.checked, mu.tallestId, mu.tallestLines, mu.shrunk, mu.cut);
+        for (int id : mu.cutIds) printf(" %d", id);
+        printf("\n");
+        MeasureStatPanel(*app.rom, sp);
+        printf("statpanel: %d words, tallest %d (%d lines), %d shrunk, %d cut", sp.checked, sp.tallestId, sp.tallestLines, sp.shrunk, sp.cut);
+        for (int id : sp.cutIds) printf(" %d", id);
+        printf("\n");
+        // Every character of those words must be in the font (else a '?' is drawn).
+        const std::vector<u32> lacking = ui::MissingGlyphs();
+        for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 ||
+                       !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.

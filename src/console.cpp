@@ -8,6 +8,8 @@
 #include "port/build.h"
 #include "port/checkin.h"
 #include "port/roominfo.h"
+#include "port/music.h"
+#include "port/statpanel.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
@@ -155,6 +157,8 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             else if (at.screen == Screen::Phone) BuildPhone(c, view, f, *game, *rom, icons, bottom, strings);
             else if (game->checkIn.valid) BuildCheckIn(c, view, f, *game, *rom, icons, bottom);
             else if (game->roomInfo.valid) BuildRoomInfo(c, view, f, *game, *rom, icons, bottom);
+            else if (game->music.valid) BuildMusic(c, view, f, *game, *rom, icons);
+            else if (game->stat.valid) BuildStatPanel(c, view, f, *game, *rom, icons);
             else BuildNote(c, view, f, *game, *rom, icons);
         };
         if (v.popup && PopupOver(s, *game))
