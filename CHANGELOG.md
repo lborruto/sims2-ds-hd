@@ -7,6 +7,11 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+### Added
+
+- The Steam Controller and the Steam Deck work through Steam's default Gamepad layout (added as
+  a non-Steam game); without Steam, the Steam Controller needs `SDL_JOYSTICK_HIDAPI_STEAM=1`.
+
 ### Changed
 
 - CONSOLE is now the default layout (the other layouts stay in SETTINGS > DISPLAY > LAYOUT).

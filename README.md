@@ -264,11 +264,17 @@ always works beside them. The pause menu is Start + Back (or Esc): the Guide / P
 stays the system's. A controller plugged in says so at the top of the window, and the touch
 screen's cursor hint shows it too.
 
-**Through Steam** (and on a **Steam Deck**): in Steam, *Add a Game > Add a Non-Steam Game*, pick
-`sims2wide.exe` (or `sims2wide` on Linux), and leave Steam Input on. To skip the file picker, put
-the ROM's path in its *Properties > Launch Options*, in quotes: `"C:\Games\Sims 2.nds"`. The Deck's
-own buttons then work as a controller; the game fills its 1280 × 800 screen with thin bars above
-and below.
+**Steam Controller and Steam Deck:** supported through Steam, with its default *Gamepad* layout. In Steam, *Add a Game > Add a Non-Steam Game*, pick `sims2wide.exe` (or `sims2wide` on
+Linux or the Deck), and leave Steam Input on. To skip the file picker, put the ROM's path in its
+*Properties > Launch Options*, in quotes: `"C:\Games\Sims 2.nds"`. The pad shows up as an Xbox
+controller, so the buttons are labelled the Xbox way (the right pad, as a stick, moves the cursor;
+its click is SWAP SCREENS, and the Steam button stays Steam's). The Deck fills its 1280 x 800
+screen with thin bars above and below. Without Steam, the Steam Controller is read directly only if you set the environment variable
+`SDL_JOYSTICK_HIDAPI_STEAM=1` with Steam closed (a running Steam fights over the pad); its back
+grip then stands for the right pad's click (R3). The Deck's own controls work natively.
+Pause: Start + Back, as on any pad. SAVE STATE and LOAD STATE are in the pause menu; BLOW (the
+microphone, for other layouts than CONSOLE, where Y does it) has no button until you give it one
+in SETTINGS > CONTROLS.
 
 **A controller that does nothing** has no mapping yet: the program says which one on its console
 output. Make one with [SDL2 Gamepad Tool](https://generalarcade.com/gamepadtool/) or Steam's

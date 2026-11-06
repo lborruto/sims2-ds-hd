@@ -22,6 +22,10 @@ void Pads::Hints()
     // RawInput beside XInput and DirectInput, HIDAPI's drivers (PlayStation, Switch, 8BitDo…).
     SDL_SetHint(SDL_HINT_JOYSTICK_RAWINPUT, "1");
     SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI, "1");
+    // SDL_JOYSTICK_HIDAPI_STEAM stays at SDL's default, off: a running Steam client (its desktop
+    // configuration emulates keyboard and mouse) fights a second opener of the Steam Controller.
+    // The player can set it (the environment variable) with Steam closed. The Steam Deck's driver
+    // follows SDL_JOYSTICK_HIDAPI: on.
     // SDL_HINT_GAMECONTROLLERCONFIG, SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES(_EXCEPT),
     // SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD and the button labels are Steam's and the
     // player's: never set here.
@@ -86,6 +90,14 @@ bool Pads::SteamVirtual(Uint16 vendor, Uint16 product, Uint16 version)
 #endif
 }
 
+bool Pads::SteamController(Uint16 vendor, Uint16 product)
+{
+    if (vendor != 0x28DE) return false;
+    // SDL's list: the legacy, wired, Bluetooth and wireless pads, and the second generation.
+    return product == 0x1101 || product == 0x1102 || product == 0x1105 || product == 0x1106 || product == 0x1142 || product == 0x1201 ||
+           product == 0x1202;
+}
+
 int Pads::StyleOf(SDL_GameControllerType t)
 {
     switch (t)
@@ -121,7 +133,7 @@ void Pads::Open(int index, const PadOptions& o)
         return;
     }
     const SDL_GameControllerType type = SDL_GameControllerGetType(c);
-    pads_.push_back({c, SDL_JoystickInstanceID(j), steam, StyleOf(type), type});
+    pads_.push_back({c, SDL_JoystickInstanceID(j), steam, SteamController(vendor, product), StyleOf(type), type});
     const char* name = SDL_GameControllerName(c);
     connected_.push_back({name ? name : "", StyleOf(type), type});
     fprintf(stderr, "controller: %s%s\n", name ? name : "?", steam ? " (Steam Input)" : "");
@@ -270,6 +282,8 @@ PadRaw Pads::Read(const PadOptions& o) const
     };
     stick(SDL_CONTROLLER_AXIS_LEFTX, SDL_CONTROLLER_AXIS_LEFTY, r.lx, r.ly);
     stick(SDL_CONTROLLER_AXIS_RIGHTX, SDL_CONTROLLER_AXIS_RIGHTY, r.rx, r.ry);
+    // A Steam Controller on SDL's driver cannot send its right pad's click: its back grip is R3.
+    if (p->rsFromGrip && SDL_GameControllerGetButton(c, SDL_CONTROLLER_BUTTON_PADDLE1)) r.btn[IN_RS] = true;
     r.btn[IN_LT] = axis(SDL_CONTROLLER_AXIS_TRIGGERLEFT) > o.trigger;
     r.btn[IN_RT] = axis(SDL_CONTROLLER_AXIS_TRIGGERRIGHT) > o.trigger;
     return r;
