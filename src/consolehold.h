@@ -47,7 +47,7 @@ private:
 };
 
 // Where milestone 1's picture is the design, not a swap (never held): the furniture editor, DS
-// Wireless's slots, the in-game Create-a-Sim pages without their view, a room hint not known,
+// Wireless's slots, an in-game video, the boot's popup splash, the in-game Create-a-Sim pages without their view, a room hint not known,
 // RAM or the game's words not reading.
 bool ConsoleM1ByDesign(const App& app);
 }

@@ -21,6 +21,8 @@ bool ConsoleM1ByDesign(const App& app)
     if (!app.portSupported || !app.rom || app.rom->StringCount() == 0 || !app.hudStrings.ok) return true;
     if (!g.valid && !g.between) return true;   // (RAM not reading: the pixels' screen)
     if (g.placement.valid) return true;
+    if (g.front.video.valid) return true;                          // (an in-game video)
+    if (g.front.boot.valid && g.front.boot.mode == 4) return true; // (the boot's popup splash)
     if (g.front.load.valid && g.front.load.wireless) return true;
     if (g.front.cas.valid && g.front.cas.page >= 5 && !ConsoleView(app.ConsoleScreen(), &g, app.rom.get()).valid) return true;
     if (g.roomInfo.valid && g.roomInfo.hint && g.roomInfo.hintId < 0) return true;

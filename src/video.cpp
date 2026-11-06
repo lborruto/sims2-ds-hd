@@ -424,14 +424,14 @@ bool Video::TouchAt(const App& app, int wx, int wy, int& tx, int& ty, int* piece
     return TouchFromComposition(c, CanvasFit::For(c.cw, c.ch, ow, oh), px, py, tx, ty, pieceIndex);
 }
 
-void Video::TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& tx, int& ty) const
+bool Video::TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& tx, int& ty) const
 {
     const Composition c = Composed(app);
     int ow, oh;
     SDL_GetRendererOutputSize(ren, &ow, &oh);
     float px, py;
     ToOutput(wx, wy, px, py);
-    TouchClampedComposition(c, pieceIndex, CanvasFit::For(c.cw, c.ch, ow, oh), px, py, tx, ty);
+    return TouchClampedComposition(c, pieceIndex, CanvasFit::For(c.cw, c.ch, ow, oh), px, py, tx, ty);
 }
 
 bool Video::OverTop(const App& app, int wx, int wy) const

@@ -201,6 +201,15 @@ void Navigator::Step(TouchScript& touch, u32& dsKeys)
     }
 }
 
+void Navigator::Held(const TouchScript& touch, u32& dsKeys)
+{
+    // As Step's keys (the stylus first: a keys step after a tap waits for it there too).
+    if (running_.empty() || running_.front().kind != MenuStep::Keys || touch.Owns()) return;
+    MenuStep& st = running_.front();
+    if (st.frames-- > 0) { dsKeys |= st.keys; if (st.frames > 0) return; }
+    running_.erase(running_.begin());
+}
+
 const MenuAction* Navigator::DirAction(const MenuView& v, int dir, bool& scroll) const
 {
     scroll = false;

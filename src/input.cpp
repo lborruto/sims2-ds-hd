@@ -393,12 +393,14 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         // pointing games' tools and sliders, a question of the game's popup.
         navigator.SetActivityRam(MinigameRam(game));
         // A held picture (consolehold.h: the last HD one through a swap of the game's) takes no
-        // input: the navigator waits for the screen to read again (nothing typed meanwhile either).
+        // input: the navigator waits for the screen to read again (nothing typed meanwhile either);
+        // only a keys step already running goes on (Navigator::Held).
         if (!app.consoleHold.Holding())
         {
             navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
             TypeName(app);
         }
+        else navigator.Held(touchScript, keys);
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
         app.consoleArmed = navigator.Armed();
@@ -531,8 +533,13 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     else if (rotate < 0) { keys |= 1u << kL; rotate++; }
 
     int mx, my;
-    if (mouseDown && stylusDrag) { video.TouchClampedAt(app, dragPiece, mouseX, mouseY, mx, my); touching = true; tx = mx; ty = my; }
-    else if (tapFrames > 0) { touching = true; tx = tapX; ty = tapY; }
+    // (A held CONSOLE picture, consolehold.h: the stylus is up, the drag goes on after it.)
+    const bool pictureHeld = app.shown == Layout::Console && app.consoleHold.Holding();
+    if (!pictureHeld)
+    {
+        if (mouseDown && stylusDrag && video.TouchClampedAt(app, dragPiece, mouseX, mouseY, mx, my)) { touching = true; tx = mx; ty = my; }
+        else if (tapFrames > 0) { touching = true; tx = tapX; ty = tapY; }
+    }
     if (tapFrames > 0) tapFrames--;
 
     // The stick cursor: faster with a fuller deflection, for both precision and reach.

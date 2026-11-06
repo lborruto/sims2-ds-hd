@@ -194,8 +194,8 @@ static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int top
                 const float px = fit.ox + cx * fit.scale, py = fit.oy + cy * fit.scale;
                 int tx = -1, ty = -1, idx = -1, dx = -1, dy = -1;
                 const bool hit = TouchFromComposition(c, fit, px, py, tx, ty, &idx);
-                TouchClampedComposition(c, i, fit, px, py, dx, dy);
-                if (!hit || tx != x || ty != y || idx != i || dx != x || dy != y || OverTopComposition(c, fit, px, py))
+                const bool dragged = TouchClampedComposition(c, i, fit, px, py, dx, dy);
+                if (!hit || !dragged || tx != x || ty != y || idx != i || dx != x || dy != y || OverTopComposition(c, fit, px, py))
                 {
                     fprintf(stderr, "console %s menu %d top %dx%d out %dx%d: piece %d pixel %d,%d -> %s %d,%d (piece %d), drag %d,%d\n",
                             ScreenStateName(s).c_str(), menuOpen, topW, topH, ow, oh, i, x, y, hit ? "hit" : "miss", tx, ty, idx, dx, dy);
@@ -205,9 +205,9 @@ static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int top
             }
         // A drag that began on the piece and left it is held to the piece's own rectangle.
         int tx, ty;
-        TouchClampedComposition(c, i, fit, -1000, -1000, tx, ty);
+        CHECK(TouchClampedComposition(c, i, fit, -1000, -1000, tx, ty));
         CHECK(tx == q.from.x && ty == q.from.y);
-        TouchClampedComposition(c, i, fit, 1e6f, 1e6f, tx, ty);
+        CHECK(TouchClampedComposition(c, i, fit, 1e6f, 1e6f, tx, ty));
         CHECK(tx == q.from.x + q.from.w - 1 && ty == q.from.y + q.from.h - 1);
     }
     // A black load (Loading) shows nothing at all: no piece to touch.
@@ -826,10 +826,10 @@ int main()
         const CanvasFit fit = CanvasFit::For(dlg.cw, dlg.ch, 1280, 720);
         int tx, ty;
         // Over the portrait (piece 3) with a stale index.
-        TouchClampedComposition(dlg, 99, fit, kDialoguePortraitTo.x + 2 * 10 + 1, kDialoguePortraitTo.y + 2 * 5 + 1, tx, ty);
+        CHECK(TouchClampedComposition(dlg, 99, fit, kDialoguePortraitTo.x + 2 * 10 + 1, kDialoguePortraitTo.y + 2 * 5 + 1, tx, ty));
         CHECK(tx == kDialoguePortraitFrom.x + 10 && ty == kDialoguePortraitFrom.y + 5);
         // Over the world (piece 0, a top piece): the largest, the text.
-        TouchClampedComposition(dlg, 0, fit, 5, 5, tx, ty);
+        CHECK(TouchClampedComposition(dlg, 0, fit, 5, 5, tx, ty));
         CHECK(tx == kDialogueTextFrom.x && ty == kDialogueTextFrom.y);
         // A piece reaching past the DS screen: held to the screen, never an empty range.
         Composition odd {600, 400, {}, {}};
@@ -839,9 +839,22 @@ int main()
         for (int idx : {0, 1})
             for (float p : {-500.0f, 10.0f, 110.0f, 5000.0f})
             {
-                TouchClampedComposition(odd, idx, f2, p, p, tx, ty);
+                CHECK(TouchClampedComposition(odd, idx, f2, p, p, tx, ty));
                 CHECK(tx >= 0 && tx < SW && ty >= 0 && ty < SH);
             }
+        // No touchable piece (a held CONSOLE picture: consolehold.h; a black load): no touch at
+        // all, never the whole touch screen under the canvas.
+        Composition held = dlg;
+        for (Piece& p : held.pieces) p.touch = false;
+        for (int idx : {-1, 0, 3, 99})
+        {
+            tx = ty = -7;
+            CHECK(!TouchClampedComposition(held, idx, fit, kDialoguePortraitTo.x + 21, kDialoguePortraitTo.y + 11, tx, ty));
+            CHECK(tx == -7 && ty == -7);
+        }
+        const Composition black = BuildConsole({Screen::Loading, Tab::None}, false, -1, SW, SH);
+        const CanvasFit fb = CanvasFit::For(black.cw, black.ch, 1280, 720);
+        CHECK(!TouchClampedComposition(black, 0, fb, 640, 360, tx, ty));
     }
     // The stick cursor: drawn through the piece that shows its point, hidden where none does.
     {
@@ -882,9 +895,9 @@ int main()
         CHECK(TouchFromComposition(c, fit, 900 + 2 * 30, 2 * 5, tx, ty, &idx) && tx == 30 && ty == 101 && idx == 1);
         CHECK(!TouchFromComposition(c, fit, 850, 100, tx, ty)); // the gap between them
         // A drag that started on the first piece stays on it: past its right edge it is held.
-        TouchClampedComposition(c, 0, fit, 1300, 500, tx, ty);
+        CHECK(TouchClampedComposition(c, 0, fit, 1300, 500, tx, ty));
         CHECK(tx == SW - 1 && ty == 95);
-        TouchClampedComposition(c, 1, fit, 0, -50, tx, ty);
+        CHECK(TouchClampedComposition(c, 1, fit, 0, -50, tx, ty));
         CHECK(tx == 0 && ty == 96);
     }
     // A drag begun on FOCUS top-big's panel (piece 1) when the layout flips to bottom-big (where
@@ -899,11 +912,11 @@ int main()
                 for (float py : {-100.0f, 360.0f, 5000.0f})
                 {
                     int tx = -1, ty = -1;
-                    TouchClampedComposition(big, idx, fit, px, py, tx, ty);
+                    CHECK(TouchClampedComposition(big, idx, fit, px, py, tx, ty));
                     CHECK(tx >= 0 && tx < SW && ty >= 0 && ty < SH);
                 }
         int tx, ty;
-        TouchClampedComposition(big, 1, fit, 480, 360, tx, ty); // the middle of the big touch screen
+        CHECK(TouchClampedComposition(big, 1, fit, 480, 360, tx, ty)); // the middle of the big touch screen
         CHECK(abs(tx - SW / 2) <= 1 && abs(ty - SH / 2) <= 1);
     }
     // Overlapping pieces: the later one is hit.

@@ -92,8 +92,8 @@ struct Video
     // pieceIndex (when given) receives the piece of the composition it is on.
     bool TouchAt(const App& app, int wx, int wy, int& tx, int& ty, int* pieceIndex = nullptr) const;
     // A window position as a DS touch position held to the edges of the piece (from TouchAt) a
-    // drag started on.
-    void TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& tx, int& ty) const;
+    // drag started on; false when no piece takes a touch (compose.h: TouchClampedComposition).
+    bool TouchClampedAt(const App& app, int pieceIndex, int wx, int wy, int& tx, int& ty) const;
     // Whether a window position is over the top (world) screen's picture.
     bool OverTop(const App& app, int wx, int wy) const;
 };

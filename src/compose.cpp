@@ -43,18 +43,16 @@ bool TouchFromComposition(const Composition& c, const CanvasFit& fit, float px, 
     return false;
 }
 
-void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty)
+bool TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty)
 {
     float cx, cy;
     fit.ToCanvas(px, py, cx, cy);
     auto usable = [&](int i) { return i >= 0 && i < (int)c.pieces.size() && c.pieces[i].src == Src::Bottom && c.pieces[i].touch; };
     // The piece the drag began on; if the layout changed since (the indices with it), the
-    // touchable bottom piece under the point, else the largest, else the whole touch screen.
-    Piece whole {Src::Bottom, {0, 0, SW, SH}, {0, 0, SW, SH}};
-    const Piece* pq = &whole;
-    if (usable(pieceIndex))
-        pq = &c.pieces[pieceIndex];
-    else
+    // touchable bottom piece under the point, else the largest; none (a held CONSOLE picture,
+    // a black load): no touch.
+    int at = pieceIndex;
+    if (!usable(at))
     {
         int under = -1, largest = -1;
         long largestArea = -1;
@@ -65,16 +63,17 @@ void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasF
             if (Inside(r, cx, cy)) under = i; // the later one is on top
             if ((long)r.w * r.h > largestArea) { largestArea = (long)r.w * r.h; largest = i; }
         }
-        if (under >= 0) pq = &c.pieces[under];
-        else if (largest >= 0) pq = &c.pieces[largest];
+        at = under >= 0 ? under : largest;
+        if (at < 0) return false;
     }
-    const Piece& q = *pq;
+    const Piece& q = c.pieces[at];
     const float x = q.from.x + (cx - q.to.x) * q.from.w / q.to.w, y = q.from.y + (cy - q.to.y) * q.from.h / q.to.h;
     // Held to the piece's source rectangle, itself held to the DS screen (lo <= hi always).
     const int x0 = std::clamp(q.from.x, 0, SW - 1), x1 = std::clamp(q.from.x + q.from.w - 1, x0, SW - 1);
     const int y0 = std::clamp(q.from.y, 0, SH - 1), y1 = std::clamp(q.from.y + q.from.h - 1, y0, SH - 1);
     tx = (int)std::clamp(std::floor(x), (float)x0, (float)x1);
     ty = (int)std::clamp(std::floor(y), (float)y0, (float)y1);
+    return true;
 }
 
 bool OverTopComposition(const Composition& c, const CanvasFit& fit, float px, float py)

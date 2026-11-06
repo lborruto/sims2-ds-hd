@@ -90,6 +90,10 @@ public:
     // A press held by the gate is dropped when the view's Hash changes before it runs (no stale
     // taps); the focus follows its item's id across rebuilds.
     void Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys, bool settled = true, const MenuView* view = nullptr);
+    // Instead of Update while CONSOLE's picture is held (consolehold.h): no press is taken and
+    // nothing taps, but a running action's keys step goes on to its end (a held Up / Down is not
+    // released and pressed again mid-step); the step after it waits for Update.
+    void Held(const TouchScript& touch, u32& dsKeys);
     // CONSOLE left (another layout): the touch script cancelled, the menu closed, nothing held;
     // buttons still held when CONSOLE comes back are not taken as presses.
     void Leave(TouchScript& touch);

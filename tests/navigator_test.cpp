@@ -3201,6 +3201,61 @@ static void view_front_menus()
     }
 }
 
+// A held CONSOLE picture (consolehold.h: Held instead of Update): a keys step already running
+// goes on to its end (the phone's Up / Down not released and pressed again mid-step), the step
+// after it waits for Update, and nothing new starts (no press taken, no tap).
+static void held_picture_finishes_the_keys_step()
+{
+    MenuView k = ListView(1, -1);
+    k.items[0].action = {KeysStep(1u << kDown, 4), TapStep(10, 20)};
+    Rig r;
+    r.view = &k;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    PadState a;
+    a.a = true;
+    CHECK(r.Frame(kInteract, a) == (1u << kDown));
+    CHECK(r.nav.Running());
+    // Held: its three frames left, Down each frame, then nothing (the tap waits).
+    for (int i = 0; i < 3; i++)
+    {
+        u32 keys = 0;
+        r.nav.Held(r.touch, keys);
+        CHECK(keys == (1u << kDown));
+    }
+    u32 keys = 0;
+    r.nav.Held(r.touch, keys);
+    CHECK(keys == 0);
+    CHECK(!r.touch.Owns());
+    CHECK(r.nav.Running());
+    // The hold over: the tap runs.
+    r.Frame(kInteract);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 10 && y == 20);
+    CHECK(!r.nav.Running());
+    // Nothing running: Held presses nothing.
+    MenuView w = ListView(1, -1);
+    w.items[0].action = {KeysStep(1u << kA, 2)};
+    Rig q;
+    q.view = &w;
+    q.Frame(kInteract);
+    q.Press(kInteract, &PadState::menu);
+    keys = 0;
+    q.nav.Held(q.touch, keys);
+    CHECK(keys == 0 && !q.nav.Running());
+    // A wait before the keys: not run while held (only a keys step already running goes on).
+    w.items[0].action = {WaitStep(2), KeysStep(1u << kA, 2)};
+    q.Frame(kInteract, a);
+    CHECK(q.nav.Running());
+    for (int i = 0; i < 4; i++)
+    {
+        keys = 0;
+        q.nav.Held(q.touch, keys);
+        CHECK(keys == 0);
+    }
+    CHECK(q.nav.Running());
+}
+
 int main()
 {
     view_front_menus();
@@ -3265,6 +3320,7 @@ int main()
     view_page_change_restarts_the_focus();
     view_lb_rb_pages();
     view_front_start();
+    held_picture_finishes_the_keys_step();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

@@ -79,9 +79,10 @@ bool TouchFromComposition(const Composition& c, const CanvasFit& fit, float px, 
 // The same, held to one piece's source rectangle wherever the point is: a drag stays on the
 // piece it started on. A stale index (the layout changed meanwhile: no longer a touchable
 // bottom piece) falls back to the touchable bottom piece under the point, else the largest one
-// on the canvas, else the whole touch screen; the result is always within the DS screen,
-// whatever the piece's source rectangle.
-void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty);
+// on the canvas; the result is always within the DS screen, whatever the piece's source
+// rectangle. False (no touch, tx / ty untouched) when no piece is touchable: a held CONSOLE
+// picture (consolehold.h) or a black load never puts the stylus anywhere.
+bool TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty);
 // Whether an output pixel position is on a touchable top piece and no later piece covers it
 // (the mouse camera's area): the topmost piece under it decides, as for a click.
 bool OverTopComposition(const Composition& c, const CanvasFit& fit, float px, float py);
