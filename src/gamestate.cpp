@@ -137,6 +137,8 @@ struct EUTable
         u32 nameKb, nameBuf, hairSel, hairScroll, face, thCat, thPage, thItem, cfAsp, cfAnswer;
         u32 heroSkin, heroHair, heroSize, maxSkin, maxHairColour, maxHairStyle, maxHairScroll, maxFace, maxCat, maxThPage, maxThItem;
         u32 bgMode, bgCount, bgDuration, bgMaxMode, vdMovie, vdMaxMovie;   // boot, video
+        u32 pgSprites, vtSprite, sprFlags, sprX, sprY, maxSprites;   // a page's CActorSprite list (null-ended), a sprite's vtable, visible bit 0, position 20.12
+        u32 hairPos, hairArrowL, hairArrowR, thArrowL, thArrowR, thRing, thCellX0, thCellY0, thCellDx, thCellDy;   // sprite indices; the Clothes ring at (x0 + dx c, y0 + dy r)
     } front;
 };
 constexpr EUTable kEU = {
@@ -246,8 +248,10 @@ constexpr EUTable kEU = {
         0x74, 0x76, 0x58, 0x48, 0x84, 7, 0x021509B0,
         {0x02150B54, 0x02150B10, 0x02150AA8, 0x02150BF4, 0x02150A2C, 0x02150B9C}, {0xDC, 0x4C, 0x14, 0x24, 0x18, 0x18},
         0x12, 0x70, 0x3E, 0x38, 0x10, 0x14, 0x16, 0x18, 0x10, 0x11,
-        0x232, 0x236, 0x244, 3, 7, 17, 7, 8, 5, 7, 127,
+        0x232, 0x236, 0x244, 3, 7, 17, 7, 8, 5, 11, 127,
         0x28, 0x24, 0x26, 6, 0x2C, 3,
+        0x8, 0x0212FED8, 0x4, 0x50, 0x54, 24,
+        0x3A, 2, 3, 6, 7, 8, 88, 41, 48, 64,
     },
 };
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
@@ -1319,10 +1323,14 @@ CasState ReadCas(const Reader& m, u32 S)
     const auto& f = kEU.front;
     CasState c;
     u32 page, gender, N, vt, G;
-    if (!m.In(S, f.casSize) || !m.R16(S + f.casPage, page) || page > f.casMaxPage || !m.R16(S + f.casGender, gender) || gender > 1 || !m.R32(S + f.casObj, N) || N == 0 || !m.R32(N, vt)) return c;
+    if (!m.In(S, f.casSize) || !m.R16(S + f.casPage, page) || page > f.casMaxPage || !m.R16(S + f.casGender, gender) || gender > 1 || !m.R32(S + f.casObj, N)) return c;
+    if (N != 0 && !m.R32(N, vt)) return c;
     static const int kObjOfPage[8] = {0, 1, 2, 3, 4, 5, 1, 3};   // the in-game pages 6 / 7 reuse the Hair and Clothes pages
     const int idx = kObjOfPage[page];
-    if (vt != f.vtCas[idx] || !m.In(N, f.sizeCas[idx])) return c;
+    // The page and its object disagree (or there is none) for the 2-4 frames a page change is in
+    // flight (the old object closed, the new one made on a later update): the page reads, its
+    // fields do not (`switching`).
+    const bool switching = N == 0 || vt != f.vtCas[idx] || !m.In(N, f.sizeCas[idx]);
     if (!m.R32(kEU.gameBlock, G) || !ReadCString(m, G + kEU.simName, kEU.simNameMax, c.simName) || c.simName.size() > (size_t)kCasName) return CasState{};
     for (char ch : c.simName) if (ch < 0x20 || ch > 0x7E) return CasState{};
     u32 H;
@@ -1333,16 +1341,43 @@ CasState ReadCas(const Reader& m, u32 S)
         if (m.R16(H + f.heroHair, hair) && hair <= f.maxHairColour) c.hairColour = (int)hair;
     }
     u32 a, b, d;
-    switch (idx)
+    // A sprite of the page's list (null-ended, CActorSprite by its vtable): shown, and where.
+    auto sprite = [&](u32 i, bool& shown, int& x, int& y) {
+        u32 list, sp, sv, flags, sx, sy;
+        if (i >= f.maxSprites || !m.R32(N + f.pgSprites, list) || list == 0) return false;
+        for (u32 k = 0; k <= i; k++)
+            if (!m.R32(list + 4 * k, sp) || sp == 0) return false;
+        if (!m.R32(sp, sv) || sv != f.vtSprite || !m.R32(sp + f.sprFlags, flags) || !m.R32(sp + f.sprX, sx) || !m.R32(sp + f.sprY, sy)) return false;
+        shown = flags & 1;
+        x = (int)((int32_t)sx >> 12);
+        y = (int)((int32_t)sy >> 12);
+        return true;
+    };
+    // The page's arrows, shown only where the game can scroll.
+    auto arrows = [&](u32 l, u32 r) {
+        int x, y;
+        if (sprite(l, c.canLeft, x, y) && sprite(r, c.canRight, x, y)) c.arrowsKnown = true;
+        else c.canLeft = c.canRight = false;
+    };
+    switch (switching ? -1 : idx)
     {
     case 0:
-        if (!m.R16(N + f.nameKb, a) || a > 2 || !ReadCString(m, N + f.nameBuf, kCasName + 1, c.name)) return CasState{};   // NUL within the game's 7 + 1
-        for (char ch : c.name) if (ch < 0x20 || ch > 0x7E) return CasState{};
+    {
+        // The Name page's editor is filled a frame or two after its object is made (its buffer
+        // garbage until then, seen on the way back from another page): a buffer that does not
+        // read (no NUL within the game's 7 + 1, a character out of range) is that page still
+        // being made, as a page change in flight.
+        bool ok = m.R16(N + f.nameKb, a) && a <= 2 && ReadCString(m, N + f.nameBuf, kCasName + 1, c.name);
+        for (char ch : c.name) if (ch < 0x20 || ch > 0x7E) ok = false;
+        if (!ok) { c.name.clear(); c.page = (int)page; c.gender = (int)gender; c.switching = true; c.valid = true; return c; }
         c.keyboard = (int)a; c.nameKnown = true;
         break;
+    }
     case 1:
         if (!m.R16(N + f.hairSel, a) || a > f.maxHairStyle || !m.R16(N + f.hairScroll, b) || b > f.maxHairScroll) return CasState{};
-        c.hairStyle = (int)a; c.hairScroll = (int)b; c.hairKnown = true;
+        if (!m.R16(N + f.hairPos, d) || d > f.maxHairStyle) return CasState{};
+        c.hairStyle = (int)a; c.hairScroll = (int)b; c.hairPos = (int)d; c.hairKnown = true;
+        arrows(f.hairArrowL, f.hairArrowR);
         break;
     case 2:
         if (!m.R16(N + f.face, a) || a > f.maxFace) return CasState{};
@@ -1351,6 +1386,17 @@ CasState ReadCas(const Reader& m, u32 S)
     case 3:
         if (!m.R16(N + f.thCat, a) || a > f.maxCat || !m.R16(N + f.thPage, b) || b > f.maxThPage || !m.R16(N + f.thItem, d) || d > f.maxThItem) return CasState{};
         c.category = (int)a; c.clothesPage = (int)b; c.item = (int)d; c.clothesKnown = true;
+        arrows(f.thArrowL, f.thArrowR);
+        {   // The game's ring: on the chosen item's cell when this page shows it.
+            bool shown = false;
+            int x, y;
+            if (sprite(f.thRing, shown, x, y) && shown)
+            {
+                const int cx = x - (int)f.thCellX0, cy = y - (int)f.thCellY0;
+                if (cx >= 0 && cy >= 0 && cx % (int)f.thCellDx == 0 && cy % (int)f.thCellDy == 0 && cx / (int)f.thCellDx < 3 && cy / (int)f.thCellDy < 2)
+                    c.clothesCell = cy / (int)f.thCellDy * 3 + cx / (int)f.thCellDx;
+            }
+        }
         break;
     case 4:
         if (!m.R8(N + f.cfAsp, a) || a > 3 || !m.R8(N + f.cfAnswer, b) || b > 2) return CasState{};
@@ -1359,6 +1405,7 @@ CasState ReadCas(const Reader& m, u32 S)
     default: break;
     }
     c.page = (int)page; c.gender = (int)gender;
+    c.switching = switching;
     c.valid = true;
     return c;
 }

@@ -1,0 +1,37 @@
+# From s3, CONSOLE: Up, Up, Right, A → male; Right, Right, A → the second skin figure; RB → Hair:
+# Up, Right, Right, A → hair colour 5; Down, A → another style; Right x3 → the game's arrows scroll
+# (1, 2, 3), A; Left x4 → back (2, 1, 0); RB → Face: Down, Right, A → face 5; RB → Clothes: Down,
+# Right, A → the fifth cell's item; Right, Right (the arrow), A → the next page.
+10 2 pad up
+20 2 pad up
+30 2 pad right
+40 2 pad a
+70 2 pad right
+80 2 pad right
+90 2 pad a
+120 2 pad rb
+160 2 pad up
+170 2 pad right
+180 2 pad right
+190 2 pad a
+220 2 pad down
+230 2 pad a
+260 2 pad right
+270 2 pad right
+290 2 pad right
+310 2 pad a
+340 2 pad left
+350 2 pad left
+370 2 pad left
+390 2 pad left
+410 2 pad rb
+450 2 pad down
+460 2 pad right
+470 2 pad a
+500 2 pad rb
+540 2 pad down
+550 2 pad right
+560 2 pad a
+580 2 pad right
+590 2 pad right
+600 2 pad a

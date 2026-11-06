@@ -11,6 +11,7 @@
 #include "port/gift.h"
 #include "port/front.h"
 #include "port/frontmenus.h"
+#include "port/cas.h"
 #include "port/note.h"
 #include "port/options.h"
 #include "port/panelmenu.h"
@@ -138,6 +139,8 @@ MenuView ScreenView(ScreenState s, const GameState* game, const RomData* rom)
         if (game && game->stat.valid) return StatPanelView(s, game, rom);
         return NoteView(s, game, rom);
     // The front end's boot, title and main menu (port/front.h), Settings and Load-a-Sim (port/frontmenus.h).
+    // Create-a-Sim (port/cas.h).
+    case Screen::CreateASim: return CasView(s, game, rom);
     case Screen::FrontEnd: case Screen::None: case Screen::Loading:
         if (MenuView v = FrontView(s, game, rom); v.valid) return v;
         if (game && game->front.settings.valid) return SettingsView(s, game, rom);

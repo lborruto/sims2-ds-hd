@@ -130,6 +130,9 @@ struct MenuView
     bool backCloses = false;
     // DS buttons passed on while held (Game Paused's Start), whatever the focus.
     u32 passKeys = 0;
+    // The right stick's horizontal holds the DS's L (left) / R (right) while deflected: Create-a-
+    // Sim's model turns as the game turns it on L / R (LB / RB are the screen's pages there).
+    bool stickTurns = false;
     // (Drawing only, not hashed: set by CONSOLE from the navigator) the id of the item whose X is
     // armed (xAsks), 0 none.
     u32 armed = 0;

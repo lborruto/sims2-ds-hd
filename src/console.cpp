@@ -14,6 +14,7 @@
 #include "port/dialogue.h"
 #include "port/front.h"
 #include "port/frontmenus.h"
+#include "port/cas.h"
 #include "port/gift.h"
 #include "port/note.h"
 #include "port/options.h"
@@ -148,6 +149,13 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
                 SortUi(c.ui);
             }
             else screen(v, focus);
+            return c;
+        }
+    // Create-a-Sim in HD (port/cas.h): the whole canvas its.
+    if (s.screen == Screen::CreateASim)
+        if (const MenuView v = ConsoleView(s, game, rom); v.valid)
+        {
+            BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH);
             return c;
         }
     // A black load (both screens black, RAM between screens): the bare backdrop.

@@ -310,7 +310,7 @@ front_run() { # NAME STATE: the front lines in NAME.front
     if [ ! -f "$file" ]; then echo "no save state $2.st" > "$tmp/$name.front"; return; fi
     "$bin" "$rom" --headless --frames 30 --state-load "$file" --save "$tmp/$name.sav" --print-front "${town[@]}" > "$tmp/$name.frontlog" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.frontlog" && touch "$tmp/$name.frontok"
-    grep -E '^frame [0-9]+: (front|title|settings|load|cas|boot|video) ' "$tmp/$name.frontlog" | sed 's/^frame [0-9]*: //' > "$tmp/$name.front"
+    grep -E '^frame [0-9]+: (front|title|settings|load|cas|cas-sprites|boot|video) ' "$tmp/$name.frontlog" | sed 's/^frame [0-9]*: //' > "$tmp/$name.front"
 }
 front_want() { # NAME KIND PATTERN LABEL: the last line of that kind matches
     if [ -f "$tmp/$1.frontok" ] && grep "^$2 " "$tmp/$1.front" | tail -n 1 | grep -q -E "$3"; then echo "ok   $4"
@@ -351,6 +351,11 @@ front_want F-face-5-40 cas ' face=4$' "front: face 5"
 front_want F-cas-tab4-60 cas '^cas page=3 .* category=0 clothespage=0 item=0$' "front: the Clothes page"
 front_want F-thr-cat3-40 cas ' category=2 ' "front: the third clothes category"
 front_want F-thr-6-40 cas ' item=16$' "front: the sixth cell of Clothes"
+front_want F-cas-tab2-60 cas-sprites '^cas-sprites left=0 right=1 cell=-1 pos=0$' "front: the Hair page, its right arrow alone"
+front_want F-hair-s3-40 cas-sprites ' pos=9$' "front: the third hair style at row 2, column 1"
+front_want F-hair-next3-130 cas-sprites '^cas-sprites left=1 right=1 ' "front: the hair scrolled, both arrows"
+front_want F-thr-6-40 cas-sprites '^cas-sprites left=0 right=1 cell=5 ' "front: Clothes, the game's ring on the sixth cell"
+front_want F-thr-cat3-40 cas-sprites '^cas-sprites left=0 right=1 cell=0 ' "front: the third category's first page"
 front_want F-keep-asp2-30 front '^front KeepSim$' "front: Keep this Sim?"
 front_want F-keep-asp2-30 cas ' aspiration=2 answer=0$' "front: Popularity chosen"
 front_want F-keep-tick-30 cas ' aspiration=0 answer=1$' "front: the tick pressed"

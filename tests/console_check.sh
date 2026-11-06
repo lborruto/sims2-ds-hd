@@ -18,8 +18,10 @@
 #   touch screen's own pixels 2x; s5-hd-wide (--wide): the world not cut at its sides;
 #   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
 #   top right, the hints' box; s2 (the main menu), title, boot: the HD front end (src/port/front.*);
-#   s3, s4 (Create-a-Sim, Keep this Sim?: no HUD): the front end's view, the top screen framed at the left at its shape and the touch screen
-#   2.5x framed at the right, the buttons' hint below, never SIDE; slots (sit-store, Options >
+#   s3-m1 (Create-a-Sim with --no-romdata: no HUD): milestone 1's front end view, the top screen framed at the left at its shape and the touch screen
+#   2.5x framed at the right, the buttons' hint below, never SIDE; s3, s4, cas-hair, cas-face, cas-clothes (and s3 at 2x and
+#   --wide, s4 in Italian): the HD Create-a-Sim (src/port/cas.*: the model framed at the left, the game's tabs and the
+#   page's cells the touch screen's pixels, the focus's halo); slots (sit-store, Options >
 #   Save: the save slots, from RAM): the HD slot list (src/port/options.*, three "No Data" rows),
 #   never the touch screen 3x; slots-hd (B-cas-opt-save): the current slot's number green;
 #   goals-menu, rel-menu (and --wide), opt-menu: the HD Goals, Relationships and Options tabs; load
@@ -116,10 +118,9 @@ run social act-social "${town[@]}" &
 wait
 run vacuum act-vacuum "${hotel[@]}" &
 run cards act-cards "${late[@]}" &
-run s3 s3 "${town[@]}" &
+run s3-m1 s3 "${town[@]}" --no-romdata &
 wait
 run s2 s2 "${town[@]}" --console-focus 0 &
-run s4 s4 "${town[@]}" &
 run slots sit-store "${town[@]}" --input "$repo/scripts/hotspots/options-save.txt" &
 run load act-cards "${late[@]}" --input "$repo/scripts/console/cards-quit.txt" &
 wait
@@ -204,9 +205,20 @@ run loadgame-wide F-cload-150 "${town[@]}" --console-focus 0 --wide &
 run loadgame-empty F-mm-load-150 "${town[@]}" &
 run loadgame-loading F-cload-t1-60 "${town[@]}" &
 wait
+run s3 s3 "${town[@]}" --console-focus 9 &
+run s3-2x s3 "${town[@]}" --console-focus 9 --compose-scale 2 &
+run s3-wide s3 "${town[@]}" --console-focus 9 --wide &
+run s4 s4 "${town[@]}" --console-focus 0 &
+wait
+run s4-it s4 "${town[@]}" --console-focus 4 --language 4 &
+run cas-hair F-hair-s3-40 "${town[@]}" --console-focus 10 &
+run cas-face F-face-5-40 "${town[@]}" --console-focus 4 &
+run cas-clothes F-thr-6-40 "${town[@]}" --console-focus 11 &
+wait
 
 fails=0
-for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
+for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3-m1 slots load casino casino-2x \
+    s3 s3-2x s3-wide s4 s4-it cas-hair cas-face cas-clothes \
     title title-wide boot boot-wide menu-2x menu-wide menu-de \
     settings settings-2x settings-wide settings-concept settings-credits settings-fr loadgame loadgame-2x loadgame-wide loadgame-empty loadgame-loading \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
@@ -348,6 +360,49 @@ def front():
         errors.append("no hint text")
 
 BACKDROP = (16, 18, 24)
+
+def front_cas(page, focus, raw_top=True):
+    """HD Create-a-Sim (src/port/cas.*): the top screen (the model) at its shape in 16,16 664 x 640
+    (4:3: 664 x 498 at 16,87), framed; the panel at the right; the game's five tabs = the touch
+    screen's pixels 2x in the tab bar; one live crop of the page = the touch screen's pixels (the
+    gender button 2x, a hair cell, a face, a clothes cell 3x, an aspiration 2x); the focus's green
+    halo just outside `focus` (x, y, w, h); white words in the title's well (the name's letters on
+    page 0, the page's title on 1-4); the hints."""
+    expect("canvas", comp.size, (1280, 720))
+    if raw_top:
+        k = 664 / 256
+        for x in range(0, 256, 11):
+            for y in range(0, 192, 11):
+                expect(f"top DS {x},{y}", C(16 + int((x + 0.5) * k), 87 + int((y + 0.5) * k)), top(x, y))
+                if len(errors) > 4:
+                    return
+    expect("top frame", C(12, 300), OUTLINE)
+    expect("backdrop", C(5, 5), BACKDROP)
+    expect("panel", C(704, 640), FRAME)
+    for i in range(5):
+        x0, y0 = 780 + 80 * i + 6, 34 + 4
+        for dy in range(0, 30, 5):
+            for dx in range(0, 34, 5):
+                expect(f"tab {i} DS {1 + dx},{8 + 37 * i + dy}", C(x0 + 2 * dx + 1, y0 + 2 * dy + 1), bottom(1 + dx, 8 + 37 * i + dy))
+        if len(errors) > 4:
+            return
+    # One live crop of the page: DS x, y, w, h, its scale, its HD box.
+    fx, fy, fw, fh, s, (bx, by, bw, bh) = {
+        0: (47, 7, 37, 37, 2, (750, 188, 84, 84)), 1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129)),
+        3: (188, 109, 38, 54, 3, (1084, 384, 120, 174)), 4: (60, 24, 44, 48, 2, (746, 186, 108, 112))}[page]
+    ox, oy = bx + (bw - fw * s) // 2, by + (bh - fh * s) // 2
+    for dy in range(0, fh, 4):
+        for dx in range(0, fw, 4):
+            expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), bottom(fx + dx, fy + dy))
+            if len(errors) > 4:
+                return
+    x, y, w, h = focus
+    r, g, b = C(x + w // 2, y - 3)
+    if not (g > r + 80 and g > b + 60): errors.append(f"no focus halo above {focus}: {(r, g, b)}")
+    words = sum(1 for yy in range(122, 166) for xx in range(730, 1230) if C(xx, yy) == (255, 255, 255))
+    if words < 60: errors.append(f"no title or name ({words})")
+    hints = [C(xx, yy) for yy in range(654, 690) for xx in range(1000, 1240)]
+    if sum(1 for p in hints if p != FRAME) < 40: errors.append("no hints")
 
 def front_menu(focus, raw_top=True):
     """The HD main menu (src/port/front.*): the top screen 3x at 24,72 framed, the panel at the
@@ -945,8 +1000,20 @@ elif case in ("title", "title-wide"):
     front_title(raw_top=case == "title")
 elif case in ("boot", "boot-wide"):
     front_boot(raw=case == "boot")
-elif case in ("s3", "s4"):
+elif case == "s3-m1":
     front()
+elif case in ("s3", "s3-2x", "s3-wide"):
+    front_cas(0, (731, 352, 50, 50), raw_top=case != "s3-wide")
+elif case == "s4":
+    front_cas(4, (746, 186, 108, 112))
+elif case == "s4-it":
+    front_cas(4, (756, 544, 210, 88))
+elif case == "cas-hair":
+    front_cas(1, (822, 441, 150, 171))
+elif case == "cas-face":
+    front_cas(2, (909, 331, 141, 129))
+elif case == "cas-clothes":
+    front_cas(3, (1084, 384, 120, 174))
 elif case == "load":
     # Frame 119 of the cards' quit: the game between Cards and the casino's panel, both screens
     # black: only the backdrop, no frame, no hint.
@@ -1604,6 +1671,54 @@ check_pad pad-settings-volume settings_volume
 check_pad pad-settings-pages settings_pages
 check_pad pad-load-slot load_slot
 check_pad pad-boot-keys boot_keys
+# Create-a-Sim (src/port/cas.*, --print-front): from s3, Y, A, X, Right, A, X, A x5, Start → the
+# name typed through the three keyboards, the backspace, never past seven, then committed to G+0x53
+# when the page closes; from F-cas-kbs4-140, Y at empty → nothing, A → "A"; from s3, the gender,
+# the skin, the hair colour and style and the game's scroll both ways, a face, a clothes cell and
+# the next page by its arrow; from s4 on a copy of the complete save, Popularity, the tick → the
+# game starts (the town); B → the cross: the title at phase 0; the right stick turns the model
+# (the model's picture differs from the same run without it).
+pad_cas() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4; shift 4
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
+        --layout console --print-game --print-front "${town[@]}" --input "$input" "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_cas pad-cas-name s3 cas-name 260 &
+pad_cas pad-cas-empty F-cas-kbs4-140 cas-empty 90 &
+pad_cas pad-cas-looks s3 cas-looks 640 &
+pad_cas pad-cas-keep s4 cas-keep 400 &
+wait
+pad_cas pad-cas-cross s4 cas-cross 200 &
+pad_cas pad-cas-turn s3 cas-turn 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-turn" &
+pad_cas pad-cas-still s3 cas-cross 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-still" &
+wait
+cas_name() {
+    in_order pad-cas-name 'name=Si len=2 keyboard=0' 'name=SiA len=3 keyboard=0' 'name=SiA len=3 keyboard=1' 'name=SiAb len=4' 'name=SiAb len=4 keyboard=2' \
+        'name=SiAb111 len=7' 'cas page=1 .* switching' 'cas page=1 gender=0 simname=SiAb111 ' || return 1
+    ! grep -q -E 'len=[89]' "$tmp/pad-cas-name.log" || { echo "  pad-cas-name: past seven"; return 1; }
+}
+cas_empty() { in_order pad-cas-empty 'name= len=0' 'name=A len=1'; }
+cas_looks() {
+    in_order pad-cas-looks 'cas page=0 gender=1 ' 'gender=1 .*skin=1 ' 'cas page=1 ' 'haircolour=4 hair=0 ' 'haircolour=4 hair=1 scroll=0' 'scroll=1' 'scroll=2' 'scroll=3' \
+        'scroll=2' 'scroll=1' 'scroll=0' 'cas page=2 ' 'face=4' 'cas page=3 ' 'item=15' 'clothespage=1 item=15'
+}
+cas_keep() { in_order pad-cas-keep 'aspiration=0 answer=0' 'aspiration=2 answer=0' 'aspiration=2 answer=1' 'game Panel/Interact'; }
+cas_cross() { in_order pad-cas-cross 'aspiration=0 answer=2' 'front Title' 'title phase=0'; }
+cas_turn() {
+    "$python" -I -c '
+import sys
+from PIL import Image, ImageChops
+a, b = (Image.open(p).convert("RGB").crop((16, 87, 680, 585)) for p in sys.argv[1:3])
+sys.exit(0 if ImageChops.difference(a, b).getbbox() else 1)' "$tmp/pad-cas-turn/f000049.png" "$tmp/pad-cas-still/f000049.png"
+}
+check_pad pad-cas-name cas_name
+check_pad pad-cas-empty cas_empty
+check_pad pad-cas-looks cas_looks
+check_pad pad-cas-keep cas_keep
+check_pad pad-cas-cross cas_cross
+check_pad pad-cas-turn cas_turn
 # The HD Interact tab's words in each language (src/port/interact.*: --measure-menu): every verb
 # in its row and in the A hint, every Sim's and object's name in the title and the strip, held in
 # their boxes (shrunk at most; a neighbour's name beside the plate may end in an ellipsis).

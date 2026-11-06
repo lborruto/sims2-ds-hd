@@ -1074,25 +1074,49 @@ static void front_cas()
     r.W16(kS + 0x76, 1); g = ReadGameState(r.View()); CHECK(g.front.cas.gender == 1 && g.front.cas.skin == 1 && g.front.cas.hairColour == 7);
     put_text(r, kFN + 0x70, "SimABCD"); CHECK(ReadGameState(r.View()).front.cas.name == "SimABCD" && ReadGameState(r.View()).front.cas.name.size() == 7);
     for (u32 i = 0; i < 8; i++) r.W8(kFN + 0x70 + i, 'A');   // 8 characters, no NUL: past the game's limit
-    CHECK(!ReadGameState(r.View()).front.cas.valid);
-    put_text(r, kFN + 0x70, "Si"); r.W8(kFN + 0x71, 0x07); CHECK(!ReadGameState(r.View()).front.cas.valid);   // not printable
-    put_text(r, kFN + 0x70, "Sim"); r.W16(kFN + 0x12, 3); CHECK(!ReadGameState(r.View()).front.cas.valid); r.W16(kFN + 0x12, 0);
-    setpage(1, 1); r.W16(kFN + 0x3E, 2); r.W16(kFN + 0x38, 3);
-    g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.hairKnown && g.front.cas.hairStyle == 2 && g.front.cas.hairScroll == 3 && !g.front.cas.nameKnown);
+    // (a buffer that does not read: the Name page's editor not filled yet, as a page change in flight)
+    auto making = [&]() { const CasState c = ReadGameState(r.View()).front.cas; return c.valid && c.switching && c.page == 0 && !c.nameKnown && c.name.empty(); };
+    CHECK(making());
+    put_text(r, kFN + 0x70, "Si"); r.W8(kFN + 0x71, 0x07); CHECK(making());   // not printable
+    put_text(r, kFN + 0x70, "Sim"); r.W16(kFN + 0x12, 3); CHECK(making()); r.W16(kFN + 0x12, 0);
+    CHECK(!ReadGameState(r.View()).front.cas.switching);
+    setpage(1, 1); r.W16(kFN + 0x3E, 2); r.W16(kFN + 0x38, 3); r.W16(kFN + 0x3A, 13);
+    g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.hairKnown && g.front.cas.hairStyle == 2 && g.front.cas.hairScroll == 3 && g.front.cas.hairPos == 13 && !g.front.cas.nameKnown);
+    r.W16(kFN + 0x3A, 18); CHECK(!ReadGameState(r.View()).front.cas.valid); r.W16(kFN + 0x3A, 13);
     r.W16(kFN + 0x3E, 18); CHECK(!ReadGameState(r.View()).front.cas.valid); r.W16(kFN + 0x3E, 17);
     setpage(2, 2); r.W16(kFN + 0x10, 8); CHECK(ReadGameState(r.View()).front.cas.face == 8); r.W16(kFN + 0x10, 9); CHECK(!ReadGameState(r.View()).front.cas.valid);
     setpage(3, 3); r.W16(kFN + 0x14, 4); r.W16(kFN + 0x16, 1); r.W16(kFN + 0x18, 16);
     g = ReadGameState(r.View()); CHECK(g.front.cas.clothesKnown && g.front.cas.category == 4 && g.front.cas.clothesPage == 1 && g.front.cas.item == 16);
-    r.W16(kFN + 0x14, 6); CHECK(!ReadGameState(r.View()).front.cas.valid);
+    r.W16(kFN + 0x14, 6); CHECK(!ReadGameState(r.View()).front.cas.valid); r.W16(kFN + 0x14, 4);
+    CHECK(!ReadGameState(r.View()).front.cas.arrowsKnown && ReadGameState(r.View()).front.cas.clothesCell == -1);   // no sprite list
+    {   // the page's sprites (a null-ended list of CActorSprites): its arrows [6] / [7] and its ring [8] on a cell
+        const u32 list = 0x021A5000, spr = 0x021A5100;
+        r.W32(kFN + 8, list);
+        for (u32 i = 0; i < 9; i++)
+        {
+            r.W32(list + 4 * i, spr + 0x80 * i);
+            r.W32(spr + 0x80 * i, 0x0212FED8);
+            r.W32(spr + 0x80 * i + 4, i == 7 ? 0 : 1);
+        }
+        r.W32(list + 4 * 9, 0);
+        r.W32(spr + 0x80 * 8 + 0x50, 136u << 12); r.W32(spr + 0x80 * 8 + 0x54, 105u << 12);   // the ring on cell 4
+        g = ReadGameState(r.View());
+        CHECK(g.front.cas.arrowsKnown && g.front.cas.canLeft && !g.front.cas.canRight && g.front.cas.clothesCell == 4);
+        r.W32(spr + 0x80 * 8 + 0x50, 137u << 12); CHECK(ReadGameState(r.View()).front.cas.clothesCell == -1);   // between cells
+        r.W32(spr + 0x80 * 8 + 4, 0); r.W32(spr + 0x80 * 8 + 0x50, 136u << 12); CHECK(ReadGameState(r.View()).front.cas.clothesCell == -1);   // hidden
+        r.W32(spr + 0x80 * 6, 0x12345678); CHECK(!ReadGameState(r.View()).front.cas.arrowsKnown);   // not a sprite
+        r.W32(list + 4 * 3, 0); CHECK(!ReadGameState(r.View()).front.cas.arrowsKnown && ReadGameState(r.View()).front.cas.valid);   // the list ends early
+        r.W32(kFN + 8, 0);
+    }
     setpage(4, 4); r.W8(kFN + 0x10, 3); r.W8(kFN + 0x11, 1);
     g = ReadGameState(r.View()); CHECK(g.front.kind == FrontKind::KeepSim && g.front.cas.keepKnown && g.front.cas.aspiration == 3 && g.front.cas.answer == 1);
     r.W8(kFN + 0x11, 3); CHECK(!ReadGameState(r.View()).front.cas.valid && ReadGameState(r.View()).front.kind == FrontKind::None);
     // the page and its object must agree; the in-game pages reuse the Hair / Clothes objects
-    setpage(4, 1); CHECK(!ReadGameState(r.View()).front.cas.valid);
+    setpage(4, 1); g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.switching && g.front.cas.page == 4 && !g.front.cas.keepKnown && !g.front.cas.hairKnown);
     setpage(6, 1); r.W16(kFN + 0x3E, 1); r.W16(kFN + 0x38, 0); CHECK(ReadGameState(r.View()).front.cas.valid && ReadGameState(r.View()).front.cas.page == 6);
     setpage(5, 5); CHECK(ReadGameState(r.View()).front.cas.valid && !ReadGameState(r.View()).front.cas.hairKnown);
     setpage(8, 5); CHECK(!ReadGameState(r.View()).front.cas.valid);
-    setpage(0, 0); r.W32(kS + 0x58, 0); CHECK(!ReadGameState(r.View()).front.cas.valid);   // a page change in flight
+    setpage(0, 0); r.W32(kS + 0x58, 0); g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.switching && !g.front.cas.nameKnown);   // a page change in flight
     // the committed name never exceeds the game's 7 + NUL
     r.W32(kS + 0x58, kFN); put_text(r, kGb + 0x53, "ABCDEFG"); CHECK(ReadGameState(r.View()).front.cas.simName == "ABCDEFG");
     for (u32 i = 0; i < 8; i++) r.W8(kGb + 0x53 + i, 'A'); CHECK(!ReadGameState(r.View()).front.cas.valid);

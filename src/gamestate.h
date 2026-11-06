@@ -505,6 +505,7 @@ struct CasState
 {
     bool valid = false;
     int page = -1;                    // S+0x74: 0 Name, 1 Hair, 2 Face, 3 Clothes, 4 Keep this Sim?; in game 5 Tan, 6 Hair, 7 Clothes
+    bool switching = false;           // the page object is not yet the page's (a page change in flight, 2-4 frames): no page fields
     int gender = -1;                  // 0 female, 1 male
     std::string simName;              // G+0x53, the committed name, at most 7 characters
     int skin = -1;                    // skin figure 0..3 (hero), -1 not read
@@ -517,11 +518,16 @@ struct CasState
     bool hairKnown = false;
     int hairStyle = -1;               // selected 0..17
     int hairScroll = -1;              // column scroll 0..7
+    int hairPos = -1;                 // the chosen style's place in the two rows of nine: column + 9 row (0..17; shown when column - scroll is 0 or 1)
+    // Hair and Clothes: the game's arrows (shown only where it can scroll), from the page's sprites
+    bool arrowsKnown = false;
+    bool canLeft = false, canRight = false;
     // Face page
     int face = -1;                    // selected 0..8
     // Clothes page
     bool clothesKnown = false;
-    int category = -1, clothesPage = -1, item = -1;
+    int category = -1, clothesPage = -1, item = -1;   // category 0..5, page 0..11
+    int clothesCell = -1;             // the cell (0..5, row by row) the game's ring is on; -1 not on this page
     // Keep this Sim?
     bool keepKnown = false;
     int aspiration = -1;              // 0 Fortune, 1 Romance, 2 Popularity, 3 Party

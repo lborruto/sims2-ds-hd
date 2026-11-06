@@ -459,6 +459,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             else if ((back || menu) && !v.own) menuOpen_ = false;
             // DS buttons the view passes on (Game Paused's Start).
             if (v.passKeys) dsKeys |= DsKeys(pad, true) & v.passKeys;
+            // The right stick turns what the game turns on L / R (Create-a-Sim's model).
+            if (v.stickTurns && pad.rx < -kStick) dsKeys |= 1u << kL;
+            else if (v.stickTurns && pad.rx > kStick) dsKeys |= 1u << kR;
             break;
         }
         if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);

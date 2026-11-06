@@ -22,6 +22,7 @@
 #include "port/music.h"
 #include "port/statpanel.h"
 #include "port/catalogue.h"
+#include "port/cas.h"
 #include "port/dialogue.h"
 #include "port/front.h"
 #include "port/frontmenus.h"
@@ -2397,6 +2398,260 @@ int main()
         GameState bad = load(7, 0, false, false);
         bad.front.load.valid = false;
         CHECK(!LoadViewOf(none, bad).valid);
+    }
+
+    // Create-a-Sim (port/cas.h) on made-up states, every page: the items' taps on the game's own
+    // targets (inside the cell, key, button or arrow the game draws there), the keys' count per
+    // keyboard page, none to press once the name holds seven and no backspace at empty, X the next
+    // keyboard page, the hair grid's Left / Right the game's arrows only while it shows them, the
+    // clothes' arrows focusable only then, the aspirations in the game's order, the tick and the
+    // cross dead once one is pressed (B the cross), LB / RB the tabs in a ring, Start the next
+    // page but on the last, the page in flight with nothing to press; ids distinct and the
+    // module's; every enabled item reachable; inside the canvas, layers ascending; the mouse round
+    // trips and lands each item on its game target; no view on another screen, on the in-game
+    // pages, without the RAM's part or the strings.
+    {
+        RomData rom;
+        const ScreenState cas {Screen::CreateASim, Tab::None};
+        std::vector<u32> bottom(SW * SH, 0xFF5961A2);
+        auto layers = [&](const Composition& comp) {
+            int layer = 0;
+            for (const ui::UiItem& u : comp.ui)
+            {
+                CHECK(u.to.x >= 0 && u.to.y >= 0 && u.to.x + u.to.w <= kConsoleW && u.to.y + u.to.h <= kConsoleH);
+                if (u.kind == ui::UiItem::Image) continue;
+                CHECK(u.layer >= layer);
+                layer = u.layer;
+            }
+        };
+        auto state = [](int page) {
+            GameState g;
+            g.valid = true;
+            g.front.kind = page == 4 ? FrontKind::KeepSim : FrontKind::CreateASim;
+            CasState& c = g.front.cas;
+            c.valid = true;
+            c.page = page;
+            c.gender = 0;
+            c.simName = "Sim";
+            c.skin = 1;
+            c.hairColour = 3;
+            return g;
+        };
+        // The game's target box of an item (the picture or box its tap lies in), by its id.
+        auto target = [](u32 id, int& x0, int& y0, int& w, int& h) {
+            Rect r {};
+            const u32 k = id & 0xFF;
+            if (id >= kCasGenderId && id < kCasGenderId + 2) r = kCasGenderFrom[k];
+            else if (id >= kCasSkinId && id < kCasSkinId + 4) r = {kCasSkinFrom.x + kCasSkinDx * (int)(k - 0x10), kCasSkinFrom.y, kCasSkinFrom.w, kCasSkinFrom.h};
+            else if (id >= kCasKeyId && id < kCasKeyId + 26) r = {kCasKeyBoxFrom.x + kCasKeyDx * (int)(k % 9), kCasKeyBoxFrom.y + kCasKeyDy * (int)(k / 9), kCasKeyBoxFrom.w, kCasKeyBoxFrom.h};
+            else if (id == kCasBackId) r = kCasBackFrom;
+            else if (id >= kCasKbPageId && id < kCasKbPageId + 3) r = {kCasKbX - 12, kCasKbY[k - 0x30] - 12, 24, 24};
+            else if (id >= kCasSwatchId && id < kCasSwatchId + 8) r = {kCasSwatchFrom.x + kCasSwatchDx * (int)k, kCasSwatchFrom.y, kCasSwatchFrom.w, kCasSwatchFrom.h};
+            else if (id >= kCasHairId && id < kCasHairId + 4) r = {kCasHairFrom.x + kCasHairDx * (int)((k - 0x10) & 1), kCasHairFrom.y + kCasHairDy * (int)((k - 0x10) >> 1), kCasHairFrom.w, kCasHairFrom.h};
+            else if (id >= kCasFaceId && id < kCasFaceId + 9) r = {kCasFaceFrom.x + kCasFaceDx * (int)(k % 3), kCasFaceFrom.y + kCasFaceDy * (int)(k / 3), kCasFaceFrom.w, kCasFaceFrom.h};
+            else if (id >= kCasCatId && id < kCasCatId + 6) r = {kCasCatFrom.x, kCasCatFromY[k], kCasCatFrom.w, kCasCatFrom.h};
+            else if (id >= kCasClothId && id < kCasClothId + 6) r = {kCasClothFrom.x + kCasClothDx * (int)((k - 0x10) % 3), kCasClothFrom.y + kCasClothDy * (int)((k - 0x10) / 3), kCasClothFrom.w, kCasClothFrom.h};
+            else if (id == kCasClothId + 0x10) r = kCasClothLeftFrom;
+            else if (id == kCasClothId + 0x11) r = kCasClothRightFrom;
+            else if (id >= kCasAspId && id < kCasAspId + 4) r = {kCasAspFrom.x + kCasAspDx * (int)[&] { for (int j = 0; j < 4; j++) if (kCasAspOfSlot[j] == (int)k) return j; return 0; }(), kCasAspFrom.y, kCasAspFrom.w, kCasAspFrom.h};
+            else if (id == kCasTickId || id == kCasCrossId) r = {(id == kCasTickId ? kCasTickX : kCasCrossX) - 16, kCasAnswerY - 16, 32, 32};
+            else return false;
+            x0 = r.x; y0 = r.y; w = r.w; h = r.h;
+            return true;
+        };
+        std::set<u32> ids;
+        auto check = [&](const GameState& g, const char* what) {
+            const MenuView v = CasViewOf(cas, g);
+            if (!v.valid || !v.own || v.replay || !v.stickTurns || !AllReachable(v)) { fprintf(stderr, "cas %s: view\n", what); failures++; return v; }
+            CHECK(!CasView(cas, &g, &rom).valid);   // no strings: milestone 1's
+            CHECK(!CasViewOf({Screen::FrontEnd, Tab::None}, g).valid && !CasViewOf({Screen::Panel, Tab::Interact}, g).valid);
+            const int page = g.front.cas.page;
+            std::set<u32> here;
+            for (const ViewItem& it : v.items)
+            {
+                CHECK((it.id >> 24) == (kModCas >> 24));
+                here.insert(it.id);
+                ids.insert(it.id);
+                CHECK(it.rect.x >= kCasPanel.x && it.rect.y >= kCasPanel.y && it.rect.x + it.rect.w <= kCasPanel.x + kCasPanel.w && it.rect.y + it.rect.h <= kCasPanel.y + kCasPanel.h);
+                int x0, y0, w, h;
+                CHECK(target(it.id, x0, y0, w, h));
+                for (const MenuAction* a : {&it.action})
+                    if (!a->empty())
+                    {
+                        CHECK(it.enabled && a->size() == 1 && (*a)[0].kind == MenuStep::Tap);
+                        CHECK((*a)[0].x >= x0 && (*a)[0].x < x0 + w && (*a)[0].y >= y0 && (*a)[0].y < y0 + h);
+                    }
+            }
+            CHECK(here.size() == v.items.size());
+            if (g.front.cas.switching) CHECK(v.items.empty() && v.buttons[(int)MenuButton::LB].empty() && v.buttons[(int)MenuButton::Start].empty());
+            else
+            {
+                const MenuAction& lb = v.buttons[(int)MenuButton::LB];
+                const MenuAction& rb = v.buttons[(int)MenuButton::RB];
+                const MenuAction& start = v.buttons[(int)MenuButton::Start];
+                CHECK(lb.size() == 1 && lb[0].x == kCasTabX && lb[0].y == kCasTabY0 + kCasTabDy * ((page + 4) % 5));
+                CHECK(rb.size() == 1 && rb[0].x == kCasTabX && rb[0].y == kCasTabY0 + kCasTabDy * ((page + 1) % 5));
+                CHECK(start.empty() == (page == 4));
+                if (page < 4) CHECK(start == rb);
+            }
+            for (int topW : {256, 341})
+                for (int focus : {-1, MenuFirst(v), (int)v.items.size() - 1})
+                {
+                    Composition comp {kConsoleW, kConsoleH, {}, {}};
+                    BuildCas(comp, v, focus, g, rom, nullptr, bottom.data(), topW, 192);
+                    layers(comp);
+                    int tops = 0;
+                    for (const Piece& q : comp.pieces)
+                        if (q.src == Src::Top) { tops++; CHECK(q.touch && q.from.w == topW && q.to.x + q.to.w <= kCasPanel.x); }
+                    CHECK(tops == 1);
+                    if (topW != 256 || focus != MenuFirst(v)) continue;
+                    if (g.front.cas.switching)
+                    {
+                        for (const Piece& q : comp.pieces) CHECK(q.src != Src::Bottom);   // (nothing to click)
+                        continue;
+                    }
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(cas, false, 256, 192, o.first, o.second, false, &comp);
+                    // Each item with something to do: its HD rectangle onto the game's target.
+                    const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                    for (const ViewItem& it : v.items)
+                    {
+                        int x0, y0, w, h, tx, ty;
+                        target(it.id, x0, y0, w, h);
+                        const bool hit = TouchFromComposition(comp, fit, it.rect.x + it.rect.w / 2.0f, it.rect.y + it.rect.h / 2.0f, tx, ty);
+                        CHECK(hit == !it.action.empty());
+                        if (hit) CHECK(tx >= x0 && tx < x0 + w && ty >= y0 && ty < y0 + h);
+                    }
+                    // The tabs onto the game's.
+                    for (int i = 0; i < 5 && !g.front.cas.switching; i++)
+                    {
+                        int tx, ty;
+                        CHECK(TouchFromComposition(comp, fit, kCasTabsX + i * kCasTabCell + kCasTabCell / 2.0f, kCasTabBar.y + kCasTabBar.h / 2.0f, tx, ty));
+                        CHECK(std::abs(tx - kCasTabX) <= 17 && std::abs(ty - (kCasTabY0 + kCasTabDy * i)) <= 15);
+                    }
+                }
+            return v;
+        };
+        // Name: every keyboard page, an empty, short and full name.
+        for (int kb = 0; kb < 3; kb++)
+            for (const char* name : {"", "Sim", "SimABCD"})
+                for (int gender : {0, 1})
+                {
+                    GameState g = state(0);
+                    CasState& c = g.front.cas;
+                    c.nameKnown = true;
+                    c.name = name;
+                    c.keyboard = kb;
+                    c.gender = gender;
+                    const MenuView v = check(g, "name");
+                    CHECK(v.items.size() == 2 + 4 + 3 + 26 + 1u);
+                    int keys = 0, live = 0;
+                    for (const ViewItem& it : v.items)
+                        if (it.id >= kCasKeyId && it.id < kCasKeyId + 26) { keys += it.enabled; live += !it.action.empty(); }
+                    const bool full = std::string(name).size() == 7;
+                    CHECK(keys == kCasKeyCount[kb] && live == (full ? 0 : kCasKeyCount[kb]));
+                    CHECK(v.items[MenuFirst(v)].id == kCasKeyId);
+                    const MenuAction& y = v.buttons[(int)MenuButton::Y];
+                    CHECK(y.empty() == (*name == 0) && y == v.items.back().action);
+                    const MenuAction& x = v.buttons[(int)MenuButton::X];
+                    CHECK(x.size() == 1 && x[0].x == kCasKbX && x[0].y == kCasKbY[(kb + 1) % 3]);
+                    for (int p = 0; p < 3; p++) CHECK(v.items[6 + p].action.empty() == (p == kb));
+                }
+        // Hair: the arrows only where the game shows them; the first focus the game's style when in view.
+        for (int scroll : {0, 3, 7})
+            for (int pos : {0, 4, 13})
+                for (int arrows = 0; arrows < 4; arrows++)
+                {
+                    GameState g = state(1);
+                    CasState& c = g.front.cas;
+                    c.hairKnown = true;
+                    c.hairScroll = scroll;
+                    c.hairPos = pos;
+                    c.hairStyle = 2;
+                    c.arrowsKnown = true;
+                    c.canLeft = arrows & 1;
+                    c.canRight = arrows & 2;
+                    const MenuView v = check(g, "hair");
+                    CHECK(v.items.size() == 12u);
+                    for (int cell = 0; cell < 4; cell++)
+                    {
+                        const ViewItem& it = v.items[8 + cell];
+                        CHECK(it.left.empty() == !((cell & 1) == 0 && c.canLeft) && it.right.empty() == !((cell & 1) == 1 && c.canRight));
+                        if (!it.left.empty()) CHECK(it.left[0].x == kCasHairLeftX && it.left[0].y == kCasHairArrowY);
+                        if (!it.right.empty()) CHECK(it.right[0].x == kCasHairRightX && it.right[0].y == kCasHairArrowY);
+                    }
+                    const int col = pos % 9 - scroll;
+                    CHECK(MenuFirst(v) == (col >= 0 && col <= 1 ? 8 + (pos / 9) * 2 + col : 3));
+                }
+        // Face.
+        for (int face = 0; face < 9; face++)
+        {
+            GameState g = state(2);
+            g.front.cas.face = face;
+            const MenuView v = check(g, "face");
+            CHECK(v.items.size() == 9u && MenuFirst(v) == face);
+        }
+        // Clothes: the categories, the cells, the arrows only while shown.
+        for (int cat = 0; cat < 6; cat++)
+            for (int cell : {-1, 0, 5})
+                for (int arrows = 0; arrows < 4; arrows++)
+                {
+                    GameState g = state(3);
+                    CasState& c = g.front.cas;
+                    c.clothesKnown = true;
+                    c.category = cat;
+                    c.clothesPage = arrows;
+                    c.item = 3;
+                    c.clothesCell = cell;
+                    c.arrowsKnown = true;
+                    c.canLeft = arrows & 1;
+                    c.canRight = arrows & 2;
+                    const MenuView v = check(g, "clothes");
+                    CHECK(v.items.size() == 14u);
+                    CHECK(v.items[12].enabled == c.canLeft && v.items[13].enabled == c.canRight);
+                    for (int i = 0; i < 6; i++) CHECK(v.items[i].action.empty() == (i == cat));
+                    CHECK(MenuFirst(v) == 6 + std::max(cell, 0));
+                }
+        // Keep this Sim?: the aspirations, the answer.
+        for (int asp = 0; asp < 4; asp++)
+            for (int answer = 0; answer < 3; answer++)
+            {
+                GameState g = state(4);
+                CasState& c = g.front.cas;
+                c.keepKnown = true;
+                c.aspiration = asp;
+                c.answer = answer;
+                const MenuView v = CasViewOf(cas, g);
+                CHECK(v.valid && v.items.size() == 6u);
+                if (answer)
+                {
+                    for (const ViewItem& it : v.items) CHECK(!it.enabled);
+                    CHECK(v.back.empty() && MenuFirst(v) < 0);
+                    continue;
+                }
+                check(g, "keep");
+                for (int j = 0; j < 4; j++) CHECK(v.items[j].id == kCasAspId + (u32)kCasAspOfSlot[j] && v.items[j].action.empty() == (kCasAspOfSlot[j] == asp));
+                CHECK(v.items[MenuFirst(v)].id == kCasAspId + (u32)asp);
+                CHECK(v.items[4].closes && v.items[5].closes && v.backCloses && v.back == v.items[5].action);
+                CHECK(v.items[4].action[0].x == kCasTickX && v.items[5].action[0].x == kCasCrossX);
+            }
+        // A page change in flight; the in-game pages; nothing read.
+        for (int page = 0; page < 5; page++)
+        {
+            GameState g = state(page);
+            g.front.cas.switching = true;
+            check(g, "switching");
+        }
+        for (int page = 5; page < 8; page++) CHECK(!CasViewOf(cas, state(page)).valid);
+        {
+            GameState g = state(0);
+            g.front.cas.valid = false;
+            CHECK(!CasViewOf(cas, g).valid);
+            g = state(2);
+            g.valid = false;
+            CHECK(!CasViewOf(cas, g).valid);
+        }
+        CHECK(ids.size() == 2 + 4 + 26 + 1 + 3 + 8 + 4 + 9 + 6 + 6 + 2 + 4 + 2u);
     }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }

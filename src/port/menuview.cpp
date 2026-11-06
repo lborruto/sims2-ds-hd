@@ -97,6 +97,7 @@ u64 MenuView::Hash() const
     MixText(h, title);
     Mix(h, ((u64)own << 2) | ((u64)popup << 1) | (u64)backCloses);
     Mix(h, passKeys);
+    Mix(h, stickTurns);
     return h;
 }
 

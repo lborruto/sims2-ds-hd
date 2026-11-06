@@ -7,7 +7,8 @@
 // "wheel <notches>" (positive: up) and "winshot" (the window's picture to the shot folder,
 // w<frame>.png). CONSOLE's navigator (headless runs and the window alike): "pad <action>", the
 // action held as on a controller: a, b, x, y, l (or lb), r (or rb), start, select, menu (the
-// touch menu's action, PANEL), up, down, left, right; "layout <auto|focus|side|stacked|console>"
+// touch menu's action, PANEL), up, down, left, right, rsleft / rsright (the right stick pushed
+// fully that way); "layout <auto|focus|side|stacked|console>"
 // switches the layout at that frame (as the 0-3 keys and the pause menu do).
 #pragma once
 #include <string>

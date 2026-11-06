@@ -1807,6 +1807,70 @@ static void view_front_start()
     }
 }
 
+// Create-a-Sim (port/cas.h) on its own screen: the right stick holds the DS's L / R while
+// deflected (stickTurns; none without it, none from LB / RB, which are the view's page taps), Y and
+// X the view's own taps (backspace, the keyboard's next page), Start its next page, A a key's tap.
+static void view_cas()
+{
+    const ScreenState cas {Screen::CreateASim, Tab::None};
+    MenuView v;
+    v.valid = v.own = true;
+    v.replay = false;
+    v.stickTurns = true;
+    ViewItem key;
+    key.rect = {731, 352, 50, 50};
+    key.id = 0x12000200;
+    key.action = {TapStep(88, 85)};
+    v.items.push_back(key);
+    v.buttons[(int)MenuButton::Y] = {TapStep(165, 168)};
+    v.buttons[(int)MenuButton::X] = {TapStep(58, 145)};
+    v.buttons[(int)MenuButton::Start] = {TapStep(18, 60)};
+    v.buttons[(int)MenuButton::LB] = {TapStep(18, 171)};
+    v.buttons[(int)MenuButton::RB] = {TapStep(18, 60)};
+    int x, y;
+    {
+        Rig r;
+        r.view = &v;
+        r.Frame(cas);
+        PadState left;
+        left.rx = -0.9f;
+        CHECK((r.Frame(cas, left) & ((1u << kL) | (1u << kR))) == (1u << kL));
+        PadState right;
+        right.rx = 0.9f;
+        CHECK((r.Frame(cas, right) & ((1u << kL) | (1u << kR))) == (1u << kR));
+        PadState slight;
+        slight.rx = 0.3f;
+        CHECK((r.Frame(cas, slight) & ((1u << kL) | (1u << kR))) == 0);
+        PadState lb;
+        lb.lb = true;
+        CHECK((r.Frame(cas, lb) & ((1u << kL) | (1u << kR))) == 0 && r.Touched(x, y) && x == 18 && y == 171);
+        r.Drain();
+        r.Frame(cas);
+        CHECK(!r.touch.Owns());
+        r.Press(cas, &PadState::y);
+        CHECK(r.Touched(x, y) && x == 165 && y == 168);
+        r.Drain();
+        r.Press(cas, &PadState::x);
+        CHECK(r.Touched(x, y) && x == 58 && y == 145);
+        r.Drain();
+        r.Press(cas, &PadState::a);
+        CHECK(r.Touched(x, y) && x == 88 && y == 85);
+        r.Drain();
+        r.Press(cas, &PadState::start);
+        CHECK(r.Touched(x, y) && x == 18 && y == 60);
+    }
+    {
+        MenuView w = v;
+        w.stickTurns = false;
+        Rig r;
+        r.view = &w;
+        r.Frame(cas);
+        PadState left;
+        left.rx = -0.9f;
+        CHECK((r.Frame(cas, left) & (1u << kL)) == 0);
+    }
+}
+
 // The boot's splashes that take no touch (port/front.h): a view with no item passes the DS's own
 // Start and A on (passKeys) while they are held; Settings and Load-a-Sim (port/frontmenus.h) on the
 // front end's None screen: LB / RB the view's page taps, a slider's Left / Right its drag, B its
@@ -1904,6 +1968,7 @@ static void view_front_menus()
 int main()
 {
     view_front_menus();
+    view_cas();
     view_modules_on_one_screen();
     view_catalogue_spends_once();
     menu_opens_and_closes();

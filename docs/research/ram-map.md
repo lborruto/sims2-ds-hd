@@ -203,10 +203,18 @@ part reads, so a caller falls back to the pixel front end). `--print-front` logs
   Clothes, A2C Confirm, B9C Tan). `u16 S+0x76` gender (0 female: `*(S+0x48)`, 1 male: `*(S+0x4C)` = the hero H); hero `u16 H+0x232`
   skin figure 0..3, `u16 H+0x236` hair colour 0..7; the committed name `char G+0x53[8]` (7 + NUL). Name page: live buffer
   `char N+0x70[8]` (NUL within the 7 + 1, printable), `u16 N+0x12` keyboard page 0 ABC / 1 abc / 2 123!. Hair: `u16 N+0x3E` selected
-  style 0..17, `N+0x38` scroll 0..7. Face: `u16 N+0x10` 0..8. Clothes: `u16 N+0x14` category 0..5, `+0x16` page, `+0x18` item
-  (medium: the cell to item map is not decoded). Confirm: `u8 N+0x10` aspiration 0 Fortune, 1 Romance, 2 Popularity, 3 Party, `u8 N+0x11`
-  0 choosing / 1 tick pressed / 2 cross pressed. Name never above 7 characters; a longer or non-printable buffer makes the
-  whole part invalid.
+  style 0..17 (an id: F-hair-s3-40's bottom-left cell reads 2), `u16 N+0x3A` its place in the two rows of nine (column + 9 row:
+  F-hair-s2-40 1, F-hair-s3-40 9), `N+0x38` scroll 0..7. Face: `u16 N+0x10` 0..8. Clothes: `u16 N+0x14` category 0..5, `+0x16` page
+  (0..11: a female Sim's categories have 12 / 12 / 2 / 2 / 1 / 2 pages, a male's 12 / 8 / 2 / 2 / 1 / 1, measured by tapping the right
+  arrow until it stops), `+0x18` item (medium: the cell to item map is not decoded). Confirm: `u8 N+0x10` aspiration 0 Fortune, 1
+  Romance, 2 Popularity, 3 Party, `u8 N+0x11` 0 choosing / 1 tick pressed / 2 cross pressed. A page's sprites: `*(N+0x8)` a
+  null-ended list of CActorSprite pointers (vtable 0x0212FED8, `+0x4` bit 0 shown, `+0x50` / `+0x54` x / y in 20.12): Hair [0] the
+  colour ring, [1] the style ring (hidden when scrolled away), [2] / [3] the left / right arrows (shown only while the game can
+  scroll), [4..7] the cells; Clothes [0..5] the categories, [6] / [7] the arrows (the same), [8] the ring at (88 + 48 c, 41 + 64 r),
+  [9..14] the cells; Name [0] the skin ring, [1..3] the keyboard page's highlight, [4] / [5] the ♀ / ♂ icons; Confirm [0..3] the
+  aspirations in screen order (Fortune 78, Popularity 123, Romance 168, Party 213), [4..7] the tick and cross. A page change takes 2-4
+  frames in which `S+0x74` is the new page and `*(S+0x58)` the old object or 0; back on the Name page its buffer is garbage for a
+  frame (the editor not yet filled): both read as the page with no fields (`switching`). Name never above 7 characters.
 - **Boot and video**: `CBGDisplayMenu` 0x02131A70 in either slot, `u8 +0x28` mode (0 touch to continue, 1 Maxis, 2 EA, 3 legal,
   4 popup, 5 zoom, 6 blank), `s16 +0x24` countdown, `+0x26` duration; `CVideoScreenMenu` 0x02131E20 in the top slot, `u32 +0x2C` movie 0..3
   (the intro is 3), over a mode-0 BGDisplay.

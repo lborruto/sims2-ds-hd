@@ -195,9 +195,10 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   the save slots, the item in hand and unknown screens, where the stick cursor works); a
   conversation the world without its status bar and the dialogue's name, text, portrait and
   arrow (2x) in a wide frame; activities the touch screen 3x at the left, the world small at the
-  top right and the hints' box; no HUD (title, main menu, Create-a-Sim) the top screen framed at
-  the left at its own shape and the touch screen 2.5x framed at the right, with the buttons' hint
-  below; a black load between screens (Loading) only the dark backdrop. The focus ring frames a hotspot's area (`hotspots.*`) where the
+  top right and the hints' box; the front end (boot, title, main menu, Settings, Load-a-Sim,
+  Create-a-Sim) its own HD screens (`port/front.*`, `frontmenus.*`, `cas.*`), and without them (no
+  HUD, no view) the top screen framed at the left at its own shape and the touch screen 2.5x
+  framed at the right, with the buttons' hint below; a black load between screens (Loading) only the dark backdrop. The focus ring frames a hotspot's area (`hotspots.*`) where the
   piece showing it draws it. The navigator (below) opens the menu and moves the ring;
   `--console-menu` and `--console-focus N` pin them for the checks' pictures (`tests/console_check.sh`); `tests/layout_test.cpp` maps every pixel of every piece
   of every CONSOLE composition back to itself.

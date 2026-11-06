@@ -40,6 +40,7 @@
 #include "ui/font.h"
 #include "port/front.h"
 #include "port/frontmenus.h"
+#include "port/cas.h"
 #include "port/build.h"
 #include "port/checkin.h"
 #include "port/roominfo.h"
@@ -111,7 +112,7 @@ static void Usage()
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
-        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms, the Registry, room info, the main menu) can show fitted to its box, in --language's\n"
+        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms, the Registry, room info, the main menu, Settings, Load-a-Sim, Create-a-Sim) can show fitted to its box, in --language's\n"
         "                                words: how many shrink, how many need an ellipsis or a character the font lacks (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load; exit 2 on an overflow or a character the font lacks), and stop\n"
@@ -476,6 +477,12 @@ int main(int argc, char** argv)
         MeasureFrontMenus(*app.rom, fm);
         printf("frontmenus: %d words, %d shrunk, %d cut", fm.checked, fm.shrunk, fm.cut);
         for (int id : fm.cutIds) printf(" %d", id);
+        printf("\n");
+        // Create-a-Sim: the pages' titles, the aspirations, Yes / No, the hints, every key.
+        BlockMeasure ca;
+        MeasureCas(*app.rom, ca);
+        printf("cas: %d words, tallest %d (%d lines), %d shrunk, %d cut", ca.checked, ca.tallestId, ca.tallestLines, ca.shrunk, ca.cut);
+        for (int id : ca.cutIds) printf(" %d", id);
         printf("\n");
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
@@ -971,7 +978,9 @@ int main(int argc, char** argv)
                             if (c.face >= 0) fprintf(stderr, " face=%d", c.face);
                             if (c.clothesKnown) fprintf(stderr, " category=%d clothespage=%d item=%d", c.category, c.clothesPage, c.item);
                             if (c.keepKnown) fprintf(stderr, " aspiration=%d answer=%d", c.aspiration, c.answer);
+                            if (c.switching) fprintf(stderr, " switching");
                             fprintf(stderr, "\n");
+                            if (c.arrowsKnown) fprintf(stderr, "frame %ld: cas-sprites left=%d right=%d cell=%d pos=%d\n", frame, c.canLeft ? 1 : 0, c.canRight ? 1 : 0, c.clothesCell, c.hairPos);
                         }
                     }
                     if (!(v.boot == b.boot) || frame == 0)
