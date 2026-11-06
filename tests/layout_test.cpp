@@ -370,11 +370,27 @@ static void minigame_frame()
                 const size_t overlays0 = 3;   // (the backdrop and the two pictures' frames)
                 Composition c {kConsoleW, kConsoleH, {}, {}};
                 BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom, nullptr, &pv, sc == Screen::MixerSave ? (variant == 1 ? 30 : 27) : -1);
-                CHECK(c.pieces.size() == 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
+                // The playfield and the top screen; an HD box over the playfield (port/popup.h's
+                // BuildGameBox: a minigame's question, message or help) adds its buttons' mouse
+                // pieces, inside the box's area.
+                CHECK(c.pieces.size() >= 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
                       c.pieces[0].to.w == kActivityBottomTo.w && c.pieces[0].to.h == kActivityBottomTo.h);
-                const Rect topTo = c.pieces[1].to;
+                const Piece* topPiece = nullptr;
+                std::vector<Piece> pictures {c.pieces[0]};
+                for (size_t i = 1; i < c.pieces.size(); i++)
+                {
+                    if (c.pieces[i].src == Src::Top) { CHECK(!topPiece); topPiece = &c.pieces[i]; pictures.push_back(c.pieces[i]); continue; }
+                    const Rect q = c.pieces[i].to;
+                    CHECK(q.x >= kMgBoxArea.x && q.y >= kMgBoxArea.y && q.x + q.w <= kMgBoxArea.x + kMgBoxArea.w && q.y + q.h <= kMgBoxArea.y + kMgBoxArea.h);
+                }
+                CHECK(topPiece != nullptr);
+                if (!topPiece) continue;
+                const Rect topTo = topPiece->to;
                 CHECK(topTo.x == kActivityTopX && topTo.y == kActivityTopY && topTo.w == kActivityTopW);
-                CHECK(c.pieces[1].from.h == (sc == Screen::Cards ? top.second : HudCropRows(top.second)));
+                // (the social game's top screen without the game's own bar rows: kMgSocialBarRows)
+                const int skip = sc == Screen::Social ? top.second * kMgSocialBarRows / SH : 0;
+                CHECK(topPiece->from.y == skip && topPiece->from.h == (sc == Screen::Cards ? top.second : HudCropRows(top.second)) - skip);
+                bool box = false;
                 int layer = -1, prompt = 0, lit = 0, chips = 0, pointer = 0;
                 bool images = false;
                 for (const ui::UiItem& it : c.ui)
@@ -391,8 +407,10 @@ static void minigame_frame()
                         layer = it.layer;
                         continue;
                     }
+                    // An HD box (and the status bar lifted above its veil): over the playfield by design.
+                    if (it.layer >= kPopLayer) { box = true; continue; }
                     // Off both pictures (their frames' 6 pixels too).
-                    for (const Piece& q : c.pieces)
+                    for (const Piece& q : pictures)
                         CHECK(r.x + r.w <= q.to.x - 6 || r.x >= q.to.x + q.to.w + 6 || r.y + r.h <= q.to.y - 6 || r.y >= q.to.y + q.to.h + 6);
                     if (it.kind == ui::UiItem::Image) { images = true; CHECK(r.x >= kMgSideX && r.x + r.w <= kMgSideX + kMgSideW && r.y + r.h <= kMgSideBottom); continue; }
                     CHECK(!images && it.layer >= layer);   // still layers ascending, the images last
@@ -409,24 +427,30 @@ static void minigame_frame()
                                     (sc == Screen::Scratch && variant == 3) || (sc == Screen::Mixer && variant == 1) || (sc == Screen::MixerSave && variant == 1);
                 // (The save page with a slot asked over: its row lit too, beside A's hint.)
                 CHECK(lit == (sc == Screen::Crime && variant == 1 ? 3 : sc == Screen::MixerSave && variant == 1 ? 2 : litNow ? 1 : 0));
-                CHECK(pointer == (OwnScheme(sc) ? 2 : 0));   // (shown: the navigator shows it on the pointing games and the crime game's aim)
+                // (shown: the navigator shows it on the pointing games and the crime game's aim; never
+                // under an HD box, whose answers are the buttons')
+                CHECK(pointer == (OwnScheme(sc) && !box ? 2 : 0));
                 // MooGoo's focus: one ring over the playfield, around the monkey (an overlay).
                 CHECK(c.overlays.size() == overlays0 + ((sc == Screen::MooGoo && variant == 1) || (sc == Screen::Mixer && variant == 2) ? 1 : 0));
-                // The lottery's popup: A alone (the game's Close); the mixer's save question: A, B, X;
-                // the wireless lobby: B alone.
+                // The lottery's popup: A alone (the game's Close); the mixer's save question (an HD
+                // box since task 3 of the polish, its focus on No): the D-pad, A, B, X; the wireless
+                // lobby: B alone.
                 if (sc == Screen::Scratch && variant == 2) CHECK(chips == 1);
-                if (sc == Screen::Mixer && variant == 3) CHECK(chips == 3);
+                if (sc == Screen::Mixer && variant == 3) CHECK(box && chips == 4);
                 if (sc == Screen::Trading) CHECK(chips == 1);
                 if (sc == Screen::MooGoo && variant == 1)
                 {
                     const Rect o = c.overlays.back().to;
                     CHECK(o.x >= kActivityBottomTo.x + (56 + 32 * 5) * 3 - 8 && o.x + o.w <= kActivityBottomTo.x + (80 + 32 * 5) * 3 + 8 && o.y >= kActivityBottomTo.y + 32 * 3 - 8);
                 }
-                // MooGoo's question: two chips (Yes, No).
-                if (sc == Screen::MooGoo && variant == 2) CHECK(chips == 2);
-                // The painting's question: two chips (Yes, No).
-                if (sc == Screen::Art && variant == 2) CHECK(chips == 2);
-                if (sc == Screen::Cards) CHECK(chips == (variant == 2 ? 2 : variant == 3 ? 1 : 5));
+                // The questions (MooGoo's, the painting's, the cards'; No focused first): the D-pad, A
+                // the focused answer, B No.
+                if (sc == Screen::MooGoo && variant == 2) CHECK(box && chips == 3);
+                if (sc == Screen::Art && variant == 2) CHECK(chips == 3);
+                // The cards: nothing known (the table's prompts), the draw step (X, B), the question,
+                // the end of a turn (A).
+                if (sc == Screen::Cards) CHECK(chips == (variant == 0 ? 4 : variant == 1 ? 2 : variant == 2 ? 3 : 1));
+                if (sc == Screen::Cards && variant >= 2) CHECK(box);
                 for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
                     TestConsoleRoundtrip({sc, Tab::None}, false, top.first, top.second, o.first, o.second, true, &c);
             }
@@ -2211,7 +2235,16 @@ int main()
             {
                 const GameState h = phone(page, row, scroll, rows);
                 const MenuView v = PhoneViewOf(ps, h, &rom);
-                CHECK(v.valid && v.own && !v.popup && v.back.size() == 1 && v.back[0].x == kPhoneClose.x && v.backCloses);
+                CHECK(v.valid && v.own && !v.popup);
+                // B: back one level where the page ends on the game's Exit row (its highlight moved
+                // there, then A), else the game's X; MENU hangs up from any page: the X.
+                {
+                    const PhonePage bp = PhonePageOf(h, rom);
+                    const bool exitRow = page != 0 && page != 10 && bp.valid && !bp.crop && !bp.rows.empty() && bp.rows.back().text == MenuWords(rom, kStrPhExit);
+                    if (exitRow) CHECK(!v.backCloses && v.back.back().kind == MenuStep::Keys && v.back.back().keys == (1u << kA));
+                    else CHECK(v.back.size() == 1 && v.back[0].x == kPhoneClose.x && v.backCloses);
+                }
+                CHECK(v.menu.size() == 1 && v.menu[0].x == kPhoneClose.x && v.menu[0].y == kPhoneClose.y && v.menuCloses);
                 if (page == 10) { CHECK(v.items.empty()); continue; }
                 CHECK(MenuFocusable(v, v.selected));
                 const ViewItem& sel = v.items[v.selected];

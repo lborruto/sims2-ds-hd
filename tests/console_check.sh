@@ -256,6 +256,7 @@ wait
 run s3 s3 "${town[@]}" --console-focus 9 &
 run s3-2x s3 "${town[@]}" --console-focus 9 --compose-scale 2 &
 run s3-wide s3 "${town[@]}" --console-focus 9 --wide &
+run s3-res2 s3 "${town[@]}" --console-focus 9 --res3d 2 &
 run s4 s4 "${town[@]}" --console-focus 0 &
 wait
 run s4-it s4 "${town[@]}" --console-focus 4 --language 4 &
@@ -268,7 +269,7 @@ fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3-m1 slots load casino casino-2x \
     cards-m1 cards-ask cards-wide vacuum-clog vacuum-2x social-wide autopsy autopsy-2x detector detector-wide art art-ask \
     moogoo moogoo-2x drencher drencher-wide crime scratch mixer mixer-wide mixer-save trading \
-    s3 s3-2x s3-wide s4 s4-it cas-hair cas-face cas-clothes \
+    s3 s3-2x s3-wide s3-res2 s4 s4-it cas-hair cas-face cas-clothes \
     title title-wide boot boot-wide menu-2x menu-wide menu-de \
     settings settings-2x settings-wide settings-concept settings-credits settings-fr loadgame loadgame-2x loadgame-wide loadgame-empty loadgame-loading \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
@@ -1188,6 +1189,14 @@ elif case == "s3-m1":
     front()
 elif case in ("s3", "s3-2x", "s3-wide"):
     front_cas(0, (731, 352, 50, 50), raw_top=case != "s3-wide")
+elif case == "s3-res2":
+    # --res3d 2: the top picture is 512 x 384; the game's "L" / "R" pills (DS 29-56 / 200-227,
+    # 144-156) must still be under the pad's chips' dark plates (#5961A2), at the DS's places.
+    front_cas(0, (731, 352, 50, 50), raw_top=False)
+    k = 664 / 256
+    for name, dx in (("L", 31), ("R", 202)):
+        expect(f"turn pill {name} covered", C(16 + int(dx * k), 87 + int(150 * k)), hexrgb("5961A2"))
+        expect(f"turn pill {name} covered (its end)", C(16 + int((dx + 23) * k), 87 + int(146 * k)), hexrgb("5961A2"))
 elif case == "s4":
     front_cas(4, (746, 186, 108, 112))
 elif case == "s4-it":
@@ -2149,7 +2158,7 @@ pad_t1 mg-art-palette G-X-artgal art-palette 200 "2026-11-05 12:05" &
 pad_t1 mg-drencher-help G-C-wg-pump drencher-help 240 "2026-11-05 12:05" &
 pad_t1 mg-crime-help G-X-crime crime-help 240 "2026-11-05 12:05" &
 wait
-pad_t1 mg-mixer-help G-X-music mixer-help 120 "2026-11-05 12:05" &
+pad_t1 mg-mixer-help G-X-music mixer-help 280 "2026-11-05 12:05" &
 pad_t1 pad-placement-leave BD-place-lobby placement-leave 120 "2026-11-05 12:05" &
 pad_t1 pad-boot-late-start F-boot-900 boot-late-start 220 "2026-11-05 12:05" &
 pad_t1 pad-boot-late-a F-boot-900 boot-late-a 220 "2026-11-05 12:05" &
@@ -2171,7 +2180,10 @@ crime_help() {
         'crime help=0 text=0 ' && ! grep -q 'game Panel' "$tmp/mg-crime-help.log"
 }
 check_pad mg-crime-help crime_help
-mixer_help() { in_order mg-mixer-help 'minigame mixer .* phase=0 ' 'minigame mixer .* phase=8 ' 'minigame mixer .* phase=0 ' && ! grep -q 'game Panel' "$tmp/mg-mixer-help.log"; }
+mixer_help() {
+    in_order mg-mixer-help 'minigame mixer .* phase=0 ' 'minigame mixer .* phase=8 ' 'minigame mixer .* phase=9 ' 'minigame mixer .* phase=0 ' \
+        'minigame mixer .* phase=8 ' 'minigame mixer .* phase=0 ' && ! grep -q 'game Panel' "$tmp/mg-mixer-help.log"
+}
 check_pad mg-mixer-help mixer_help
 placement_leave() { in_order pad-placement-leave 'game Unknown\(ov=-1,vt=0x021351A8\)' 'placement none' 'game Panel/Interact'; }
 check_pad pad-placement-leave placement_leave
@@ -2401,5 +2413,35 @@ check_pad mg-drencher-help t3_help
 check_pad t3-phone-back t3_phone_back
 check_pad t3-detector-off t3_detector_off
 check_pad t3-scratch-win t3_scratch_win
+# The review fixes of the polish's tasks 1-3: the phone's MENU hangs up from a sub-page (never its
+# menu first); B from the phone opened from the menu: the dimmed world while the menu comes back,
+# never the town's flash (the frames between the phone and the menu open on its tab darker than
+# the town).
+pad_t3 fx-phone-menu s7 phone-menu 260 "2026-01-01 12:00" &
+pad_t3 fx-return-veil B-cas-opt return-phone 240 "2026-11-05 12:05" --print-screen --compose --shot-dir "$tmp/fx-return-veil" --shot-every 1 &
+wait
+fx_phone_menu() {
+    in_order fx-phone-menu 'phone page=4 ' 'phone page=10 ' 'game Panel/Interact' || return 1
+    ! awk '/phone page=4 /{s=1} s && /phone page=0 /{f=1} END{exit !f}' "$tmp/fx-phone-menu.log" || { echo "  fx-phone-menu: the phone's menu before hanging up"; return 1; }
+}
+fx_return_veil() {
+    in_order fx-return-veil 'game Phone' 'game Panel' 'console menu open, focus 4' || return 1
+    local from to
+    from=$(awk '/game Phone/{p=1} p && /game Panel/{sub(":","",$2); print $2; exit}' "$tmp/fx-return-veil.log")
+    to=$(awk -v F="$from" '$1=="frame" && ($2+0)>=F && /console menu open/{sub(":","",$2); print $2; exit}' "$tmp/fx-return-veil.log")
+    "$python" -I - "$tmp/fx-return-veil" "$from" "$to" <<'PYEOF'
+import sys
+from PIL import Image, ImageStat
+d, a, b = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+def mean(n):
+    return ImageStat.Stat(Image.open(f"{d}/f{n:06d}.png").convert("L").crop((0, 0, 1280, 600))).mean[0]
+town = mean(10)   # (the town, the menu not yet opened)
+bad = [n for n in range(a, b) if mean(n) > 0.6 * town]
+if bad: print(f"  fx-return-veil: the town shown undimmed at frames {bad[:5]} (town {town:.1f})")
+sys.exit(1 if bad else 0)
+PYEOF
+}
+check_pad fx-phone-menu fx_phone_menu
+check_pad fx-return-veil fx_return_veil
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

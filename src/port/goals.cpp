@@ -225,6 +225,13 @@ void BuildGoals(Composition& c, const MenuView& v, int focus, const GameState& g
 
 void MeasureGoals(const RomData& rom, BlockMeasure& m)
 {
+    {
+        // No goal: the port's words in the list's well (as BuildGoals: one line, 24 px in from each side).
+        const FittedText f = FitLine(OwnWord(&rom, OwnWordId::NoGoals), kGoalsSize, 20, kGoalsList.w - 48, Weight::ExtraBold);
+        m.checked++;
+        if (f.size < kGoalsSize) m.shrunk++;
+        if (!f.fits) { m.cut++; m.cutIds.push_back(9000 + (int)OwnWordId::NoGoals); }
+    }
     // Each goal alone in the list (with the footer: the smaller well) at the smallest size.
     auto block = [&](int id, const std::string& text) {
         const float lh = Metrics(kGoalsMin).lineHeight;

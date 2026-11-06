@@ -728,12 +728,15 @@ int main(int argc, char** argv)
                 // asked about (not in RAM), kept while it is up; a text up with no touch since the screen rose: none
                 MinigameState& mg = app.game.minigame;
                 if (app.game.screen != before.screen) lastTouchX = lastTouchY = -1;
-                // the game's popup over a minigame just gone: its box still drawn this frame
+                // the game's popup just gone (on any screen; only the minigames' box, BoxOf, reads
+                // popupGone): its box still drawn this frame, as the game's slides out
                 const PopupState& p0 = before.town.popup;
                 const bool upBefore = p0.valid && p0.state >= 1 && p0.state <= 3, upNow = app.game.town.popup.valid && app.game.town.popup.state >= 1 && app.game.town.popup.state <= 3;
-                if (upBefore && !upNow && app.game.screen == before.screen && !before.minigame.popupGone.valid) mg.popupGone = p0;
+                if (upBefore && !upNow && app.game.screen == before.screen) mg.popupGone = p0;
+                // (decided once, when the text rises: kept while it is up, even when it was not
+                // known then (-1), never taken from a later touch)
                 auto fill = [&](bool up, bool wasUp, int was, int& id) {
-                    if (up) id = wasUp && was >= 0 ? was : lastTouchX >= 0 ? MinigameHelpAt(app.ConsoleScreen().screen, lastTouchX, lastTouchY) : -1;
+                    if (up) id = wasUp ? was : lastTouchX >= 0 ? MinigameHelpAt(app.ConsoleScreen().screen, lastTouchX, lastTouchY) : -1;
                 };
                 fill(mg.drencher.valid && mg.drencher.helpText, before.minigame.drencher.valid && before.minigame.drencher.helpText, before.minigame.drencher.helpId, mg.drencher.helpId);
                 fill(mg.crime.valid && mg.crime.helpText, before.minigame.crime.valid && before.minigame.crime.helpText, before.minigame.crime.helpId, mg.crime.helpId);

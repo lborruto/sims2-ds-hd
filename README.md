@@ -270,7 +270,7 @@ Plug in any controller, before or during the game: Xbox (and every XInput pad), 
 / 5, Switch Pro and Joy-Cons, 8BitDo and the many others SDL knows, by USB or Bluetooth, on
 Windows, Mac and Linux. Several can be plugged in: whichever you touch last plays. The keyboard
 always works beside them. The pause menu is Start + Back (or Esc): the Guide / PS / Home button
-stays the system's. A controller plugged in says so at the top of the window, and the touch
+stays the system's. Press Back first: Start first may also open a minigame's help on its way. A controller plugged in says so at the top of the window, and the touch
 screen's cursor hint shows it too.
 
 **Through Steam** (and on a **Steam Deck**): in Steam, *Add a Game > Add a Non-Steam Game*, pick

@@ -16,8 +16,8 @@ namespace
 using namespace ui;
 
 constexpr u32 kRowFill = 0xFF6A72B8, kRowFocusFill = 0xFF9AA2E3;   // (Interact's rows)
-constexpr u32 kSubColour = 0xFFD8DAF4;
-constexpr u32 kPinkPlate = 0xE0302F5C;                             // the pink names' plate: dark, the rows' hue                             // a pale lavender (Build Rooms' places)
+constexpr u32 kSubColour = 0xFFD8DAF4;                             // a pale lavender (Build Rooms' places)
+constexpr u32 kPinkPlate = 0xE0302F5C;                             // the pink names' plate: dark, the rows' hue
 constexpr u32 kScoreColour = 0xFFFFE9A0;                           // a warm white (the money's)
 constexpr u32 kIconWell = 0xFF5961A2;                              // the game's row button
 

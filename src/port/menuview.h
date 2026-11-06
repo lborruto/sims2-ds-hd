@@ -86,9 +86,11 @@ struct ViewItem
     // skydive): the panel's menu closes with it, so the world shows big.
     bool closesMenu = false;
     // Its Left / Right step a value the game reads back (a volume slider): every press counts.
-    // Presses made while a step runs or before the game took it are queued and coalesced (Left
-    // and Right cancel out), and each queued step runs once the item's Left / Right have been
-    // rebuilt from the game's new value (the drag starts where the knob now is).
+    // Presses made while a step runs or before the game took it are queued in order (one step a
+    // press, 16 at most; a press past an end does nothing when its turn comes), and each queued
+    // step runs once the item's Left / Right have been rebuilt from the game's new value (the drag
+    // starts where the knob now is). B, MENU, LB, RB, the item going or the screen changing drop
+    // what is still queued (Navigator::queue_).
     bool queues = false;
 };
 
@@ -106,6 +108,10 @@ struct MenuView
     MenuAction buttons[(int)MenuButton::Count];
     // B: empty closes the panel's menu (no tap), as before.
     MenuAction back;
+    // MENU on a screen of its own: empty does what B does; else this (the phone: its X from any
+    // page, while B goes back one level), closing the screen when `menuCloses`.
+    MenuAction menu;
+    bool menuCloses = false;
     // The list's own scroll (see above); `scrollGroup` the group it belongs to.
     MenuAction scrollUp, scrollDown;
     int scrollGroup = 0;

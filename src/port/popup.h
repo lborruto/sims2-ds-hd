@@ -79,15 +79,21 @@ void BuildHintBox(Composition& c, int focus, const std::string& title, const std
 // save question, a help text; port/minigame.h) or the game's popup over a minigame, in the popups'
 // look: a button's chips (the activity's own buttons: no focus, each answer its button) and the
 // mouse's piece onto the game's DS rectangle `from` (none when empty).
+// One chip of a box's button: the button's chip and its word, or (`wordOnly`) the word alone with
+// no chip: an answer that A does not press until it has the focus (a question's Yes).
+struct BoxChip
+{
+    ui::Button button = ui::Button::A;
+    std::string word;
+    bool wordOnly = false;
+};
 struct GameBoxButton
 {
-    std::vector<std::pair<ui::Button, std::string>> chips;
+    std::vector<BoxChip> chips;
     Rect from {};
     bool pressed = false;   // the game's held button (green)
     bool focused = false;   // the answer A gives (a question's: the focus's halo)
 };
-// A button's word alone, no chip (an answer A does not press until it has the focus).
-constexpr ui::Button kChipWordOnly = (ui::Button)-1;
 // The box's place: at least the popups' box (no buttons: lower), as large as `cover` (the game's own
 // box on the canvas, which it hides) and a margin, centred across `area`, level with `cover`, held inside it.
 Rect GameBoxAt(Rect cover, Rect area, int buttons);

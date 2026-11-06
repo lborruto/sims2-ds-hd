@@ -33,6 +33,8 @@ struct App
     bool consoleMenu = false;      // CONSOLE: the menu is up (the touch screen 3x over the dimmed world)
     int consoleFocus = -1;         // CONSOLE: the focused target, an index in HotspotsFor (-1: none)
     bool consolePictureClosed = false; // CONSOLE: the view's big picture closed by B (Navigator::PictureClosed)
+    bool consoleVeiled = false;    // CONSOLE: the panel's menu coming back (Navigator::Returning): the dimmed world, no flash
+    int consoleWorldOnly = 0;      // CONSOLE: frames in a row on the panel without its tab / no bottom object (Input::Steer)
     u32 consoleArmed = 0;          // CONSOLE: the HD view item whose X is armed (Navigator::Armed), 0 none
     PointerView consolePointer;    // CONSOLE: a pointing minigame's pointer (the navigator's), drawn by its HD frame
     int consolePayout = 0;         // CONSOLE: the money's last change, for kPayoutFrames frames (Input::Steer), 0 none

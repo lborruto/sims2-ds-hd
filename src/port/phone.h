@@ -19,8 +19,10 @@
 // research m3 §4): Up / Down press the DS's Up / Down as many times as the game's highlight must
 // move to reach the next HD row (a message's text lines are rows to the game: one press of Down
 // from the sender goes past them all to "Next Message"); A moves the highlight to the focused
-// row the same way if it is not there, then presses the DS's A (the game's OK). B taps the
-// game's X (kPhoneClose). Mouse: the HD Up / OK / Down and X map onto the game's own buttons.
+// row the same way if it is not there, then presses the DS's A (the game's OK). B goes back one
+// level where the page has the game's Exit row (the highlight to Exit, then A: a message to the
+// list, a list to the menu), else taps the game's X (kPhoneClose: the menu, hung up); MENU taps
+// the X from any page (MenuView::menu). Mouse: the HD Up / OK / Down and X map onto the game's own buttons.
 //
 // A page whose content does not read as the game's (the contacts' list not matching the game's
 // count or highlighted Sim, a recorded custom ringtone whose name is not decoded) shows the

@@ -90,6 +90,8 @@ u64 MenuView::Hash() const
     }
     for (const MenuAction& a : buttons) MixAction(h, a);
     MixAction(h, back);
+    MixAction(h, menu);
+    Mix(h, menuCloses);
     MixAction(h, scrollUp);
     MixAction(h, scrollDown);
     Mix(h, (u64)(u32)scrollGroup);

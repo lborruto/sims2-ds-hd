@@ -250,6 +250,11 @@ MenuMeasure MeasureInteract(const RomData& rom)
         const float w = TextWidth(label, kPmTextSize, Weight::ExtraBold);
         if (w > m.widestW) { m.widestW = w; m.widestId = id; }
     }
+    {
+        // No action: the port's words over the rows' place (as BuildInteract).
+        const Rect area {RowRect(0).x, RowRect(0).y, RowRect(0).w, RowRect(kInteractRows - 1).y + RowRect(0).h - RowRect(0).y};
+        fit(0, 9000 + (int)OwnWordId::NoActions, OwnWord(&rom, OwnWordId::NoActions), kPmTextSize, kPmTextMin, area.w, Weight::ExtraBold);
+    }
     const StripBoxes sb = Strip();
     std::vector<int> names {kSimNameUnknown};
     for (int id = kSimNameBase; id <= kSimNameLast; id++) names.push_back(id);

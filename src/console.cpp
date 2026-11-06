@@ -143,15 +143,15 @@ static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right 
 {
     constexpr float kSize = 24;
     constexpr int kGap = 12, kPad = 14, kBetween = 22, kH = 58;
-    struct Hint
+    struct CursorChip
     {
         ui::Button b;
         const char* word;
     };
-    std::vector<Hint> hints {{ui::Button::RStick, OwnWord(rom, OwnWordId::Cursor)}, {ui::Button::A, OwnWord(rom, OwnWordId::MixerPoint)}};
+    std::vector<CursorChip> hints {{ui::Button::RStick, OwnWord(rom, OwnWordId::Cursor)}, {ui::Button::A, OwnWord(rom, OwnWordId::MixerPoint)}};
     if (close) hints.push_back({ui::Button::B, OwnWord(rom, OwnWordId::Close)});
     int bw = 2 * kPad - kBetween;
-    for (const Hint& h : hints) bw += ui::ChipRect(0, 0, h.b, h.word, kSize).w + kBetween;
+    for (const CursorChip& h : hints) bw += ui::ChipRect(0, 0, h.b, h.word, kSize).w + kBetween;
     const char* word = OwnWord(rom, OwnWordId::Pause);
     const Rect chip = ui::ChipRect(0, 0, ui::Button::Pause, word, kSize);
     const int pw = kPad + chip.w + kPad;
@@ -159,7 +159,7 @@ static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right 
     y = std::min(y, kConsoleH - kH - 4);
     c.ui.push_back(ui::PanelItem({bx, y, bw, kH}));
     int x = bx + kPad;
-    for (const Hint& h : hints)
+    for (const CursorChip& h : hints)
     {
         const Rect r = ui::ChipRect(0, 0, h.b, h.word, kSize);
         c.ui.push_back(ui::ChipItem(x, y + (kH - r.h) / 2, h.b, h.word, kSize));
@@ -173,7 +173,7 @@ static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right 
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
                          const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed, const PointerView* pointer,
-                         int payout, bool pictureClosed)
+                         int payout, bool pictureClosed, bool veiled, int worldOnlyFrames)
 {
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
@@ -287,11 +287,25 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         SortUi(c.ui); // (the bar's layer after the screen's, a popup's after it, the images last)
         return c;     // (the focus is the view's: no ring from HotspotsFor)
     }
+    else if (veiled && !menuOpen && (s.screen == Screen::Panel || s.screen == Screen::Unknown || s.screen == Screen::Loading))
+    {
+        // The panel's menu coming back (B from the Save slots or the phone opened from it): the
+        // dimmed world it will open over, never the town's flash while the game passes Interact.
+        Piece world = World(topW, worldRows, bar);
+        world.touch = false;
+        c.pieces.push_back(world);
+        c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
+        if (bar) AddStatusBar(c, *hud, *strings);
+        SortUi(c.ui);
+        return c;
+    }
     else if (s.screen == Screen::Unknown && !menuOpen && game && (game->valid || game->between) && rom && rom->StringCount() > 0 &&
-             (game->between || game->screen == GScreen::Panel || game->vtable == 0))
+             (game->between || game->screen == GScreen::Panel || game->vtable == 0) && worldOnlyFrames <= kWorldOnlyMax)
     {
         // The panel coming (its tab not read yet) or no bottom object at all (between two, after a
-        // minigame): the town's world (and bar when it reads), never the cursor's framed black touch screen.
+        // minigame): the town's world (and bar when it reads), never the cursor's framed black touch
+        // screen; for kWorldOnlyMax frames in a row at most, then the cursor's screen below (a screen
+        // that stays so is not a dead end: the stick cursor and its hints).
         c.pieces.push_back(World(topW, worldRows, bar));
         if (bar) AddStatusBar(c, *hud, *strings);
     }

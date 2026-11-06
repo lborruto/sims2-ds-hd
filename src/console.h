@@ -106,8 +106,15 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
                          const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
                          const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0, const PointerView* pointer = nullptr,
-                         int payout = 0, bool pictureClosed = false);
+                         int payout = 0, bool pictureClosed = false, bool veiled = false, int worldOnlyFrames = 0);
 // pictureClosed: the view's big picture (MenuView::picture: Settings' concept art) closed by B.
+// veiled: the panel's menu is coming back (Navigator::Returning: B from the Save slots or the phone
+// opened from it, the game passing through Interact first): the dimmed world and the status bar
+// alone while the panel shows with its menu closed, never the world's flash. worldOnlyFrames: the
+// frames in a row the panel was coming without its tab read, or no bottom object at all
+// (App::consoleWorldOnly): the town's world for kWorldOnlyMax of them, then milestone 1's framed
+// touch screen and the cursor's hints (an unforeseen screen is never a dead end).
+constexpr int kWorldOnlyMax = 10;
 // payout (above): the money's last change (App::consolePayout: the slot machine's coin and its
 // payout, a ticket's prize, ...), shown on the panel's world beside the HD status bar while not 0.
 

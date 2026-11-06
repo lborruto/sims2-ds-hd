@@ -44,7 +44,7 @@ enum class OwnWordId : int
     ScratchHold, ScratchRub, ScratchQuitAgain, ScratchTopPrize, ScratchOpened,
     // The music mixer and its save page.
     MixerTouch, MixerPoint, MixerOctave, MixerSustain, MixerStop, MixerVox, MixerVoxStop, MixerChoose, MixerBack,
-    MixerDpad, MixerSong, MixerInstrument, MixerReady, MixerPlaying, MixerRecording, MixerHelp,
+    MixerSong, MixerInstrument, MixerReady, MixerPlaying, MixerRecording, MixerHelp,
     SaveType, SaveHere, SaveOverwrite, SaveErase, SaveSlot,
     // The wireless lobby.
     TradingNote,

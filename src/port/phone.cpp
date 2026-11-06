@@ -258,6 +258,9 @@ MenuView PhoneViewOf(ScreenState s, const GameState& game, const RomData* rom)
         v.back = {TapStep(kPhoneClose.x, kPhoneClose.y)};
         v.backCloses = true;
     }
+    // MENU hangs up from any page: the phone's X (B goes back one level).
+    v.menu = {TapStep(kPhoneClose.x, kPhoneClose.y)};
+    v.menuCloses = true;
     v.title = MenuWords(*rom, kStrPhone);
     v.own = true;
     v.valid = true;

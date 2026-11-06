@@ -253,7 +253,8 @@ The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the 
 - **Cards** (`CardsState`, module 0x10, vtable 0x0212F98C): `S+0x4C` u16 total (60), `S+0x4E` u16 deck left; the hands: ten places each, `S+0xC0 + 0x14 i` (the player's)
   and `S+0x188 + 0x14 i` (the opponent's), a pointer into the object's own card table (`S+0x200..0x300`) or 0 when empty: their counts are the score board's; `S+0x2CC` /
   `S+0x2D0` s32 the scores (a cannon takes them below 0), `S+0x2E4` s32 the treasure chest; `S+0x306` a box up, `S+0x307` the quit question, `S+0x2F7` the end-of-turn message
-  ("Touch for @1's turn.", 1695: any touch goes on); `S+0x308` the player's name (ASCII, as the board shows it). Found on the owner's `act-cards` (draw, discard, the message,
+  ("Touch for @1's turn.", 1695: any touch goes on); `S+0x2F0` u8 the turn's step (the top screen's line: 0 draw, 1 play or discard, 2
+  discard, 3 the plank, 4 the cannon, 5 two cards drawn, 6 the turn ending, 7 the deal, 8 a card drawn), `S+0x2F1` u8 whose turn (0 the player, 1 the opponent); `S+0x308` the player's name (ASCII, as the board shows it). Found on the owner's `act-cards` (draw, discard, the message,
   quit, help: states saved by `--state-save`, the board's numbers compared on the same frames), checked on the research's `G-cas-next-row1` / `G-X-pirate`.
 - **Vacuum** (`VacuumState`, overlay 17, vtable 0x0214C658): `S+0x158` u8 the filter clogged (1 from touching dust to 17 frames after a 7-frame blow: `act-vacuum-clog`, the
   blow script), the stat panel's "Vacuum Earnings" `G+0x7C`.
@@ -287,7 +288,7 @@ The screen request that brings one up (`P + 0xDF0 + 0x20 * slot`: module, r3, ..
 - **Drencher** (`DrencherState`): `S+0x24` s32 pump 20.12 (0..180), `S+0x28 / 2C` target record / type (2 Sim, 0xB object; -1 none), `S+0x34` pumping, `S+0x35` firing, `S+0x70` u8 target
   mode, `S+0x78 / 79` help / help text; `G+0x18` water (20.12, 0..100), `G+0x1C` pressure (0..125). Stylus: X 219..253 x 11..45, target 137..171 x 46..80, ? 71..105 x 159..193, refill
   13..51 x 159..197, fire 219..253 x 159..193 held, pump band y 94..146.
-- **Crime** (`CrimeState`): `S+0x4C` help, `S+0x52` dragging, `S+0x58` u8 throw phase 0 idle / 1 grabbed / 2 aiming / 3 released, `S+0x5A` s16 angle -90..90, `S+0x5C / 5D / 5E` scare /
+- **Crime** (`CrimeState`): `S+0x4C` help, `S+0x4D` its help text up (1 while one of the help texts shows: `G-C-cr-help`), `S+0x52` dragging, `S+0x58` u8 throw phase 0 idle / 1 grabbed / 2 aiming / 3 released, `S+0x5A` s16 angle -90..90, `S+0x5C / 5D / 5E` scare /
   armed / subdue available, `S+0x5F / 60` pressed, `S+0x61` the throw hit (0x10 until the first throw: unset). Stylus: X 209..239 x 17..47, scare 94..161 x 13..56, subdue 94..161 x 135..178.
 - **Mixer** (`MixerState`): `S+8` mode, `S+0xA55` phase (0 idle, 1 playing, 2 recording, 5 VOX, 7 song select, 8 / 9 help, 0xA save prompt), `S+0x8E2` track mask, `S+0x8E3` u8[3] keys held
   (0xD none), `S+0x8E6` s8 octave, `S+0x8E7` instrument (1, 2, 3, 5), `S+0x8E9` sustain, `S+0x8EA / EB` sliders 0..26, `S+0x8EC` tempo, `S+0x8ED` variation, `S+0xA5C` song 0..8,

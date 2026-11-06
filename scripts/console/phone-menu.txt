@@ -1,0 +1,6 @@
+# From s7 (the phone), CONSOLE: Down, Down, A (Options: the ringtones), MENU (the phone's X from a
+# sub-page: hung up, the panel; never the phone's menu first).
+20 2 pad down
+40 2 pad down
+60 2 pad a
+110 2 pad menu

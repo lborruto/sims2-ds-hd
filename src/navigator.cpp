@@ -23,9 +23,16 @@ constexpr float kStick = 0.5f;
 // A slider's queued step (ViewItem::queues) waits for the game to read the last one back this
 // many frames at most (an end: nothing changes).
 constexpr int kQueueRead = 30;
-// Back from the Save slots or the phone opened from the menu: the panel within this many frames
-// (the slots' saving and its popup included), then its tab and item.
-constexpr int kReturnFrames = 900, kLeftFrames = 60;
+// Back from the Save slots or the phone opened from the menu (Navigator::returnFrames_ counts
+// down from kReturnFrames): the panel must come back within this many frames (the slots' saving
+// and its popup included), else the return is forgotten. Once the panel is back,
+// Navigator::returnFocus_ counts down from kReturnFocusFrames: the tab is tapped and the item
+// refocused within that time, else the menu stays as the game left it. kLeftFrames: the Save slots
+// or the phone must follow the panel's menu within this many frames to count as opened from it.
+constexpr int kReturnFrames = 900, kReturnFocusFrames = 900, kLeftFrames = 60;
+// The dimmed world instead of the town while the menu comes back (Returning): this many frames
+// at most once the panel is back (the tab's tap takes about 5).
+constexpr int kReturnVeilFrames = 60;
 
 enum class Mode
 {
@@ -254,6 +261,14 @@ static bool HasModule(const MenuView& v, u32 tag)
     return false;
 }
 
+bool Navigator::Returning() const
+{
+    // (Still on the Save slots or the phone too: the frame the game leaves them is drawn before the
+    // navigator sees it; CONSOLE veils only the panel, Unknown and Loading, never an HD screen.)
+    return returnFrames_ > 0 ||
+           (menuOpen_ && returnFocus_ > kReturnFocusFrames - kReturnVeilFrames && screen_.tab != returnTab_);
+}
+
 int Navigator::FocusFor(const MenuView& v) const
 {
     if (!v.valid) return focus_;
@@ -336,7 +351,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             menuOpen_ = true;
             returnTap_ = s.tab != returnTab_;
             returnFrames_ = 0;
-            returnFocus_ = kReturnFrames;
+            returnFocus_ = kReturnFocusFrames;
         }
         else if (s.screen != Screen::Panel && s.screen != Screen::SaveSlots && s.screen != Screen::Phone && s.screen != Screen::Popup &&
                  s.screen != Screen::Unknown && s.screen != Screen::Loading)
@@ -577,6 +592,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             if (pressed(&PadState::y)) Run(v.buttons[(int)MenuButton::Y], touch);
             // Start: the view's own (the front end's touch); else nothing (or passed on, below).
             if (!v.buttons[(int)MenuButton::Start].empty() && pressed(&PadState::start)) Run(v.buttons[(int)MenuButton::Start], touch);
+            // B, MENU, LB or RB leave the slider (another page, tab or screen): a step still
+            // queued for it must not run after (its drag would land on what comes next).
+            if (edge(&PadState::b) || edge(&PadState::menu) || edge(&PadState::lb) || edge(&PadState::rb)) ClearQueue();
             const int t = s.tab == Tab::None ? -1 : (int)s.tab - (int)Tab::Interact;
             if (s.screen == Screen::Panel && pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
             else if (s.screen == Screen::Panel && pressed(&PadState::lb)) tap(kTabIcon[t < 0 ? 4 : (t + 4) % 5]);
@@ -584,10 +602,13 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             else if (s.screen != Screen::Panel && pressed(&PadState::lb)) { Run(v.buttons[(int)MenuButton::LB], touch); pictureOpen_ = false; }
             const bool back = pressed(&PadState::b), menu = pressed(&PadState::menu);
             // MENU does what B does on a screen of its own (not a popup: its question is B's)
-            const bool backKey = back || (menu && v.own && !v.popup);
+            // (unless the view gives MENU its own action: the phone's X from any page)
+            const bool ownMenu = menu && v.own && !v.popup && !v.menu.empty();
+            const bool backKey = back || (menu && v.own && !v.popup && v.menu.empty());
             // A big picture first: B closes it. B's safe landing (Keep this Sim?'s cross): one B
             // never discards.
-            if (backKey && v.picture && pictureOpen_) pictureOpen_ = false;
+            if (ownMenu) { if (Run(v.menu, touch) && v.menuCloses) closing_ = kClosingFrames; }
+            else if (backKey && v.picture && pictureOpen_) pictureOpen_ = false;
             else if (backKey && MenuFocusable(v, v.backFocus) && focus_ != v.backFocus) focus_ = v.backFocus;
             else if (backKey && !v.back.empty()) { if (Run(v.back, touch) && v.backCloses) closing_ = kClosingFrames; }
             else if ((back || menu) && !v.own) menuOpen_ = false;

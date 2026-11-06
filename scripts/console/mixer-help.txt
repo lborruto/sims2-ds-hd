@@ -1,3 +1,8 @@
-# From G-X-music, CONSOLE: Start taps ? (help mode, phase 8), B taps it again (phase 0).
+# From G-X-music, CONSOLE: Start taps ? (help mode, phase 8), A on the pointer (the middle: a
+# control) shows its help text (phase 9), A closes it (the game leaves help mode with it: phase 0),
+# Start again (help mode), B taps ? again (phase 0; never the mixer's quit).
 20 2 pad start
-80 2 pad b
+60 2 pad a
+140 2 pad a
+180 2 pad start
+220 2 pad b

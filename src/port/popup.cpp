@@ -30,7 +30,6 @@ using namespace ui;
 
 constexpr u32 kBtnFill = 0xFF6A72B8, kBtnFocusFill = 0xFF9AA2E3, kBtnPressed = 0xFF309A41; // the game's green while held
 constexpr u32 kVeil = 0x8C181C38;
-constexpr Button kWordOnly = kChipWordOnly;
 constexpr Rect kCanvas {0, 0, 1280, 720};
 
 bool Overlaps(Rect a, Rect b) { return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h; }
@@ -178,7 +177,10 @@ namespace
 // their row free). Everything on kPopLayer.
 void BoxBase(Composition& c, const std::string& title, const std::string& text, bool buttons, Rect boxAt = kPopBox)
 {
-    const Rect titleAt {boxAt.x + 120, boxAt.y - 26, boxAt.w - 240, 56};
+    // (A title that does not hold on the plate at its smallest gets a plate almost the box's width:
+    // a minigame's long help title, Spanish's "RELLENOS DE PERCUSIÓN / VARIACIONES".)
+    const int inset = FitLine(title, 30, 22, boxAt.w - 240 - 40, Weight::ExtraBold).fits ? 120 : 40;
+    const Rect titleAt {boxAt.x + inset, boxAt.y - 26, boxAt.w - 2 * inset, 56};
     const Theme& th = GameTheme();
     for (Piece& q : c.pieces) q.touch = false;
     std::vector<UiItem> kept;
@@ -230,7 +232,7 @@ void BoxBase(Composition& c, const std::string& title, const std::string& text, 
 
 // A box's button: its fill (pressed: the game's green), the focus's halo, its chips centred, the
 // mouse's piece onto the game's DS rectangle `from` (none when empty).
-void BoxButton(Composition& c, Rect r, bool pressed, bool focused, const std::vector<std::pair<Button, std::string>>& chips, Rect from)
+void BoxButton(Composition& c, Rect r, bool pressed, bool focused, const std::vector<BoxChip>& chips, Rect from)
 {
     const Theme& th = GameTheme();
     auto add = [&](UiItem u) { u.layer = kPopLayer; c.ui.push_back(u); };
@@ -247,25 +249,25 @@ void BoxButton(Composition& c, Rect r, bool pressed, bool focused, const std::ve
     add(bt);
     int total = 0;
     std::vector<Rect> rs;
-    // (kWordOnly: the word alone, no chip: an answer A does not press until it has the focus.)
-    for (auto& [ch, word] : chips)
+    // (wordOnly: the word alone, no chip: an answer A does not press until it has the focus.)
+    for (const BoxChip& ch : chips)
     {
-        if (ch == kWordOnly) rs.push_back({0, 0, (int)TextWidth(word, 28, Weight::ExtraBold) + 2, 36});
-        else rs.push_back(ChipRect(0, 0, ch, word, 28, 0, Weight::ExtraBold));
+        if (ch.wordOnly) rs.push_back({0, 0, (int)TextWidth(ch.word, 28, Weight::ExtraBold) + 2, 36});
+        else rs.push_back(ChipRect(0, 0, ch.button, ch.word, 28, 0, Weight::ExtraBold));
         total += rs.back().w;
     }
     total += 12 * ((int)chips.size() - 1);
     int x = r.x + (r.w - total) / 2;
     for (size_t i = 0; i < chips.size(); i++)
     {
-        if (chips[i].first == kWordOnly)
+        if (chips[i].wordOnly)
         {
-            UiItem t = TextItem({x, r.y, rs[i].w, r.h}, chips[i].second, 28, Align::Left, Weight::ExtraBold);
+            UiItem t = TextItem({x, r.y, rs[i].w, r.h}, chips[i].word, 28, Align::Left, Weight::ExtraBold);
             t.wrap = false;
             t.middle = true;
             add(t);
         }
-        else add(ChipItem(x, r.y + (r.h - rs[i].h) / 2, chips[i].first, chips[i].second, 28, 0, Weight::ExtraBold));
+        else add(ChipItem(x, r.y + (r.h - rs[i].h) / 2, chips[i].button, chips[i].word, 28, 0, Weight::ExtraBold));
         x += rs[i].w + 12;
     }
     if (from.w > 0) AddMousePiece(c, from, r);
@@ -279,7 +281,7 @@ void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& gam
     PopupWords(p, title, text);
     BoxBase(c, title, text, p.kind != 3);
     // The buttons: the game's held one green (P+0xD8C, its index P+0xD88), the focus's halo.
-    auto button = [&](Rect r, int index, bool focused, std::vector<std::pair<Button, std::string>> chips) {
+    auto button = [&](Rect r, int index, bool focused, std::vector<BoxChip> chips) {
         int bx, by;
         const Rect from = PopupButton(p, index, bx, by) ? Rect {bx - 12, by - 12, 24, 24} : Rect {};
         BoxButton(c, r, p.pressing && p.pressed == index, focused, chips, from);
@@ -293,7 +295,7 @@ void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& gam
         if (focus == 1) button(kPopNo, 0, false, {{Button::B, no}});
         else button(kPopNo, 0, true, {{Button::A, ""}, {Button::B, no}});
         if (focus == 1) button(kPopYes, 1, true, {{Button::A, yes}});
-        else button(kPopYes, 1, false, {{kWordOnly, yes}});
+        else button(kPopYes, 1, false, {{Button::A, yes, true}});
     }
 }
 

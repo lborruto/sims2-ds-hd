@@ -13,8 +13,13 @@
 //     focused item's own X (Pockets' bin) or the view's, B runs the view's back action or closes
 //     the menu.
 //   Phone: in HD (port/phone.h) whenever its view is valid: the game's own Up / Down / A on its
-//     rows, B or MENU its X; else the focus as in the menu; B or MENU tap the phone's X (back to the
-//     panel, menu closed).
+//     rows, B back one level (a page's Exit row; the menu's: the X), MENU the X from any page
+//     (MenuView::menu); else the focus as in the menu; B or MENU tap the phone's X (back to the
+//     panel, menu closed). Opened from the menu, the menu comes back on its tab and item after it
+//     (and after the Save slots), the dimmed world drawn meanwhile (Returning).
+//   A question (a popup of kind 2, Build Rooms', a minigame's) opens on its No (MenuView::initial);
+//     a view's backFocus takes the first B (Create-a-Sim's Keep this Sim?: the cross), the second
+//     runs it; a slider's presses queue (ViewItem::queues), dropped on B / MENU / LB / RB.
 //   A popup over the panel or an HD screen, a note: in HD (port/popup.h, port/note.h) whenever its
 //     view is valid (MenuView::own). A popup over the open menu wins the focus and keeps the menu
 //     open beneath; when it goes and the screen is back, the focus returns to the item it was on
@@ -23,7 +28,8 @@
 //     no tabs); else, like Catalogue and Build: the focus as in the menu; B taps the screen's X
 //     when it has one.
 //   On every HD screen of its own (phone, Give Gift, the Save slots, a note) MENU does what B does
-//     (a popup's MENU does nothing: its question is B's).
+//     unless the view gives it its own action (the phone's X); a popup's MENU does nothing (its
+//     question is B's).
 //   Social, Cards, Vacuum: the activity's own buttons (activities.h); the cards' focus moves as
 //     in the menu, the vacuum's hand is the stick cursor.
 //   Popup (a goal, tips, Game Paused) without its HD view: A or B tap its X; Start stays the DS's
@@ -93,10 +99,16 @@ public:
     // it every frame; default: nothing known).
     void SetActivityRam(const ActivityRam& r) { activityRam_ = r; }
 
-    // The panel's menu is up (the touch screen 3x over the dimmed world).
+    // The panel's menu is up (its HD view, else milestone 1's touch screen 3x, over the dimmed world).
     // (Not drawn open while it is coming back to the tab it was left on: the game shows Interact
     // first for a few frames.)
     bool MenuOpen() const { return menuOpen_ && !(returnFocus_ > 0 && screen_.tab != returnTab_); }
+    // The menu is coming back (B from the Save slots or the phone opened from it): from that screen
+    // through the frames between (no bottom object, Loading) to the panel on another tab than the
+    // one it was left on, before the tab's tap: CONSOLE draws the panel, Unknown and Loading as the
+    // dimmed world then, not the town (a flash of a few frames).
+    // At most kReturnVeilFrames after the panel is back (a tab tap that missed: the town again).
+    bool Returning() const;
     // The focused target, an index in HotspotsFor(screen) or, when ViewFocus, in the MenuView's
     // items; -1: no focus on this screen.
     int Focus() const { return focus_; }
@@ -188,21 +200,26 @@ private:
     int viewPage_ = 0;   // the view's page last frame (MenuView::page)
     bool viewQuestion_ = false;   // and whether it was a question
     u32 pageKeptId_ = 0; // the focused item's id when the last non-question page was left
-    int pageKeptIndex_ = -1;
+    int pageKeptIndex_ = -1; // and its index (the item gone when the page is back: the one in its place)
     bool pictureOpen_ = false; // MenuView::picture shown big: an A ran; B, LB / RB or another screen close it
     // The Save slots or the phone opened from the menu: the tab and item it was opened from, the
     // frames left to come back to the panel (returnFrames_) and to put the focus back
-    // (returnFocus_), the tab still to tap (the game comes back on Interact).
+    // (returnFocus_; kReturnFrames / kReturnFocusFrames in navigator.cpp), the tab still to tap
+    // (the game comes back on Interact).
     Tab returnTab_ = Tab::None;
     u32 returnId_ = 0;
     int returnFrames_ = 0, returnFocus_ = 0;
     Tab leftTab_ = Tab::None; // (the menu's tab and item when it was last left for another screen)
     u32 leftId_ = 0;
     int leftFrames_ = 0;
-    bool returnTap_ = false; // and its index (the item gone when the page is back: the one in its place)
+    bool returnTap_ = false; // the panel came back on another tab than returnTab_: tap returnTab_'s icon first
     // A slider's presses (ViewItem::queues): the steps still owed in the order pressed (-1 Left,
-    // +1 Right; 16 at most), its item's id, the Left / Right it had when the last step ran (the next waits until they change: the
-    // game took it), and how long the queue has waited.
+    // +1 Right; 16 at most, one entry a press: nothing is merged, so Left then Right is a step
+    // there and one back), its item's id, the Left / Right it had when the last step ran, and how
+    // long the queue has waited. It drains one step at a time, settled: each waits until the item's
+    // Left / Right were rebuilt from the game's new value (the game took the last one) or
+    // kQueueRead frames passed (an end); an empty or stale queue (kHoldFrames) is cleared, and so
+    // is any queue on a screen change, the item going, or B / MENU / LB / RB.
     std::vector<int> queue_;
     int queueFrames_ = 0;
     u32 queueId_ = 0;

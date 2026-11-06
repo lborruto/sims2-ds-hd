@@ -58,7 +58,25 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
 {
     const std::vector<Hotspot>& h = HotspotsFor({Screen::Cards, Tab::None});
     if (st.focus < 0 || st.focus >= (int)h.size() || h[st.focus].dragOnly) st.focus = Named(h, "card 1");
-    if (!canTap) return; // a press while a touch runs is dropped
+    // The question as RAM shows it (opened by the mouse too: it still reads Cards). Once RAM has
+    // shown it, RAM also says when it has gone (answered by the mouse, or by A / B a frame ago).
+    if (st.ram.cards)
+    {
+        if (st.ram.quitAsk) st.confirm = st.askSeen = true;
+        else if (st.askSeen) st.confirm = st.askSeen = false;
+    }
+    if (!canTap)
+    {
+        // A press while a touch runs is dropped; the question's Left / Right still move its focus
+        // (they tap nothing: an edge never lost).
+        if (st.confirm)
+        {
+            PadState moves = pad;
+            moves.a = moves.b = false;
+            Question(moves, st, true);
+        }
+        return;
+    }
     auto pressed = [&](bool PadState::*b) { return pad.*b && !(st.prev.*b); };
     const Hotspot& f = h[st.focus];
     const int card = CardOf(f);
@@ -68,13 +86,6 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
         touch.Tap(q.x, q.y);
         st.confirm = true;
     };
-    // The question as RAM shows it (opened by the mouse too: it still reads Cards). Once RAM has
-    // shown it, RAM also says when it has gone (answered by the mouse, or by A / B a frame ago).
-    if (st.ram.cards)
-    {
-        if (st.ram.quitAsk) st.confirm = st.askSeen = true;
-        else if (st.askSeen) st.confirm = st.askSeen = false;
-    }
     if (!st.confirm && st.ram.cards && st.ram.message)
     {
         // The end of a turn: a touch anywhere goes on (the other buttons wait).

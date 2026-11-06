@@ -548,6 +548,27 @@ static void cards_ram_answered()
     CHECK(r.Touched(x, y) && x == HotspotsFor(kCards)[Index(kCards, "card 1")].x && y == HotspotsFor(kCards)[Index(kCards, "card 1")].y);
 }
 
+// The cards' question while a touch still runs (the stylus owned): Right still moves its focus to
+// Yes (an edge never lost), A meanwhile is dropped; once the stylus is free, A answers Yes.
+static void cards_question_moves_while_touching()
+{
+    Rig r;
+    r.Frame(kCards);
+    ActivityRam ram;
+    ram.cards = true;
+    ram.quitAsk = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kCards);
+    CHECK(r.nav.AskFocus() == 0);
+    r.touch.Tap(1, 1); // (a touch running)
+    r.Press(kCards, &PadState::right);
+    CHECK(r.nav.AskFocus() == 1);
+    r.Drain();
+    int x = -1, y = -1;
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y) && x == kCardsQuitYes.x && y == kCardsQuitYes.y);
+}
+
 static void cards_ram()
 {
     Rig r;
@@ -2511,6 +2532,27 @@ static void view_tab_change_disarms_and_menu_is_b()
         for (int i = 0; i < 3; i++) z.Frame(s);
         CHECK(!z.touch.Owns());
     }
+    // A view with MENU's own action (the phone: its X from any page, while B goes back a level):
+    // MENU runs it, B its back.
+    {
+        MenuView o = ListView(3, -1);
+        o.own = true;
+        o.back = {TapStep(100, 100)};
+        o.menu = {TapStep(237, 15)};
+        o.menuCloses = true;
+        Rig q;
+        q.view = &o;
+        q.Frame(kPhone);
+        q.Press(kPhone, &PadState::menu);
+        for (int i = 0; i < 3 && !q.touch.Owns(); i++) q.Frame(kPhone);
+        CHECK(q.Touched(x, y) && x == 237 && y == 15);
+        Rig b;
+        b.view = &o;
+        b.Frame(kPhone);
+        b.Press(kPhone, &PadState::b);
+        for (int i = 0; i < 3 && !b.touch.Owns(); i++) b.Frame(kPhone);
+        CHECK(b.Touched(x, y) && x == 100 && y == 100);
+    }
 }
 
 // A selection the game owns with no arrow above it (its first entry): Up goes to the phone and
@@ -3188,6 +3230,7 @@ int main()
     cards_quit_question();
     cards_ram();
     cards_ram_answered();
+    cards_question_moves_while_touching();
     vacuum_blows_drives_and_grabs();
     pointer_moves();
     autopsy_scheme();

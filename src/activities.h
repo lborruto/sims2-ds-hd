@@ -79,9 +79,13 @@
 //     the first A asks, armedSlot, a second saves over it), Y backspace, B the X (back to the
 //     mixer).
 //   The wireless lobby (Trading): out of scope; B taps its X (back to the title), the rest waits.
-// The other DS buttons stay the DS's where the game may use them (Start, Select; the vacuum's
-// B, L, R). Presses are edges against ActivityState::prev (the navigator's previous PadState);
-// a tap or drag is queued only when the touch script does not own the stylus.
+// The DS's own Start and Select are passed on only where the game may read them and no rule
+// above takes them: Select everywhere but the wireless lobby; Start on the social game, the
+// cards, the vacuum and the detector (the autopsy, MooGoo, the lottery, the mixer, its save page,
+// the painting, the Drencher, the crime game and the lobby give it a rule of their own). The
+// vacuum's B is its bowl's X now, never the DS's. Presses are edges against ActivityState::prev
+// (the navigator's previous PadState); a tap or drag is queued only when the touch script does
+// not own the stylus.
 #pragma once
 #include <vector>
 

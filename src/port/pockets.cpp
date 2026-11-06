@@ -1,4 +1,5 @@
 #include "port/pockets.h"
+#include "port/ownwords.h"
 
 #include <algorithm>
 
@@ -350,6 +351,14 @@ BlockMeasure MeasurePockets(const RomData& rom)
     line(kStrTrash, MenuWords(rom, kStrTrash), 26, 18, kPkBinBtn.w - 92);
     line(kStrGive, MenuWords(rom, kStrGive), 30, 20, kGiftBow.w - 120);
     for (int id : {kStrUse, kStrTrash, kStrGive}) line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, 240);
+    {
+        // The armed bin's X hint ("Again: throw it away", the port's word, 9000 + its id) in the
+        // room BuildPanelMenu leaves it: the hints' band less B "Close" and A "Use".
+        const int bw = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold).w;
+        const int aw = ChipRect(0, 0, Button::A, MenuWords(rom, kStrUse), kPmHintSize, 0, Weight::ExtraBold).w;
+        const int room = kPmHints.w - 8 - bw - 28 - aw - 28 - 60;
+        line(9000 + (int)OwnWordId::TrashAgain, OwnWord(&rom, OwnWordId::TrashAgain), kPmHintSize, kPmHintSize, room);
+    }
     for (int id = kSimNameUnknown; id <= kSimNameLast; id++)
     {
         if ((id > kSimNameUnknown && id < kSimNameBase) || unused(id)) continue;

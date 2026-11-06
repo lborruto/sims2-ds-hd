@@ -954,8 +954,8 @@ void FocusQuestion(MgBox& b, int focus, const RomData& rom)
     if (!b.question || b.buttons.size() < 2) return;
     const int f = focus == 1 ? 1 : 0;
     const std::string no = Words(rom, kStrMgNo), yes = Words(rom, kStrMgYes);
-    b.buttons[0].chips = f == 0 ? std::vector<std::pair<Button, std::string>> {{Button::A, ""}, {Button::B, no}} : std::vector<std::pair<Button, std::string>> {{Button::B, no}};
-    b.buttons[1].chips = f == 1 ? std::vector<std::pair<Button, std::string>> {{Button::A, yes}} : std::vector<std::pair<Button, std::string>> {{kChipWordOnly, yes}};
+    b.buttons[0].chips = f == 0 ? std::vector<BoxChip> {{Button::A, ""}, {Button::B, no}} : std::vector<BoxChip> {{Button::B, no}};
+    b.buttons[1].chips = f == 1 ? std::vector<BoxChip> {{Button::A, yes}} : std::vector<BoxChip> {{Button::A, yes, true}};
     b.buttons[0].focused = f == 0;
     b.buttons[1].focused = f == 1;
 }
@@ -991,6 +991,8 @@ bool BoxOf(Screen s, const GameState& game, const RomData& rom, MgBox& b)
         b.cover = {128 - p.boxW / 2, p.boxY, p.boxW, 8 * p.boxTiles + 32};
         if (gone || p.state != 2) b.cover.h = SH - p.boxY;
         b.text = MenuText(GameTextToUtf8(p.text));
+        // (a question's title in RAM is stale: not drawn; a message's and a hint's are its own)
+        b.title = p.kind == 2 ? "" : MenuText(GameTextToUtf8(p.title));
         for (size_t at; (at = b.text.find('$')) != std::string::npos;) b.text.replace(at, 1, "\xC2\xA7");   // (the game's simoleon)
         int x, y;
         auto from = [&](int i) { return PopupButton(p, i, x, y) ? Rect {x - 12, y - 12, 24, 24} : Rect {}; };
@@ -1015,7 +1017,7 @@ bool BoxOf(Screen s, const GameState& game, const RomData& rom, MgBox& b)
         {
             // "End of Turn." and whose turn comes, in the game's words (MooGoo's "@1's turn"): not its "Touch for…".
             const std::string next = m.cards.turn == 0 ? Words(rom, kStrMgOpponent) : m.cards.name.empty() ? Words(rom, kStrMgPlayer) : m.cards.name;
-            b.text = FirstLine(rom.String(kStrMgEndOfTurn)) + "\n" + MenuWordsWith(rom, kStrMgTurnOf, next);
+            b.text = MenuText(FirstLine(rom.String(kStrMgEndOfTurn))) + "\n" + MenuWordsWith(rom, kStrMgTurnOf, next);
             b.buttons = {Btn(Button::A, Own(rom, OwnWordId::CardsContinue), Around(kCardsMessage, 20))};
         }
         return true;
@@ -1396,6 +1398,37 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     me.Block(id(OwnWordId::TradingNote), Own(rom, OwnWordId::TradingNote), kMgValueSize, kMgValueMin, {0, 0, kMgInnerW - 28, 100});
 }
 
+// The minigames' own boxes (BoxOf) at GameBoxAt's places, as BuildGameBox lays them out (the
+// popups' BoxBase: the title on its plate, the text in the well at 30 → 20 px), and the game's
+// lines the HD frame redraws: the cards' turn line in the side panel, MooGoo's on its plate.
+static void MeasureGameBoxes(const RomData& rom, BlockMeasure& m)
+{
+    const Measurer me {m};
+    auto box = [&](int id, Rect cover, int buttons, const std::string& title, const std::string& text) {
+        const Rect b = GameBoxAt(ToCanvas(cover, 0), kMgBoxArea, buttons);
+        const Rect well = buttons > 0 ? Rect {b.x + 28, b.y + 42, b.w - 56, b.h - 162} : Rect {b.x + 28, b.y + 42, b.w - 56, b.h - 70};
+        me.Block(id, text, 30, 20, {well.x + 24, well.y + 10, well.w - 48, well.h - 20});
+        // (the plate widens when the title does not hold on it: BoxBase)
+        if (!title.empty()) me.Line(id, title, 30, 22, FitLine(title, 30, 22, b.w - 240 - 40, Weight::ExtraBold).fits ? b.w - 240 - 40 : b.w - 80 - 40);
+    };
+    // The quit questions (the cards', MooGoo's), the end of a turn (the longest name), the mixer's
+    // save question and its microphone, the help texts (the Drencher's, the crime game's, the mixer's
+    // title and body).
+    box(kStrMgQuitAsk, kMgCardsBox, 2, "", Words(rom, kStrMgQuitAsk));
+    box(kStrMgQuitAsk, kMgMooGooBox, 2, "", Words(rom, kStrMgQuitAsk));
+    for (const std::string& next : {Words(rom, kStrMgOpponent), Words(rom, kStrMgPlayer), std::string("WWWWWWW")})
+        box(kStrMgEndOfTurn, kMgCardsBox, 1, "", MenuText(FirstLine(rom.String(kStrMgEndOfTurn))) + "\n" + MenuWordsWith(rom, kStrMgTurnOf, next));
+    box(kStrMgMixSaveAsk, kMgMixerBox, 3, "", Words(rom, kStrMgMixSaveAsk));
+    box(kStrMgMixMic, kMgMicBox, 1, "", Words(rom, kStrMgMixMic));
+    for (int id = kStrMgDrHelp0; id < kStrMgCrHelp0 + 3; id++) box(id, kMgHelpBox, 1, "", MenuText(rom.String(id)));
+    for (int id = kStrMgMixHelp0; id + 1 < kStrMgMixHelpEnd; id += 2) box(id, kMgHelpBox, 1, Words(rom, id), MenuText(rom.String(id + 1)));
+    // The cards' turn line over the board (CardsValues) and MooGoo's on its plate (AddMooGooLine).
+    for (int id = kStrMgCardsLine0; id <= kStrMgCardsOther; id++) me.Line(id, Words(rom, id), 26, kMgValueMin, kMgInnerW - 8);
+    const int plateW = ToCanvas(kMgMooLineFrom, 0).w - 32;
+    for (int id : {kStrMgMooShuffling, kStrMgMooDealing, kStrMgMooPlayCard, kStrMgMooTarget}) me.Line(id, Words(rom, id), 30, 20, plateW);
+    me.Line(9000 + (int)OwnWordId::MooGooBetLine, Own(rom, OwnWordId::MooGooBetLine), 30, 20, plateW);
+}
+
 void MeasureMinigames(const RomData& rom, BlockMeasure& m)
 {
     const Measurer me {m};
@@ -1442,5 +1475,6 @@ void MeasureMinigames(const RomData& rom, BlockMeasure& m)
         me.Line(kStrMgVacuumEarnings, label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28, Weight::Bold);
     else m.checked++;
     MeasureOwnWords(rom, m);
+    MeasureGameBoxes(rom, m);
 }
 }

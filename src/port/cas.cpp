@@ -281,8 +281,11 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         }
         // The game's own "L" / "R" pills on its arrows (the DS's shoulder buttons: LB / RB are the
         // pages here) covered by the pad's turn chips: X / Y off the Name page, else the right stick.
-        const float sx = (float)top.w / topW, sy = (float)top.h / topH;
-        const int ox = (topW - SW) / 2; // (a wide picture: the 2D layer centred)
+        // The top picture is SW x SH DS pixels at --res3d's n (n = topH / SH, the 3D resolution's
+        // factor), wider with --wide (the 2D layer centred): a pill's DS rectangle is n times its size there.
+        const float n = (float)topH / SH;
+        const float sx = (float)top.w / topW * n, sy = (float)top.h / topH * n; // canvas pixels per DS pixel
+        const float ox = (topW / n - SW) / 2;                                  // DS pixels left of the 2D layer
         for (int k = 0; k < 2; k++)
         {
             const Rect pill = kCasTurnPill[k];

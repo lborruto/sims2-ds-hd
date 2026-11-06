@@ -127,7 +127,6 @@ constexpr const char* kWords[][5] = {
     {"Let go: stop", "Relâcher : arrêter", "Loslassen: stopp", "Rilascia: ferma", "Suelta: parar"},
     {"Choose", "Choisir", "Wählen", "Scegli", "Elegir"},
     {"Back", "Retour", "Zurück", "Indietro", "Atrás"},
-    {"Octave, sustain, @1", "Octave, tenue, @1", "Oktave, halten, @1", "Ottava, sostegno, @1", "Octava, sostener, @1"},
     // The mixer's values
     {"Song", "Morceau", "Song", "Brano", "Canción"},
     {"Instrument", "Instrument", "Instrument", "Strumento", "Instrumento"},

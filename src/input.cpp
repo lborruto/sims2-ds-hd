@@ -319,6 +319,10 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
         app.consoleArmed = navigator.Armed();
         app.consolePictureClosed = navigator.PictureClosed();
+        app.consoleVeiled = navigator.Returning();
+        app.consoleWorldOnly = screen.screen == Screen::Unknown && game && (game->between || game->screen == GScreen::Panel || game->vtable == 0)
+                                   ? app.consoleWorldOnly + 1
+                                   : 0;
         app.consolePointer = {navigator.PointerShown(), navigator.PointerDown(), navigator.QuitArmed(), navigator.PointerX(), navigator.PointerY(),
                               navigator.Mark(), navigator.AskFocus()};
         // The money's last change, shown on the panel's world for kPayoutFrames frames (an
@@ -345,6 +349,8 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
         app.consoleArmed = 0;
         app.consolePictureClosed = false;
+        app.consoleVeiled = false;
+        app.consoleWorldOnly = 0;
         app.consolePointer = {};
         app.consolePayout = 0;
         payoutFrames_ = 0;
