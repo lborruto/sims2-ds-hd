@@ -1,0 +1,5 @@
+# From M-ci-occ-info (the Small Guest Room, the concierge staying), CONSOLE: Down, Down (the
+# check-out date's line), A (the game's hint 2603, in HD).
+20 2 pad down
+40 2 pad down
+60 2 pad a

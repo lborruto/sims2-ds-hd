@@ -1,0 +1,9 @@
+# From D-hotel-down (the early hotel's lobby, before the concierge), CONSOLE: MENU, Down (his
+# "Registry"), A (the game's Registry in HD), A (the Small Guest Room: its room info), B (the
+# X: the Registry, the focus back on the room), B (its X: the panel).
+20 2 pad menu
+40 2 pad down
+60 2 pad a
+140 2 pad a
+220 2 pad b
+300 2 pad b

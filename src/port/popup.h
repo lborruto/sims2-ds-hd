@@ -69,6 +69,11 @@ ScreenState UnderScreen(ScreenState s, const GameState& game);
 // the pieces already in c stop taking the mouse, and the pictures beneath that the box would
 // cover go (images are drawn above every still item: they would show through it).
 void BuildPopup(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom);
+// A screen's own hint box in the popups' look (room info's line hints, port/roominfo.h): over what
+// c holds, the veil, the box with `title` on its plate (none when empty) and `text`, one Close
+// button (A and B chips, the focus on it when `focus` is 0) whose mouse piece maps onto the DS
+// rectangle `from` (none when empty). Everything on kPopLayer, as BuildPopup.
+void BuildHintBox(Composition& c, int focus, const std::string& title, const std::string& text, const RomData& rom, Rect from);
 
 // (A check, --measure-menu) every popup text the game opens (the ids at its call sites) in the
 // box, in rom's language.

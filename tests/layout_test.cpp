@@ -7,6 +7,7 @@
 #include <tuple>
 #include <cstdio>
 #include <cstdlib>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -16,6 +17,8 @@
 #include "hotspots.h"
 #include "layout.h"
 #include "port/build.h"
+#include "port/checkin.h"
+#include "port/roominfo.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
@@ -1197,6 +1200,212 @@ int main()
             CHECK(BuildRoomsViewOf(bs, h).items[0].id != first);
             h.build.valid = false;
             CHECK(!BuildRoomsViewOf(bs, h).valid);
+        }
+        // The Registry / a guest's check-in and room info (port/checkin.h, port/roominfo.h) on made-up
+        // hotels: the five rooms built or not, vacant or occupied, the Penthouse's flag; both modes.
+        // A on a room only where the game takes it (the Registry: built; a check-in: built and
+        // vacant), its row button; B the X; the check-in never replayed, closing (the speech
+        // follows). Room info: a line per line the game shows (6 vacant, 8 occupied), A its tap,
+        // each tap read back as the hint the game opens there (RoomInfoHintAt); a hint up: one
+        // Close item, A and B a tap away from every line; its string unknown: no view. Every id
+        // distinct (within and across both), every item reachable, inside the panel, layers
+        // ascending, the mouse round trips onto the game's buttons and lines.
+        {
+            static u32 fakeBottom[SW * SH];
+            for (int i = 0; i < SW * SH; i++) fakeBottom[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+            const ScreenState us {Screen::Unknown, Tab::None};
+            const int places[5] = {29, 8, 15, 18, 20};
+            auto hotel = [&](int mode, int mask, int occupiedMask, bool flag) {
+                GameState h;
+                h.valid = true;
+                h.screen = GScreen::Unknown;
+                CheckInState& ci = h.checkIn;
+                ci.valid = true;
+                ci.mode = mode;
+                ci.guest = mode == 0 ? 7 : -1;
+                ci.score = 42;
+                for (int i = 0; i < 5; i++)
+                {
+                    RegistryRow& r = ci.rows[i];
+                    r.place = places[i];
+                    r.built = (mask >> i) & 1;
+                    r.occupant = r.built && ((occupiedMask >> i) & 1) ? 3 + i : -1;
+                    r.infoOk = r.built && (i != 4 || flag);
+                    r.available = r.infoOk && r.occupant < 0;
+                }
+                return h;
+            };
+            std::set<u32> allIds;
+            for (int mode : {0, 1})
+                for (int mask : {0, 1, 0x13, 0x1F})
+                    for (int occ : {0, 1, 0x1E})
+                        for (bool flag : {false, true})
+                        {
+                            const GameState h = hotel(mode, mask, occ, flag);
+                            const MenuView v = CheckInViewOf(us, h);
+                            CHECK(v.valid && v.own && v.items.size() == 5 && v.replay == (mode == 1) && v.backCloses);
+                            CHECK(v.back.size() == 1 && v.back[0].x == kCiCloseX && v.back[0].y == kCiCloseY);
+                            CHECK(AllReachable(v) && MenuFocusable(v, MenuFirst(v)));
+                            std::set<u32> ids;
+                            for (int i = 0; i < 5; i++)
+                            {
+                                const RegistryRow& r = h.checkIn.rows[i];
+                                const ViewItem& it = v.items[i];
+                                ids.insert(it.id);
+                                allIds.insert(it.id);
+                                CHECK(it.enabled && (it.id >> 24) == (kModCheckIn >> 24));
+                                const bool takes = mode == 1 ? r.infoOk : r.available;
+                                CHECK(it.action.empty() == !takes && it.closes == (takes && mode == 0));
+                                if (takes) CHECK(it.action.size() == 1 && it.action[0].x == kCiRowX && it.action[0].y == kCiRowY0 + i * kCiRowDy);
+                                CHECK(MenuMove(v, i, 2) == i && MenuMove(v, i, 3) == i);
+                                if (i > 0) CHECK(MenuMove(v, i, 0) == i - 1);
+                            }
+                            CHECK(ids.size() == 5 && MenuMove(v, 0, 0) == 0 && MenuMove(v, 4, 1) == 4);
+                            if (mask == 0x13 && occ == 1 && flag) CHECK(MenuFirst(v) == (mode == 1 ? 0 : 1)); // (the first room it takes)
+                            for (int focus : {-1, 0, 2, 4})
+                            {
+                                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                                Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                                world.touch = false;
+                                comp.pieces.push_back(world);
+                                BuildCheckIn(comp, v, focus, h, rom, nullptr, fakeBottom);
+                                CHECK(!comp.ui.empty());
+                                int layer = 0, crops = 0;
+                                for (const ui::UiItem& u : comp.ui)
+                                {
+                                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                                    if (u.kind == ui::UiItem::Image) { crops++; continue; }
+                                    CHECK(u.layer >= layer);
+                                    layer = u.layer;
+                                }
+                                // An occupied room's portrait: the game's own row button, live (2x in its row; 3x focused).
+                                int occupied = 0;
+                                for (const RegistryRow& r : h.checkIn.rows) occupied += r.occupant >= 0;
+                                const int f = focus >= 0 ? focus : 0;
+                                CHECK(crops == occupied + (h.checkIn.rows[f].occupant >= 0));
+                                if (focus != 0 || mask != 0x1F || occ != 1 || flag) continue;
+                                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                    TestConsoleRoundtrip(us, false, 256, 192, o.first, o.second, true, &comp);
+                                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                                int tx, ty;
+                                for (int i = 0; i < 5; i++)
+                                {
+                                    const Rect r = v.items[i].rect;
+                                    CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - kCiRowX) <= 15 && std::abs(ty - (kCiRowY0 + i * kCiRowDy)) <= 15);
+                                }
+                                CHECK(TouchFromComposition(comp, fit, kCiClose.x + kCiClose.w / 2.0f, kCiClose.y + kCiClose.h / 2.0f, tx, ty));
+                                CHECK(std::abs(tx - kCiCloseX) <= 15 && std::abs(ty - kCiCloseY) <= 15);
+                                CHECK(!TouchFromComposition(comp, fit, kCiInfo.x + 10.5f, kCiInfo.y + 200.5f, tx, ty)); // the focused room: nothing
+                                CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty));                    // the dimmed world: nothing
+                            }
+                        }
+            // No view off its screen, without RAM's part, with a mode the game has not, or the strings.
+            GameState h = hotel(1, 1, 0, false);
+            CHECK(!CheckInViewOf({Screen::Panel, Tab::Interact}, h).valid);
+            CHECK(!CheckInView(us, &h, &rom).valid); // no strings: milestone 1's
+            h.checkIn.mode = 2;
+            CHECK(!CheckInViewOf(us, h).valid);
+            h.checkIn.valid = false;
+            CHECK(!CheckInViewOf(us, h).valid);
+
+            // Room info, vacant and occupied, a hint up or not.
+            auto info = [&](bool occupied, bool hint, int hintId) {
+                GameState g;
+                g.valid = true;
+                g.screen = GScreen::Unknown;
+                RoomInfoState& ri = g.roomInfo;
+                ri.valid = true;
+                ri.place = 29;
+                ri.occupied = occupied;
+                ri.occupant = occupied ? 7 : 45;
+                ri.moodId = occupied ? 2087 : -1;
+                ri.checkOutKnown = occupied;
+                ri.month = 1; ri.day = 3; ri.days = 2;
+                ri.baseValue = 400; ri.serviceCharge = 2; ri.scoreBonus = 0; ri.total = 422;
+                ri.hint = hint;
+                ri.hintId = hintId;
+                return g;
+            };
+            for (bool occupied : {false, true})
+            {
+                const GameState g = info(occupied, false, -1);
+                const MenuView v = RoomInfoViewOf(us, g);
+                const int n = occupied ? 8 : 6;
+                CHECK(v.valid && v.own && !v.popup && (int)v.items.size() == n && !v.backCloses && v.back.size() == 1);
+                CHECK(v.back[0].x == kRiCloseX && v.back[0].y == kRiCloseY && RoomInfoHintAt(kRiCloseX, kRiCloseY, occupied) < 0);
+                CHECK(AllReachable(v) && MenuFirst(v) == 1);
+                std::set<int> hints;
+                std::set<u32> ids = allIds; // (the Registry's ids)
+                for (int k = 0; k < n; k++)
+                {
+                    const ViewItem& it = v.items[k];
+                    CHECK(ids.insert(it.id).second); // (distinct from each other and the Registry's)
+                    CHECK(it.enabled && it.action.size() == 1 && it.action[0].x == kRiLineX);
+                    const int hid = RoomInfoHintAt(it.action[0].x, it.action[0].y, occupied);
+                    CHECK(hid >= 2594 && hid <= 2603 && hints.insert(hid).second);
+                    CHECK(MenuMove(v, k, 2) == k && MenuMove(v, k, 3) == k);
+                    if (k > 0) CHECK(MenuMove(v, k, 0) == k - 1);
+                }
+                CHECK(hints.count(occupied ? 2595 : 2596) == 1 && hints.count(2601) == (size_t)occupied && hints.count(2600) == 1);
+                CHECK(RoomInfoHintAt(kRiAwayX, kRiAwayY, occupied) < 0 && RoomInfoHintAt(40, 63, false) < 0);
+                for (int focus : {-1, 0, 1, n - 1})
+                {
+                    Composition comp {kConsoleW, kConsoleH, {}, {}};
+                    Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                    world.touch = false;
+                    comp.pieces.push_back(world);
+                    BuildRoomInfo(comp, v, focus, g, rom, nullptr, fakeBottom);
+                    int layer = 0, crops = 0;
+                    for (const ui::UiItem& u : comp.ui)
+                    {
+                        CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                              u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                        if (u.kind == ui::UiItem::Image) { crops++; continue; }
+                        CHECK(u.layer >= layer);
+                        layer = u.layer;
+                    }
+                    CHECK(crops == 1); // (the portrait: the occupant's, or the concierge's when vacant)
+                    if (focus != 1) continue;
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(us, false, 256, 192, o.first, o.second, true, &comp);
+                    const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                    int tx, ty;
+                    for (const ViewItem& it : v.items)
+                    {
+                        const Rect r = it.rect;
+                        CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                        CHECK(RoomInfoHintAt(tx, ty, occupied) == RoomInfoHintAt(it.action[0].x, it.action[0].y, occupied));
+                    }
+                    CHECK(TouchFromComposition(comp, fit, kRiClose.x + kRiClose.w / 2.0f, kRiClose.y + kRiClose.h / 2.0f, tx, ty));
+                    CHECK(std::abs(tx - kRiCloseX) <= 15 && std::abs(ty - kRiCloseY) <= 15);
+                    CHECK(!TouchFromComposition(comp, fit, kRiPortrait.x + 10.5f, kRiPortrait.y + 10.5f, tx, ty)); // the portrait: nothing
+                }
+                // The hint box: one Close, A and B a tap on no line; over the lines (no focus there).
+                const GameState gh = info(occupied, true, occupied ? 2601 : 2596);
+                const MenuView hv = RoomInfoViewOf(us, gh);
+                CHECK(hv.valid && hv.own && hv.popup && hv.items.size() == 1 && hv.items[0].id == kRiHintCloseId && ids.count(kRiHintCloseId) == 0);
+                CHECK(hv.items[0].action.size() == 1 && RoomInfoHintAt(hv.items[0].action[0].x, hv.items[0].action[0].y, occupied) < 0 && hv.back == hv.items[0].action);
+                CHECK(hv.items[0].action[0].x != kRiCloseX && RoomHintUp(gh) && !RoomHintUp(g));
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                BuildRoomInfo(comp, hv, 0, gh, rom, nullptr, fakeBottom);
+                const size_t beneath = comp.ui.size();
+                BuildRoomHint(comp, hv, 0, gh, rom);
+                CHECK(comp.ui.size() > beneath);
+                for (size_t i = beneath; i < comp.ui.size(); i++) CHECK(comp.ui[i].layer >= kPopLayer);
+                for (const ui::UiItem& u : comp.ui) CHECK(u.kind != ui::UiItem::Image || u.to.x + u.to.w <= kPopBox.x); // (the portrait under the box: gone)
+                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                int tx, ty;
+                CHECK(TouchFromComposition(comp, fit, kPopClose.x + kPopClose.w / 2.0f, kPopClose.y + kPopClose.h / 2.0f, tx, ty));
+                CHECK(RoomInfoHintAt(tx, ty, occupied) < 0 && std::abs(tx - kRiAwayX) <= 12 && std::abs(ty - kRiAwayY) <= 12);
+                CHECK(!RoomInfoViewOf(us, info(occupied, true, -1)).valid); // (which hint unknown: milestone 1's)
+            }
+            GameState g = info(true, false, -1);
+            CHECK(!RoomInfoViewOf({Screen::Panel, Tab::Interact}, g).valid);
+            CHECK(!RoomInfoView(us, &g, &rom).valid); // no strings: milestone 1's
+            g.roomInfo.place = 40;
+            CHECK(!RoomInfoViewOf(us, g).valid);
         }
         // Goals, Relationships, Options (port/goals.h, relations.h, options.h) and the Save slots
         // on made-up states: the game's selection held (Up / Down its arrows), Options' moves

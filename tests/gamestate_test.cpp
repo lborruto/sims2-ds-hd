@@ -789,7 +789,8 @@ static void registry_and_room()
     CheckInState c = ReadGameState(r.View()).checkIn;
     CHECK(c.valid && c.mode == 1 && c.rows[0].place == 29 && c.rows[0].built && c.rows[0].available && c.rows[1].place == 8 && !c.rows[1].built && !c.rows[1].available);
     CHECK(c.rows[2].built && c.rows[2].occupant == 7 && !c.rows[2].available && c.rows[4].built && !c.rows[4].available);   // Penthouse: flag 0x15 clear
-    r.W32(kGb + 0x4814 + 0, 1u << 21); CHECK(ReadGameState(r.View()).checkIn.rows[4].available);
+    CHECK(c.rows[0].infoOk && !c.rows[1].infoOk && c.rows[2].infoOk && !c.rows[4].infoOk);   // room info: built (an occupied room too), the Penthouse's flag
+    r.W32(kGb + 0x4814 + 0, 1u << 21); CHECK(ReadGameState(r.View()).checkIn.rows[4].available && ReadGameState(r.View()).checkIn.rows[4].infoOk);
     r.W8(kS + 0x26, 0); r.W8(kS + 0x25, 45);
     c = ReadGameState(r.View()).checkIn; CHECK(c.valid && c.mode == 0 && c.guest == 45);
     r.W8(kS + 0x25, 46); CHECK(!ReadGameState(r.View()).checkIn.valid);
@@ -812,6 +813,9 @@ static void registry_and_room()
     CHECK(v.valid && v.place == 29 && v.occupied && v.occupant == 45 && v.moodId == 2088 && v.checkOutKnown && v.days == 2 && v.month == 2 && v.day == 2);
     CHECK(v.baseValue == 400 && v.serviceCharge == 2 && v.scoreBonus == 12 && v.total == 414);   // the casino is built: score 6
     q.W32(kGb + 0x68, 0); CHECK(ReadGameState(q.View()).roomInfo.total == 434);
+    for (u32 k = 0; k < 4; k++) q.W8(kS + 0x34 + k, 1);   // a hint box up: which one is not in RAM (the frame loop's, -1 here)
+    v = ReadGameState(q.View()).roomInfo; CHECK(v.valid && v.hint && v.hintId == -1);
+    for (u32 k = 0; k < 4; k++) q.W8(kS + 0x34 + k, 0);
     q.W8(kS + 0x25, 0); q.W16(kS + 0x32, 45);
     v = ReadGameState(q.View()).roomInfo; CHECK(v.valid && !v.occupied && !v.checkOutKnown && v.moodId == -1);
     q.W16(kS + 0x30, 8); q.W32(0x0211F9D4, 9); CHECK(!ReadGameState(q.View()).roomInfo.valid);   // not a guest room

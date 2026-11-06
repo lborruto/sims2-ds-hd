@@ -48,6 +48,13 @@ Mode ModeOf(Screen s, bool menuOpen)
 }
 
 bool Up(const PadState& p) { return p.up || p.ly < -kStick; }
+// Whether a view holds an item of the module `tag` (an id's top bits).
+bool HasModule(const MenuView& v, u32 tag)
+{
+    for (const ViewItem& it : v.items)
+        if (it.id >> 24 == tag) return true;
+    return false;
+}
 bool Down(const PadState& p) { return p.down || p.ly > kStick; }
 bool Left(const PadState& p) { return p.left || p.lx < -kStick; }
 bool Right(const PadState& p) { return p.right || p.lx > kStick; }
@@ -232,6 +239,15 @@ void Navigator::Move(ScreenState s, int dx, int dy)
     focus_ = index[Neighbour(list, from, dx, dy)];
 }
 
+int Navigator::Arrive(const MenuView& v) const
+{
+    // Another screen module on the same screen (the Registry and its room info, both Unknown):
+    // the item it last had the focus on, else its first.
+    const u32 tag = v.items.empty() ? 0 : v.items[0].id >> 24;
+    if (focusId_ != 0 && !HasModule(v, focusId_ >> 24) && tag < 16 && moduleId_[tag]) return MenuKeep(v, moduleId_[tag], MenuFirst(v));
+    return MenuFirst(v);
+}
+
 void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys, bool settled, const MenuView* view)
 {
     view_ = view;
@@ -280,6 +296,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         pendingDir_ = -1;
         viewHash_ = 0;
         armed_ = 0; // (an armed X belongs to the screen or tab it was pressed on)
+        for (u32& id : moduleId_) id = 0; // (the modules' last focus belongs to their screen)
     }
     else if (closing_ > 0) closing_--;
     if (!popupNow && popupUp_) closing_ = 0; // (the popup went: its closing wait is over)
@@ -295,7 +312,13 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     const bool useView = mode == Mode::Focus && UsesView(s);
     const u64 viewHash = useView ? view_->Hash() : 0;
     const bool viewChanged = useView && viewHash != viewHash_;
-    if (useView && viewChanged && viewHash_ != 0 && focus_ >= 0) focus_ = MenuKeep(*view_, focusId_, focus_);
+    if (useView && viewChanged && viewHash_ != 0 && focus_ >= 0)
+    {
+        // Another screen module on the same screen, no popup coming or going (the Registry's room
+        // info): the focus starts again there (below: its last item, else its first).
+        if (!popupNow && !popupUp_ && !view_->items.empty() && !HasModule(*view_, focusId_ >> 24)) focus_ = -1;
+        else focus_ = MenuKeep(*view_, focusId_, focus_);
+    }
     if (!useView && viewFocus_) focus_ = -1; // (an index of the view means nothing to HotspotsFor)
     // The resume: the item the focus was on before the popup, once its view is back.
     if (restore_ && useView)
@@ -359,7 +382,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             const MenuView& v = *view_;
             // (held while the focus is in the list: the phone above it keeps the focus)
             if (MenuFocusable(v, v.selected) && (!MenuFocusable(v, focus_) || v.items[focus_].group == v.scrollGroup)) focus_ = v.selected;
-            if (!MenuFocusable(v, focus_)) focus_ = MenuFirst(v);
+            if (!MenuFocusable(v, focus_)) focus_ = Arrive(v);
             // A move that waited for the list's own scroll: once the rebuilt view shows more.
             if (pendingDir_ >= 0 && (viewChanged || ++pendingFrames_ > kHoldFrames))
             {
@@ -480,8 +503,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     case Mode::Focus: case Mode::Popup:
         if (viewFocus_)
         {
-            if (!MenuFocusable(*view_, focus_)) focus_ = MenuFirst(*view_);
+            if (!MenuFocusable(*view_, focus_)) focus_ = Arrive(*view_);
             focusId_ = focus_ >= 0 ? view_->items[focus_].id : 0;
+            if ((focusId_ >> 24) < 16) moduleId_[focusId_ >> 24] = focusId_;
             viewHash_ = view_->Hash();
         }
         else if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);

@@ -6,6 +6,8 @@
 #include "activities.h"
 #include "hotspots.h"
 #include "port/build.h"
+#include "port/checkin.h"
+#include "port/roominfo.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
@@ -151,9 +153,11 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             else if (at.screen == Screen::Catalogue) BuildCatalogue(c, view, f, *game, *rom, icons);
             else if (at.screen == Screen::Build) BuildBuildRooms(c, view, f, *game, *rom, icons);
             else if (at.screen == Screen::Phone) BuildPhone(c, view, f, *game, *rom, icons, bottom, strings);
+            else if (game->checkIn.valid) BuildCheckIn(c, view, f, *game, *rom, icons, bottom);
+            else if (game->roomInfo.valid) BuildRoomInfo(c, view, f, *game, *rom, icons, bottom);
             else BuildNote(c, view, f, *game, *rom, icons);
         };
-        if (v.popup)
+        if (v.popup && PopupOver(s, *game))
         {
             // What the popup is over: its HD screen (the panel's menu while it was open) without a
             // focus, or the dimmed world.
@@ -166,6 +170,8 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         {
             screen(s, v, focus);
             if (bar) AddStatusBar(c, *hud, *strings);
+            // Room info's own hint box (a popup of the screen's: port/roominfo.h), over the bar too.
+            if (s.screen == Screen::Unknown && RoomHintUp(*game)) BuildRoomHint(c, v, focus, *game, *rom);
         }
         SortUi(c.ui); // (the bar's layer after the screen's, a popup's after it, the images last)
         return c;     // (the focus is the view's: no ring from HotspotsFor)

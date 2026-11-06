@@ -39,6 +39,8 @@
 #include "romdata.h"
 #include "ui/font.h"
 #include "port/build.h"
+#include "port/checkin.h"
+#include "port/roominfo.h"
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/interact.h"
@@ -104,7 +106,7 @@ static void Usage()
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
-        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms) can show fitted to its box, in --language's\n"
+        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms, the Registry, room info) can show fitted to its box, in --language's\n"
         "                                words: how many shrink, how many need an ellipsis or a character the font lacks (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load; exit 2 on an overflow or a character the font lacks), and stop\n"
@@ -439,7 +441,18 @@ int main(int argc, char** argv)
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || !lacking.empty() ? 2 : 0;
+        // The Registry and room info: the titles, the rooms, every guest, the lines, the hints.
+        BlockMeasure ci;
+        MeasureCheckIn(*app.rom, ci);
+        printf("checkin: %d words, tallest %d (%d lines), %d shrunk, %d cut", ci.checked, ci.tallestId, ci.tallestLines, ci.shrunk, ci.cut);
+        for (int id : ci.cutIds) printf(" %d", id);
+        printf("\n");
+        BlockMeasure ri;
+        MeasureRoomInfo(*app.rom, ri);
+        printf("roominfo: %d words, tallest %d (%d lines), %d shrunk, %d cut", ri.checked, ri.tallestId, ri.tallestLines, ri.shrunk, ri.cut);
+        for (int id : ri.cutIds) printf(" %d", id);
+        printf("\n");
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.
@@ -535,6 +548,8 @@ int main(int argc, char** argv)
     bool lastMenu = app.consoleMenu;
     int lastFocus = app.consoleFocus;
     int disagree = 0; // frames the game's settled screen and the pixels' answer have disagreed
+    int lastTouchX = -1, lastTouchY = -1; // the stylus's last point down (room info's hint: which line)
+    bool wasTouching = false;
     auto keepPace = [&]() {
         if (headless || app.fast) { nextFrameAt = 0; return; }
         double now = SDL_GetPerformanceCounter() / perfFreq;
@@ -608,6 +623,8 @@ int main(int argc, char** argv)
 
         nds.SetKeyMask(~keys & 0xFFF);
         if (touching) nds.TouchScreen((melonDS::u16)tx, (melonDS::u16)ty); else nds.ReleaseScreen();
+        if (touching && !wasTouching) { lastTouchX = tx; lastTouchY = ty; } // (the stylus's last point down: room info's hint)
+        wasTouching = touching;
         looks.Apply(app);
         nds.RunFrame();
         looks.Frame(app);
@@ -625,6 +642,12 @@ int main(int argc, char** argv)
                 PhoneState& ph = app.game.town.phone;
                 if (ph.valid && ph.page == 7 && !ph.contactsKnown && ph.contacts == 0)
                     ph.contactsWait = before.town.phone.valid ? before.town.phone.contactsWait + 1 : 1;
+            }
+            {   // room info's hint: which line the stylus opened it on (not in RAM), kept while it is up
+                RoomInfoState& ri = app.game.roomInfo;
+                if (ri.valid && ri.hint)
+                    ri.hintId = before.roomInfo.valid && before.roomInfo.hint && before.roomInfo.hintId >= 0 ? before.roomInfo.hintId
+                                : lastTouchX >= 0 ? RoomInfoHintAt(lastTouchX, lastTouchY, ri.occupied) : -1;
             }
             if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
             if (app.portSupported && printHud)
@@ -804,8 +827,9 @@ int main(int argc, char** argv)
                     const RoomInfoState& v = g.roomInfo;
                     if (!v.valid) fprintf(stderr, "frame %ld: roominfo none\n", frame);
                     else
-                        fprintf(stderr, "frame %ld: roominfo place=%d occupant=%d occupied=%d mood=%d checkout=%d/%d/%d days=%d base=%d service=%d bonus=%d total=%d hint=%d\n", frame, v.place, v.occupant, v.occupied ? 1 : 0,
-                                v.moodId, v.checkOutKnown ? 1 : 0, v.month, v.day, v.days, v.baseValue, v.serviceCharge, v.scoreBonus, v.total, v.hint ? 1 : 0);
+                        fprintf(stderr, "frame %ld: roominfo place=%d occupant=%d occupied=%d mood=%d checkout=%d/%d/%d days=%d base=%d service=%d bonus=%d total=%d hint=%d%s\n", frame, v.place, v.occupant, v.occupied ? 1 : 0,
+                                v.moodId, v.checkOutKnown ? 1 : 0, v.month, v.day, v.days, v.baseValue, v.serviceCharge, v.scoreBonus, v.total, v.hint ? 1 : 0,
+                                v.hint ? (":" + std::to_string(v.hintId)).c_str() : "");
                 }
                 if (!(g.music == b.music) || frame == 0)
                 {

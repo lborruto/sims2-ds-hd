@@ -953,6 +953,7 @@ CheckInState ReadCheckIn(const Reader& m, u32 S)
         r.built = (built >> place) & 1;
         r.occupant = sim;
         r.available = r.built && sim < 0 && (place != h.penthouse || flagOk);
+        r.infoOk = r.built && (place != h.penthouse || flagOk);
     }
     v.mode = (int)mode; v.guest = mode == 0 ? (int)guest : -1;
     v.valid = true;

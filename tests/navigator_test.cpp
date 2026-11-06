@@ -1558,8 +1558,59 @@ static void view_catalogue_spends_once()
     CHECK(r.Touched(x, y) && x == 235 && y == 19);
 }
 
+// Two screen modules on one screen state (the Registry and its room info, both Unknown): when the
+// other module's view comes the focus starts on its first item (not the old index), and when the
+// first module's view is back the focus is on the item it was on, by id; a view gap between them
+// (the game between its overlays) changes nothing of that. Another view of the same module keeps
+// the focus by id as ever.
+static void view_modules_on_one_screen()
+{
+    const ScreenState un {Screen::Unknown, Tab::None};
+    auto list = [](u32 tag, int n, int initial) {
+        MenuView v;
+        v.valid = v.own = true;
+        for (int i = 0; i < n; i++)
+        {
+            ViewItem it;
+            it.rect = {200, 140 + 80 * i, 500, 70};
+            it.action = {TapStep(20, 39 + 33 * i)};
+            it.id = (tag << 24) + 0x100 + (u32)i;
+            v.items.push_back(it);
+        }
+        v.initial = initial;
+        return v;
+    };
+    const MenuView reg = list(12, 5, 0), info = list(13, 6, 1), none;
+    Rig r;
+    r.view = &reg;
+    r.Frame(un);
+    r.Press(un, &PadState::down);
+    r.Press(un, &PadState::down);
+    r.Press(un, &PadState::down);
+    CHECK(r.nav.Focus() == 3);
+    r.view = &info; // (straight over)
+    r.Frame(un);
+    CHECK(r.nav.Focus() == 1);
+    r.Press(un, &PadState::down);
+    CHECK(r.nav.Focus() == 2);
+    r.view = &none; // (a gap)
+    r.Frame(un);
+    r.view = &reg;
+    r.Frame(un);
+    CHECK(r.nav.Focus() == 3);
+    r.view = &info;
+    r.Frame(un);
+    CHECK(r.nav.Focus() == 2); // (room info's own last item)
+    MenuView fewer = list(13, 6, 1);
+    fewer.items.erase(fewer.items.begin()); // (the same module, a row gone: the focus by id)
+    r.view = &fewer;
+    r.Frame(un);
+    CHECK(r.nav.Focus() == 1);
+}
+
 int main()
 {
+    view_modules_on_one_screen();
     view_catalogue_spends_once();
     menu_opens_and_closes();
     view_save_slots_and_slider();

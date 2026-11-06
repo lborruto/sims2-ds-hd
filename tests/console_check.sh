@@ -147,12 +147,21 @@ run build-ask BD-row2 "${town[@]}" --console-focus 1 &
 run build-poor BD-down3 "${town[@]}" --console-focus 0 &
 run build-empty sit-build "${town[@]}" &
 wait
+run registry M-ci-occ-reg2 "${hotel[@]}" --console-focus 0 &
+run registry-2x M-ci-occ-reg2 "${hotel[@]}" --console-focus 0 --compose-scale 2 &
+run registry-wide M-ci-occ-reg2 "${hotel[@]}" --console-focus 0 --wide &
+run registry-guest M-ci-g-base "${hotel[@]}" --console-focus 0 &
+run roominfo M-ci-occ-info "${hotel[@]}" --console-focus 1 &
+run roominfo-vacant M-ci-e-btn1 "${hotel[@]}" --console-focus 1 &
+run roominfo-hint M-ci-occ-info "${hotel[@]}" --input "$repo/scripts/console/roominfo-hint.txt" &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
-    shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty; do
+    shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
+    registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -538,6 +547,55 @@ elif case in ("build-list", "build-list-2x", "build-list-wide", "build-ask", "bu
             if red(600, 180, 720, 230) < 10: errors.append("the Spa & Gym's permit is not red")
         elif red(200, 124, 1080, 578) > 0: errors.append("a red permit in a list the money covers")
     not_big()
+elif case in ("registry", "registry-2x", "registry-wide", "registry-guest"):
+    # The Registry / a guest's check-in in HD (src/port/checkin.*): the panel, the title's well;
+    # the focus ring around the first room; the Registry's score on its warm plate (none in the
+    # check-in); M-ci-occ-reg2: the Small Guest Room's occupant (the concierge) the game's own row
+    # button 2x in its row and 3x beside the list, the four other rooms' names pink (not built);
+    # M-ci-g-base: the Small Guest Room's key (the game's sprite) and its name white (vacant);
+    # never the touch screen 3x.
+    expect("panel outline", C(176, 300), OUTLINE)
+    expect("panel band", C(180, 300), hexrgb("6171B2"))
+    expect("title well", C(640, 50), hexrgb("6A72B8"))
+    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    if not ring(212, 175): errors.append("no focus ring around the first room")
+    if ring(212, 261): errors.append("a focus ring around the second room")
+    warm = sum(1 for y in range(56, 98, 2) for x in range(700, 1000, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
+    if (warm >= 20) != (case != "registry-guest"): errors.append(f"the score plate ({warm} warm pixels)")
+    pink = lambda y0: sum(1 for y in range(y0, y0 + 60, 2) for x in range(300, 640, 2) if C(x, y) == hexrgb("F35961"))
+    if min(pink(230), pink(316), pink(402), pink(488)) < 10: errors.append("an unbuilt room's name not pink")
+    white = sum(1 for y in range(140, 180, 2) for x in range(300, 640, 2) if C(x, y) == (255, 255, 255))
+    if case == "registry-guest":
+        if pink(144) > 0 or white < 20: errors.append(f"the vacant room's name not white ({white})")
+        key = {C(x, y) for y in range(150, 205, 3) for x in range(228, 285, 3)}
+        if len(key) < 6: errors.append(f"no key in the first row ({len(key)} colours)")
+    else:
+        if pink(144) < 10: errors.append("the occupied room's name not pink")
+        piece("row portrait 2x", 8, 24, 28, 30, 228, 145, 2, step=3)
+        piece("big portrait 3x", 8, 24, 28, 30, 906, 151, 3, step=3)
+    not_big()
+elif case in ("roominfo", "roominfo-vacant", "roominfo-hint"):
+    # Room info in HD (src/port/roominfo.*): the panel; the portrait the game's own (the concierge:
+    # occupying, or vacant) 3x; the focus ring around the guest's line; the values in warm white;
+    # the hint (M-ci-occ-info, Down, Down, A: the check-out's 2603): the popups' veil and box over
+    # it, its Close button (the picture's focus is pinned to none), the portrait under the box
+    # gone; never the touch screen 3x.
+    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    if case == "roominfo-hint":
+        expect("box band", C(304, 400), hexrgb("6171B2"))
+        expect("the Close button", C(500, 470), hexrgb("6A72B8"))
+        if C(330, 300) == bottom(172 + (330 - 223) // 3, 36 + (300 - 145) // 3): errors.append("the portrait drawn under the box")
+        text = sum(1 for y in range(232, 380, 2) for x in range(340, 940, 2) if C(x, y) == (255, 255, 255))
+        if text < 100: errors.append(f"no hint text ({text} white pixels)")
+    else:
+        expect("panel outline", C(176, 300), OUTLINE)
+        expect("title well", C(640, 50), hexrgb("6A72B8"))
+        piece("portrait 3x", 172, 36, 70, 86, 223, 145, 3, step=6)
+        if not ring(484, 163): errors.append("no focus ring around the guest's line")
+        if ring(484, 225): errors.append("a focus ring around the second line")
+        warm = sum(1 for y in range(140, 570, 2) for x in range(880, 1060, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
+        if warm < (200 if case == "roominfo" else 100): errors.append(f"too few values ({warm} warm pixels)")
+    not_big()
 elif case in ("pockets-menu", "pockets-armed"):
     # Pockets in HD (src/port/pockets.*): the Pockets tab's icon green, the focus ring around slot
     # 1 (the Arcade-Pie Factory), the counted items' icons the touch screen's pixels 2x (DS 99 +
@@ -745,6 +803,17 @@ pad_build() {
         --layout console --print-screen --print-game --print-hotel --print-town "${town[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
+# pad_hotel NAME STATE SCRIPT FRAMES: the early hotel's states (its clock, a scratch save), the hotel logged.
+pad_hotel() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 file=$shots/$2.st
+    [ -f "$file" ] || file=$more_shots/$2.st
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$tmp/$name.sav" \
+        --layout console --print-screen --print-game --print-hotel "${hotel[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_hotel pad-registry D-hotel-down registry-concierge 380 &
+pad_hotel pad-roominfo M-ci-early registry-info 330 &
+pad_hotel pad-checkin M-ci-g-base checkin-guest 260 &
 pad_build pad-build-scroll BD-list build-scroll 260 &
 pad_build pad-build-cancel BD-list build-cancel 260 &
 pad_build pad-build-buy BD-list build-buy 330 &
@@ -890,6 +959,31 @@ check_pad pad-build-scroll build_scroll
 check_pad pad-build-cancel build_cancel
 check_pad pad-build-buy build_buy
 check_pad pad-build-poor build_poor
+# The Registry and room info (src/port/checkin.*, roominfo.*), the early hotel: from the lobby,
+# MENU, Down, A on the concierge's "Registry" → the game's Registry; A → the Small Guest Room's
+# room info; B → the Registry, the focus back on the room; B → the panel. From M-ci-early: A, Down,
+# A → the base value's hint (2597, from the stylus's point); A → closed, the focus back on the
+# line; B, B → the panel. From M-ci-g-base (the research's patch: the concierge waiting as Sim 45),
+# Down, A on the Deluxe Guest Room (not built) → nothing; Up, A → checked into the Small Guest
+# Room (slot 0, the guests stayed 1), then the guest's speech; once.
+registry() {
+    in_order pad-registry 'game Panel/Interact' 'console menu open, focus 1' 'checkin mode=1 guest=-1 score=0 rows=29:ba:-1,8:--' \
+        'console menu closed, focus 0' 'roominfo place=29 occupant=45 occupied=0 .* total=422 hint=0' 'console menu closed, focus 1' \
+        'checkin mode=1 ' 'console menu closed, focus 0' 'game Panel/Interact'
+}
+roominfo_hints() {
+    in_order pad-roominfo 'checkin mode=1 ' 'roominfo place=29 .*hint=0' 'console menu closed, focus 2' 'roominfo .*hint=1:2597' \
+        'roominfo .*hint=0' 'console menu closed, focus 2' 'checkin mode=1 ' 'game Panel/Interact'
+}
+checkin_guest() {
+    in_order pad-checkin 'checkin mode=0 guest=45 score=0 rows=29:ba:-1' 'console menu closed, focus 1' 'console menu closed, focus 0' \
+        'hotel .*stayed=1 .*slots=29:45:[1-3],' 'checkin mode=0 guest=45 score=0 rows=29:b-:45' 'game Dialogue' || return 1
+    [ "$(grep -c 'stayed=1 ' "$tmp/pad-checkin.log")" -ge 1 ] && ! grep -q 'stayed=2 ' "$tmp/pad-checkin.log" || { echo "  pad-checkin: checked in twice"; return 1; }
+    ! grep -E 'slots=(8|15|18|20):45' "$tmp/pad-checkin.log" -q || { echo "  pad-checkin: an unbuilt room taken"; return 1; }
+}
+check_pad pad-registry registry
+check_pad pad-roominfo roominfo_hints
+check_pad pad-checkin checkin_guest
 check_pad pad-gift-close gift_close
 # Goals, Relationships, Options and the Save slots (src/port/goals.*, relations.*, options.*):
 # from B-pg8-goals, MENU, Down x3, Up → the game's selection 1, 2, 3 (its scroll first=1), 2,

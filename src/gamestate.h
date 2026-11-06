@@ -321,6 +321,7 @@ struct RegistryRow
     bool built = false;
     int occupant = -1;                // the Sim in the room, -1 vacant
     bool available = false;           // built and vacant (the Penthouse also needs game flag 0x15): the row can be used
+    bool infoOk = false;              // built (the Penthouse also needs game flag 0x15): the Registry opens its room info
     bool operator==(const RegistryRow&) const = default;
 };
 struct CheckInState
@@ -345,6 +346,10 @@ struct RoomInfoState
     int days = 0, month = 0, day = 0; // the check out date and the days left; the date counts a 365-day year
     int baseValue = 0, serviceCharge = 0, scoreBonus = 0, total = 0;   // simoleons per day (total: the daily cost)
     bool hint = false;                // a hint box is up (the next tap closes it)
+    // The hint's string (2594..2603), or -1: which line was tapped is not in RAM, so the frame loop
+    // (main.cpp) fills it from the stylus's last point when `hint` rises (RoomInfoHintAt,
+    // port/roominfo.h) and keeps it while the box is up; ReadGameState leaves it -1.
+    int hintId = -1;
     bool operator==(const RoomInfoState&) const = default;
 };
 
