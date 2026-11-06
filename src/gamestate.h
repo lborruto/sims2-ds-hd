@@ -137,6 +137,7 @@ struct InteractAction
     int code = 0;
     int labelId = -1;                 // 1845 + code
     bool greyed = false;              // disabled: the D-pad skips it
+    int amount = -1;                  // the label's @1 as the game sets it (Buy, Payoff, Bail, Pay); -1: none
     bool operator==(const InteractAction&) const = default;
 };
 struct InteractState

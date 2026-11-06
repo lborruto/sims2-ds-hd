@@ -8,7 +8,9 @@
 //     in HD (a valid MenuView, port/menuview.h), the focus is over the view's items instead of
 //     HotspotsFor: A runs the focused item's action (taps, DS buttons, drags, in order), greyed
 //     items are skipped and never run, the view's screen-wide buttons (Left / Right: Interact's
-//     targets) and list scroll apply, B runs the view's back action or closes the menu.
+//     targets), the focused item's own Left / Right, a selection the game owns (Up / Down its
+//     scroll) and the list's scroll apply (those taps held by the gate like A's), B runs the
+//     view's back action or closes the menu.
 //   Phone: the focus as in the menu; B or MENU tap the phone's X (back to the panel, menu closed).
 //   Gift, Catalogue, Build: the focus as in the menu; B taps the screen's X when it has one.
 //   Social, Cards, Vacuum: the activity's own buttons (activities.h); the cards' focus moves as
@@ -104,6 +106,10 @@ private:
     bool Run(const MenuAction& a, const TouchScript& touch);
     // One frame of the running action: taps and drags queued when the stylus is free, keys held.
     void Step(TouchScript& touch, u32& dsKeys);
+    // What a direction (0 up, 1 down, 2 left, 3 right) performs on view v with the current focus:
+    // the selection's scroll, the focused item's Left / Right, the view's Left / Right, the list's
+    // scroll past its end (scroll true); null: a focus move.
+    const MenuAction* DirAction(const MenuView& v, int dir, bool& scroll) const;
     // The panel's menu is open and the view given is valid: the focus is over it.
     bool UsesView(ScreenState s) const;
     // Whether a press of b would tap on s (the gate holds only those).

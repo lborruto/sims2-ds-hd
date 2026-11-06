@@ -7,6 +7,7 @@
 #include "hotspots.h"
 #include "port/icons.h"
 #include "port/interact.h"
+#include "port/statusbar.h"
 #include "romdata.h"
 
 namespace sims2wide
@@ -24,9 +25,21 @@ constexpr u32 kTabPlateFill = 0xFF9AA2E3;
 bool IsPunct(char c) { return c == '.' || c == ',' || c == '!' || c == '?' || c == ';' || c == ':' || c == ')'; }
 }
 
-std::string MenuWords(const RomData& rom, int id)
+std::string MenuWords(const RomData& rom, int id, int amount)
 {
-    const std::string in = rom.String(id);
+    std::string in = rom.String(id);
+    if (amount >= 0)
+    {
+        // The amount in @1, the simoleon glyph for '$' (as the HD status bar draws the money).
+        std::string f;
+        for (size_t i = 0; i < in.size(); i++)
+        {
+            if (in.compare(i, 2, "@1") == 0 && (i + 2 >= in.size() || !std::isdigit((unsigned char)in[i + 2]))) { f += GroupThousands(amount); i++; }
+            else if (in[i] == '$') f += "\xC2\xA7";
+            else f += in[i];
+        }
+        in = f;
+    }
     std::string s;
     for (size_t i = 0; i < in.size(); i++)
     {
@@ -95,9 +108,9 @@ FittedText FitLine(const std::string& text, float size, float minSize, int width
     std::string t = text;
     while (!t.empty() && TextWidth(t + dots, minSize, w) > width)
     {
-        t.pop_back();
+        // One whole letter: its continuation bytes, then its first byte.
         while (!t.empty() && ((unsigned char)t.back() & 0xC0) == 0x80) t.pop_back();
-        if (!t.empty() && ((unsigned char)t.back() & 0xC0) == 0xC0) t.pop_back();
+        if (!t.empty()) t.pop_back();
     }
     while (!t.empty() && t.back() == ' ') t.pop_back();
     f.text = t + dots;
@@ -134,10 +147,10 @@ int AddHint(Composition& c, int right, Button b, const std::string& label)
 MenuView PanelMenuView(ScreenState s, const GameState* game, const RomData* rom)
 {
     if (!game || !rom || rom->StringCount() <= kStrClose) return {};
-    return PanelMenuViewOf(s, *game);
+    return PanelMenuViewOf(s, *game, rom);
 }
 
-MenuView PanelMenuViewOf(ScreenState s, const GameState& game)
+MenuView PanelMenuViewOf(ScreenState s, const GameState& game, const RomData* rom)
 {
     MenuView v;
     if (s.screen != Screen::Panel || !game.valid) return v;
@@ -145,15 +158,21 @@ MenuView PanelMenuViewOf(ScreenState s, const GameState& game)
     {
     case Tab::Interact:
         if (!game.town.interact.valid) return v;
-        AddInteractView(v, game.town.interact);
+        AddInteractView(v, game.town.interact, rom);
         break;
     default: return v; // (the other tabs: milestone 1's composition until they are redrawn)
     }
-    // The phone button, after the tab's own items (the first focus is the tab's).
+    // The phone button, after the tab's own items (the first focus is the tab's), linked to them
+    // explicitly: the geometry alone puts it at the edge of the 60° cone from the rows.
+    const int tabFirst = MenuFirst(v), phoneAt = (int)v.items.size();
+    for (int i = 0; i < phoneAt; i++)
+        if (v.items[i].enabled && v.items[i].next[0] < 0 && MenuNeighbour(v, i, 0, -1) == i) v.items[i].next[0] = phoneAt;
     ViewItem phone;
-    phone.rect = {kPmPhone.x + 8, kPmPhone.y + 4, kPmPhone.w - 16, kPmPhone.h - 8};
+    phone.rect = kPmPhoneWell;
     phone.action = {TapStep(kPhoneIcon.x, kPhoneIcon.y)};
     phone.id = kPhoneId;
+    phone.next[1] = tabFirst;
+    if (rom) phone.word = MenuWords(*rom, kStrPhone);
     v.items.push_back(phone);
     v.valid = true;
     return v;
@@ -184,7 +203,7 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
         plate.radius = 18;
         c.ui.push_back(plate);
     }
-    UiItem phoneCell = PanelItem({kPmPhone.x + 8, kPmPhone.y + 4, kPmPhone.w - 16, kPmPhone.h - 8});
+    UiItem phoneCell = PanelItem(kPmPhoneWell);
     phoneCell.fill = th.frameDark; // (the game's well colour behind the live phone)
     phoneCell.border = 0;
     phoneCell.raised = false;
@@ -209,11 +228,8 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     phoneCell.layer = 1;
     c.ui.push_back(phoneCell);
 
-    // The tab's title.
-    std::string name;
-    if (s.tab == Tab::Interact && game.town.interact.target.kind != TargetRef::None && game.town.interact.target.nameId >= 0)
-        name = MenuWords(rom, game.town.interact.target.nameId);
-    const FittedText t = FitLine(MenuTitle(rom, tab, name), kPmTitleSize, kPmTextMin, kPmTitle.w - 48, Weight::ExtraBold);
+    // The tab's title (the view's, in the game's words; the tab's name without one).
+    const FittedText t = FitLine(v.title.empty() ? MenuTitle(rom, tab, "") : v.title, kPmTitleSize, kPmTextMin, kPmTitle.w - 48, Weight::ExtraBold);
     UiItem tt = TextItem({kPmTitle.x + 24, kPmTitle.y, kPmTitle.w - 48, kPmTitle.h}, t.text, t.size, Align::Centre, Weight::ExtraBold);
     tt.wrap = false;
     tt.middle = true;
@@ -226,16 +242,9 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     // The hints: A (the focused item's own word when it has one), B closes.
     int right = kPmHints.x + kPmHints.w - 8;
     right = AddHint(c, right, Button::B, MenuWords(rom, kStrClose));
-    std::string aWord;
-    if (focus >= 0 && focus < (int)v.items.size() && v.items[focus].enabled)
+    if (MenuFocusable(v, focus))
     {
-        if (s.tab == Tab::Interact && focus < (int)game.town.interact.actions.size())
-            aWord = InteractLabel(rom, game.town.interact.actions[focus].labelId);
-        else if (v.items[focus].id == kPhoneId) aWord = MenuWords(rom, kStrPhone);
-    }
-    if (focus >= 0 && focus < (int)v.items.size() && v.items[focus].enabled)
-    {
-        const FittedText a = FitLine(aWord, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+        const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
         AddHint(c, right, Button::A, a.text);
     }
 
@@ -259,7 +268,7 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
 
     // The mouse: the tab icons and the phone onto the game's own.
     for (int i = 0; i < 5; i++) AddMousePiece(c, kTabIcon[i].area, {kPmTabsX + i * kPmTabCell, cellY, kPmTabCell, kPmTabCell});
-    AddMousePiece(c, kPhoneIcon.area, {kPmPhone.x + 8, kPmPhone.y + 4, kPmPhone.w - 16, kPmPhone.h - 8});
+    AddMousePiece(c, kPhoneIcon.area, kPmPhoneWell);
 
     // The still items in ascending layers (the tab's wells on layer 0 come after the frame's
     // layer 1 items above), each layer in the order given; the images after them.

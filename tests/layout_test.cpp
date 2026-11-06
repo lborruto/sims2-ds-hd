@@ -192,6 +192,40 @@ static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int top
     CHECK(s.screen == Screen::Loading ? bottoms == 0 : bottoms > 0);
 }
 
+// Every enabled item of v reachable from every other by the pad's moves, as the navigator makes
+// them (MenuMove; Left / Right that run an action instead are no moves).
+static bool AllReachable(const MenuView& v)
+{
+    const int n = (int)v.items.size();
+    for (int from = 0; from < n; from++)
+    {
+        if (!v.items[from].enabled) continue;
+        std::vector<bool> seen(n, false);
+        std::vector<int> todo {from};
+        seen[from] = true;
+        while (!todo.empty())
+        {
+            const int i = todo.back();
+            todo.pop_back();
+            for (int d = 0; d < 4; d++)
+            {
+                if (d >= 2 && (!(d == 2 ? v.items[i].left : v.items[i].right).empty() ||
+                               !v.buttons[(int)(d == 2 ? MenuButton::Left : MenuButton::Right)].empty()))
+                    continue;
+                const int to = MenuMove(v, i, d);
+                if (to >= 0 && !seen[to]) { seen[to] = true; todo.push_back(to); }
+            }
+        }
+        for (int i = 0; i < n; i++)
+            if (v.items[i].enabled && !seen[i])
+            {
+                fprintf(stderr, "menu: item %d not reachable from %d\n", i, from);
+                return false;
+            }
+    }
+    return true;
+}
+
 int main()
 {
     // CONSOLE's compositions.
@@ -694,6 +728,30 @@ int main()
         CHECK(!v.items[2].enabled && v.items[0].enabled && v.items[3].enabled);
         CHECK(!v.buttons[(int)MenuButton::Left].empty() && !v.buttons[(int)MenuButton::Right].empty());
         CHECK(MenuFirst(v) == 0 && MenuNeighbour(v, 1, 0, 1) == 3); // the greyed row skipped
+
+        // Reachability on the real views: every enabled item from every other, the phone from
+        // the rows and back (Up from the top row, Down from the phone), with and without a
+        // target, greyed rows, neighbours (Left / Right then switch targets, not moves).
+        for (int rows : {0, 1, 3, 4})
+            for (int greyed : {-1, 0, 1})
+                for (bool side : {false, true})
+                {
+                    GameState h = g;
+                    InteractState& hi = h.town.interact;
+                    hi.actions.clear();
+                    for (int i = 0; i < rows; i++) hi.actions.push_back({i, 1845 + i, i == greyed});
+                    if (!side) hi.prev = hi.next = TargetRef {};
+                    if (rows == 0) hi.target = TargetRef {};
+                    const MenuView w = PanelMenuViewOf(it, h);
+                    CHECK(w.valid && AllReachable(w));
+                    const int phone = (int)w.items.size() - 1;
+                    const int top = MenuFirst(w);
+                    if (top != phone)
+                    {
+                        CHECK(MenuMove(w, top, 0) == phone);
+                        CHECK(MenuMove(w, phone, 1) == top);
+                    }
+                }
         CHECK(!PanelMenuView(it, &g, &rom).valid);                  // no strings: milestone 1's
         CHECK(!PanelMenuViewOf({Screen::Panel, Tab::Goals}, g).valid);
         GameState bad = g;
@@ -754,6 +812,21 @@ int main()
         CHECK(!f2.fits && f2.size == 22 && ui::TextWidth(f2.text, 22) <= 300 && f2.text.size() > 3);
         const FittedText f3 = FitLine("\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9", 30, 30, 40); // accents never split
         CHECK(!f3.fits && f3.text.size() % 2 == 1);
+        // Mixed letters: only whole letters go, never more than needed (an ASCII letter cut alone,
+        // not the accented one before it).
+        const std::string mixed = "a\xC3\xA9" "a\xC3\xA9" "a\xC3\xA9" "a\xC3\xA9" "a\xC3\xA9" "a\xC3\xA9";
+        for (int w = 20; w < 140; w += 7)
+        {
+            const FittedText f = FitLine(mixed, 30, 30, w);
+            if (f.fits) continue;
+            const std::string kept = f.text.substr(0, f.text.size() - 3);
+            CHECK(mixed.compare(0, kept.size(), kept) == 0);
+            CHECK(kept.empty() || ((unsigned char)kept.back() & 0xC0) != 0xC0); // no letter cut in two
+            // One more letter of the original would not fit.
+            size_t next = kept.size();
+            if (next < mixed.size()) { next++; while (next < mixed.size() && ((unsigned char)mixed[next] & 0xC0) == 0x80) next++; }
+            CHECK(ui::TextWidth(mixed.substr(0, next) + "\xE2\x80\xA6", 30) > w || next == mixed.size());
+        }
     }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }

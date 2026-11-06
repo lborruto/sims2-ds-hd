@@ -46,6 +46,12 @@ namespace
 {
 void Mix(u64& h, u64 v) { h = (h ^ v) * 0x100000001B3ull; }
 
+void MixText(u64& h, const std::string& t)
+{
+    Mix(h, t.size());
+    for (char c : t) Mix(h, (u8)c);
+}
+
 void MixAction(u64& h, const MenuAction& a)
 {
     Mix(h, a.size());
@@ -70,12 +76,18 @@ u64 MenuView::Hash() const
         Mix(h, ((u64)(u32)it.rect.w << 32) | (u32)it.rect.h);
         Mix(h, ((u64)it.id << 32) | ((u64)(u32)it.group << 1) | (u64)it.enabled);
         MixAction(h, it.action);
+        MixAction(h, it.left);
+        MixAction(h, it.right);
+        for (int n : it.next) Mix(h, (u64)(u32)n);
+        MixText(h, it.word);
     }
     for (const MenuAction& a : buttons) MixAction(h, a);
     MixAction(h, back);
     MixAction(h, scrollUp);
     MixAction(h, scrollDown);
     Mix(h, (u64)(u32)scrollGroup);
+    Mix(h, ((u64)(u32)initial << 32) | (u32)selected);
+    MixText(h, title);
     return h;
 }
 
@@ -112,6 +124,15 @@ int MenuNeighbour(const MenuView& v, int from, int dx, int dy)
         }
     }
     return best;
+}
+
+int MenuMove(const MenuView& v, int from, int dir)
+{
+    if (from < 0 || from >= (int)v.items.size() || dir < 0 || dir > 3) return from;
+    const int to = v.items[from].next[dir];
+    if (to != from && MenuFocusable(v, to)) return to;
+    static const int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
+    return MenuNeighbour(v, from, dx[dir], dy[dir]);
 }
 
 int MenuKeep(const MenuView& v, u32 id, int old)

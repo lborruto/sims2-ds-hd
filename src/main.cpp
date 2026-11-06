@@ -641,7 +641,7 @@ int main(int argc, char** argv)
                     else
                     {
                         std::string a;
-                        for (const InteractAction& x : v.actions) a += (a.empty() ? "" : ",") + std::to_string(x.code) + ":" + std::to_string(x.labelId) + (x.greyed ? ":grey" : "");
+                        for (const InteractAction& x : v.actions) a += (a.empty() ? "" : ",") + std::to_string(x.code) + ":" + std::to_string(x.labelId) + (x.greyed ? ":grey" : "") + (x.amount >= 0 ? ":$" + std::to_string(x.amount) : "");
                         fprintf(stderr, "frame %ld: interact target=%s prev=%s next=%s big=%d pad=%d hl=%d actions=%s\n", frame, tgt(v.target).c_str(), tgt(v.prev).c_str(), tgt(v.next).c_str(),
                                 v.bigPortraitRes, v.padMode, v.highlighted, a.empty() ? "-" : a.c_str());
                     }

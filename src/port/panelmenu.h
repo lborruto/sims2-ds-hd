@@ -34,7 +34,8 @@ constexpr Rect kPmContent {kPmInnerX, 206, kPmInnerW, 372}; // the tab's own are
 constexpr Rect kPmHints {kPmInnerX, 590, kPmInnerW, 40};    // the button hints, right-aligned
 constexpr int kPmTabCell = 88, kPmTabIcon = 72;             // a tab's cell; its icon 3x (24 px)
 constexpr int kPmTabsX = kPmPanel.x + kPmPanel.w / 2 - 5 * kPmTabCell / 2; // the first tab cell: LB, the tabs, RB centred
-constexpr Rect kPmPhone {kPmInnerX + kPmInnerW - 90, 44, 90, 84}; // the phone button's cell (its well inset 8, 4)
+constexpr Rect kPmPhone {kPmInnerX + kPmInnerW - 90, 44, 90, 84}; // the phone button's cell
+constexpr Rect kPmPhoneWell {kPmPhone.x + 8, kPmPhone.y + 4, kPmPhone.w - 16, kPmPhone.h - 8}; // its well: the item, the mouse's piece
 constexpr float kPmTitleSize = 32, kPmTextSize = 30, kPmTextMin = 22, kPmHintSize = 24;
 
 // The game's string ids the frame uses (the same in every language).
@@ -52,8 +53,10 @@ constexpr Rect kPmPhoneFrom {218, 10, 30, 34};
 // the panel's tab whose data reads (RAM valid, its part of GameState valid) with the game's
 // strings. Built every frame by both the navigator's caller (input.cpp) and CONSOLE.
 MenuView PanelMenuView(ScreenState s, const GameState* game, const RomData* rom);
-// The same from the game's state alone (no check of the strings: tests).
-MenuView PanelMenuViewOf(ScreenState s, const GameState& game);
+// The same without the strings' check (tests): rom null leaves the words (title, items' A words)
+// empty. The phone comes last, linked to the tab's items: Up from a top item (nothing enabled
+// above it) goes to the phone, Down from the phone to the tab's first item.
+MenuView PanelMenuViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);
 
 // The HD menu appended to c (after the dimmed world and before the status bar): the frame, the
 // tab's content, the focus on view item `focus`, the hints, and the mouse's pieces. icons may be
@@ -63,8 +66,10 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
 
 // Helpers the tabs share.
 // A game string as shown in a menu: RomData's escapes and any @ placeholder dropped (with a '$'
-// or empty brackets left before one: "Pay ($@1)" → "Pay"), spaces folded, one line.
-std::string MenuWords(const RomData& rom, int id);
+// or empty brackets left before one: "Pay ($@1)" → "Pay"), spaces folded, one line. amount >= 0
+// fills @1 as the game does for the verbs that carry one (grouped by ',', the game's '$' its
+// simoleon glyph drawn §: "Buy (§1,200)").
+std::string MenuWords(const RomData& rom, int id, int amount = -1);
 // The "@1: @2" title with the tab's name and `name` (empty: the tab's name alone, as the game).
 std::string MenuTitle(const RomData& rom, int tab, const std::string& name);
 // A single line fitted to `width`: the size shrunk from `size` to `minSize`, then "…"

@@ -967,10 +967,136 @@ static void view_scrolls_with_the_game()
     r.Frame(kInteract);
     CHECK(r.nav.Focus() == 2);
     CHECK(v1.items[2].id == 0x103);
-    // Not settled: no scroll (it would be a tap).
+    // Not settled: the scroll is a tap like A's, held, then replayed on the first settled frame.
     r.Frame(kInteract);
     r.Frame(kInteract, d, false);
+    r.Frame(kInteract, {}, false);
     CHECK(!r.touch.Owns());
+    r.Frame(kInteract, {}, true);
+    CHECK(r.Touched(x, y));
+    CHECK(x == 240 && y == 170);
+}
+
+// A selection the game owns (Relationships' Sim, the phone's row): the focus is held on it, and
+// Up / Down are the game's own scroll whatever the geometry; the rebuilt view moves the focus.
+static void view_selection_the_game_owns()
+{
+    auto sel = [](int selected) {
+        MenuView v;
+        v.valid = true;
+        for (int i = 0; i < 4; i++)
+        {
+            ViewItem it;
+            it.rect = {460, 210 + 76 * i, 620, 62};
+            it.action = {TapStep(100, 40 + 30 * i)};
+            it.id = 0x200 + (u32)i;
+            v.items.push_back(it);
+        }
+        v.selected = selected;
+        v.scrollUp = {TapStep(240, 40)};
+        v.scrollDown = {TapStep(240, 170)};
+        return v;
+    };
+    MenuView v1 = sel(1), v2 = sel(2);
+    Rig r;
+    r.view = &v1;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    CHECK(r.nav.Focus() == 1);
+    PadState d;
+    d.down = true;
+    r.Frame(kInteract, d);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == 240 && y == 170);
+    CHECK(r.nav.Focus() == 1); // the game has not moved yet
+    r.Drain();
+    r.Frame(kInteract);
+    r.view = &v2;
+    r.Frame(kInteract);
+    CHECK(r.nav.Focus() == 2);
+    // Up from the first row too (no geometry decides), A on the selected item.
+    MenuView v0 = sel(0);
+    r.view = &v0;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::up);
+    CHECK(r.Touched(x, y));
+    CHECK(x == 240 && y == 40);
+    r.Drain();
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::a);
+    CHECK(r.Touched(x, y));
+    CHECK(x == 100 && y == 40);
+    // Unsettled: held; the view changing meanwhile (the game moved by itself): dropped.
+    r.Drain();
+    r.Frame(kInteract);
+    r.Frame(kInteract, d, false);
+    r.Frame(kInteract, {}, false);
+    r.view = &v2;
+    r.Frame(kInteract, {}, true);
+    CHECK(!r.touch.Owns());
+}
+
+// An item's own Left / Right (Options' sliders): before the view's Left / Right and a focus move;
+// held while unsettled like a tap; the view's Left / Right held too.
+static void view_item_left_right()
+{
+    MenuView v = ListView();
+    v.items[1].right = {DragStep(232, 121, 200, 121)};
+    v.items[1].left = {DragStep(232, 121, 100, 121)};
+    v.buttons[(int)MenuButton::Right] = {TapStep(122, 167)};
+    Rig r;
+    r.view = &v;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::right); // row 0: the view's Right
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == 122 && y == 167);
+    r.Drain();
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::down);
+    CHECK(r.nav.Focus() == 1);
+    PadState right;
+    right.right = true;
+    r.Frame(kInteract, right);
+    int x0, y0, x1, y1;
+    CHECK(r.Path(x0, y0, x1, y1));
+    CHECK(x0 == 232 && x1 == 200);
+    r.Frame(kInteract);
+    // Unsettled: held, then replayed.
+    PadState left;
+    left.left = true;
+    r.Frame(kInteract, left, false);
+    r.Frame(kInteract, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(kInteract, {}, true);
+    CHECK(r.Path(x0, y0, x1, y1));
+    CHECK(x0 == 232 && x1 == 100);
+    // The view's Left / Right held the same way (Interact's targets).
+    MenuView t = ListView();
+    t.buttons[(int)MenuButton::Left] = {TapStep(55, 167)};
+    Rig q;
+    q.view = &t;
+    q.Frame(kInteract);
+    q.Press(kInteract, &PadState::menu);
+    q.Frame(kInteract, left, false);
+    q.Frame(kInteract, {}, false);
+    CHECK(!q.touch.Owns());
+    q.Frame(kInteract, {}, true);
+    CHECK(q.Touched(x, y));
+    CHECK(x == 55 && y == 167);
+    // An explicit move wins over the geometry.
+    MenuView e = ListView(4, -1);
+    e.items[3].next[1] = 0; // Down from the last row: back to the first
+    Rig w;
+    w.view = &e;
+    w.Frame(kInteract);
+    w.Press(kInteract, &PadState::menu);
+    for (int i = 0; i < 3; i++) w.Press(kInteract, &PadState::down);
+    CHECK(w.nav.Focus() == 3);
+    w.Press(kInteract, &PadState::down);
+    CHECK(w.nav.Focus() == 0);
 }
 
 int main()
@@ -1001,6 +1127,8 @@ int main()
     view_buttons_keys_and_sequences();
     view_content_changes();
     view_scrolls_with_the_game();
+    view_selection_the_game_owns();
+    view_item_left_right();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

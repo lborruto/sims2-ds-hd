@@ -52,6 +52,11 @@ struct EUTable
         u32 ifCount, ifCodes, maxActions, maxCode;           // IInteractable
         u32 actionLabel, unknownName, typeSim, typeObject, maxSimIndex;   // label 1845 + code, name 321, actor types, Sim record rows
         u32 greyCodes[4];
+        // The verbs whose label holds an amount (@1), as the game's own label methods set it
+        // (0x0208B708, 0x02093588, 0x020960E8, 0x02097554): Buy (2 x the object's record price,
+        // its row's +0xE, signed), Payoff 1500, Bail 200, Pay (the object's entry in the three
+        // {u8 record, u8, s16 amount} at G + payTable; none: no amount, the game prints stale text).
+        u32 ifActor, codeBuy, codePayoff, codeBail, codePay, payoffAmount, bailAmount, payTable, payEntries;
         // Pockets (Pk) and Goals (TG)
         u32 pkSlot, pkRing, ringShown, ringX, ringX0, ringStep;
         u32 tgCount, tgLines, tgEntries, tgEntryStride, tgSelected, tgFirst, maxGoals, maxLines, maxEntryLines;
@@ -119,6 +124,7 @@ constexpr EUTable kEU = {
         8, 0x10, 4, 106,
         1845, 321, 2, 0xB, 57,
         {2, 0x3A, 0x3B, 0x3C},
+        4, 0x5E, 0x4F, 0x5F, 7, 1500, 200, 0x2FA4 + 0x78, 3,
         0x74, 0x34, 4, 0x50, 109, 29,
         0x50C, 0x510, 0x18, 16, 0x514, 0x518, 44, 132, 8,
         0, 4, 8, 0xC,
@@ -391,6 +397,34 @@ bool ReadTarget(const Reader& m, u32 entry, TargetRef& t)
     return true;
 }
 
+// The amount the game prints in an action's label (@1), -1 when it sets none (InteractAction).
+int ActionAmount(const Reader& m, u32 iface, u32 code)
+{
+    const auto& q = kEU.menus;
+    const auto& t = kEU.town;
+    if (code == q.codePayoff) return (int)q.payoffAmount;
+    if (code == q.codeBail) return (int)q.bailAmount;
+    if (code != q.codeBuy && code != q.codePay) return -1;
+    u32 actor, k;
+    if (!m.R32(iface + q.ifActor, actor) || !m.In(actor, 0x10) || !m.R16(actor + q.actIndex, k)) return -1;
+    if (code == q.codeBuy)
+    {
+        if (k > 0x1FF) return -1;
+        u32 price;
+        if (!m.R16(t.recTable + t.recSize * (t.itemRow0 + k) + t.recPrice, price)) return -1;
+        return std::max(0, 2 * (int)(int16_t)price);
+    }
+    u32 G;
+    if (!m.R32(kEU.gameBlock, G)) return -1;
+    for (u32 i = 0; i < q.payEntries; i++)
+    {
+        u32 id, amount;
+        if (!m.R8(G + q.payTable + 4 * i, id) || !m.R16(G + q.payTable + 4 * i + 2, amount)) return -1;
+        if (id == (k & 0xFF)) return std::max(0, (int)(int16_t)amount);
+    }
+    return -1;
+}
+
 InteractState ReadInteract(const Reader& m, u32 S)
 {
     const auto& q = kEU.menus;
@@ -417,6 +451,7 @@ InteractState ReadInteract(const Reader& m, u32 S)
                 InteractAction a;
                 a.code = (int)code; a.labelId = (int)(q.actionLabel + code);
                 for (u32 c : q.greyCodes) if (c == code) a.greyed = true;
+                a.amount = ActionAmount(m, iface, code);
                 // The row's own selector button says it too (+0x94): it wins when it reads.
                 if (m.R32(T + q.itSelectors + 4 * i, sel) && sel != 0 && m.In(sel, 0x96) && m.R8(sel + q.selDisabled, dis) && dis <= 1) a.greyed = dis == 1;
                 v.actions.push_back(a);

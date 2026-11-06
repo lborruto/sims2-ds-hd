@@ -39,6 +39,8 @@ struct TierColours { u32 rim, body, light; };
 TierColours MeterColours(int tier);
 
 constexpr int kStatusBarH = 48;
+// The bar's still layer (ui::UiItem::layer), above an HD menu's frame (0) and content (1).
+constexpr int kStatusBarLayer = 2;
 // The status bar (UI items appended to c.ui) with its top-left at (x, y), at most maxW wide: the
 // meter shrinks to fit, then the label goes; every item stays inside the bar's panel. Returns
 // the panel's rectangle ({x, y, 0, 0} when nothing is drawn).

@@ -284,6 +284,15 @@ def hd_menu(rows, focus, wide=False):
     expect("panel band", C(180, 300), hexrgb("6171B2"))
     expect("panel fill", C(190, 300), FRAME)
     expect("title well", C(640, 166), hexrgb("6A72B8"))
+    # The tab bar: the game's own icons, Interact's (the first of the five cells from x 420, 88
+    # wide) the green one, the others blue (no green pixel).
+    def greens(cell):
+        x0 = 420 + 88 * cell
+        return sum(1 for y in range(48, 126, 2) for x in range(x0 + 8, x0 + 80, 2)
+                   if (lambda p: p[1] > p[0] + 50 and p[1] > p[2] + 30)(C(x, y)))
+    counts = [greens(i) for i in range(5)]
+    if counts[0] < 200 or any(counts[1:]):
+        errors.append(f"tab icons' green pixels {counts} (want Interact's only)")
     piece("portrait 3x", 63, 47, 65, 81, 220, 230, 3, step=4)
     for i in range(4):
         row = [C(x, y) for y in range(214 + 76 * i, 268 + 76 * i) for x in range(488, 900)]

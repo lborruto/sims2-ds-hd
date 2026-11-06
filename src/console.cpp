@@ -136,6 +136,10 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
         BuildPanelMenu(c, s, v, focus, *game, *rom, icons, bottom);
         if (bar) AddStatusBar(c, *hud, *strings);
+        // The UI in layer order (the bar's layer after the menu's), the images last.
+        std::stable_sort(c.ui.begin(), c.ui.end(), [](const ui::UiItem& a, const ui::UiItem& b) {
+            return (a.kind == ui::UiItem::Image ? 1 << 20 : a.layer) < (b.kind == ui::UiItem::Image ? 1 << 20 : b.layer);
+        });
         return c; // (the focus is the view's: no ring from HotspotsFor)
     }
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)

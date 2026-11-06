@@ -42,12 +42,13 @@ constexpr u32 kInteractRowId = 0x100;
 
 // Interact's items appended to v (the rows: one per action the game lists, greyed ones disabled)
 // and its Left / Right (the strip's previous / next target, when there is one).
-void AddInteractView(MenuView& v, const InteractState& in);
+// rom (null: no words): the rows' words (the verbs, with the game's amount) and the title.
+void AddInteractView(MenuView& v, const InteractState& in, const RomData* rom);
 // Its drawing (UI items, the mouse's pieces) in the frame's content area.
 void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons,
                    const u32* bottom);
-// The row label as shown.
-std::string InteractLabel(const RomData& rom, int labelId);
+// The row label as shown (amount: the game's @1 for it, -1 none).
+std::string InteractLabel(const RomData& rom, int labelId, int amount = -1);
 
 // (A check, --measure-menu) every word the tab can show, in rom's language, fitted to its HD
 // box: the verbs 1845-1951 in a row and in the A hint, the titles "Interact: <name>" and the

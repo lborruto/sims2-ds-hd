@@ -568,6 +568,32 @@ static void interact_list()
     CHECK(n.valid && n.target.kind == TargetRef::None && n.actions.empty());
     CHECK(ReadGameState(r.View()).town.goals.valid == false);   // read only on its own tab
 }
+
+// The amounts the game's own label methods put in @1: Buy 2 x the object's record price, Payoff
+// 1500, Bail 200, Pay the object's entry in G's three {record, -, amount}; none for other verbs.
+static void interact_amounts()
+{
+    Ram r = menus_ram(0x0213203C, -1, 0);
+    r.W32(kS + 0x34, kT); r.W32(kT, 0x021321C4);
+    put_item_row(r, 29, 100);
+    r.W32(kT + 0x300, kE); r.W32(kE, kActor); r.W32(kE + 4, 1);
+    r.W16(kActor + 0xA, 29); r.W16(kActor + 0xC, 0xB); r.W32(kActor + 0x130, kIface);
+    r.W32(kIface + 4, kActor);
+    r.W32(kIface + 8, 4); r.W8(kIface + 0x10, 0x5E); r.W8(kIface + 0x11, 0x4F); r.W8(kIface + 0x12, 0x5F); r.W8(kIface + 0x13, 7);
+    r.W32(kT + 0x314, 1); r.W32(kT + 0x318, 0);
+    r.W8(kGb + 0x301C + 4, 29); r.W16(kGb + 0x301C + 6, 350);   // Pay: the second entry is this object's
+    InteractState v = ReadGameState(r.View()).town.interact;
+    CHECK(v.valid && v.actions.size() == 4);
+    if (v.actions.size() == 4)
+    {
+        CHECK(v.actions[0].amount == 160);   // 2 x the row's 80
+        CHECK(v.actions[1].amount == 1500 && v.actions[2].amount == 200 && v.actions[3].amount == 350);
+    }
+    r.W8(kGb + 0x301C + 4, 30);              // no entry for it: no amount
+    r.W8(kIface + 0x10, 0x62);               // another verb: none
+    v = ReadGameState(r.View()).town.interact;
+    CHECK(v.valid && v.actions[0].amount == -1 && v.actions[3].amount == -1);
+}
 static void goals_list()
 {
     Ram r = menus_ram(0x0213203C, -1, 2);
@@ -686,6 +712,7 @@ int main()
     saves();
     town_random();
     interact_list();
+    interact_amounts();
     goals_list();
     relations_list();
     phone_gift_note();

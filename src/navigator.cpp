@@ -161,6 +161,32 @@ void Navigator::Step(TouchScript& touch, u32& dsKeys)
     }
 }
 
+const MenuAction* Navigator::DirAction(const MenuView& v, int dir, bool& scroll) const
+{
+    scroll = false;
+    const bool vertical = dir <= 1;
+    const MenuAction& gameScroll = dir == 0 ? v.scrollUp : v.scrollDown;
+    // A selection the game owns: Up / Down are its own buttons (its scroll).
+    if (MenuFocusable(v, v.selected) && vertical) return gameScroll.empty() ? nullptr : &gameScroll;
+    if (!vertical)
+    {
+        if (MenuFocusable(v, focus_))
+        {
+            const MenuAction& own = dir == 2 ? v.items[focus_].left : v.items[focus_].right;
+            if (!own.empty()) return &own;
+        }
+        const MenuAction& side = v.buttons[(int)(dir == 2 ? MenuButton::Left : MenuButton::Right)];
+        return side.empty() ? nullptr : &side;
+    }
+    // Past the list's end: the game's own scroll (the focus follows once the rebuilt view shows more).
+    if (MenuFocusable(v, focus_) && MenuMove(v, focus_, dir) == focus_ && v.items[focus_].group == v.scrollGroup && !gameScroll.empty())
+    {
+        scroll = true;
+        return &gameScroll;
+    }
+    return nullptr;
+}
+
 bool Navigator::UsesView(ScreenState s) const
 {
     return view_ && view_->valid && s.screen == Screen::Panel && menuOpen_;
@@ -271,34 +297,41 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     {
         if (useView)
         {
-            // The HD menu (port/menuview.h): the focus over the view's enabled items.
+            // The HD menu (port/menuview.h): the focus over the view's enabled items; a selection
+            // the game owns holds it.
             const MenuView& v = *view_;
+            if (MenuFocusable(v, v.selected)) focus_ = v.selected;
             if (!MenuFocusable(v, focus_)) focus_ = MenuFirst(v);
             // A move that waited for the list's own scroll: once the rebuilt view shows more.
             if (pendingDir_ >= 0 && (viewChanged || ++pendingFrames_ > kHoldFrames))
             {
-                if (viewChanged && focus_ >= 0)
-                {
-                    static const int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
-                    focus_ = MenuNeighbour(v, focus_, dx[pendingDir_], dy[pendingDir_]);
-                }
+                if (viewChanged && focus_ >= 0 && !MenuFocusable(v, v.selected)) focus_ = MenuMove(v, focus_, pendingDir_);
                 pendingDir_ = -1;
             }
-            if (move)
+            // A direction: an action (the item's Left / Right, the view's, the game's scroll) is a
+            // tap like A's, held by the gate while not settled and replayed (or dropped when the
+            // view changed); otherwise a focus move, never held.
+            static bool PadState::*const kDirs[4] = {&PadState::up, &PadState::down, &PadState::left, &PadState::right};
+            int act = -1;
+            for (int d = 0; d < 4; d++)
+                if (replay == kDirs[d]) act = d;
+            if (move && act < 0)
             {
-                const MenuAction& side = v.buttons[(int)(dir == 2 ? MenuButton::Left : MenuButton::Right)];
-                if ((dir == 2 || dir == 3) && !side.empty()) { if (settled) Run(side, touch); }
-                else if (focus_ >= 0)
+                bool scroll = false;
+                if (DirAction(v, dir, scroll))
                 {
-                    static const int dx[4] = {0, 0, -1, 1}, dy[4] = {-1, 1, 0, 0};
-                    const int to = MenuNeighbour(v, focus_, dx[dir], dy[dir]);
-                    // Past the list's end: the game's own scroll, the focus following once it shows.
-                    const MenuAction& scroll = dir == 0 ? v.scrollUp : v.scrollDown;
-                    if (to == focus_ && dir <= 1 && v.items[focus_].group == v.scrollGroup && !scroll.empty())
-                    {
-                        if (settled && Run(scroll, touch)) { pendingDir_ = dir; pendingFrames_ = 0; }
-                    }
-                    else focus_ = to;
+                    if (settled) act = dir;
+                    else { held_ = kDirs[dir]; heldFrames_ = 0; heldHash_ = viewHash; }
+                }
+                else if (focus_ >= 0) focus_ = MenuMove(v, focus_, dir);
+            }
+            if (act >= 0)
+            {
+                bool scroll = false;
+                if (const MenuAction* a = DirAction(v, act, scroll); a && Run(*a, touch) && scroll)
+                {
+                    pendingDir_ = act;
+                    pendingFrames_ = 0;
                 }
             }
             if (pressed(&PadState::a) && MenuFocusable(v, focus_)) Run(v.items[focus_].action, touch);
@@ -385,6 +418,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     default: focus_ = -1; break;
     }
     prev_ = pad;
+    view_ = nullptr; // (the caller's view lives for this call only)
 }
 
 void Navigator::Leave(TouchScript& touch)

@@ -21,6 +21,7 @@ constexpr u32 kRowFill = 0xFF6A72B8, kRowFocusFill = 0xFF9AA2E3;
 constexpr u32 kGreyText = 0x80FFFFFF, kGreyShadow = 0x40383869;
 constexpr int kArrowIcon = 48;      // the ▶, 2x
 constexpr u32 kStripDim = 0xC0FFFFFF;
+constexpr u32 kPlateRim = 0xFFB2B2E3; // the game's light lavender
 
 Rect RowRect(int i) { return {kInteractRowX, kInteractRowY + i * (kInteractRowH + kInteractRowGap), kInteractRowW, kInteractRowH}; }
 
@@ -57,10 +58,15 @@ constexpr int kLabelInset = 28;
 int LabelW() { return kInteractRowW - kLabelInset - kArrowIcon - 28; }
 }
 
-std::string InteractLabel(const RomData& rom, int labelId) { return labelId >= 0 ? MenuWords(rom, labelId) : std::string(); }
-
-void AddInteractView(MenuView& v, const InteractState& in)
+std::string InteractLabel(const RomData& rom, int labelId, int amount)
 {
+    return labelId >= 0 ? MenuWords(rom, labelId, amount) : std::string();
+}
+
+void AddInteractView(MenuView& v, const InteractState& in, const RomData* rom)
+{
+    if (rom)
+        v.title = MenuTitle(*rom, 0, in.target.kind != TargetRef::None && in.target.nameId >= 0 ? MenuWords(*rom, in.target.nameId) : "");
     const int n = std::min((int)in.actions.size(), kInteractRows);
     for (int i = 0; i < n; i++)
     {
@@ -70,6 +76,7 @@ void AddInteractView(MenuView& v, const InteractState& in)
         it.action = {TapStep(kInteractArrowX, kInteractArrowY0 + i * kInteractArrowStep)};
         it.group = 1;
         it.id = kInteractRowId + ((u32)in.actions[i].code << 4) + (u32)i;
+        if (rom) it.word = InteractLabel(*rom, in.actions[i].labelId, in.actions[i].amount);
         v.items.push_back(it);
     }
     if (in.prev.kind != TargetRef::None) v.buttons[(int)MenuButton::Left] = {TapStep(kInteractPrevX, kInteractStripY)};
@@ -108,7 +115,7 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
         row.layer = 1;
         c.ui.push_back(row);
         const int textX = r.x + kLabelInset, textW = LabelW();
-        const FittedText t = FitLine(InteractLabel(rom, in.actions[i].labelId), kPmTextSize, kPmTextMin, textW, Weight::ExtraBold);
+        const FittedText t = FitLine(v.items[i].word, kPmTextSize, kPmTextMin, textW, Weight::ExtraBold);
         UiItem label = TextItem({textX, r.y, textW, r.h}, t.text, t.size, Align::Left, Weight::ExtraBold);
         label.wrap = false;
         label.middle = true;
@@ -118,16 +125,16 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
         AddMousePiece(c, {kInteractArrowFrom.x, kInteractArrowFrom.y + i * kInteractArrowStep, kInteractArrowFrom.w, kInteractArrowFrom.h}, r);
     }
 
-    // The strip: the previous target at the left, the current one in the middle (on a plate,
-    // ringed in the game's green as its bracket), the next at the right; the D-pad's chip when
+    // The strip: the previous target at the left, the current one in the middle (on a plate with
+    // a thin light rim), the next at the right; the D-pad's chip when
     // Left / Right switch.
     const StripBoxes sb = Strip();
     if (in.target.kind != TargetRef::None)
     {
         UiItem plate = PanelItem({sb.cur.x, sb.cur.y + 8, sb.cur.w, sb.cur.h - 16});
         plate.fill = th.frame;
-        plate.borderArgb = 0xFF309A41;
-        plate.border = 3;
+        plate.borderArgb = kPlateRim; // (not green: only the focus is)
+        plate.border = 2;
         plate.radius = (sb.cur.h - 16) / 2.0f;
         plate.layer = 1;
         c.ui.push_back(plate);
@@ -209,7 +216,8 @@ MenuMeasure MeasureInteract(const RomData& rom)
     for (int id = 1845; id <= 1951; id++)
     {
         if (unused(id)) continue;
-        const std::string label = InteractLabel(rom, id);
+        // A verb with an amount, at the widest the game's money reaches.
+        const std::string label = InteractLabel(rom, id, rom.String(id).find("@1") != std::string::npos ? 99999999 : -1);
         fit(0, id, label, kPmTextSize, kPmTextMin, LabelW(), Weight::ExtraBold);
         fit(1, id, label, kPmHintSize, kPmHintSize, hintW, Weight::ExtraBold);
         const float w = TextWidth(label, kPmTextSize, Weight::ExtraBold);

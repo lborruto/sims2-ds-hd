@@ -14,6 +14,7 @@
 // rebuilt that frame, the focus stays on the item with the same id or clamps to the nearest
 // enabled one, and a press waiting for the gate is dropped when the view's Hash changed.
 #pragma once
+#include <string>
 #include <vector>
 
 #include "common.h"
@@ -45,6 +46,16 @@ struct ViewItem
     bool enabled = true;   // false: shown dimmed (greyed, empty), the focus skips it, A never performs it
     int group = 0;         // a list: Up / Down past its ends perform scrollUp / scrollDown (when given)
     u32 id = 0;            // stable across rebuilds (the focus stays on the same id)
+    // Left / Right while this item has the focus (a slider's knob: Options' volumes): before the
+    // view's screen-wide Left / Right and before a focus move; empty: as without.
+    MenuAction left, right;
+    // Explicit focus moves, item indices for Up, Down, Left, Right (-1: the nearest by geometry,
+    // MenuNeighbour): a link the geometry would leave to chance (the panel's phone button above
+    // the tab's first row and back).
+    int next[4] = {-1, -1, -1, -1};
+    // The word A's hint shows while it has the focus (the game's own, e.g. the row's verb); empty:
+    // the chip alone.
+    std::string word;
 };
 
 // Screen-wide buttons (not the focused item's).
@@ -64,9 +75,16 @@ struct MenuView
     int scrollGroup = 0;
     // The item focused when the screen opens (an index; -1: the first enabled one).
     int initial = -1;
+    // A selection the game owns (Relationships' Sim, the phone's row): when >= 0 and enabled, the
+    // focus is held on that item, and every Up / Down performs scrollUp / scrollDown (the game's
+    // own buttons move its selection; the rebuilt view follows it). -1: the navigator's focus.
+    int selected = -1;
+    // The tab's title, in the game's words (the frame draws it).
+    std::string title;
 
-    // What the player sees and what the items do (rects, actions, enabled, ids, buttons): a press
-    // held by the gate is dropped when this changes before it runs.
+    // What the player sees and what the items do (rects, actions, enabled, ids, moves, words,
+    // buttons, the selection, the title): a press held by the gate is dropped when this changes
+    // before it runs.
     u64 Hash() const;
 };
 
@@ -75,8 +93,13 @@ int MenuFirst(const MenuView& v);
 // The nearest enabled item from `from` in the direction (dx, dy): the item centres within 60
 // degrees of it, nearest first (greyed rows are skipped as if absent); `from` when none.
 int MenuNeighbour(const MenuView& v, int from, int dx, int dy);
-// The focus after a rebuild: the item with `id` when it is still there and enabled, else the
-// enabled item nearest to index `old` (clamped to the list), else MenuFirst.
+// The focused item after a Up (0), Down (1), Left (2) or Right (3) press: the item's explicit
+// `next` when it is focusable, else MenuNeighbour; `from` when nothing lies that way.
+int MenuMove(const MenuView& v, int from, int dir);
+// The focus after a rebuild: the enabled item with `id` when there is one; else, `old` clamped
+// to the list, the enabled item at that index (the one that took a removed item's place), else
+// the nearest enabled one, the one before before the one after at the same distance; -1 when
+// none is enabled.
 int MenuKeep(const MenuView& v, u32 id, int old);
 // Whether `i` is a focusable item of v.
 inline bool MenuFocusable(const MenuView& v, int i) { return i >= 0 && i < (int)v.items.size() && v.items[i].enabled; }
