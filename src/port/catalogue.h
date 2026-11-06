@@ -70,9 +70,15 @@ struct CatalogueGeometry
 };
 CatalogueGeometry CatalogueLayout(bool vendor);
 
-// Item ids (stable across rebuilds; a cell's id carries its list index and record row, an owned
-// place's its item id: a list re-rolled or an item sold is another item).
-constexpr u32 kCaCellId = kModCatalogue + 0x100, kCaOwnedId = kModCatalogue + 0x200, kCaPayId = kModCatalogue + 0x300;
+// Item ids (stable across rebuilds; a cell's id carries its record row and list index, an owned
+// place's its item id and place: a list re-rolled or an item sold is another item). The kinds
+// sit in bits 20-23 and the row / item id (< 0x1000) above the index (4 bits), so no two meet.
+constexpr u32 kCaCellId = kModCatalogue + (1u << 20), kCaOwnedId = kModCatalogue + (2u << 20), kCaPayId = kModCatalogue + (3u << 20),
+              kCaEmptyId = kModCatalogue + (4u << 20); // + 8 for an empty owned place
+inline u32 CatalogueCellId(int row, int index) { return kCaCellId + ((u32)row << 4) + (u32)index; }
+inline u32 CatalogueOwnedId(int itemId, int place) { return kCaOwnedId + ((u32)itemId << 4) + (u32)place; }
+// The view's order: the six shop cells, Pay, then the store's six owned places.
+constexpr int kCaPayIndex = 6, kCaOwned0 = 7;
 
 // The item ids the game will not buy back (its quest items: a tap on its button only plays a sound).
 bool CatalogueRefusesSale(int itemId);

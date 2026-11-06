@@ -35,6 +35,14 @@ DsPoint OwnedPoint(int i) { return {kCaOwnedX0 + (i % 2) * kCaOwnedDx, kCaCellY0
 Rect HitAround(DsPoint p) { return {p.x - 16, p.y - 16, 32, 32}; }
 Rect ButtonHit(int x, int y) { return {x - 15, y - 15, 30, 30}; }
 
+// The width the A hint's word is fitted to: what B's "Close" leaves of the hints' band.
+int HintAWidth(const RomData& rom)
+{
+    const Rect b = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold);
+    const int right = kPmHints.x + kPmHints.w - 8 - b.w - 28;
+    return right - kPmHints.x - 60;
+}
+
 // An item's icon in its cell, from the record's own triple (tiles, descriptor, palette: a few
 // items' palettes are not the descriptor's neighbour), the largest whole factor (3x at most) that
 // leaves the cell's rim clear (the store's pictures are 24 to 32 pixels: a bed 2x, a chair 3x).
@@ -109,7 +117,8 @@ bool CataloguePays(const CatalogueState& ca)
 {
     const ShopItem* s = Selected(ca);
     if (!ca.valid || !s) return false;
-    if (!ca.sell) return ca.money >= s->buyPrice && (int)ca.owned.size() < kOwnedPlaces;
+    // (A price of 0 or less is never paid: a record the port cannot show a sum for.)
+    if (!ca.sell) return s->buyPrice > 0 && ca.money >= s->buyPrice && (int)ca.owned.size() < kOwnedPlaces;
     return !ca.vendor && ca.shop == kCaStore && s->sellPrice > 0 && !CatalogueRefusesSale(s->id);
 }
 
@@ -146,18 +155,19 @@ MenuView CatalogueViewOf(ScreenState s, const GameState& game, const RomData* ro
         it.enabled = i < count;
         if (it.enabled)
         {
-            it.id = kCaCellId + (u32)i + ((u32)ca.items[i].row << 8);
+            it.id = CatalogueCellId(ca.items[i].row, i);
             const DsPoint p = CellPoint(ca.vendor, c);
             it.action = {TapStep(p.x, p.y)};
+            if (rom) it.word = MenuWords(*rom, kStrBuy); // (the mode the tap sets)
         }
-        else it.id = kCaCellId + 0xF0 + (u32)c;
+        else it.id = kCaEmptyId + (u32)c;
         v.items.push_back(it);
     }
     // Pay: the game's button. Always focusable (the D-pad's way through the screen does not move
     // under the player's thumb); it performs only when the game would pay (CataloguePays), else it
     // is drawn greyed and A does nothing.
     const ShopItem* sel = Selected(ca);
-    const int pay = (int)v.items.size();
+    const int pay = kCaPayIndex;
     {
         ViewItem it;
         it.rect = g.pay;
@@ -171,7 +181,7 @@ MenuView CatalogueViewOf(ScreenState s, const GameState& game, const RomData* ro
         v.items.push_back(it);
     }
     // The owned places (the store only): the pockets' six.
-    const int owned0 = (int)v.items.size();
+    const int owned0 = kCaOwned0;
     if (!ca.vendor)
         for (int i = 0; i < kOwnedPlaces; i++)
         {
@@ -180,11 +190,12 @@ MenuView CatalogueViewOf(ScreenState s, const GameState& game, const RomData* ro
             it.enabled = i < (int)ca.owned.size();
             if (it.enabled)
             {
-                it.id = kCaOwnedId + (u32)i + ((u32)ca.owned[i].id << 8);
+                it.id = CatalogueOwnedId(ca.owned[i].id, i);
                 const DsPoint p = OwnedPoint(i);
                 it.action = {TapStep(p.x, p.y)};
+                if (rom) it.word = MenuWords(*rom, kStrSell);
             }
-            else it.id = kCaOwnedId + 0xF0 + (u32)i;
+            else it.id = kCaEmptyId + 8 + (u32)i;
             v.items.push_back(it);
         }
     // Explicit moves in the shop's grid: Up from its top row and Down from its bottom row stay
@@ -224,7 +235,7 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
     const Theme& th = GameTheme();
     const CatalogueState& ca = game.catalogue;
     const CatalogueGeometry g = CatalogueLayout(ca.vendor);
-    const int pay = kCells, owned0 = kCells + 1;
+    const int pay = kCaPayIndex, owned0 = kCaOwned0;
     if ((int)v.items.size() < kCells + 1 + (ca.vendor ? 0 : kOwnedPlaces)) return;
     const size_t first = c.ui.size();
 
@@ -374,7 +385,7 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
     int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty())
     {
-        const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+        const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, HintAWidth(rom), Weight::ExtraBold);
         right = AddHint(c, right, Button::A, a.text);
     }
     if (!ca.vendor && (ca.upEnabled || ca.downEnabled)) AddHint(c, right, Button::DPadV, "");
@@ -443,7 +454,8 @@ void MeasureCatalogue(const RomData& rom, BlockMeasure& m)
         const std::string w = MenuWords(rom, id) + " " + Price(rom, 65534);
         line(id, w, kCaPaySize, kCaPayMin, store.payText.w);
         line(id, w, kCaPaySize, kCaPayMin, vendor.payText.w);
-        line(id, w, kPmHintSize, kPmHintSize, 400); // (the A hint beside B's)
+        line(id, w, kPmHintSize, kPmHintSize, HintAWidth(rom)); // (the A hint beside B's)
+        line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, HintAWidth(rom)); // (a cell's A)
     }
 }
 }

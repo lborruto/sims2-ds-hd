@@ -961,6 +961,8 @@ int main()
                             const MenuView v = CatalogueViewOf(cs, h);
                             const size_t n = vendor ? 7 : 13;
                             CHECK(v.valid && v.own && !v.replay && v.backCloses && v.items.size() == n && AllReachable(v));
+                            for (size_t a = 0; a < v.items.size(); a++)
+                                for (size_t b = a + 1; b < v.items.size(); b++) CHECK(v.items[a].id != v.items[b].id);
                             CHECK(v.back.size() == 1 && v.back[0].x == kCaCloseX && v.back[0].y == kCaCloseY);
                             for (int c = 0; c < 6; c++)
                             {
@@ -1055,6 +1057,28 @@ int main()
             CHECK(!CatalogueViewOf(cs, h).valid);
             h.catalogue.valid = true;
             CHECK(!CatalogueView(cs, &h, &rom).valid); // no strings: milestone 1's
+            // Every id distinct, where the first ids met: owned place 0 holding item 1 against Pay,
+            // a cell's row against an owned item id at the same index.
+            {
+                GameState q = shop(false, 12, 0, 2, false, 0, 100);
+                q.catalogue.owned[0].id = 1;
+                q.catalogue.items[0].row = 1 + 1;
+                q.catalogue.items[1].row = q.catalogue.owned[1].id + 1; // (the first ids: 0x100 + 1 + row << 8 == 0x200 + 1 + id << 8)
+                const MenuView w = CatalogueViewOf(cs, q);
+                for (size_t a = 0; a < w.items.size(); a++)
+                    for (size_t b = a + 1; b < w.items.size(); b++) CHECK(w.items[a].id != w.items[b].id);
+                CHECK(w.items[kCaPayIndex].id == kCaPayId && w.items[kCaOwned0].id != kCaPayId);
+            }
+            // A price of 0 (or less) is never paid: the port would spend a sum it does not show.
+            {
+                GameState q = shop(false, 12, 0, 0, false, 0, 100);
+                q.catalogue.items[0].buyPrice = 0;
+                CHECK(!CataloguePays(q.catalogue) && CatalogueViewOf(cs, q).items[kCaPayIndex].action.empty());
+                q.catalogue.items[0].buyPrice = -20;
+                CHECK(!CataloguePays(q.catalogue));
+            }
+            // The cells' A word is the mode their tap sets (none without the strings).
+            CHECK(CatalogueViewOf(cs, shop(false, 12, 0, 1, false, 0, 100)).items[0].word.empty());
             // The ids: a re-rolled list is other items (the focus does not stay on a new item by its place).
             GameState k = shop(false, 12, 0, 0, false, 0, 100);
             const u32 before = CatalogueViewOf(cs, k).items[0].id;
@@ -1446,6 +1470,45 @@ int main()
                     CHECK(PopupViewOf(on, off).valid == (kind == 3));
                     CHECK(!PopupView(on, &h, &rom).valid); // (no strings: milestone 1's)
                 }
+            {
+                // A popup over the HD catalogue (port/catalogue.h): the popup's view, the catalogue
+                // drawn beneath it without a focus, its cells taking no click, the popup's X on the game's.
+                GameState h;
+                h.valid = true;
+                h.screen = GScreen::Catalogue;
+                h.town.popup = {true, 2, 0, std::string(80, 'w'), "Title", -1, false, 56, 160, 6};
+                CatalogueState& ca = h.catalogue;
+                ca.valid = true;
+                ca.shop = kCaStore;
+                for (int i = 0; i < 12; i++) ca.items.push_back({100 + i + 0x3B, 100 + i, 563 + i, 922 + i, 1991, 200, 100});
+                ca.selected = 0;
+                ca.money = 1000;
+                ca.downEnabled = true;
+                const ScreenState on {Screen::Catalogue, Tab::None};
+                const MenuView v = PopupViewOf(on, h);
+                CHECK(v.valid && v.popup && v.items.size() == 1);
+                CHECK(UnderScreen(on, h).screen == Screen::Catalogue);
+                const MenuView u = CatalogueViewOf(on, h);
+                CHECK(u.valid);
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                world.touch = false;
+                comp.pieces.push_back(world);
+                BuildCatalogue(comp, u, -1, h, rom, nullptr);
+                BuildPopup(comp, v, 0, h, rom);
+                SortUi(comp.ui);
+                int layer = 0;
+                for (const ui::UiItem& it : comp.ui)
+                {
+                    if (it.kind == ui::UiItem::Image) continue;
+                    CHECK(it.layer >= layer);
+                    layer = it.layer;
+                }
+                CHECK(TouchFromComposition(comp, fit, kPopClose.x + kPopClose.w / 2.0f, kPopClose.y + kPopClose.h / 2.0f, tx, ty));
+                CHECK(inside(tx, ty, {120, 104, 24, 24}));
+                const Rect cell = u.items[0].rect;
+                CHECK(!TouchFromComposition(comp, fit, cell.x + cell.w / 2.0f, cell.y + cell.h / 2.0f, tx, ty)); // the catalogue beneath
+            }
             // A popup the game shows over Save slots, Give Gift or the phone whose HD view does not
             // read (a box without its place): no view at all, not the screen's (milestone 1's picture
             // holds the game's own popup). (This rom has no strings: the guard itself is PopupOver's.)

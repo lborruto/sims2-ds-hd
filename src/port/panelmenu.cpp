@@ -195,7 +195,7 @@ MenuView PanelMenuViewOf(ScreenState s, const GameState& game, const RomData* ro
     // explicitly: the geometry alone puts it at the edge of the 60° cone from the rows.
     const int tabFirst = MenuFirst(v), phoneAt = (int)v.items.size();
     for (int i = 0; i < phoneAt; i++)
-        if (v.items[i].enabled && v.items[i].next[0] < 0 && MenuNeighbour(v, i, 0, -1) == i) v.items[i].next[0] = phoneAt;
+        if (v.items[i].enabled && v.items[i].next[0] == -1 && MenuNeighbour(v, i, 0, -1) == i) v.items[i].next[0] = phoneAt;
     ViewItem phone;
     phone.rect = kPmPhoneWell;
     phone.action = {TapStep(kPhoneIcon.x, kPhoneIcon.y)};

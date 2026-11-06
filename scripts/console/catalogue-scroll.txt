@@ -1,6 +1,6 @@
 # From sit-storebuy (the catalogue, its list at 0), CONSOLE: Down (the second row), Down twice
-# (the game's down arrow: the list at 3, then 6), Up three times (back up a row, then the game's
-# up arrow: 3), then B (the game's X: the panel).
+# (the game's down arrow: the list at 3, then 6), Up twice (back up a row, then the game's up
+# arrow: 3), then B (the game's X: the panel).
 20 2 pad down
 40 2 pad down
 80 2 pad down
