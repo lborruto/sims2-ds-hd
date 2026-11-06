@@ -9,9 +9,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
-- The Steam Controller and the Steam Deck work out of the box: through Steam's default Gamepad
-  layout (added as a non-Steam game), and without Steam too (the Steam Controller's own driver is
-  turned on when Steam did not start the game, its back grip standing for the right pad's click).
+- The Steam Controller and the Steam Deck work through Steam's default Gamepad layout (added as
+  a non-Steam game); without Steam, the Steam Controller needs `SDL_JOYSTICK_HIDAPI_STEAM=1`.
 
 ### Changed
 

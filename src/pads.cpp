@@ -22,13 +22,10 @@ void Pads::Hints()
     // RawInput beside XInput and DirectInput, HIDAPI's drivers (PlayStation, Switch, 8BitDo…).
     SDL_SetHint(SDL_HINT_JOYSTICK_RAWINPUT, "1");
     SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI, "1");
-    // The Steam Controller's own HIDAPI driver is off in SDL (the Steam client owns the pad and
-    // gives a game its virtual pad): on when Steam did not start the game, so the pad plays with
-    // Steam closed, on the desktop. (Steam running but the game started elsewhere: the driver
-    // opens the pad beside Steam, whose virtual pad, if any, still wins in Pads::Driving.)
-    // Set by the player (the hint or its environment variable), it stays as set. The Steam Deck's
-    // driver follows SDL_HINT_JOYSTICK_HIDAPI: on.
-    if (!LaunchedBySteam()) SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_STEAM, "1");
+    // SDL_JOYSTICK_HIDAPI_STEAM stays at SDL's default, off: a running Steam client (its desktop
+    // configuration emulates keyboard and mouse) fights a second opener of the Steam Controller.
+    // The player can set it (the environment variable) with Steam closed. The Steam Deck's driver
+    // follows SDL_JOYSTICK_HIDAPI: on.
     // SDL_HINT_GAMECONTROLLERCONFIG, SDL_HINT_GAMECONTROLLER_IGNORE_DEVICES(_EXCEPT),
     // SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD and the button labels are Steam's and the
     // player's: never set here.
@@ -99,13 +96,6 @@ bool Pads::SteamController(Uint16 vendor, Uint16 product)
     // SDL's list: the legacy, wired, Bluetooth and wireless pads, and the second generation.
     return product == 0x1101 || product == 0x1102 || product == 0x1105 || product == 0x1106 || product == 0x1142 || product == 0x1201 ||
            product == 0x1202;
-}
-
-bool Pads::LaunchedBySteam()
-{
-    for (const char* v : {"SteamGameId", "SteamAppId", "SteamOverlayGameId"})
-        if (const char* e = SDL_getenv(v); e && *e) return true;
-    return false;
 }
 
 int Pads::StyleOf(SDL_GameControllerType t)

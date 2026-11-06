@@ -449,7 +449,7 @@ static void steam()
     SDL_SetHint("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD", "0");
 }
 
-// The Steam Controller and the Deck, natively (SDL's HIDAPI drivers) and through Steam Input.
+// The Steam Controller and the Deck, through Steam Input and as SDL's drivers show them.
 static void steam_pads()
 {
     // The ids: SDL's Steam Controllers, not the Deck, not Steam's virtual pad, not a Sony pad.
@@ -458,16 +458,9 @@ static void steam_pads()
     CHECK(!Pads::SteamController(0x28DE, 0x11FF)); // Steam's virtual pad
     CHECK(!Pads::SteamController(kSony, 0x1102));
     // The driver off in SDL, on here unless Steam launched the game (the player's own hint stays).
-    SDL_setenv("SteamGameId", "", 1);
-    CHECK(!Pads::LaunchedBySteam());
-    SDL_setenv("SteamGameId", "12345", 1);
-    CHECK(Pads::LaunchedBySteam());
-    SDL_setenv("SteamGameId", "", 1);
-    CHECK(!Pads::LaunchedBySteam());
-    SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_STEAM, "0");
+    // SDL's default stays: the Steam Controller driver off unless the player sets it.
     Pads::Hints();
-    CHECK(SDL_GetHintBoolean(SDL_HINT_JOYSTICK_HIDAPI_STEAM, SDL_FALSE)); // (not launched by Steam)
-    SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_STEAM, "0");
+    CHECK(!SDL_GetHintBoolean(SDL_HINT_JOYSTICK_HIDAPI_STEAM, SDL_FALSE));
     // Each type's look: Xbox-style glyphs for the Steam Controller, the Deck and Steam's pad.
     CHECK(Pads::StyleOf(SDL_CONTROLLER_TYPE_UNKNOWN) == XBOX);
     Pads pads;

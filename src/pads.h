@@ -80,9 +80,6 @@ public:
     // A Valve Steam Controller (not the Deck, not Steam's virtual pad) by its USB ids: through
     // SDL's HIDAPI driver its right pad's click never reaches SDL (R3), its back grip does.
     static bool SteamController(Uint16 vendor, Uint16 product);
-    // Whether the game was started by Steam (its environment: SteamGameId, SteamAppId): then
-    // Steam Input owns the Steam Controller and gives the game its virtual pad.
-    static bool LaunchedBySteam();
 
 private:
     struct Pad
