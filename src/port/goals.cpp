@@ -108,8 +108,10 @@ void AddGoalsView(MenuView& v, const GoalsState& g, const RomData* rom)
     }
     if (g.selected >= first && g.selected < last) v.selected = base + g.selected - first;
     v.scrollGroup = 1;
-    v.scrollUp = {TapStep(kGoalsUpX, kGoalsUpY)};
-    v.scrollDown = {TapStep(kGoalsDownX, kGoalsDownY)};
+    // (The game's arrow is not there at the list's ends: none, so Up from the first goal goes to
+    // the phone.)
+    if (g.selected != 0) v.scrollUp = {TapStep(kGoalsUpX, kGoalsUpY)};
+    if (g.selected < 0 || g.selected + 1 < (int)g.entries.size()) v.scrollDown = {TapStep(kGoalsDownX, kGoalsDownY)};
 }
 
 void AddScrollBar(Composition& c, Rect track, int first, int shown, int count)

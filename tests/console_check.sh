@@ -595,6 +595,8 @@ pad_late pad-rel B-cas-rel relations-select 230 &
 pad_late pad-volume B-cas-opt options-volume 330 &
 pad_late pad-save B-cas-opt options-save 330 &
 pad pad-slot B-st-opt-save saveslots-save 300 &
+pad_late pad-ask-no B-cas-opt-save saveslots-ask-no 200 &
+pad_late pad-ask-yes B-cas-opt-save saveslots-ask-yes 200 &
 pad pad-tabs s7 tabs 320 &
 pad pad-popup s6 popup 120 &
 pad pad-opening s6 popup-opening 200 &
@@ -694,6 +696,16 @@ check_pad pad-rel rel
 check_pad pad-volume volume
 check_pad pad-save save_open
 check_pad pad-slot slot_save
+# The game's question over a used slot (on a copy of the complete save): from B-cas-opt-save, A on
+# Jun's slot → "Overwrite this save?" (kind 2), the HD focus on its Yes; B → its cross, the
+# question gone, nothing saved; A, A → its tick, "Saving", slot 3 written (Jun's money now).
+ask_no() {
+    in_order pad-ask-no 'saves current=2 .*2=Jun/9150/' 'console menu closed, focus 2' 'popup state=1 kind=2 .*Overwrite' 'focus 3' 'popup none' || return 1
+    if grep -q -E 'kind=3|2=Jun/14843' "$tmp/pad-ask-no.log"; then echo "  pad-ask-no: saved after B"; return 1; fi
+}
+ask_yes() { in_order pad-ask-yes 'popup state=1 kind=2 .*Overwrite' 'focus 3' 'popup state=1 kind=3' 'saves current=2 .*2=Jun/14843/'; }
+check_pad pad-ask-no ask_no
+check_pad pad-ask-yes ask_yes
 
 # The activities on buttons (src/activities.*): act NAME STATE SCRIPT FRAMES SHOTS CLOCK, a
 # CONSOLE run with --print-screen and shots of the two screens at SHOTS (NAME/f*.png).

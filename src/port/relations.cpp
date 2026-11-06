@@ -69,8 +69,10 @@ void AddRelationsView(MenuView& v, const RelState& r, const RomData* rom)
     }
     if (r.selected >= r.first && r.selected < r.first + kRelRowsShown && r.selected < n) v.selected = base + r.selected - r.first;
     v.scrollGroup = 1;
-    v.scrollUp = {TapStep(kRelPrevX, kRelPrevY)};
-    v.scrollDown = {TapStep(kRelNextX, kRelNextY)};
+    // (The game's arrow is not there at the list's ends: none, so Up from the first Sim goes to
+    // the phone.)
+    if (r.selected > 0) v.scrollUp = {TapStep(kRelPrevX, kRelPrevY)};
+    if (r.selected + 1 < n) v.scrollDown = {TapStep(kRelNextX, kRelNextY)};
 }
 
 void BuildRelations(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom)

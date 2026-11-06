@@ -1281,10 +1281,58 @@ static void view_item_x_asks()
     CHECK(r.nav.Armed() == 0);
 }
 
+// A selection the game owns with no arrow above it (its first entry): Up goes to the phone and
+// the focus stays there; Down from the phone comes back to the selection. A view that does not
+// replay (the Save slots): a press held while unsettled is dropped once it settles.
+static void view_selection_phone_and_no_replay()
+{
+    const ScreenState goals {Screen::Panel, Tab::Goals};
+    MenuView v = ListView(3, -1);
+    for (ViewItem& it : v.items) it.action.clear();
+    v.selected = 0;
+    v.scrollGroup = 1;
+    v.scrollDown = {TapStep(62, 145)};
+    v.items[0].next[0] = 3; // (the frame's link: the top item Up to the phone)
+    v.items[3].next[1] = 0;
+    Rig r;
+    r.view = &v;
+    r.Frame(goals);
+    r.Press(goals, &PadState::menu);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(goals, &PadState::up);
+    CHECK(r.nav.Focus() == 3 && !r.touch.Owns());
+    r.Frame(goals);
+    CHECK(r.nav.Focus() == 3);
+    r.Press(goals, &PadState::down);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(goals, &PadState::down); // the game's arrow
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 62 && y == 145);
+
+    const ScreenState slots {Screen::SaveSlots, Tab::None};
+    MenuView s = ListView(3, -1);
+    s.replay = false;
+    Rig q;
+    q.view = &s;
+    q.Frame(slots);
+    PadState pa;
+    pa.a = true;
+    q.Frame(slots, pa, false); // unsettled: held...
+    q.Frame(slots, {}, false);
+    q.Frame(slots, {}, true);  // ...and dropped
+    q.Frame(slots, {}, true);
+    CHECK(!q.touch.Owns());
+    s.replay = true;
+    q.Frame(slots, pa, false);
+    q.Frame(slots, {}, true);
+    CHECK(q.touch.Owns()); // (replayed where the view allows it)
+}
+
 int main()
 {
     menu_opens_and_closes();
     view_save_slots_and_slider();
+    view_selection_phone_and_no_replay();
     dpad_moves_focus();
     a_taps_focused();
     lb_rb_tap_tabs();

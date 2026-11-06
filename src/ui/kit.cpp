@@ -18,7 +18,8 @@ namespace
 {
 // Chip geometry, canvas pixels, from the label's text size.
 float ChipHeight(float size) { return std::round(size * 1.3f); }
-bool Round(Button b) { return b == Button::A || b == Button::B || b == Button::X || b == Button::Y || b == Button::DPad; }
+bool Round(Button b) { return b == Button::A || b == Button::B || b == Button::X || b == Button::Y || b == Button::DPad ||
+                        b == Button::DPadV || b == Button::DPadH; }
 const char* ButtonText(Button b)
 {
     switch (b)
@@ -30,7 +31,7 @@ const char* ButtonText(Button b)
     case Button::LB: return "LB";
     case Button::RB: return "RB";
     case Button::Start: return "START";
-    case Button::DPad: return "";
+    case Button::DPad: case Button::DPadV: case Button::DPadH: return "";
     }
     return "";
 }
@@ -199,12 +200,12 @@ void DrawChip(Layer& L, const UiItem& it, float s, float ox, float oy)
     FillRoundRect(L, x0 + line, y0 + line, x1 - line, y1 - line, r - line, 0xFF2E3063); // the dark face
     // A soft sheen on the face's upper half.
     FillRoundRect(L, x0 + line * 2, y0 + line * 1.5f, x1 - line * 2, (y0 + y1) / 2, r - line * 2, 0x1FFFFFFF);
-    if (it.button == Button::DPad)
+    if (it.button == Button::DPad || it.button == Button::DPadV || it.button == Button::DPadH)
     {
-        // A cross: two rounded bars.
+        // A cross: two rounded bars (one faint when only the other's directions do something).
         const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
-        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0xFFFFFFFF);
-        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0xFFFFFFFF);
+        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, it.button == Button::DPadV ? 0x59FFFFFF : 0xFFFFFFFF);
+        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, it.button == Button::DPadH ? 0x59FFFFFF : 0xFFFFFFFF);
     }
     else
     {

@@ -183,8 +183,9 @@ const MenuAction* Navigator::DirAction(const MenuView& v, int dir, bool& scroll)
     scroll = false;
     const bool vertical = dir <= 1;
     const MenuAction& gameScroll = dir == 0 ? v.scrollUp : v.scrollDown;
-    // A selection the game owns: Up / Down are its own buttons (its scroll).
-    if (MenuFocusable(v, v.selected) && vertical) return gameScroll.empty() ? nullptr : &gameScroll;
+    // A selection the game owns, the focus on it: Up / Down are its own buttons (its scroll); none
+    // that way (its first entry's Up): a focus move.
+    if (MenuFocusable(v, v.selected) && focus_ == v.selected && vertical) return gameScroll.empty() ? nullptr : &gameScroll;
     if (!vertical)
     {
         if (MenuFocusable(v, focus_))
@@ -280,7 +281,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         else if (held_)
         {
             // A press made on a view whose content has changed since is stale: dropped.
-            if (heldHash_ == viewHash) replay = held_;
+            if (heldHash_ == viewHash && (!useView || view_->replay)) replay = held_;
             held_ = nullptr;
         }
     }
@@ -319,7 +320,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             // The HD menu (port/menuview.h): the focus over the view's enabled items; a selection
             // the game owns holds it.
             const MenuView& v = *view_;
-            if (MenuFocusable(v, v.selected)) focus_ = v.selected;
+            // (held while the focus is in the list: the phone above it keeps the focus)
+            if (MenuFocusable(v, v.selected) && (!MenuFocusable(v, focus_) || v.items[focus_].group == v.scrollGroup)) focus_ = v.selected;
             if (!MenuFocusable(v, focus_)) focus_ = MenuFirst(v);
             // A move that waited for the list's own scroll: once the rebuilt view shows more.
             if (pendingDir_ >= 0 && (viewChanged || ++pendingFrames_ > kHoldFrames))

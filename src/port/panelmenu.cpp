@@ -289,9 +289,9 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
         const FittedText x = FitLine(v.items[focus].xWord, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
         right = AddHint(c, right, Button::X, x.text);
     }
-    // The D-pad, its chip alone, while Up / Down move a selection the game owns (Goals,
-    // Relationships: the game's own arrows).
-    if (MenuFocusable(v, v.selected) && (!v.scrollUp.empty() || !v.scrollDown.empty())) AddHint(c, right, Button::DPad, "");
+    // The D-pad's Up / Down (its vertical arms lit: the game has no word for its arrows) while they
+    // move a selection the game owns (Goals, Relationships: the game's own arrows).
+    if (MenuFocusable(v, v.selected) && focus == v.selected && (!v.scrollUp.empty() || !v.scrollDown.empty())) AddHint(c, right, Button::DPadV, "");
 
     // The icons (images: drawn above the still layers): the five tabs, the selected one green.
     if (icons)

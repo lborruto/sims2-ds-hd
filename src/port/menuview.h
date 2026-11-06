@@ -87,11 +87,16 @@ struct MenuView
     // The item focused when the screen opens (an index; -1: the first enabled one).
     int initial = -1;
     // A selection the game owns (Relationships' Sim, the phone's row): when >= 0 and enabled, the
-    // focus is held on that item, and every Up / Down performs scrollUp / scrollDown (the game's
-    // own buttons move its selection; the rebuilt view follows it). -1: the navigator's focus.
+    // focus is held on that item while it is in the list (scrollGroup), and every Up / Down there
+    // performs scrollUp / scrollDown (the game's own buttons move its selection; the rebuilt view
+    // follows it); an empty one (the game's arrow does nothing that way) is a plain focus move
+    // (Up from the first entry: the phone). -1: the navigator's focus.
     int selected = -1;
     // The tab's title, in the game's words (the frame draws it).
     std::string title;
+    // A press the gate held while the game was not settled is replayed once it settles (true), or
+    // dropped (false: a screen where a late tap would do harm, the Save slots).
+    bool replay = true;
     // (Drawing only, not hashed: set by CONSOLE from the navigator) the id of the item whose X is
     // armed (xAsks), 0 none.
     u32 armed = 0;

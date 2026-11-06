@@ -123,8 +123,8 @@ Interact tab, A does the highlighted action and Left / Right pick the next thing
 In Pockets, A uses the highlighted item and X throws it away (press X twice: the first only asks,
 the bin turns green; moving away cancels). In Give Gift, A gives the highlighted item and B closes. In Goals and
 Relationships, Up / Down move the game's own selection; in Options, Left / Right turn a volume
-up or down a notch, and A on Save opens the save slots (A saves into the highlighted one, B
-closes).
+up or down a notch, and A on Save opens the save slots (A saves into the highlighted one: an
+empty slot at once, a used one after the game asks, A yes, B no; B closes).
 **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or B.
 
 **The activities** are played on the buttons too, with a box of hints beside them:

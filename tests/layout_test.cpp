@@ -939,8 +939,11 @@ int main()
                 for (const ViewItem& it : v.items)
                     CHECK(it.rect.x >= kPmPanel.x && it.rect.y >= kPmPanel.y && it.rect.x + it.rect.w <= kPmPanel.x + kPmPanel.w &&
                           it.rect.y + it.rect.h <= kPmPanel.y + kPmPanel.h);
-                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
-                    TestConsoleRoundtrip(st, true, 256, 192, o.first, o.second, true, &comp);
+                bool touchable = false; // ("Saving" over the slots: nothing to touch)
+                for (const Piece& q : comp.pieces) touchable |= q.src == Src::Bottom;
+                if (touchable)
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(st, true, 256, 192, o.first, o.second, true, &comp);
                 return comp;
             };
             auto inside = [](int x, int y, Rect a) { return x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h; };
@@ -972,7 +975,10 @@ int main()
                         g.score = 100;
                         const MenuView v = PanelMenuViewOf(gs, h);
                         CHECK(v.valid && AllReachable(v));
-                        CHECK(v.scrollUp.size() == 1 && v.scrollUp[0].x == kGoalsUpX && v.scrollDown[0].y == kGoalsDownY);
+                        // The game's arrows, none past the list's ends (Up from the first goal: the phone).
+                        CHECK(v.scrollUp.empty() == (sel == 0) && (sel == 0 || v.scrollUp[0].x == kGoalsUpX));
+                        CHECK(v.scrollDown.empty() == (sel >= 0 && sel == n - 1) && (v.scrollDown.empty() || v.scrollDown[0].y == kGoalsDownY));
+                        if (sel == 0) CHECK(MenuMove(v, v.selected, 0) == (int)v.items.size() - 1);
                         if (sel >= 0)
                         {
                             CHECK(MenuFocusable(v, v.selected) && v.items[v.selected].id == kGoalsId + (u32)sel);
@@ -1009,7 +1015,10 @@ int main()
                     if (n)
                     {
                         CHECK(MenuFocusable(v, v.selected) && v.selected == sel - r.first);
-                        CHECK(v.scrollUp[0].x == kRelPrevX && v.scrollUp[0].y == kRelPrevY && v.scrollDown[0].y == kRelNextY);
+                        CHECK(v.scrollUp.empty() == (sel == 0) && v.scrollDown.empty() == (sel == n - 1));
+                        if (sel > 0) CHECK(v.scrollUp[0].x == kRelPrevX && v.scrollUp[0].y == kRelPrevY);
+                        if (sel + 1 < n) CHECK(v.scrollDown[0].y == kRelNextY);
+                        if (sel == 0) CHECK(MenuMove(v, v.selected, 0) == (int)v.items.size() - 1); // the phone
                     }
                     const Composition comp = check(rs, v, h, v.selected);
                     for (int i = 0; i < std::min(4, n); i++)
@@ -1054,13 +1063,36 @@ int main()
                 sv.used[1] = sv.slot[1].used = true;
                 sv.slot[1] = {true, 9150, 0x14, 0, "Jun"};
                 const MenuView v = SaveSlotsViewOf(ss, h);
-                CHECK(v.valid && v.items.size() == 3 && AllReachable(v) && MenuFirst(v) == (cur < 0 ? 0 : cur));
+                CHECK(v.valid && v.items.size() == 3 && AllReachable(v) && MenuFirst(v) == (cur < 0 ? 0 : cur) && !v.replay);
                 CHECK(v.back.size() == 1 && v.back[0].x == kSlotCloseX && v.back[0].y == kSlotCloseY);
                 for (int i = 0; i < 3; i++) CHECK(v.items[i].action[0].x == kSlotTickX && v.items[i].action[0].y == kSlotTickY[i]);
                 const Composition comp = check(ss, v, h, 1);
                 const Rect q = v.items[2].rect;
                 CHECK(TouchFromComposition(comp, fit, q.x + q.w / 2.0f, q.y + q.h / 2.0f, tx, ty));
                 CHECK(inside(tx, ty, {kSlotTickX - 12, kSlotTickY[2] - 12, 24, 24}));
+                // No current slot, the first used: the first empty one.
+                GameState e = h;
+                e.town.saves.current = -1;
+                e.town.saves.used[0] = true;
+                CHECK(MenuFirst(SaveSlotsViewOf(ss, e)) == 2);
+                // The game's question over a used slot (popup kind 2): the slots wait, A its tick,
+                // B its cross, the answers' pieces on them; "Saving" (kind 3): nothing to press.
+                GameState pq = h;
+                pq.town.popup = {true, 2, 2, "Overwrite this save?", "", -1, false};
+                const MenuView a = SaveSlotsViewOf(ss, pq);
+                CHECK(a.valid && a.items.size() == 4 && MenuFirst(a) == 3 && !a.items[0].enabled && !a.items[2].enabled);
+                CHECK(a.items[3].action[0].x == kSlotAskTickX && a.items[3].action[0].y == kSlotAskY);
+                CHECK(a.back.size() == 1 && a.back[0].x == kSlotAskCrossX && a.back[0].y == kSlotAskY);
+                const Composition qc = check(ss, a, pq, 3);
+                CHECK(TouchFromComposition(qc, fit, kSlotYes.x + kSlotYes.w / 2.0f, kSlotYes.y + kSlotYes.h / 2.0f, tx, ty));
+                CHECK(inside(tx, ty, {kSlotAskTickX - 12, kSlotAskY - 12, 24, 24}));
+                CHECK(TouchFromComposition(qc, fit, kSlotNo.x + kSlotNo.w / 2.0f, kSlotNo.y + kSlotNo.h / 2.0f, tx, ty));
+                CHECK(inside(tx, ty, {kSlotAskCrossX - 12, kSlotAskY - 12, 24, 24}));
+                CHECK(!TouchFromComposition(qc, fit, kPmContent.x + 40.5f, kSlotY0 + 20.5f, tx, ty)); // a row behind: nothing
+                pq.town.popup = {true, 2, 3, "Do not turn off", "Saving", -1, false};
+                const MenuView w = SaveSlotsViewOf(ss, pq);
+                CHECK(w.valid && MenuFirst(w) == -1 && w.back.empty());
+                check(ss, w, pq, -1);
                 CHECK(!SaveSlotsViewOf({Screen::Panel, Tab::Options}, h).valid);
                 CHECK(!SaveSlotsView(ss, &h, &rom).valid); // no strings: the stick cursor's screen
                 h.town.saves.valid = false;

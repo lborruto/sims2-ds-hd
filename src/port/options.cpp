@@ -1,6 +1,7 @@
 #include "port/options.h"
 
 #include <algorithm>
+#include <tuple>
 
 #include "hotspots.h"
 #include "port/panelmenu.h"
@@ -75,8 +76,8 @@ void AddSlider(Composition& c, Rect well, const std::string& label, int notch, b
     c.ui.push_back(vt);
     if (focused)
     {   // The D-pad's chip: Left / Right move the knob.
-        const Rect dp = ChipRect(0, 0, Button::DPad, "", 24);
-        UiItem chip = ChipItem(well.x + well.w - 28 - pw - 16 - dp.w, well.y + 10 + (44 - dp.h) / 2, Button::DPad, "", 24);
+        const Rect dp = ChipRect(0, 0, Button::DPadH, "", 24);
+        UiItem chip = ChipItem(well.x + well.w - 28 - pw - 16 - dp.w, well.y + 10 + (44 - dp.h) / 2, Button::DPadH, "", 24);
         chip.layer = 1;
         c.ui.push_back(chip);
     }
@@ -177,23 +178,54 @@ MenuView SaveSlotsView(ScreenState s, const GameState* game, const RomData* rom)
     return SaveSlotsViewOf(s, *game, rom);
 }
 
+int SlotsPopup(const GameState& game)
+{
+    const PopupState& p = game.town.popup;
+    return p.valid && p.state >= 1 && p.state <= 3 ? p.kind : -1;
+}
+
 MenuView SaveSlotsViewOf(ScreenState s, const GameState& game, const RomData* rom)
 {
     MenuView v;
     const SaveSlots& sv = game.town.saves;
     if (s.screen != Screen::SaveSlots || !game.valid || !sv.valid) return v;
     if (rom) v.title = MenuWords(*rom, kStrSaveGame);
+    // A popup over the slots (the game's question before it overwrites a used slot, kind 2; its
+    // "Saving", kind 3): the slots wait; the question's A is its tick, B its cross.
+    const int popup = SlotsPopup(game);
     for (int i = 0; i < kSaveSlotCount; i++)
     {
         ViewItem it;
         it.rect = SlotRect(i);
         it.id = kSlotId + (u32)i;
+        it.enabled = popup < 0;
         it.action = {TapStep(kSlotTickX, kSlotTickY[i])};
         if (rom) it.word = MenuWords(*rom, kStrSave);
         v.items.push_back(it);
     }
-    v.back = {TapStep(kSlotCloseX, kSlotCloseY)};
-    v.initial = sv.current >= 0 && sv.current < kSaveSlotCount ? sv.current : 0;
+    if (popup == 2)
+    {
+        ViewItem yes;
+        yes.rect = kSlotYes;
+        yes.id = kSlotYesId;
+        yes.action = {TapStep(kSlotAskTickX, kSlotAskY)};
+        if (rom) yes.word = MenuWords(*rom, kStrYes);
+        v.items.push_back(yes);
+        v.back = {TapStep(kSlotAskCrossX, kSlotAskY)};
+        v.initial = kSaveSlotCount;
+    }
+    else if (popup < 0)
+    {
+        v.back = {TapStep(kSlotCloseX, kSlotCloseY)};
+        // The game's current slot; without one, the first empty slot (a save there asks nothing).
+        v.initial = 0;
+        if (sv.current >= 0 && sv.current < kSaveSlotCount) v.initial = sv.current;
+        else
+            for (int i = kSaveSlotCount - 1; i >= 0; i--)
+                if (!sv.used[i]) v.initial = i;
+    }
+    // A press held while the game was not settled is dropped, never replayed: here a late A saves.
+    v.replay = false;
     v.valid = true;
     return v;
 }
@@ -283,14 +315,69 @@ void BuildSaveSlots(Composition& c, const MenuView& v, int focus, const GameStat
                 c.ui.push_back(pt);
             }
         }
-        // The mouse: the row onto its tick (a click saves, as A).
-        AddMousePiece(c, {kSlotTickX - 12, kSlotTickY[i] - 12, 24, 24}, r);
+        // The mouse: the row onto its tick (a click saves, as A), while no popup is up.
+        if (v.items[i].enabled) AddMousePiece(c, {kSlotTickX - 12, kSlotTickY[i] - 12, 24, 24}, r);
     }
-    int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
-    if (MenuFocusable(v, focus))
+    const int popup = SlotsPopup(game);
+    if (popup >= 0)
     {
-        const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
-        AddHint(c, right, Button::A, a.text);
+        // The game's popup over the slots, small: its box, its text (kind 3 "Saving": its title
+        // too) and, for the question, its two answers in the game's words with their buttons.
+        UiItem dim = PanelItem({kPmPanel.x + 12, kPmPanel.y + 12, kPmPanel.w - 24, kPmPanel.h - 24});
+        dim.plain = true;
+        dim.fill = 0x70202448; // (the slots dimmed behind the game's box)
+        dim.radius = 16;
+        dim.layer = 1;
+        c.ui.push_back(dim);
+        UiItem box = PanelItem(kSlotAsk);
+        box.radius = 22;
+        box.layer = 1;
+        c.ui.push_back(box);
+        const bool ask = popup == 2;
+        const Rect well {kSlotAsk.x + 24, kSlotAsk.y + 24, kSlotAsk.w - 48, ask ? kSlotYes.y - kSlotAsk.y - 48 : kSlotAsk.h - 48};
+        UiItem w = WellItem(well);
+        w.radius = 14;
+        w.layer = 1;
+        c.ui.push_back(w);
+        const PopupState& p = game.town.popup;
+        std::string text = MenuText(GameTextToUtf8(p.text));
+        if (!ask && !p.title.empty()) text = MenuText(GameTextToUtf8(p.title)) + "\n" + text;
+        const Rect tb {well.x + 18, well.y + 8, well.w - 36, well.h - 16};
+        const FittedBlock b = FitBlock(text, 30, 22, tb);
+        UiItem tt = TextItem(tb, b.text, b.size, Align::Centre, Weight::ExtraBold);
+        tt.middle = true;
+        tt.layer = 1;
+        c.ui.push_back(tt);
+        if (ask)
+        {
+            auto answer = [&](Rect r, Button chip, const std::string& word, bool focused, Rect from) {
+                if (focused) AddFocusRing(c, r, r.h / 2.0f);
+                UiItem bt = PanelItem(r);
+                bt.fill = focused ? kBtnFocusFill : kBtnFill;
+                bt.borderArgb = th.frame;
+                bt.border = 3;
+                bt.radius = r.h / 2.0f;
+                bt.layer = 1;
+                c.ui.push_back(bt);
+                const Rect cr = ChipRect(0, 0, chip, word, 28, 0, Weight::ExtraBold);
+                UiItem ch = ChipItem(r.x + (r.w - cr.w) / 2, r.y + (r.h - cr.h) / 2, chip, word, 28, 0, Weight::ExtraBold);
+                ch.layer = 1;
+                c.ui.push_back(ch);
+                AddMousePiece(c, from, r);
+            };
+            const int yes = kSaveSlotCount;
+            answer(kSlotNo, Button::B, MenuWords(rom, kStrNo), false, {kSlotAskCrossX - 12, kSlotAskY - 12, 24, 24});
+            answer(kSlotYes, Button::A, MenuWords(rom, kStrYes), focus == yes, {kSlotAskTickX - 12, kSlotAskY - 12, 24, 24});
+        }
+    }
+    if (popup < 0)
+    {
+        int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
+        if (MenuFocusable(v, focus))
+        {
+            const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+            AddHint(c, right, Button::A, a.text);
+        }
     }
 
     SortUi(c.ui, first);
@@ -311,6 +398,18 @@ void MeasureOptions(const RomData& rom, BlockMeasure& m)
     line(kStrSaveGame, MenuWords(rom, kStrSaveGame), kPmTitleSize, kPmTextMin, kSlotTitle.w - 48);
     const int tw = kPmContent.w - 148 - 32;
     line(kStrNoData, MenuWords(rom, kStrNoData), 32, 22, tw);
+    // The question over the slots and its answers; "Saving" with its line.
+    for (int id : {kStrNo, kStrYes}) line(id, MenuWords(rom, id), 28, 28, kSlotYes.w - 90);
+    const Rect qb {kSlotAsk.x + 42, kSlotAsk.y + 32, kSlotAsk.w - 84, kSlotYes.y - kSlotAsk.y - 64};
+    const Rect sb {kSlotAsk.x + 42, kSlotAsk.y + 32, kSlotAsk.w - 84, kSlotAsk.h - 64};
+    for (auto [id, box, text] : {std::tuple {kStrOverwrite, qb, MenuWords(rom, kStrOverwrite)},
+                                 std::tuple {kStrSaving, sb, MenuWords(rom, kStrSaving) + "\n" + MenuWords(rom, kStrSaving + 1)}})
+    {
+        const FittedBlock b = FitBlock(text, 30, 22, box);
+        m.checked++;
+        if (b.size < 30) m.shrunk++;
+        if (!b.fits) { m.cut++; m.cutIds.push_back(id); }
+    }
     const int mw = (int)TextWidth(MenuWords(rom, kStrMoney, 99999999), 32, Weight::ExtraBold) + 8;
     line(kStrMoney, "WWWWWWWW", 34, 22, tw - mw - 24); // (the widest name the game's keyboard makes)
     for (int place = 0; place < 0x20; place++)

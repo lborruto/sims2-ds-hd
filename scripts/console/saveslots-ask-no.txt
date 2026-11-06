@@ -1,0 +1,5 @@
+# From B-cas-opt-save (the complete save, the slot list, Jun's slot 3 the current one), CONSOLE:
+# A (the game's tick: "Overwrite this save?", its popup over the slots, in HD), B (its cross: the
+# question closes, nothing saved). Run it with a scratch --save.
+20 2 pad a
+90 2 pad b

@@ -24,7 +24,9 @@ const Theme& GameTheme();
 enum class Align { Left, Centre, Right };
 // The controller's buttons a chip can show: A, B, X, Y as round chips, the others as pills
 // (the D-pad as a cross).
-enum class Button { A, B, X, Y, LB, RB, Start, DPad };
+// DPadV / DPadH: the cross with its up and down (left and right) arms lit and the others faint:
+// Up / Down (Left / Right) do something there.
+enum class Button { A, B, X, Y, LB, RB, Start, DPad, DPadV, DPadH };
 
 struct UiItem
 {
