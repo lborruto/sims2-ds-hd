@@ -210,7 +210,8 @@ const std::vector<Hotspot>& HotspotsFor(ScreenState s)
     case Screen::Catalogue: return kCatalogue;
     case Screen::Build: return kBuild;
     case Screen::None: case Screen::Vacuum: case Screen::Unknown:
-    case Screen::FrontEnd: case Screen::CreateASim: case Screen::SaveSlots: case Screen::ItemHand: case Screen::Loading: return kEmpty;
+    case Screen::FrontEnd: case Screen::CreateASim: case Screen::SaveSlots: case Screen::ItemHand: case Screen::Loading:
+    case Screen::Autopsy: case Screen::Detector: case Screen::Art: return kEmpty;
     }
     return kEmpty;
 }

@@ -22,6 +22,22 @@ dir=$repo/scripts/hotspots
 tmp=$(mktemp -d)
 # KEEP=1 keeps the runs (logs, pictures) and says where.
 [ -n "${KEEP:-}" ] && echo "keeping $tmp" || trap 'rm -rf "$tmp"' EXIT
+# At most MAX_SIMS (default 4) emulators at once: "$bin" is this function, which takes one of
+# the slots (a directory each) for the run.
+max_sims=${MAX_SIMS:-4}
+real_bin=$bin
+sims2wide_slot() {
+    local i slot=
+    while [ -z "$slot" ]; do
+        for i in $(seq 1 "$max_sims"); do mkdir "$tmp/slot$i" 2>/dev/null && { slot=$tmp/slot$i; break; }; done
+        [ -n "$slot" ] || sleep 0.2
+    done
+    "$real_bin" "$@"
+    local rc=$?
+    rmdir "$slot"
+    return $rc
+}
+bin=sims2wide_slot
 
 # script:state:frames:expect, expect = "screens=A B C" (the screens printed, in order) or
 # "differs=BASE" (the last picture differs from the run of scripts/hotspots/BASE.txt).

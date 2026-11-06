@@ -222,10 +222,18 @@ static void to_screen_state()
         CHECK(ToScreenState(g) == (ScreenState{sc}));
         CHECK(std::string(ScreenName(sc)) == GScreenName(gs));
     }
-    // The Drencher is CONSOLE's ItemHand; the minigames are the stick cursor's Unknown.
+    // The Drencher is CONSOLE's ItemHand; the pointing games are their own screens (no pixel rule: the
+    // pixels' Unknown or None agree); the other minigames are the stick cursor's Unknown.
     g.screen = GScreen::Drencher;
     CHECK(ToScreenState(g) == (ScreenState{Screen::ItemHand}));
-    for (GScreen m : {GScreen::Autopsy, GScreen::Detector, GScreen::MooGoo, GScreen::Scratch, GScreen::Crime, GScreen::Mixer, GScreen::MixerSave, GScreen::ArtGallery})
+    for (auto [m, sc] : {std::pair{GScreen::Autopsy, Screen::Autopsy}, {GScreen::Detector, Screen::Detector}, {GScreen::ArtGallery, Screen::Art}})
+    {
+        g.screen = m;
+        CHECK(ToScreenState(g) == (ScreenState{sc}));
+        CHECK(PixelsAgree(g, {Screen::Unknown}) && PixelsAgree(g, {Screen::None}) && !PixelsAgree(g, {Screen::Panel, Tab::Interact}));
+        CHECK(ConsoleScreenOf(g, {Screen::None}, false, false) == (ScreenState{sc}));
+    }
+    for (GScreen m : {GScreen::MooGoo, GScreen::Scratch, GScreen::Crime, GScreen::Mixer, GScreen::MixerSave})
     {
         g.screen = m;
         CHECK(ToScreenState(g) == (ScreenState{Screen::Unknown}));
@@ -966,8 +974,10 @@ static void minigame_screens()
         const GameState g = ReadGameState(mg_ram(c.vt, c.ov).View());
         CHECK(g.valid && g.screen == c.s);
         CHECK(std::string(GScreenName(c.s)) == GameStateName(g));
-        // CONSOLE does not know them: the stick cursor's Unknown, except the Drencher (ItemHand, a cursor screen too).
-        CHECK(ToScreenState(g) == (ScreenState{c.s == GScreen::Drencher ? Screen::ItemHand : Screen::Unknown}));
+        // CONSOLE's: the pointing games their own screens, the Drencher ItemHand (a cursor screen), the others the stick cursor's Unknown.
+        const Screen want = c.s == GScreen::Drencher ? Screen::ItemHand : c.s == GScreen::Autopsy ? Screen::Autopsy
+                          : c.s == GScreen::Detector ? Screen::Detector : c.s == GScreen::ArtGallery ? Screen::Art : Screen::Unknown;
+        CHECK(ToScreenState(g) == (ScreenState{want}));
     }
     // The overlay's classes need their overlay; the arm9 classes do not care.
     CHECK(ReadGameState(mg_ram(0x0214EBC4, 1).View()).screen == GScreen::Unknown);
@@ -1049,7 +1059,10 @@ static void detector()
     r.W8(0x021A0200 + 8, 9);
     CHECK(ReadGameState(r.View()).minigame.detector.findType == -1);
     r.W8(kS + 0xD4, 0); r.W8(0x021A0200 + 8, 7);
+    CHECK(ReadGameState(r.View()).minigame.detector.findType == 7);   // (the card up: the find dug)
+    r.W8(kS + 0x4E, 0);
     CHECK(ReadGameState(r.View()).minigame.detector.findType == -1);
+    r.W8(kS + 0x4E, 1);
     for (auto [off, val] : {std::pair<u32, u32>{0x9C, 6}, {0xD0, 0xFFFFFFF0}, {0xD0, 0x300000}, {0x54, 129}})
     {
         Ram q = r;
@@ -1057,6 +1070,8 @@ static void detector()
         CHECK(ReadGameState(q.View()).screen == GScreen::Detector && !ReadGameState(q.View()).minigame.detector.valid);
     }
     { Ram q = r; q.W32(0x021A0000 + 0x90, 0x1001); CHECK(!ReadGameState(q.View()).minigame.detector.valid); }
+    // A dig with no find in the place's table leaves its count at -1 (G-A-md-dig): still read, 0 finds.
+    { Ram q = r; q.W32(kMg + 0x31C8, 0xFFFFFFFF); v = ReadGameState(q.View()).minigame.detector; CHECK(v.valid && v.findCount == 0); }
     { Ram q = r; q.W32(kS + 0xD8, 0); CHECK(!ReadGameState(q.View()).minigame.detector.valid); }
     { Ram q = r; q.W32(0x0213E434, 0); CHECK(!ReadGameState(q.View()).minigame.detector.valid); }
 }

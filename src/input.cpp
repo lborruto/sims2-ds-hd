@@ -1,5 +1,6 @@
 #include "input.h"
 
+#include "port/minigame.h"
 #include "port/popup.h"
 
 #include <algorithm>
@@ -325,17 +326,14 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         const ScreenState screen = app.ConsoleScreen();
         const GameState* game = app.portSupported ? &app.game : nullptr;
         const MenuView view = ConsoleView(screen, game, app.rom.get()); // (the same CONSOLE draws: port/popup.h)
-        {
-            // The cards' question and message, as RAM says (activities.h).
-            ActivityRam ar;
-            const CardsState& k = app.game.minigame.cards;
-            if (game && game->valid && game->screen == GScreen::Cards && k.valid) { ar.cards = true; ar.quitAsk = k.quitAsk; ar.message = k.message; }
-            navigator.SetActivityRam(ar);
-        }
+        // What RAM says on the minigame (activities.h): the cards' question and message, the
+        // pointing games' tools and sliders, a question of the game's popup.
+        navigator.SetActivityRam(MinigameRam(game));
         navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
         app.consoleArmed = navigator.Armed();
+        app.consolePointer = {navigator.PointerShown(), navigator.PointerDown(), navigator.QuitArmed(), navigator.PointerX(), navigator.PointerY()};
         // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding).
         app.micBlow = navigator.Blow();
         app.micForce = navigator.Blow();
@@ -347,8 +345,21 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         steering = false;
         if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
         app.consoleArmed = 0;
+        app.consolePointer = {};
         app.micBlow = false;
         app.micForce = false;
+    }
+}
+
+void Input::PointerTouch(const App& app, bool& touching, int& tx, int& ty)
+{
+    // A pointing minigame's stylus (activities.h): down at the pointer while the navigator says so
+    // (the mouse's drag before it keeps the stylus it holds; a touch script after it wins).
+    if (app.shown == Layout::Console && steering && navigator.PointerDown() && !touching)
+    {
+        touching = true;
+        tx = std::clamp((int)navigator.PointerX(), 0, SW - 1);
+        ty = std::clamp((int)navigator.PointerY(), 0, SH - 1);
     }
 }
 
@@ -426,6 +437,15 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
         if (hand) cursorShownUntil = frame + 180; // the vacuum's hand never hides
         if (cursorPress && !touching) { touching = true; tx = (int)cursorX; ty = (int)cursorY; }
     }
+    // A pointing minigame without its HD frame (no strings): the pointer drawn as the stick cursor's cross.
+    if (console && navigator.PointerShown() && !MinigameFramed(app.ConsoleScreen(), app.portSupported ? &app.game : nullptr, app.rom.get()))
+    {
+        cursorX = navigator.PointerX();
+        cursorY = navigator.PointerY();
+        cursorPress = navigator.PointerDown();
+        cursorShownUntil = frame + 2;
+    }
+    PointerTouch(app, touching, tx, ty);
     ScriptTouch(touching, tx, ty);
 }
 

@@ -29,9 +29,12 @@
   another version of it, the old pictures stay). Each has a focus the D-pad moves and buttons
   that say what A, X and B do: do an action, use or throw away an item, give a gift, read your
   goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend, buy
-  and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions) keep their own playfield, big,
-  in an HD frame: the game's name, its numbers (the cards' score board, the vacuum's earnings) and the
-  buttons' hints, which follow what the game asks (the cards' quit question, a clogged filter). No mouse needed, though it works.
+  and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions, the Alien Autopsy, the Metal
+  Detector, painting at the Art Gallery) keep their own playfield, big, in an HD frame: the game's name,
+  its numbers (the cards' score board, the vacuum's earnings, the organs' health, the detector's charge
+  and signal, your brush and color) and the buttons' hints, which follow what the game asks (the cards'
+  quit question, a clogged filter, an organ to carry). The pointing games have a pointer on the sticks.
+  No mouse needed, though it works.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
   nothing to set, and it never falls back to the bare two-screen layout. Title, menus and
@@ -173,6 +176,17 @@ comes back on the same row after it. A note closes on A or B.
 | | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
 | | X (hold) | A (hold) | grab a find with the hand and drag it to the box |
 | | A (hold) | Y (hold) | blow: clears a clogged filter (a tap is enough; works with any microphone setting) |
+| Alien Autopsy, painting | Arrows | either stick (LT: slow), D-pad | move the pointer (the D-pad a pixel at a time, faster held) |
+| | X (hold) | A (hold) | the stylus down: cut, lift an organ, pick a parasite, paint |
+| Alien Autopsy | S / A / W | X / Y / RB | laser / hand / tweezers |
+| | Q | LB | carry the organ to the tray (the parasite to the flask) |
+| | Z twice | B twice | quit (the game pays nothing then) |
+| Metal Detector | Arrows | left stick or D-pad | walk |
+| | X / Z | A / B | dig / switch it off |
+| | Q / W | LB / RB, right stick | depth |
+| Painting | Q / W | LB / RB | the previous / next tool |
+| | S / A | X / Y | the next color / undo |
+| | Z | B | done (then X / A: yes, Z / B: no) |
 
 <p align="center">
   <img src="docs/screenshots/console-cards.webp" alt="CONSOLE: Keelhaulin' Cards big at the left, the world small at the top right, the buttons' hints below it" width="440">
@@ -248,7 +262,8 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
 - **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).
 - **Most minigames not checked yet.** The social reactions, the shop, Build Rooms and the vacuum
   (its bowl comes big; drag the finds into the bag with the mouse; hold M to blow a clogged
-  filter clear) and the casino's cards are; painting, the music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows
+  filter clear) and the casino's cards are; the autopsy, the detector and painting were played from test states
+  (not reached by walking to them yet); the music mixer and the rest are not. If one shows up wrong, Tab swaps the big screen and 2 shows
   both.
 - **CONSOLE needs the European game** (code `ASJP`): it reads the game's screens from its memory,
   and that map is the European one. With another version, CONSOLE falls back to recognising the

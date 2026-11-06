@@ -36,7 +36,7 @@ Mode ModeOf(Screen s, bool menuOpen)
     {
     case Screen::Panel: return menuOpen ? Mode::Focus : Mode::Pass;
     case Screen::Phone: case Screen::Gift: case Screen::Catalogue: case Screen::Build: return Mode::Focus;
-    case Screen::Social: case Screen::Cards: case Screen::Vacuum: return Mode::Activity;
+    case Screen::Social: case Screen::Cards: case Screen::Vacuum: case Screen::Autopsy: case Screen::Detector: case Screen::Art: return Mode::Activity;
     case Screen::Popup: return Mode::Popup;
     case Screen::Unknown: return Mode::Cursor;
     // No table yet: as Unknown. The front end (title, main menu, Create-a-Sim, None) is
@@ -371,7 +371,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     };
 
     const std::vector<Hotspot>& h = HotspotsFor(s);
-    cursorScreen_ = h.empty() && !useView; // (the HD Save slots: no cursor)
+    cursorScreen_ = h.empty() && !useView && !IsPointing(s.screen); // (the HD Save slots, the pointing minigames' own pointer: no cursor)
     cursorPress_ = blow_ = false;
     handDx_ = handDy_ = 0;
     // A tap only when nothing else touches: a press while a tap or a drag runs is dropped.

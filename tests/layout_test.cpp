@@ -135,7 +135,8 @@ static std::vector<ScreenState> AllStates()
     std::vector<ScreenState> v;
     for (Screen sc : {Screen::None, Screen::Panel, Screen::Phone, Screen::Dialogue, Screen::Popup, Screen::Gift, Screen::Social,
                       Screen::Vacuum, Screen::Cards, Screen::Catalogue, Screen::Build, Screen::FrontEnd,
-                      Screen::CreateASim, Screen::SaveSlots, Screen::ItemHand, Screen::Unknown, Screen::Loading})
+                      Screen::CreateASim, Screen::SaveSlots, Screen::ItemHand, Screen::Unknown, Screen::Loading, Screen::Autopsy,
+                      Screen::Detector, Screen::Art})
         if (sc == Screen::Panel)
             for (Tab t : {Tab::None, Tab::Interact, Tab::Pockets, Tab::Goals, Tab::Relationships, Tab::Options}) v.push_back({sc, t});
         else v.push_back({sc, Tab::None});
@@ -254,7 +255,7 @@ static void minigame_frame()
     RomData rom;   // no strings: the words empty, the layout the same
     static u32 bottom[SW * SH] = {};
     for (const auto& top : {std::pair<int, int> {SW, SH}, {341, 192}, {682, 384}})
-        for (Screen sc : {Screen::Cards, Screen::Vacuum, Screen::Social})
+        for (Screen sc : {Screen::Cards, Screen::Vacuum, Screen::Social, Screen::Autopsy, Screen::Detector, Screen::Art})
             for (int variant = 0; variant < 4; variant++)
             {
                 GameState g;
@@ -267,19 +268,68 @@ static void minigame_frame()
                 g.minigame.vacuum.valid = variant > 0;
                 g.minigame.vacuum.clogged = variant == 2;
                 g.minigame.vacuum.earnings = 99999999;
+                // The pointing games: 1 a hand alert, 2 the extremes (and the autopsy's quit asked, the
+                // detector's find in range, the painting's question), 3 an organ carried.
+                AutopsyState& a = g.minigame.autopsy;
+                a.valid = variant > 0;
+                a.specimen = variant == 2 ? 1 : 0;
+                a.tool = variant == 2 ? 2 : 0;
+                a.sub = variant == 3 ? 3 : 0;
+                a.earnings = variant == 2 ? 99999999 : 84;
+                a.handAlert = variant == 1;
+                a.organs[0] = {5, 0, false};
+                a.organs[1] = {1, variant == 2 ? kAutopsyDestroyed : 900, variant == 1};
+                a.organs[2] = {2, 0, false};
+                for (int i = 0; i < (variant == 2 ? kAutopsyParasites : 1); i++) a.parasites.push_back({i, 300, -20, 1, true});
+                DetectorState& d = g.minigame.detector;
+                d.valid = variant > 0;
+                d.state = 3;
+                d.charge = variant == 2 ? kDetectorFull : 0x99480;
+                d.inRange = d.card = variant == 2;
+                d.findType = variant == 2 ? 8 : -1;
+                d.mismatch = variant == 2 ? 40 : 0;
+                d.slider = variant == 2 ? kDetectorSliderMax : 0;
+                d.earnings = 99999999;
+                ArtState& art = g.minigame.art;
+                art.valid = variant > 0;
+                art.tool = variant == 2 ? 5 : 0;
+                art.brush = 2;
+                art.swatch = 14;
+                art.page = 15;
+                PopupState& pop = g.town.popup;
+                pop.valid = variant == 2 && sc == Screen::Art;
+                pop.state = 2;
+                pop.kind = 2;
+                pop.boxY = 80; pop.boxW = 160; pop.boxTiles = 6;
+                PointerView pv;
+                pv.shown = true;
+                pv.down = variant == 1;
+                pv.quitArmed = variant == 2 && sc == Screen::Autopsy;
+                pv.x = variant == 2 ? SW - 1 : 0;
+                pv.y = variant == 2 ? SH - 1 : 0;
                 Composition c {kConsoleW, kConsoleH, {}, {}};
-                BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom);
+                BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom, nullptr, &pv);
                 CHECK(c.pieces.size() == 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
                       c.pieces[0].to.w == kActivityBottomTo.w && c.pieces[0].to.h == kActivityBottomTo.h);
                 const Rect topTo = c.pieces[1].to;
                 CHECK(topTo.x == kActivityTopX && topTo.y == kActivityTopY && topTo.w == kActivityTopW);
                 CHECK(c.pieces[1].from.h == (sc == Screen::Cards ? top.second : HudCropRows(top.second)));
-                int layer = -1, prompt = 0, lit = 0, chips = 0;
+                int layer = -1, prompt = 0, lit = 0, chips = 0, pointer = 0;
                 bool images = false;
                 for (const ui::UiItem& it : c.ui)
                 {
                     const Rect r = it.to;
                     CHECK(r.x >= 0 && r.y >= 0 && r.x + r.w <= kConsoleW && r.y + r.h <= kConsoleH);
+                    if (it.layer == kMgPointerLayer && it.kind == ui::UiItem::Panel)
+                    {
+                        // The pointer: over the playfield (its frame), its own layer, the last still one.
+                        pointer++;
+                        CHECK(r.x >= kActivityBottomTo.x - 16 && r.y >= kActivityBottomTo.y - 16 && r.x + r.w <= kActivityBottomTo.x + kActivityBottomTo.w + 16 &&
+                              r.y + r.h <= kActivityBottomTo.y + kActivityBottomTo.h + 16);
+                        CHECK(!images && it.layer >= layer);
+                        layer = it.layer;
+                        continue;
+                    }
                     // Off both pictures (their frames' 6 pixels too).
                     for (const Piece& q : c.pieces)
                         CHECK(r.x + r.w <= q.to.x - 6 || r.x >= q.to.x + q.to.w + 6 || r.y + r.h <= q.to.y - 6 || r.y >= q.to.y + q.to.h + 6);
@@ -293,7 +343,11 @@ static void minigame_frame()
                 }
                 CHECK(prompt > 0);
                 // The clog lights the blow's hint; the cards' question has two chips (Yes, No), the message one.
-                CHECK(lit == (sc == Screen::Vacuum && variant == 2 ? 1 : 0));
+                const bool litNow = (sc == Screen::Vacuum && variant == 2) || (sc == Screen::Autopsy && variant > 0) || (sc == Screen::Detector && variant == 2);
+                CHECK(lit == (litNow ? 1 : 0));
+                CHECK(pointer == (IsPointing(sc) ? 2 : 0));   // (shown: the navigator never shows the detector's)
+                // The painting's question: two chips (Yes, No).
+                if (sc == Screen::Art && variant == 2) CHECK(chips == 2);
                 if (sc == Screen::Cards) CHECK(chips == (variant == 2 ? 2 : variant == 3 ? 1 : 5));
                 for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
                     TestConsoleRoundtrip({sc, Tab::None}, false, top.first, top.second, o.first, o.second, true, &c);

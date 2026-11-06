@@ -223,7 +223,9 @@ The screen request that brings one up (`P + 0xDF0 + 0x20 * slot`: module, r3, ..
   216..255 x 16..55, flask 216..255 x 136..175; B or Start quit and forfeit the earnings.
 - **Detector** (`DetectorState`): `S+0x9C` state 0 switching off / 1 power-on / 2 opening / 3 active / 4 closing / 5 found card, `S+0xD0` s32 charge
   (0x100000 full; `G+0x41DC` its copy), `S+0xD4` a find in range, `S+0xD8` -> slider (`+0x90` 0..0x1000), `S+0x4E` card shown, `S+0x54` depth mismatch
-  0..128, `S+0x58` -> the sensed find (`+8` u8 type 0..8: lead rock, copper, silver, gold, ..., 7 mummified alien), `G+0x80` earnings, `G+0x31C8` finds loaded.
+  0..128, `S+0x58` -> the sensed find (`+8` u8 type 0..8: lead rock, copper, silver, gold, ..., 7 mummified alien; while the card is up it still
+  points at the find dug, the card's name), `G+0x80` earnings, `G+0x31C8` finds loaded (a dig with no find in the table, the research's casino
+  states, leaves it at -1: read as 0).
   Stylus: power 54..101 x 136..167, dig 156..203 x 136..167, slider knob x 195 over y 33..121.
 - **MooGoo** (`MooGooState`): `S+0x1C` phase (0 players prompt ... 0xD the turn ... 0x13 results, 0x14 / 0x15 Stale Bananas / Game Over), `S+0xC` turn sub-state
   (1 pick a monkey to bet on, 3 play a card, 5 pick a target), `S+0x18` s32 timer (-1 none), `S+0x1E6` current player, `S+0x1E7` players choice, `S+0x1E9` round, `S+0x1EA` flags (1 hot-seat,

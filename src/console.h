@@ -99,10 +99,11 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // its tab's view is valid (PanelMenuView: game and rom given, the tab's data read); focus is then
 // an index in that view's items; icons (null: none drawn) gives the game's icons. Else
 // milestone 1's: the touch screen 3x over the dimmed world. armed: the view item whose X is
-// armed (the navigator's Armed(): Pockets' bin asking), 0 none.
+// armed (the navigator's Armed(): Pockets' bin asking), 0 none. pointer: a pointing minigame's
+// pointer (port/minigame.h draws it; null: none).
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
                          const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
-                         const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0);
+                         const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0, const PointerView* pointer = nullptr);
 
 // The world (the top picture's first `rows` rows, topW wide) as CONSOLE draws it: 720 high,
 // centred when narrower than the canvas; keepSides: never cut at its sides (fitted to the

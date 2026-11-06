@@ -52,10 +52,16 @@
 # Panel/Interact; the game: Cards, Unknown in the black load, which CONSOLE shows as Loading, then
 # Panel/Interact), B then B answers no and X still draws; from act-vacuum-clog, Y held 10
 # frames clears the clog (the bowl's row 1 back to #30A2D3) within 30 frames (RAM: clogged=1, then 0).
+# The pointing minigames (src/activities.*, src/port/minigame.*; the research's G-* states on copies
+# of the complete save): pictures autopsy (and -2x), detector (and -wide), art, art-ask (the frame,
+# the pointer in the playfield's middle, the hints lit as the game asks); and the mg-* runs: an organ
+# carried to the tray and banked, the payout, the autopsy quit (B twice) and not quit (B once), a dig
+# with the depth slider moved, the detector off, a stroke, undo, the bucket's fill and a colour, the
+# painting's question answered both ways.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
 #   bash tests/console_check.sh
-# Override with SIMS2WIDE, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh) and
-# PYTHON (a Python with Pillow).
+# Override with SIMS2WIDE, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh),
+# PYTHON (a Python with Pillow) and MAX_SIMS (the emulators run at once, 4).
 set -u
 repo=$(cd "$(dirname "$0")/.." && pwd)
 bin=${SIMS2WIDE:-$repo/build/sims2wide}
@@ -69,6 +75,22 @@ python=${PYTHON:-python3}
 "$python" -c "import PIL" 2>/dev/null || { echo "no Pillow for $python (set PYTHON)"; exit 2; }
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+# At most MAX_SIMS (default 4) emulators at once: "$bin" is this function, which takes one of
+# the slots (a directory each) for the run.
+max_sims=${MAX_SIMS:-4}
+real_bin=$bin
+sims2wide_slot() {
+    local i slot=
+    while [ -z "$slot" ]; do
+        for i in $(seq 1 "$max_sims"); do mkdir "$tmp/slot$i" 2>/dev/null && { slot=$tmp/slot$i; break; }; done
+        [ -n "$slot" ] || sleep 0.2
+    done
+    "$real_bin" "$@"
+    local rc=$?
+    rmdir "$slot"
+    return $rc
+}
+bin=sims2wide_slot
 
 # run NAME STATE [options...]: frame 119 as the console's picture (NAME/c/f000119.png) and as
 # the two screens (NAME/r/f000119.png); NAME.ok only if both runs went to their end.
@@ -78,11 +100,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*) cp "$complete_save" "$save" || return ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*) cp "$complete_save" "$save" ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -112,6 +134,16 @@ run cards-wide act-cards "${late[@]}" --wide &
 run vacuum-clog act-vacuum-clog "${hotel[@]}" &
 run vacuum-2x act-vacuum "${hotel[@]}" --compose-scale 2 &
 run social-wide act-social "${town[@]}" --wide &
+wait
+# The pointing minigames (the research's held-out states, on copies of the complete save): the
+# pointer in the playfield's middle (a new screen's), the game's values and prompts.
+run autopsy G-A-para "${late[@]}" &
+run autopsy-2x G-A-para "${late[@]}" --compose-scale 2 &
+run detector G-A-md-walk "${late[@]}" &
+run detector-wide G-A-md-walk "${late[@]}" --wide &
+wait
+run art G-D-art-stroke "${late[@]}" &
+run art-ask G-D-art-x "${late[@]}" &
 wait
 run s2 s2 "${town[@]}" &
 run s4 s4 "${town[@]}" &
@@ -182,7 +214,7 @@ wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
-    cards-m1 cards-ask cards-wide vacuum-clog vacuum-2x social-wide \
+    cards-m1 cards-ask cards-wide vacuum-clog vacuum-2x social-wide autopsy autopsy-2x detector detector-wide art art-ask \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
@@ -219,10 +251,15 @@ def expect(what, got, want):
     if got != want:
         errors.append(f"{what}: {got} (want {want})")
 
+# Canvas points the pointing minigames' pointer covers (its ring, 15 around its point): not compared.
+SKIP = [(421, 356)] if case.split("-")[0] in ("autopsy", "art") else []
+
 def piece(what, fx, fy, fw, fh, tx, ty, scale, step=5):
     """A piece of the bottom screen drawn whole-number times bigger: each DS pixel's block."""
     for y in range(0, fh, step):
         for x in range(0, fw, step):
+            if any(abs(tx + x * scale - sx) < 20 and abs(ty + y * scale - sy) < 20 for sx, sy in SKIP):
+                continue
             expect(f"{what} DS {fx + x},{fy + y}", C(tx + x * scale + scale // 2, ty + y * scale + scale // 2), bottom(fx + x, fy + y))
             if len(errors) > 4:
                 return
@@ -372,7 +409,8 @@ def minigame_frame(side_top):
     # just inside its top left), the title plate over the playfield (the cards' and the vacuum's).
     expect("prompt bar fill", C(40, 686), FRAME)
     bar = white_text("prompt bar", 40, 664, 1240, 708)
-    if case in ("cards", "cards-ask", "cards-wide", "vacuum", "vacuum-2x", "vacuum-clog"):
+    if case in ("cards", "cards-ask", "cards-wide", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "detector-wide",
+                "art", "art-ask"):
         white_text("title plate", 40, 12, 400, 52)
     else:
         for y in range(10, 54, 4):
@@ -391,8 +429,17 @@ def minigame_frame(side_top):
             errors.append("the question's prompts are not A and B alone")
     elif case.startswith("cards") and not (has(green) and has(red) and has(blue)):
         errors.append("the cards' prompts lack A, B or X")
-    if (case == "vacuum-clog") != has(lit):
-        errors.append("the blow's hint lit without the clog, or not lit with it")
+    # (Lit too: the autopsy's tweezers while a parasite eats, G-A-para; the detector's dig with a find in range.)
+    if (case in ("vacuum-clog", "autopsy", "autopsy-2x", "detector", "detector-wide")) != has(lit):
+        errors.append("a hint lit when the game asks for nothing, or not lit when it does")
+    # The painting's question: A and B alone.
+    if case == "art-ask" and (not has(green) or not has(red) or has(blue)):
+        errors.append("the painting's question's prompts are not A and B alone")
+    if case.split("-")[0] in ("autopsy", "art"):
+        # The pointer: its ring's white (or gold) around the playfield's middle (DS 128,96).
+        ring = [C(x, y) for y in range(338, 376) for x in range(402, 442)]
+        if (255, 255, 255) not in ring:
+            errors.append("no pointer in the playfield's middle")
 
 def hd_menu(rows, focus, wide=False):
     """The panel's HD menu (src/port/panelmenu.*, interact.*): the panel's outline and frame band,
@@ -789,13 +836,13 @@ elif case in ("s5-hd", "s5-hd-wide"):
         h = round(1280 * rows / tw)
         for cx, cy in ((2, 100), (1277, 100), (640, 300), (40, 440)):
             expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * tw // 1280, cy * rows // h)))
-elif case in ("social", "vacuum", "vacuum-2x", "vacuum-clog"):
+elif case in ("social", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask"):
     activity(176)
 elif case in ("cards", "cards-ask", "cards-m1"):
     # The card game has no HUD: its world whole, no status bar.
     expect("canvas", comp.size, (1280, 720))
     activity(hd=case != "cards-m1")
-elif case in ("cards-wide", "social-wide"):
+elif case in ("cards-wide", "social-wide", "detector-wide"):
     # The widescreen top screen: the secondary panel shorter, the side panel under it.
     expect("background", C(10, 10), PANEL)
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
@@ -1397,16 +1444,87 @@ for lang in 1 2 3 4 5; do
     if out=$("$bin" "$rom" --language $lang --measure-menu 2> "$tmp/menu-$lang.log"); then echo "ok   menu-words-$lang: $out"
     else echo "FAIL menu-words-$lang: $out $(tail -n 1 "$tmp/menu-$lang.log")"; fails=$((fails + 1)); fi
 done
-# The minigames (milestone 6, `GScreen::Autopsy` ... `ArtGallery`): CONSOLE knows none of them yet, so each
-# is the stick cursor's Unknown screen as before the kinds existed: the game's kind is printed, the pixels
+# The minigames (milestone 6) CONSOLE does not play yet (`GScreen::MooGoo` ... `MixerSave`): each is the
+# stick cursor's Unknown screen as before the kinds existed: the game's kind is printed, the pixels
 # agree (no "pixels disagree"), and the run (a stick move, A) ends well.
-for st in G-X-autopsy:Autopsy G-X-metal:Detector G-X-moogoo-game:MooGoo G-X-scratch:Scratch G-X-crime:Crime G-X-music:Mixer G-D-mus-save:MixerSave G-X-artgal:ArtGallery; do
+for st in G-X-moogoo-game:MooGoo G-X-scratch:Scratch G-X-crime:Crime G-X-music:Mixer G-D-mus-save:MixerSave; do
     pad "pad-mg-${st%%:*}" "${st%%:*}" minigame 120 &
 done
 wait
-for st in G-X-autopsy:Autopsy G-X-metal:Detector G-X-moogoo-game:MooGoo G-X-scratch:Scratch G-X-crime:Crime G-X-music:Mixer G-D-mus-save:MixerSave G-X-artgal:ArtGallery; do
+for st in G-X-moogoo-game:MooGoo G-X-scratch:Scratch G-X-crime:Crime G-X-music:Mixer G-D-mus-save:MixerSave; do
     mg_cursor() { in_order "pad-mg-${st%%:*}" "game ${st#*:}"; }
     check_pad "pad-mg-${st%%:*}" mg_cursor
 done
+# The pointing minigames on the controller (src/activities.*, the research's held-out states on
+# copies of the complete save, --print-minigame: the game's own fields, and the pointer's presses):
+# pad_mg NAME STATE SCRIPT FRAMES.
+pad_mg() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-screen --print-game --print-town --print-minigame --print-hud "${late[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_mg mg-autopsy-bank G-A-autopsy-nopara autopsy-bank 1000 &
+pad_mg mg-autopsy-quit G-X-autopsy autopsy-quit 150 &
+pad_mg mg-autopsy-stay G-X-autopsy autopsy-quit-once 200 &
+pad_mg mg-autopsy-payout G-A-payout-base autopsy-wait 120 &
+wait
+pad_mg mg-detector-dig G-A-md-walk detector-dig 150 &
+pad_mg mg-detector-quit G-X-metal detector-quit 120 &
+pad_mg mg-art-play G-X-artgal art-play 200 &
+pad_mg mg-art-done G-X-artgal art-done 200 &
+wait
+# The autopsy: the research's laser cut frees organ 1; then Y (the hand), the D-pad's pointer onto it,
+# A held and LB carry it to the tray: the hand drags it (sub 3), it goes in (4), §84 banked, the slot
+# removed. B asks, B quits (the panel); B then A goes on (still the autopsy 140 frames later). The
+# second specimen done (G-A-payout-base, §123 banked): the money paid, +123, and the panel.
+autopsy_bank() {
+    in_order mg-autopsy-bank 'minigame autopsy .*organs=0:[0-9]+:freed' 'minigame autopsy phase=1 .*tool=1 ' 'pointer down at 77,93' \
+        'minigame autopsy .*sub=3 .*dragged=0' 'minigame autopsy .*sub=4 ' 'minigame autopsy .*earnings=84 .*organs=5:'
+}
+check_pad mg-autopsy-bank autopsy_bank
+autopsy_quit() { in_order mg-autopsy-quit 'game Autopsy' 'game Panel/Interact'; }
+check_pad mg-autopsy-quit autopsy_quit
+autopsy_stay() {
+    if grep -q 'game Panel' "$tmp/mg-autopsy-stay.log"; then echo "  mg-autopsy-stay: quit on one B"; return 1; fi
+    in_order mg-autopsy-stay 'game Autopsy' 'frame 19[0-9]: minigame autopsy'
+}
+check_pad mg-autopsy-stay autopsy_stay
+autopsy_payout() {
+    local m0 m1
+    m0=$(grep -m 1 -o 'hud money=[0-9]*' "$tmp/mg-autopsy-payout.log" | cut -d= -f2)
+    m1=$(grep -o 'hud money=[0-9]*' "$tmp/mg-autopsy-payout.log" | tail -n 1 | cut -d= -f2)
+    [ -n "$m0" ] && [ -n "$m1" ] && [ $((m1 - m0)) = 123 ] || { echo "  mg-autopsy-payout: money $m0 -> $m1 (want +123)"; return 1; }
+    in_order mg-autopsy-payout 'minigame autopsy .*earnings=123' 'game Panel'
+}
+check_pad mg-autopsy-payout autopsy_payout
+# The detector: RB holds the depth slider's knob from where RAM has it and moves it deeper (the
+# game's value follows), A digs the find in range: the card shows it (find=0, a lead rock), the
+# earnings 2020 -> 2045, a pocket filled (item 300); B powers it off: the panel.
+detector_dig() {
+    in_order mg-detector-dig 'pointer down at 195,77' 'minigame detector .*slider=(3[5-9]|40)[0-9][0-9] ' 'pointer up' \
+        'minigame detector state=5 .*card=1 find=0 .*earnings=2045' &&
+        in_order mg-detector-dig 'inventory slots=171:[0-9/]+,300:'
+}
+check_pad mg-detector-dig detector_dig
+detector_quit() { in_order mg-detector-quit 'game Detector' 'minigame detector state=4' 'game Panel/Interact'; }
+check_pad mg-detector-quit detector_quit
+# The painting: A held with Right drags a stroke (cells painted), Y undoes it (none), LB four times
+# goes from the small pencil back round to the bucket (tool buttons 9, 8, 7, 6), A on the canvas fills
+# all 1536 cells, X the next swatch; B asks "Are you done painting?" (the game's popup, kind 2), B its
+# cross (closed, still painting), B and A its tick (closed: the research's patched easel has no
+# controller to finish the painting, so the screen stays).
+art_play() {
+    in_order mg-art-play 'pointer down at 128,96' 'minigame art stroke=1 .*painted=[1-9]' 'pointer up' 'minigame art .*painted=0 ' \
+        'minigame art .*button=9 ' 'minigame art .*button=8 ' 'minigame art .*button=7 ' 'minigame art .*button=6 tool=3' \
+        'minigame art .*painted=1536 ' 'minigame art .*swatch=4 '
+}
+check_pad mg-art-play art_play
+art_done() {
+    in_order mg-art-done 'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=0,1' 'popup none' \
+        'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=1,1' 'popup none'
+}
+check_pad mg-art-done art_done
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

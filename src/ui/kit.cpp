@@ -32,6 +32,7 @@ const char* ButtonText(Button b)
     case Button::Y: return "Y";
     case Button::LB: return "LB";
     case Button::RB: return "RB";
+    case Button::LT: return "LT";
     case Button::Start: return "START";
     case Button::LStick: return "L";
     case Button::RStick: return "R";

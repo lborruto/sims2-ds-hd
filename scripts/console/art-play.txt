@@ -1,0 +1,12 @@
+# From G-X-artgal (CONSOLE): a stroke (A held, Right held: the pointer drags from the middle of the
+# canvas), Y undoes it, LB four times goes back from the small pencil to the bucket (the ring of ten
+# tools), A on the canvas fills it, X the next colour.
+10 30 pad a
+12 25 pad right
+60 2 pad y
+80 2 pad lb
+90 2 pad lb
+100 2 pad lb
+110 2 pad lb
+130 4 pad a
+150 2 pad x

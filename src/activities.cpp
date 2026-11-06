@@ -1,5 +1,7 @@
 #include "activities.h"
 
+#include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 
@@ -136,15 +138,169 @@ void Vacuum(const PadState& pad, u32& dsKeys, ActivityState& st)
     set(pad.lb, kL);
     set(pad.rb, kR);
 }
+
+bool Pressed(const PadState& pad, const ActivityState& st, bool PadState::*b) { return pad.*b && !(st.prev.*b); }
+
+// The stylus at the pointer while A is held (not when a tap runs, nor after a glide until A is let go).
+void PressPointer(const PadState& pad, ActivityState& st, bool canTap)
+{
+    if (!pad.a) st.latch = false;
+    st.down = pad.a && !st.latch && canTap;
 }
 
-bool IsActivity(Screen s) { return s == Screen::Social || s == Screen::Cards || s == Screen::Vacuum; }
+void Autopsy(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
+{
+    st.pointer = true;
+    // Quitting: the game's B held a few frames (it quits at once and forfeits the earnings).
+    if (st.quitKeys > 0)
+    {
+        dsKeys |= 1u << kB;
+        st.quitKeys--;
+        return;
+    }
+    if (st.quitArmed > 0) st.quitArmed--;
+    if (Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::start))
+    {
+        if (st.quitArmed > 0) { st.quitKeys = 4; st.quitArmed = 0; return; }
+        st.quitArmed = kQuitWindow;
+    }
+    else if (Pressed(pad, st, &PadState::a) || Pressed(pad, st, &PadState::x) || Pressed(pad, st, &PadState::y) ||
+             Pressed(pad, st, &PadState::lb) || Pressed(pad, st, &PadState::rb))
+        st.quitArmed = 0; // (any other press: not quitting)
+    // LB: the organ or the parasite held carried to the tray / the flask, then let go.
+    if (st.gliding)
+    {
+        const float dx = st.glideTo.x - st.px, dy = st.glideTo.y - st.py, d = std::sqrt(dx * dx + dy * dy);
+        if (d > kPtrDrag) { st.px += dx * kPtrDrag / d; st.py += dy * kPtrDrag / d; }
+        else { st.px = (float)st.glideTo.x; st.py = (float)st.glideTo.y; st.glideRest++; }
+        st.down = st.glideRest < 4;
+        if (!st.down) { st.gliding = false; st.latch = true; }
+        return;
+    }
+    const bool laser = st.ram.autopsy && st.ram.autopsyTool == 0;
+    MovePointer(pad, st, pad.a ? (laser ? kPtrLaser : kPtrDrag) : kPtrMax, true);
+    PressPointer(pad, st, canTap);
+    if (pad.a && Pressed(pad, st, &PadState::lb) && st.ram.autopsy && (st.ram.autopsySub == 3 || st.ram.autopsySub == 6))
+    {
+        st.gliding = true;
+        st.glideRest = 0;
+        st.glideTo = st.ram.autopsySub == 3 ? kAutopsyTray : kAutopsyFlask;
+        st.down = true;
+        return;
+    }
+    if (pad.a || !canTap) return; // (the tools while the stylus is free)
+    int tool = -1;
+    if (Pressed(pad, st, &PadState::x)) tool = 0;
+    else if (Pressed(pad, st, &PadState::y)) tool = 1;
+    else if (Pressed(pad, st, &PadState::rb)) tool = 2;
+    if (tool >= 0) touch.Tap(kAutopsyTool[tool].x, kAutopsyTool[tool].y);
+}
+
+void Detector(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
+{
+    // The hero walks on the game's own D-pad (its controller reads it): the left stick too.
+    auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
+    set(pad.up || pad.ly < -kStick, kUp);
+    set(pad.down || pad.ly > kStick, kDown);
+    set(pad.left || pad.lx < -kStick, kLeft);
+    set(pad.right || pad.lx > kStick, kRight);
+    // The depth slider: its knob held and moved while LB / RB or the right stick say so.
+    float v = kKnobStep * ((pad.rb ? 1 : 0) - (pad.lb ? 1 : 0));
+    if (std::fabs(pad.ry) > kPtrDead) v += kKnobStick * pad.ry;
+    if (v != 0 && (canTap || st.sliderFrames > 0))
+    {
+        if (st.sliderFrames == 0)
+        {
+            st.px = (float)kDetectorKnobX;
+            st.py = kDetectorKnobTop + (float)kDetectorKnobSpan * std::clamp(st.ram.detectorSlider, 0, 4096) / 4096.0f;
+        }
+        else if (st.sliderFrames >= 2) // (the press lands on the knob first)
+            st.py = std::clamp(st.py + v, (float)kDetectorKnobTop, (float)(kDetectorKnobTop + kDetectorKnobSpan));
+        st.sliderFrames++;
+        st.down = true;
+        return;
+    }
+    st.sliderFrames = 0;
+    if (!canTap) return;
+    if (Pressed(pad, st, &PadState::a)) touch.Tap(kDetectorDig.x, kDetectorDig.y);
+    else if (Pressed(pad, st, &PadState::b)) touch.Tap(kDetectorPower.x, kDetectorPower.y);
+}
+
+void Art(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap)
+{
+    st.pointer = true;
+    if (st.ram.ask)
+    {
+        // "Are you done painting?": A its tick, B its cross; the rest waits.
+        if (!canTap) return;
+        if (Pressed(pad, st, &PadState::a)) { touch.Tap(st.ram.askYes.x, st.ram.askYes.y); st.latch = true; }
+        else if (Pressed(pad, st, &PadState::b)) { touch.Tap(st.ram.askNo.x, st.ram.askNo.y); st.latch = true; }
+        return;
+    }
+    MovePointer(pad, st, pad.a ? kPtrDrag : kPtrMax, true);
+    PressPointer(pad, st, canTap);
+    if (pad.a || !canTap) return;
+    const int button = std::clamp(st.ram.artButton, 0, kArtTools - 1);
+    if (Pressed(pad, st, &PadState::lb)) { const Point t = ArtTool((button + kArtTools - 1) % kArtTools); touch.Tap(t.x, t.y); }
+    else if (Pressed(pad, st, &PadState::rb)) { const Point t = ArtTool((button + 1) % kArtTools); touch.Tap(t.x, t.y); }
+    else if (Pressed(pad, st, &PadState::x)) { const Point t = ArtSwatch((std::clamp(st.ram.artSwatch, 0, kArtSwatches - 1) + 1) % kArtSwatches); touch.Tap(t.x, t.y); }
+    else if (Pressed(pad, st, &PadState::y)) touch.Tap(kArtUndo.x, kArtUndo.y);
+    else if (Pressed(pad, st, &PadState::b)) touch.Tap(kArtDone.x, kArtDone.y);
+}
+}
+
+Point ArtTool(int b)
+{
+    b = std::clamp(b, 0, kArtTools - 1);
+    return b < 6 ? Point {14, 14 + 26 * b} : Point {241, 66 + 26 * (b - 6)};
+}
+
+Point ArtSwatch(int i)
+{
+    i = std::clamp(i, 0, kArtSwatches - 1);
+    return i < 7 ? Point {55 + 25 * i, 165} : Point {43 + 25 * (i - 7), 187};
+}
+
+bool IsPointing(Screen s) { return s == Screen::Autopsy || s == Screen::Detector || s == Screen::Art; }
+
+void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
+{
+    // The stick over further: either one, the one further over.
+    float sx = pad.lx, sy = pad.ly;
+    if (pad.rx * pad.rx + pad.ry * pad.ry > sx * sx + sy * sy) { sx = pad.rx; sy = pad.ry; }
+    const float mag = std::sqrt(sx * sx + sy * sy);
+    if (mag > kPtrDead)
+    {
+        const float m = std::min(1.0f, (mag - kPtrDead) / (1.0f - kPtrDead));
+        float speed = kPtrMax * m * m;
+        if (pad.lt > 0.5f) speed *= kPtrSlow;
+        speed = std::min(speed, cap);
+        st.px += sx / mag * speed;
+        st.py += sy / mag * speed;
+    }
+    const int dx = (pad.right ? 1 : 0) - (pad.left ? 1 : 0), dy = (pad.down ? 1 : 0) - (pad.up ? 1 : 0);
+    if (dpad && (dx || dy))
+    {
+        st.dpadHeld++;
+        float step = st.dpadHeld == 1 ? 1.0f : st.dpadHeld <= kNudgeWait ? 0.0f : st.dpadHeld <= kNudgeFast ? 1.0f : kNudgeSpeed;
+        step = std::min(step, std::max(cap, 1.0f));
+        st.px += dx * step;
+        st.py += dy * step;
+    }
+    else st.dpadHeld = 0;
+    st.px = std::clamp(st.px, 0.0f, (float)(SW - 1));
+    st.py = std::clamp(st.py, 0.0f, (float)(SH - 1));
+}
+
+bool IsActivity(Screen s) { return s == Screen::Social || s == Screen::Cards || s == Screen::Vacuum || IsPointing(s); }
 
 void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st)
 {
     st.blow = st.grab = false;
     st.handDx = st.handDy = 0;
-    if (pad.start) dsKeys |= 1u << kStart;
+    st.pointer = st.down = false;
+    // (The autopsy quits on Start at once: its Start asks first, ActivityInput's Autopsy.)
+    if (pad.start && s != Screen::Autopsy) dsKeys |= 1u << kStart;
     if (pad.select) dsKeys |= 1u << kSelect;
     const bool canTap = !touch.Owns();
     switch (s)
@@ -152,6 +308,9 @@ void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKey
     case Screen::Social: Social(pad, touch, st, canTap); break;
     case Screen::Cards: Cards(pad, touch, st, canTap); break;
     case Screen::Vacuum: Vacuum(pad, dsKeys, st); st.focus = -1; break;
+    case Screen::Autopsy: Autopsy(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
+    case Screen::Detector: Detector(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
+    case Screen::Art: Art(pad, touch, st, canTap); st.focus = -1; break;
     default: break;
     }
 }
@@ -167,6 +326,14 @@ std::vector<Hint> ActivityHints(Screen s)
     case Screen::Vacuum:
         return {{"L-STICK", "DRIVE"}, {"R-STICK", "MOVE THE HAND"}, {"X+D-PAD", "MOVE THE HAND"},
                 {"A", "GRAB, DRAG TO\nTHE BOX"}, {"Y", "BLOW: UNCLOG"}};
+    case Screen::Autopsy:
+        return {{"STICK", "POINT (LT SLOW)"}, {"A", "HOLD: USE TOOL"}, {"X Y RB", "LASER, HAND,\nTWEEZERS"},
+                {"LB", "TO TRAY/FLASK"}, {"B B", "QUIT (NO PAY)"}};
+    case Screen::Detector:
+        return {{"L-STICK", "WALK"}, {"A", "DIG"}, {"LB RB", "DEPTH"}, {"B", "POWER OFF"}};
+    case Screen::Art:
+        return {{"STICK", "POINT (LT SLOW)"}, {"A", "HOLD: PAINT"}, {"LB RB", "TOOL"}, {"X", "COLOR"},
+                {"Y", "UNDO"}, {"B", "DONE"}};
     default: return {};
     }
 }

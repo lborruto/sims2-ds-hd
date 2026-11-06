@@ -123,7 +123,7 @@ static void AddCursorHint(Composition& c, int y, bool right = false)
 }
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
-                         const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed)
+                         const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed, const PointerView* pointer)
 {
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
@@ -234,7 +234,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     {
         // The HD minigame frame (port/minigame.h): the playfield big, the top screen beside it, the
         // title, the game's values and the hints' chips.
-        BuildMinigame(c, s, topW, topH, hud, strings, *game, *rom, bottom);
+        BuildMinigame(c, s, topW, topH, hud, strings, *game, *rom, bottom, icons, pointer);
     }
     else
     {

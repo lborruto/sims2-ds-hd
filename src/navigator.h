@@ -118,6 +118,14 @@ public:
     float HandDy() const { return handDy_; }
     // The vacuum's Y: blow into the microphone this frame.
     bool Blow() const { return blow_; }
+    // The pointing minigames (activities.h): their pointer, drawn (PointerShown), and the stylus
+    // down at it this frame (PointerDown: also the detector's slider knob, not drawn), DS pixels.
+    bool PointerShown() const { return activity_.pointer; }
+    bool PointerDown() const { return activity_.down; }
+    float PointerX() const { return activity_.px; }
+    float PointerY() const { return activity_.py; }
+    // The autopsy's quit asked once (a second B / Start quits).
+    bool QuitArmed() const { return activity_.quitArmed > 0; }
 
 private:
     void Move(ScreenState s, int dx, int dy);

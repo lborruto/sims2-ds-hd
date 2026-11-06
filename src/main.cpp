@@ -593,6 +593,7 @@ int main(int argc, char** argv)
         {
             // CONSOLE's navigator from the script's "pad" events; its taps over the script's touch.
             input.Steer(app, input.scriptPad, keys);
+            input.PointerTouch(app, touching, tx, ty);
             input.ScriptTouch(touching, tx, ty);
         }
         else
@@ -819,6 +820,13 @@ int main(int argc, char** argv)
             {   // the minigames (gamestate.h): one line when the screen's part changes
                 const std::string now = MinigameLine(app.game), was = MinigameLine(before);
                 if (now != was || frame == 0) fprintf(stderr, "frame %ld: minigame %s\n", frame, now.empty() ? "none" : now.c_str());
+                // A pointing minigame's stylus at its pointer (activities.h): its press and release.
+                static bool pointerDown = false;
+                if (app.consolePointer.down != pointerDown)
+                {
+                    pointerDown = app.consolePointer.down;
+                    fprintf(stderr, "frame %ld: pointer %s at %d,%d\n", frame, pointerDown ? "down" : "up", (int)app.consolePointer.x, (int)app.consolePointer.y);
+                }
             }
             if (app.portSupported && printHotel)
             {   // the hotel and the shops (gamestate.h), one line per part when it changes

@@ -511,7 +511,7 @@ struct DetectorState
     int slider = 0;                   // the depth slider, 0..kDetectorSliderMax
     int mismatch = 0;                 // 0..128: |slider - the find's depth| (the scope's noise)
     bool card = false;                // the "Found:" card is up
-    int findType = -1;                // the sensed find's type (0 lead rock ... 8 sarcophagus) when inRange, else -1
+    int findType = -1;                // the sensed find's type (0 lead rock ... 8 sarcophagus) when inRange or the card is up (the find dug), else -1
     int findCount = 0;                // the finds the place loaded
     int earnings = 0;                 // "Metal Detector Earnings" (G)
     bool operator==(const DetectorState&) const = default;

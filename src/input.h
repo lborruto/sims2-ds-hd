@@ -93,6 +93,8 @@ struct Input
     void Steer(App& app, const PadState& p, u32& keys);
     // The touch script's touch this frame, over any other while it owns the stylus.
     void ScriptTouch(bool& touching, int& tx, int& ty);
+    // A pointing minigame's stylus at its pointer (the navigator's; CONSOLE), before ScriptTouch.
+    void PointerTouch(const App& app, bool& touching, int& tx, int& ty);
     // Clears the one-frame requests and the menu's input.
     void EndFrame();
 

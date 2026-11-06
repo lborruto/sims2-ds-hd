@@ -9,7 +9,9 @@
 // message (A goes on), the vacuum's clog (the blow's hint lit red).
 // Without the game's strings or RAM: milestone 1's activity layout (console.cpp, the 5 x 7 hints).
 // Today: Keelhaulin' Cards, the vacuum and the social reaction games (their schemes from
-// milestone 1: activities.*).
+// milestone 1: activities.*), and the pointing games (milestone 6): Alien Autopsy, the Metal
+// Detector and the Art Gallery's painting, their pointer drawn over the playfield (a ring, gold
+// while the stylus is down).
 #pragma once
 #include <string>
 
@@ -31,6 +33,13 @@ struct BlockMeasure;
 // tells (which social verb started one is not read): no title plate there.
 constexpr int kStrMgCards = 492, kStrMgVacuum = 1968, kStrMgTreasure = 1684, kStrMgCardsCount = 1685, kStrMgScore = 1686;
 constexpr int kStrMgPlayer = 2022, kStrMgOpponent = 2023, kStrMgQuit = 61, kStrMgYes = 48, kStrMgNo = 49, kStrMgVacuumEarnings = 2014;
+// The pointing games: the titles (the lab's verb "Alien Autopsy" 1885, the key item "Metal
+// Detector" 1970, the place "Art Gallery" 68), the money "$@1" 28, the detector's card "Found:"
+// 1160 and its finds' names (two lines each from 1164 + 2 type; "¹" an empty line), the stat
+// panel's "Metal Detector Earnings: $@1" 2015 (StatStatsLine 3); the painting's colours are
+// resource 6028 (16 pages of 16 BGR555 colours, the swatch i the page's colour i + 1).
+constexpr int kStrMgAutopsy = 1885, kStrMgDetector = 1970, kStrMgArtGallery = 68, kStrMgMoney = 28, kStrMgFound = 1160, kStrMgFind0 = 1164;
+constexpr int kMgFindTypes = 9, kResArtColours = 6028;
 constexpr int kStrMgMax = kStrMgOpponent;   // the largest id used
 
 // The frame's geometry (canvas pixels). The playfield stays milestone 1's kActivityBottomTo (36,68,
@@ -56,7 +65,7 @@ constexpr float kMgValueSize = 24, kMgValueMin = 16, kMgHeadSize = 18;
 constexpr Rect kMgDeckFrom {110, 6, 36, 53};
 constexpr Rect kMgAnswerFrom[3] = {{6, 169, 82, 19}, {87, 150, 82, 19}, {168, 169, 82, 19}};
 
-// Whether the HD frame draws screen s: an activity (Social, Cards, Vacuum), the game's RAM read
+// Whether the HD frame draws screen s: an activity (Social, Cards, Vacuum, Autopsy, Detector, Art), the game's RAM read
 // (game valid) and its strings there (rom with every id above).
 bool MinigameFramed(ScreenState s, const GameState* game, const RomData* rom);
 
@@ -64,8 +73,17 @@ bool MinigameFramed(ScreenState s, const GameState* game, const RomData* rom);
 // framed), the title plate, the status bar (hud and strings given and ok, the game keeping its HUD:
 // not the cards), the side panel (values, hints). bottom: the DS's touch screen (the live crops;
 // null: none). The focus ring (the cards') is console.cpp's, over the playfield piece.
+// icons: unused today (null fine); pointer: a pointing game's pointer (null or not shown: none).
 void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudState* hud, const HudStrings* strings, const GameState& game,
-                   const RomData& rom, const u32* bottom);
+                   const RomData& rom, const u32* bottom, IconCache* icons = nullptr, const PointerView* pointer = nullptr);
+// The pointer's layer (it moves every frame: nothing else rasters again).
+constexpr int kMgPointerLayer = 6;
+
+// What the activities' input needs from RAM (activities.h's ActivityRam) on the minigame up:
+// the cards' question and message, the autopsy's tool and what it holds, the detector's slider,
+// the painting's tool and swatch, and a question of the game's popup (its tick and cross where
+// the game puts them: the painting's "Are you done painting?"). game null: nothing known.
+ActivityRam MinigameRam(const GameState* game);
 
 // (--measure-menu) every word the frame shows in its box: the titles, the board's labels and names,
 // the values' line, the game's words on the hints.

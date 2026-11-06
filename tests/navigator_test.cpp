@@ -13,6 +13,7 @@
 // the content changes (or clamped), a press held by the gate dropped when the view changed
 // (stale), the list's own scroll past its end with the focus following the rebuilt view.
 //   ninja -C build navigator_test && ./build/navigator_test
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -550,6 +551,260 @@ static void vacuum_blows_drives_and_grabs()
     r.Frame(kVacuum, a);
     r.Frame(kInteract);
     CHECK(!r.nav.CursorPress() && !r.nav.Hand());
+}
+
+static const ScreenState kAutopsy {Screen::Autopsy, Tab::None};
+static const ScreenState kDetector {Screen::Detector, Tab::None};
+static const ScreenState kArt {Screen::Art, Tab::None};
+
+// The pointer (the pointing minigames, activities.h): the D-pad nudges it a pixel a press and
+// reaches every pixel; held, it waits, then a pixel a frame, then faster; a stick moves it faster
+// with a fuller deflection, a quarter with LT, never past the cap; held on the screen.
+static void pointer_moves()
+{
+    Rig r;
+    r.Frame(kArt);
+    CHECK(r.nav.PointerShown() && !r.nav.PointerDown() && !r.nav.CursorScreen());
+    CHECK(r.nav.PointerX() == SW / 2 && r.nav.PointerY() == SH / 2);
+    // One press, one pixel (a press of 1 frame and of 3: the same).
+    r.Press(kArt, &PadState::right);
+    CHECK(r.nav.PointerX() == SW / 2 + 1);
+    PadState d;
+    d.right = true;
+    for (int i = 0; i < 3; i++) r.Frame(kArt, d);
+    r.Frame(kArt);
+    CHECK(r.nav.PointerX() == SW / 2 + 2);
+    // Held: 1, then nothing until kNudgeWait, then a pixel a frame until kNudgeFast, then kNudgeSpeed.
+    float x0 = r.nav.PointerX();
+    for (int i = 0; i < kNudgeFast; i++) r.Frame(kArt, d);
+    CHECK(r.nav.PointerX() == x0 + 1 + (kNudgeFast - kNudgeWait));
+    x0 = r.nav.PointerX();
+    r.Frame(kArt, d);
+    CHECK(r.nav.PointerX() == x0 + kNudgeSpeed);
+    // Every pixel of the screen, both corners included, one press at a time from the edge.
+    r.Frame(kArt);
+    PadState ul;
+    ul.left = ul.up = true;
+    for (int i = 0; i < 200; i++) r.Frame(kArt, ul);
+    r.Frame(kArt);
+    CHECK(r.nav.PointerX() == 0 && r.nav.PointerY() == 0);
+    for (int k = 1; k < SW; k++)
+    {
+        r.Press(kArt, &PadState::right);
+        if (r.nav.PointerX() != k) { CHECK(r.nav.PointerX() == k); break; }
+    }
+    for (int i = 0; i < 10; i++) r.Press(kArt, &PadState::right);
+    CHECK(r.nav.PointerX() == SW - 1); // (held on the screen)
+    PadState dn;
+    dn.down = true;
+    for (int i = 0; i < 200; i++) r.Frame(kArt, dn);
+    CHECK(r.nav.PointerY() == SH - 1);
+    // The stick: a light touch slow, a full one kPtrMax a frame; LT a quarter; under the dead zone nothing.
+    Rig s;
+    s.Frame(kArt);
+    PadState st;
+    st.lx = 0.15f;
+    s.Frame(kArt, st);
+    CHECK(s.nav.PointerX() == SW / 2);
+    st.lx = 0.3f;
+    s.Frame(kArt, st);
+    const float slow = s.nav.PointerX() - SW / 2;
+    CHECK(slow > 0 && slow < 0.2f);
+    float x = s.nav.PointerX();
+    st.lx = -1;
+    s.Frame(kArt, st);
+    CHECK(std::fabs(x - s.nav.PointerX() - kPtrMax) < 1e-4f);
+    x = s.nav.PointerX();
+    st.lt = 1;
+    s.Frame(kArt, st);
+    CHECK(std::fabs(x - s.nav.PointerX() - kPtrMax * kPtrSlow) < 1e-4f);
+    // The right stick too (the one further over wins).
+    PadState rs;
+    rs.ry = 1;
+    const float y = s.nav.PointerY();
+    s.Frame(kArt, rs);
+    CHECK(std::fabs(s.nav.PointerY() - y - kPtrMax) < 1e-4f);
+    // A held: the stylus down at the pointer, the stick capped (kPtrDrag; the autopsy's laser kPtrLaser).
+    PadState ad;
+    ad.a = true;
+    ad.lx = 1;
+    x = s.nav.PointerX();
+    s.Frame(kArt, ad);
+    CHECK(s.nav.PointerDown() && std::fabs(s.nav.PointerX() - x - kPtrDrag) < 1e-4f);
+    s.Frame(kArt);
+    CHECK(!s.nav.PointerDown());
+    Rig a;
+    ActivityRam ram;
+    ram.autopsy = true; // (the laser, tool 0)
+    a.nav.SetActivityRam(ram);
+    a.Frame(kAutopsy);
+    x = a.nav.PointerX();
+    a.Frame(kAutopsy, ad);
+    CHECK(a.nav.PointerDown() && std::fabs(a.nav.PointerX() - x - kPtrLaser) < 1e-4f);
+    ram.autopsyTool = 1;
+    a.nav.SetActivityRam(ram);
+    x = a.nav.PointerX();
+    a.Frame(kAutopsy, ad);
+    CHECK(std::fabs(a.nav.PointerX() - x - kPtrDrag) < 1e-4f);
+    // A new screen: the pointer back in the middle.
+    a.Frame(kInteract);
+    a.Frame(kArt);
+    CHECK(a.nav.PointerX() == SW / 2 && a.nav.PointerY() == SH / 2);
+}
+
+// Alien Autopsy: X / Y / RB tap the tools (not while A holds the stylus); LB carries the organ
+// held to the tray and lets go; B (or Start) asks, a second one quits (the game's B held), any
+// other press forgets the question; Start is never the DS's.
+static void autopsy_scheme()
+{
+    Rig r;
+    ActivityRam ram;
+    ram.autopsy = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kAutopsy);
+    int x, y;
+    bool PadState::*const keys[3] = {&PadState::x, &PadState::y, &PadState::rb};
+    for (int t = 0; t < 3; t++)
+    {
+        r.Press(kAutopsy, keys[t]);
+        CHECK(r.Touched(x, y) && x == kAutopsyTool[t].x && y == kAutopsyTool[t].y);
+        r.Drain();
+    }
+    PadState ax;
+    ax.a = ax.x = true;
+    r.Frame(kAutopsy, ax);
+    CHECK(!r.touch.Owns() && r.nav.PointerDown());
+    r.Frame(kAutopsy);
+    // LB with an organ dragged: the pointer glides to the tray at kPtrDrag, the stylus down, then up.
+    ram.autopsySub = 3;
+    r.nav.SetActivityRam(ram);
+    PadState a;
+    a.a = true;
+    r.Frame(kAutopsy, a);
+    PadState alb = a;
+    alb.lb = true;
+    r.Frame(kAutopsy, alb);
+    float last = r.nav.PointerX();
+    int frames = 0;
+    bool smooth = true;
+    while (r.nav.PointerDown() && frames < 200)
+    {
+        r.Frame(kAutopsy, a);
+        smooth &= std::fabs(r.nav.PointerX() - last) <= kPtrDrag + 1e-4f;
+        last = r.nav.PointerX();
+        frames++;
+    }
+    CHECK(smooth && frames < 200);
+    CHECK(r.nav.PointerX() == kAutopsyTray.x && r.nav.PointerY() == kAutopsyTray.y);
+    // Let go there; A still held does not press again until it is let go.
+    r.Frame(kAutopsy, a);
+    CHECK(!r.nav.PointerDown());
+    r.Frame(kAutopsy);
+    r.Frame(kAutopsy, a);
+    CHECK(r.nav.PointerDown());
+    r.Frame(kAutopsy);
+    // B asks; A forgets it; B, B quits (B held for the game a few frames); Start is never passed on.
+    ram.autopsySub = 0;
+    r.nav.SetActivityRam(ram);
+    PadState b;
+    b.b = true;
+    u32 k = r.Frame(kAutopsy, b);
+    CHECK(!(k & (1u << kB)) && r.nav.QuitArmed());
+    r.Frame(kAutopsy);
+    r.Press(kAutopsy, &PadState::a);
+    CHECK(!r.nav.QuitArmed());
+    PadState sp;
+    sp.start = true;
+    k = r.Frame(kAutopsy, sp);
+    CHECK(!(k & (1u << kStart)) && r.nav.QuitArmed());
+    r.Frame(kAutopsy);
+    k = r.Frame(kAutopsy, b);
+    int held = 0;
+    for (int i = 0; i < 10; i++) held += (r.Frame(kAutopsy) & (1u << kB)) ? 1 : 0;
+    CHECK(held >= 2);
+    // The question goes after kQuitWindow frames.
+    r.Frame(kAutopsy, b);
+    for (int i = 0; i < kQuitWindow + 1; i++) r.Frame(kAutopsy);
+    CHECK(!r.nav.QuitArmed());
+}
+
+// The Metal Detector: the D-pad and the stick walk (the DS's D-pad); A digs, B powers off (their
+// taps); LB / RB hold the slider's knob where RAM has it and move it, the stylus let go after.
+static void detector_scheme()
+{
+    Rig r;
+    ActivityRam ram;
+    ram.detector = true;
+    ram.detectorSlider = 2048;
+    r.nav.SetActivityRam(ram);
+    PadState w;
+    w.up = true;
+    w.lx = -1;
+    u32 k = r.Frame(kDetector, w);
+    CHECK((k & (1u << kUp)) && (k & (1u << kLeft)));
+    CHECK(!r.nav.PointerShown());
+    r.Frame(kDetector);
+    int x, y;
+    r.Press(kDetector, &PadState::a);
+    CHECK(r.Touched(x, y) && x == kDetectorDig.x && y == kDetectorDig.y);
+    r.Drain();
+    r.Press(kDetector, &PadState::b);
+    CHECK(r.Touched(x, y) && x == kDetectorPower.x && y == kDetectorPower.y);
+    r.Drain();
+    PadState rb;
+    rb.rb = true;
+    r.Frame(kDetector, rb);
+    CHECK(r.nav.PointerDown() && r.nav.PointerX() == kDetectorKnobX && r.nav.PointerY() == kDetectorKnobTop + kDetectorKnobSpan / 2);
+    for (int i = 0; i < 200; i++) r.Frame(kDetector, rb);
+    CHECK(r.nav.PointerDown() && r.nav.PointerY() == kDetectorKnobTop + kDetectorKnobSpan);
+    r.Frame(kDetector);
+    CHECK(!r.nav.PointerDown());
+    PadState lb;
+    lb.lb = true;
+    r.Frame(kDetector, lb);
+    r.Frame(kDetector, lb);
+    r.Frame(kDetector, lb);
+    CHECK(r.nav.PointerY() == kDetectorKnobTop + kDetectorKnobSpan / 2 - kKnobStep);
+}
+
+// The Art Gallery: LB / RB the previous / next tool in the ring of ten, X the next swatch, Y undo,
+// B the game's X; its question: A the tick, B the cross, the rest waiting.
+static void art_scheme()
+{
+    Rig r;
+    ActivityRam ram;
+    ram.art = true;
+    ram.artButton = 0;
+    ram.artSwatch = 14;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kArt);
+    int x, y;
+    auto tapped = [&](bool PadState::*b, Point p) {
+        r.Press(kArt, b);
+        const bool ok = r.Touched(x, y) && x == p.x && y == p.y;
+        r.Drain();
+        return ok;
+    };
+    CHECK(tapped(&PadState::lb, ArtTool(9)));
+    CHECK(tapped(&PadState::rb, ArtTool(1)));
+    CHECK(tapped(&PadState::x, ArtSwatch(0)));
+    CHECK(tapped(&PadState::y, kArtUndo));
+    CHECK(tapped(&PadState::b, kArtDone));
+    // The buttons the game draws: the ten tools in two columns, the fifteen swatches in two rows.
+    CHECK(ArtTool(0).x == 14 && ArtTool(5).y == 144 && ArtTool(6).x == 241 && ArtTool(6).y == 66 && ArtTool(9).y == 144);
+    CHECK(ArtSwatch(5).x == 180 && ArtSwatch(5).y == 165 && ArtSwatch(7).x == 43 && ArtSwatch(14).y == 187);
+    ram.ask = true;
+    ram.askYes = {164, 116};
+    ram.askNo = {92, 116};
+    r.nav.SetActivityRam(ram);
+    r.Press(kArt, &PadState::y);
+    CHECK(!r.touch.Owns());
+    CHECK(tapped(&PadState::a, ram.askYes));
+    CHECK(tapped(&PadState::b, ram.askNo));
+    PadState a;
+    a.a = true;
+    r.Frame(kArt, a);
+    CHECK(!r.nav.PointerDown());
 }
 
 static void unsettled_press_waits()
@@ -1811,6 +2066,10 @@ int main()
     cards_quit_question();
     cards_ram();
     vacuum_blows_drives_and_grabs();
+    pointer_moves();
+    autopsy_scheme();
+    detector_scheme();
+    art_scheme();
     unsettled_press_waits();
     unsettled_press_dropped_after_90();
     unsettled_ds_buttons_pass();

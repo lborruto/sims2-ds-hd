@@ -1295,14 +1295,19 @@ DetectorState ReadDetector(const Reader& m, u32 S)
     if (!m.In(S, 0xE4) || !m.R32(kEU.gameBlock, G) || !m.R32(S + q.mdState, state) || state > 5 || !m.R8(S + q.mdInRange, range) || range > 1 ||
         !Ptr(m, S + q.mdSlider, q.mdSliderValue + 4, slider) || !m.R32(slider + q.mdSliderValue, sliderVal) || sliderVal > (u32)kDetectorSliderMax ||
         !m.R8(S + q.mdCard, card) || card > 1 || !m.R32(S + q.mdMismatch, mismatch) || mismatch > 128 || !m.R32(G + q.mdEarnings, earn) || earn > 99999999 ||
-        !m.R32(G + q.mdFinds, finds) || finds > 150)
+        !m.R32(G + q.mdFinds, finds))
         return v;
+    // (The finds' count is the place's table: a dig with none in it, the casino's empty table in the
+    // research's states, leaves it at -1. It says nothing of the screen: 0 then, the part still read.)
+    if (finds > 150) finds = 0;
     const int charge = m.S32(S + q.mdCharge);
     if (charge < 0 || charge > 2 * kDetectorFull) return DetectorState{};
     v.state = (int)state; v.charge = charge; v.inRange = range == 1; v.slider = (int)sliderVal; v.mismatch = (int)mismatch; v.card = card == 1;
     v.earnings = (int)earn; v.findCount = (int)finds;
     u32 find, type;
-    if (v.inRange && Ptr(m, S + q.mdFind, q.mdFindType + 1, find) && m.R8(find + q.mdFindType, type) && type <= 8) v.findType = (int)type;
+    // The sensed find, in range; and while the "Found:" card is up, the find it shows (the record
+    // dug: the game keeps its pointer, the hero no longer in range of a find taken).
+    if ((v.inRange || v.card) && Ptr(m, S + q.mdFind, q.mdFindType + 1, find) && m.R8(find + q.mdFindType, type) && type <= 8) v.findType = (int)type;
     v.valid = true;
     return v;
 }
@@ -1868,8 +1873,11 @@ ScreenState ToScreenState(const GameState& g)
     case GScreen::SaveSlots: return {Screen::SaveSlots};
     case GScreen::Drencher: return {Screen::ItemHand};
     // The minigames: CONSOLE has no frame for them yet, so they are the stick cursor's screens (Unknown).
-    case GScreen::Autopsy: case GScreen::Detector: case GScreen::MooGoo: case GScreen::Scratch: case GScreen::Crime:
-    case GScreen::Mixer: case GScreen::MixerSave: case GScreen::ArtGallery:
+    case GScreen::Autopsy: return {Screen::Autopsy};
+    case GScreen::Detector: return {Screen::Detector};
+    case GScreen::ArtGallery: return {Screen::Art};
+    case GScreen::MooGoo: case GScreen::Scratch: case GScreen::Crime:
+    case GScreen::Mixer: case GScreen::MixerSave:
     case GScreen::Unknown: break;
     }
     return {Screen::Unknown};
@@ -1884,6 +1892,8 @@ bool PixelsAgree(const GameState& g, ScreenState pixels)
     {
     case Screen::FrontEnd: case Screen::CreateASim: return pixels.screen == Screen::None;
     case Screen::SaveSlots: case Screen::ItemHand: return pixels.screen == Screen::Unknown;
+    // (The pointing minigames: no HUD and no rule of their own in the pixels.)
+    case Screen::Autopsy: case Screen::Detector: case Screen::Art: return pixels.screen == Screen::Unknown || pixels.screen == Screen::None;
     default: return false;
     }
 }

@@ -27,8 +27,8 @@ enum class Align { Left, Centre, Right };
 // DPadV / DPadH: the cross with its up and down (left and right) arms lit and the others faint:
 // Up / Down (Left / Right) do something there.
 // DPadL / DPadU / DPadR / DPadD: one arm lit (that direction alone). LStick / RStick: the sticks
-// (a round chip with a ring, "L" / "R").
-enum class Button { A, B, X, Y, LB, RB, Start, DPad, DPadV, DPadH, DPadL, DPadU, DPadR, DPadD, LStick, RStick };
+// (a round chip with a ring, "L" / "R"). LT: the left trigger (a pill, as LB).
+enum class Button { A, B, X, Y, LB, RB, Start, DPad, DPadV, DPadH, DPadL, DPadU, DPadR, DPadD, LStick, RStick, LT };
 
 struct UiItem
 {

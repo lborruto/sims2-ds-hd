@@ -178,7 +178,8 @@ const char* ScreenName(Screen s)
 {
     static const char* const kNames[] = {"None", "Panel", "Phone", "Dialogue", "Popup", "Gift", "Social",
                                          "Vacuum", "Cards", "Catalogue", "Build", "FrontEnd", "CreateASim",
-                                         "SaveSlots", "ItemHand", "Unknown", "Loading"};
+                                         "SaveSlots", "ItemHand", "Unknown", "Loading",
+                                         "Autopsy", "Detector", "Art"};
     return kNames[(int)s];
 }
 
