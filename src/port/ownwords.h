@@ -50,6 +50,8 @@ enum class OwnWordId : int
     TradingNote,
     // A help text, a card: closed.
     Close,
+    // The town's hint for the HD menu (its chip says the button).
+    Menu,
     Count
 };
 

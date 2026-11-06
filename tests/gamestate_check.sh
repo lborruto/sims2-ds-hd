@@ -69,7 +69,7 @@ hotel=(--clock "2026-01-01 14:00")
 late=(--clock "2026-11-05 12:05")
 # state:expected, the state the game is in after 120 frames.
 cases=(
-    "s2:FrontEnd" "s3:CreateASim" "s4:CreateASim" "s5:Dialogue" "s6:Popup" "s7:Phone"
+    "s2:FrontEnd" "F-legal:FrontEnd" "s3:CreateASim" "s4:CreateASim" "s5:Dialogue" "s6:Popup" "s7:Phone"
     "sit-dialogue:Dialogue" "sit-gift:Gift" "sit-cityhall:Panel/Interact" "sit-build:Build"
     "sit-store:Panel/Interact" "sit-storebuy:Catalogue" "sit-pause:Popup" "act-social:Social"
     "sit-hotel:Panel/Interact" "sit-concierge:Dialogue" "sit-basement:Panel/Interact"

@@ -3,8 +3,8 @@
 # --layout console --compose must hold the DS screens' own pixels where the composition puts
 # them (the same run without --compose gives the two screens), and the frames, the dimmed
 # backdrop and the focus ring in the game's colours:
-#   sit-cityhall (the panel, in town): the world, the rail of the touch screen's tab column and
-#   phone icon; the same with --console-menu: the HD menu (src/port/panelmenu.*: no target, no
+#   sit-cityhall (the panel, in town): the world (no rail: the HD menu replaced it), the menu hint chip;
+#   the same with --console-menu: the HD menu (src/port/panelmenu.*: no target, no
 #   row) and with --no-romdata (menu-m1) milestone 1's menu, the touch screen 3x over the dimmed
 #   world; casino-menu (sit-casino, --console-menu, the focus on row 2), at 2x and --wide: the HD
 #   Interact tab (the portrait the touch screen's pixels 3x, three labelled rows, the focus ring on
@@ -333,10 +333,15 @@ def world_full(rows=192):
     return lambda cx, cy: top(fx + (cx - x0) * fw // rw, cy * rows // 720)
 
 def rail():
-    expect("rail outline", C(1170, 360), OUTLINE)
-    expect("rail frame", C(1175, 360), FRAME)
-    piece("rail tabs", 0, 6, 35, 184, 1177, 208, 2, step=2)
-    piece("rail phone", 222, 4, 30, 30, 1182, 144, 2)
+    """No rail (the owner: the HD menu, Back / E, replaced it): where it was is the backdrop at 4:3
+    (the world ends at 1163); and the menu hint chip, its outline, at the canvas's right edge level
+    with the status bar (x 1262, row 684)."""
+    BACK = (16, 18, 24)
+    expect("no rail: backdrop where its frame was", C(1170, 360), BACK)
+    expect("no rail: backdrop where its tabs were", C(1200, 300), BACK)
+    expect("no rail: backdrop where its phone was", C(1210, 174), BACK)
+    expect("menu hint chip's outline", C(1262, 684), OUTLINE)
+    expect("menu hint chip's frame", C(1260, 684), FRAME)
     # The world without the game's status bar (its last 16 rows): 176 rows 720 high.
     w = world_full(176)
     for cx, cy in ((400, 100), (700, 650), (1000, 300), (900, 715)):
@@ -799,7 +804,7 @@ elif case == "cityhall-wide":
         expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * 341 // 1280, cy * 176 // 661)))
     for cx, cy in ((1000, 680), (1270, 715), (700, 700)):
         expect(f"backdrop below the world at {cx},{cy}", C(cx, cy), (16, 18, 24))
-    expect("rail outline", C(1170, 360), OUTLINE)
+    expect("menu hint chip's outline", C(1262, 684), OUTLINE)
     status_bar(left=16)
 elif case == "s7":
     hd_phone(None)
