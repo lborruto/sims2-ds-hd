@@ -20,7 +20,7 @@ struct HudState
     int hour = -1, minute = -1;     // the DS clock the game shows (24 h)
     int sanity = 0, sanityMax = 0;  // whole units (the game keeps them 20.12 fixed)
     int tier = -1;                  // 0 red, 1 green, 2 yellow, 3 lavender bar
-    std::string simName;            // the current Sim, ASCII, at most 8 characters
+    std::string simName;            // the current Sim, UTF-8 from the game's charset, at most 7 characters
     bool operator==(const HudState&) const = default;
 };
 
@@ -110,7 +110,7 @@ struct SaveSlot
     bool used = false;
     int money = 0, place = -1;        // place: string 0x43 + place
     u32 time = 0;                     // the header's raw time word
-    std::string simName;              // ASCII (blank when it does not read)
+    std::string simName;              // UTF-8 from the game's charset (blank when it does not read)
     bool operator==(const SaveSlot&) const = default;
 };
 struct SaveSlots
@@ -482,7 +482,7 @@ constexpr int kLoadRows = 3;
 struct LoadRow
 {
     bool used = false;
-    std::string name;                 // the Sim's name (the game's default when empty), ASCII
+    std::string name;                 // the Sim's name (the game's default when empty), UTF-8 from the game's charset
     int money = 0;
     int place = -1, placeNameId = -1; // header place, name string 67 + place
     bool timeKnown = false;           // `month`.. decoded from the header's time

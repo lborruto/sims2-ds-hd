@@ -487,7 +487,7 @@ int main(int argc, char** argv)
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || fe.cut > 0 || fm.cut > 0 ||
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || fe.cut > 0 || fm.cut > 0 || ca.cut > 0 ||
                        !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }

@@ -146,7 +146,7 @@ controllers are known by their own button names.
 the main menu Up / Down and A pick Create-a-Sim, Load-a-Sim, Settings or DS Wireless (the buttons
 fade in first; a press during the fade does nothing). In Settings LB / RB change page (Music,
 SFX, Concept Art, Credits), Left / Right move a volume by a tenth, A opens an unlocked concept
-picture, and B goes back to the title. In Load-a-Sim Up / Down pick a slot and A loads it. The end
+picture, and B goes back to the title. In Load-a-Sim Up / Down pick a slot, A loads it and B goes back to the title. In Create-a-Sim B goes back only from the last page, as in the game. The end
 credits the game shows after the story are still the game's own picture.
 
 **In town** the buttons are the DS's. **The menu** (phone, tabs, shop, the rest of the touch
