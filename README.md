@@ -305,7 +305,7 @@ the built-in database only adds the others.
 
 Start + Back (or Esc) opens the pause menu; its Settings: layout, fullscreen (F11), smooth
 scaling, the interface's size (Auto follows your screen's size and the window's, so the
-conversations and menus are not huge on a big monitor; or 75 to 150 % by hand), the game's
+conversations and menus are not huge on a big monitor; or 60 to 150 % by hand), the game's
 pictures in the menus (Smooth: its icons and portraits redrawn with soft edges; Pixels: the DS's
 own), 3D resolution, widescreen world, 60 fps, volume, sound during fast forward (muted, or at
 normal pitch skipping ahead), the stick's cursor, its dead zone, how far a trigger goes down,

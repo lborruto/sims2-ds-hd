@@ -897,8 +897,14 @@ struct EnlargedCache
 {
     std::mutex mu;
     std::unordered_map<u64, std::shared_ptr<const Enlarged>> map;
+    std::deque<u64> order; // (the keys, oldest first)
     size_t bytes = 0;
 };
+constexpr size_t kEnlargedMax = 64u << 20;
+// A live crop of a DS screen (its picture 256 × 192: the bottom or top framebuffer): its pixels
+// change as the game draws, so its enlargements are not kept (the window's layers already draw an
+// image again only when its pixels change: HashImage); the icons' (pictures of their own) are.
+bool LiveCrop(const UiItem& im) { return im.srcW == 256 && im.srcH == 192; }
 EnlargedCache& Bigs()
 {
     static EnlargedCache* c = new EnlargedCache;
@@ -915,6 +921,7 @@ std::shared_ptr<const Enlarged> Enlarge(const UiItem& im, int k)
     constexpr int kPad = 2;
     const int fw = im.from.w, fh = im.from.h, pw = fw + 2 * kPad, ph = fh + 2 * kPad;
     std::vector<u32> in((size_t)pw * ph);
+    const bool keep = !LiveCrop(im);
     u64 h = 0xCBF29CE484222325ull;
     Mix(h, ((u64)(u32)fw << 32) | (u32)fh);
     Mix(h, (u64)k);
@@ -925,9 +932,10 @@ std::shared_ptr<const Enlarged> Enlarge(const UiItem& im, int k)
             const int Y = std::clamp(im.from.y + std::clamp(y - kPad, 0, fh - 1), 0, im.srcH - 1);
             const u32 v = im.src[(size_t)Y * im.srcW + X];
             in[(size_t)y * pw + x] = v;
-            if (x >= kPad && x < kPad + fw && y >= kPad && y < kPad + fh) Mix(h, v);
+            if (keep && x >= kPad && x < kPad + fw && y >= kPad && y < kPad + fh) Mix(h, v);
         }
     EnlargedCache& c = Bigs();
+    if (keep)
     {
         std::lock_guard<std::mutex> g(c.mu);
         if (auto f = c.map.find(h); f != c.map.end()) return f->second;
@@ -940,10 +948,23 @@ std::shared_ptr<const Enlarged> Enlarge(const UiItem& im, int k)
     e->px.resize((size_t)e->w * e->h);
     for (int y = 0; y < e->h; y++)
         memcpy(&e->px[(size_t)y * e->w], &out[(size_t)(y + kPad * k) * pw * k + kPad * k], (size_t)e->w * 4);
+    if (!keep) return e;
     std::lock_guard<std::mutex> g(c.mu);
+    if (auto f = c.map.find(h); f != c.map.end()) return f->second; // (made meanwhile on another thread)
     const size_t size = e->px.size() * 4;
-    if (c.bytes + size > (64u << 20)) { c.map.clear(); c.bytes = 0; } // (the next frames make again what they show)
+    // The oldest out first until the new one fits (one larger than the whole cache is not kept).
+    if (size > kEnlargedMax) return e;
+    while (c.bytes + size > kEnlargedMax && !c.order.empty())
+    {
+        if (auto f = c.map.find(c.order.front()); f != c.map.end())
+        {
+            c.bytes -= f->second->px.size() * 4;
+            c.map.erase(f);
+        }
+        c.order.pop_front();
+    }
     c.bytes += size;
+    c.order.push_back(h);
     return c.map.emplace(h, std::move(e)).first->second;
 }
 
@@ -951,6 +972,7 @@ void ClearEnlarged()
 {
     std::lock_guard<std::mutex> g(Bigs().mu);
     Bigs().map.clear();
+    Bigs().order.clear();
     Bigs().bytes = 0;
 }
 

@@ -52,6 +52,12 @@ float StripZoom(float z) { return std::min(z, (kStripAnchorY - kStripInside.y) /
 float MenuZoom(float z) { return std::min(z, 1.0f); }
 // The world's prompt (port/prompt.h): its plate's bottom and its drop shadow above the strip.
 constexpr Rect kPromptLimit {4, 4, kConsoleW - 8, kStripY - kPromptShadow - 4};
+// The stick cursor's screens (the touch screen at kMenuTo in its frame, FrameAround: 6 pixels):
+// the hints and the HD status bar below the frame (10 pixels below the touch screen, where they sit
+// at 100 %), the pause panel right of it (6 pixels clear, above the hints).
+constexpr int kCursorBelow = kMenuTo.y + kMenuTo.h + 10, kCursorFrameRight = kMenuTo.x + kMenuTo.w + 6;
+constexpr Rect kCursorHintsLimit {4, kCursorBelow, kConsoleW - 8, kConsoleH - 4 - kCursorBelow};
+constexpr Rect kCursorPauseLimit {kCursorFrameRight + 6, 4, kConsoleW - 4 - (kCursorFrameRight + 6), kCursorBelow - 4};
 
 Overlay Frame(Rect r, int before) { return {r, kFrameArgb, 16, 6, kOutlineArgb, before}; }
 // A frame hugging a piece: its 6-pixel border just outside it.
@@ -183,12 +189,17 @@ static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right 
         c.ui.push_back(ui::ChipItem(x, y + (kH - r.h) / 2, h.b, h.word, kSize));
         x += r.w + kBetween;
     }
-    const Rect panel = right ? Rect {std::max(kMenuTo.x + kMenuTo.w + 12, kConsoleW - 16 - pw), y - kH - kGap, pw, kH}
+    // The UI's size: about the hints' bottom right (or bottom centre). At the right (the stick
+    // cursor's framed touch screen above), the hints below the frame (kCursorHintsLimit), the pause
+    // panel its own group about its bottom right, right of the frame (kCursorPauseLimit).
+    if (right) ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW - 24.0f, (float)(y + kH), kCursorHintsLimit);
+    const Rect panel = right ? Rect {std::max(kCursorPauseLimit.x, kConsoleW - 16 - pw), y - kH - kGap, pw, kH}
                              : Rect {bx + bw + kGap, y, pw, kH};
+    const size_t pause = c.ui.size();
     c.ui.push_back(ui::PanelItem(panel));
     c.ui.push_back(ui::ChipItem(panel.x + kPad, panel.y + (kH - chip.h) / 2, ui::Button::Pause, word, kSize));
-    // The UI's size: about the hints' bottom right (or bottom centre).
-    ZoomUi(c, first, c.pieces.size(), ui::UiScale(), right ? kConsoleW - 24.0f : kConsoleW / 2.0f, (float)(y + kH), kUiLimit);
+    if (right) ZoomUi(c, pause, c.pieces.size(), ui::UiScale(), (float)(panel.x + panel.w), (float)(panel.y + panel.h), kCursorPauseLimit);
+    else ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW / 2.0f, (float)(y + kH), kUiLimit);
 }
 
 TownHints TownHintsFor(const RomData* rom, const ui::ChipLook& look)
@@ -342,12 +353,14 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             else if (game->stat.valid) BuildStatPanel(c, view, f, *game, *rom, icons);
             else BuildNote(c, view, f, *game, *rom, icons);
         };
+        bool lone = false; // (a popup over the dimmed world alone: no screen beneath)
         if (v.popup && PopupOver(s, *game))
         {
             // What the popup is over: its HD screen (the panel's menu while it was open) without a
             // focus, or the dimmed world.
             const ScreenState at = UnderScreen(s, *game);
             if (const MenuView u = ScreenView(at, game, rom); u.valid && (u.own || (at.screen == Screen::Panel && menuOpen))) screen(at, u, -1);
+            else lone = true;
             if (bar) AddStatusStrip(c, hud, *strings, 0, StripZoom(ui::UiScale()));
             BuildPopup(c, v, focus, *game, *rom);
         }
@@ -358,8 +371,10 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             // Room info's own hint box (a popup of the screen's: port/roominfo.h), over the bar too.
             if (s.screen == Screen::Unknown && RoomHintUp(*game)) BuildRoomHint(c, v, focus, *game, *rom);
         }
-        // The UI's size: the screen and its popup together (the strip's own already done).
-        ZoomUi(c, i0, p0, MenuZoom(ui::UiScale()), kConsoleW / 2.0f, kMenuAnchorY, kMenuLimit);
+        // The UI's size: the screen and its popup together (the strip's own already done); a lone
+        // popup (a goal, Game Paused, Quit over the world) as large as the UI's size, as far as the
+        // canvas above the strip holds it.
+        ZoomUi(c, i0, p0, lone ? ui::UiScale() : MenuZoom(ui::UiScale()), kConsoleW / 2.0f, kMenuAnchorY, kMenuLimit);
         SortUi(c.ui); // (the bar's layer after the screen's, a popup's after it, the images last)
         b = ConsoleBranch::Screen;
         return c;     // (the focus is the view's: no ring from HotspotsFor)
@@ -400,13 +415,13 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         {
             c.overlays.push_back(FrameAround(kMenuTo, 1));
             // (a controller player: how to leave, as on the title; the furniture editor's B its X)
-            AddCursorHint(c, kMenuTo.y + kMenuTo.h + 10, rom, true, s.screen == Screen::Unknown && game && game->placement.valid);
+            AddCursorHint(c, kCursorBelow, rom, true, s.screen == Screen::Unknown && game && game->placement.valid);
         }
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
         // Not dimmed: the game keeps its status bar up while the touch screen is used.
         const size_t i0 = c.ui.size();
         if (bar && AddStatusBar(c, *hud, *strings).w > 0)
-            ZoomUi(c, i0, c.pieces.size(), ui::UiScale(), 16, kStatusBarY + kStatusBarH, kUiLimit);
+            ZoomUi(c, i0, c.pieces.size(), ui::UiScale(), 16, kStatusBarY + kStatusBarH, kCursorHintsLimit);
         b = ConsoleBranch::CursorM1;
     }
     else if (s.screen == Screen::Panel)

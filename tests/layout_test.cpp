@@ -523,14 +523,15 @@ static void platform()
     }
 }
 
-// The UI's size (ui::UiScale, console.cpp's groups) at 75, 100 and 150 %, in five languages, on
+// The UI's size (ui::UiScale, console.cpp's groups) at 60, 100 and 150 %, in five languages, on
 // made-up states drawn by BuildConsole with a made-up string table: the town's strip (the status
 // at its left, the hints at its right, a payout; the pad's look and the keyboard's, whose camera
-// hint is its own L / R keys), the panel's HD menu, a popup over it, the conversation, the stick
-// cursor's screen. Every item (as drawn: ui::Placed) inside the canvas; the strip's inside the
-// strip below its band, the status clear of the hints; the menus above the strip, never larger than
-// at 100 %; the mouse's pieces round trip at every window size; at 100 % the items as they always
-// were (no zoom). The whole-canvas screens (the front end, Create-a-Sim) keep their layout.
+// hint is its own L / R keys), the panel's HD menu, a popup over it, a lone popup over the world,
+// the conversation, the stick cursor's screen. Every item (as drawn: ui::Placed) inside the canvas;
+// the strip's inside the strip below its band, the status clear of the hints; the menus above the
+// strip, never larger than at 100 %; a lone popup above the strip, as large as the UI's size; the
+// stick cursor's hints, pause panel and status bar clear of its touch screen's frame; the mouse's
+// pieces round trip at every window size; at 100 % the items as they always were (no zoom). The whole-canvas screens (the front end, Create-a-Sim) keep their layout.
 static void ui_scale()
 {
     std::vector<u32> face(SW * SH);
@@ -558,7 +559,7 @@ static void ui_scale()
                 look.glyph[(int)ui::Button::Pause] = "Escape";
             }
             ui::SetChipLook(look);
-            for (float z : {0.75f, 1.0f, 1.5f})
+            for (float z : {0.6f, 1.0f, 1.5f})
             {
                 ui::SetUiScale(z);
                 auto inCanvas = [&](const Composition& c, const char* what) {
@@ -616,6 +617,7 @@ static void ui_scale()
                 for (int i = 0; i < 4; i++) in.actions.push_back({i, 1845 + i, i == 2});
                 GameState p = m;
                 p.screen = GScreen::Popup;
+                p.tab = 0; // (over the Interact tab's menu)
                 p.town.popup = {true, 2, 2, std::string(300, 'w'), "stale", -1, false, 56, 160, 6};
                 p.town.options = {true, 4096, 2048};
                 const ScreenState pan {Screen::Panel, Tab::Interact}, pop {Screen::Popup, Tab::None};
@@ -639,7 +641,54 @@ static void ui_scale()
                         TestConsoleRoundtrip(c == &menu ? pan : pop, true, 341, 192, o.first, o.second, true, c);
                 }
                 inCanvas(cursor, "cursor");
-                // The conversation: about the canvas's bottom centre, 75 % of its width at 75 %.
+                {
+                    // The touch screen's frame (FrameAround kMenuTo: 6 pixels) and every item clear
+                    // of it: the hints and the status bar below, the pause panel at its right.
+                    const Rect frame {kMenuTo.x - 6, kMenuTo.y - 6, kMenuTo.w + 12, kMenuTo.h + 12};
+                    bool framed = false;
+                    for (const Overlay& o : cursor.overlays) framed |= o.to.x == frame.x && o.to.y == frame.y && o.to.w == frame.w && o.to.h == frame.h;
+                    CHECK(framed);
+                    int panels = 0;
+                    for (const ui::UiItem& it : cursor.ui)
+                    {
+                        if (it.to.x <= 0 && it.to.x + it.to.w >= kConsoleW) continue;
+                        const Rect r = ui::Placed(it);
+                        panels += it.kind == ui::UiItem::Panel;
+                        if (r.x < frame.x + frame.w && r.x + r.w > frame.x && r.y < frame.y + frame.h && r.y + r.h > frame.y)
+                        {
+                            fprintf(stderr, "ui %d%% lang %d keys %d: cursor item at %d,%d %dx%d over the frame\n", (int)(z * 100), lang, keys, r.x, r.y, r.w, r.h);
+                            failures++;
+                        }
+                    }
+                    CHECK(panels >= 3); // (the hints', the pause's, the status bar's)
+                }
+                // A lone popup (over the dimmed world, no menu beneath): its own group, as large as
+                // the UI's size (as far as the canvas above the strip holds it).
+                {
+                    GameState q = g;
+                    q.screen = GScreen::Popup;
+                    q.tab = -1; // (no tab: nothing beneath)
+                    q.town.popup = {true, 2, 2, "A goal reached.", "stale", -1, false, 56, 160, 6};
+                    const Composition lone = BuildConsole(pop, false, 0, 341, 192, &hud, &strings, &q, &rom, face.data());
+                    inCanvas(lone, "lone popup");
+                    float most = 0, least = 9;
+                    for (const ui::UiItem& it : lone.ui)
+                    {
+                        if (it.to.x <= 0 && it.to.x + it.to.w >= kConsoleW) continue;
+                        if (it.layer == kStatusBarLayer || it.layer == kPopLayer + 1) continue; // (the strip's)
+                        const Rect r = ui::Placed(it);
+                        CHECK(r.y + r.h <= kStripY);
+                        most = std::max(most, it.zoom);
+                        least = std::min(least, it.zoom);
+                    }
+                    CHECK(least <= most);
+                    if (z < 1) CHECK(std::abs(most - z) < 1e-4f && std::abs(least - z) < 1e-4f);
+                    else if (z == 1) CHECK(most == 1 && least == 1);
+                    else CHECK(least > 1.1f && most <= z + 1e-4f);
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(pop, false, 341, 192, o.first, o.second, true, &lone);
+                }
+                // The conversation: about the canvas's bottom centre, 60 % of its width at 60 %.
                 GameState d = g;
                 d.screen = GScreen::Dialogue;
                 d.dialogue.valid = true; d.dialogue.page = 1; d.dialogue.pages = 2; d.dialogue.stringId = 7; d.dialogue.speaker = 0x40;

@@ -586,9 +586,14 @@ float Video::AutoUiScale() const
     int ww, wh, ow, oh;
     SDL_GetWindowSize(win, &ww, &wh);
     SDL_GetRendererOutputSize(ren, &ow, &oh);
-    const int key[5] = {SDL_GetWindowDisplayIndex(win), ww, wh, ow, oh};
-    if (std::equal(key, key + 5, autoKey)) return autoScale;
-    std::copy(key, key + 5, autoKey);
+    // (the display's bounds too: a display mode change, macOS's "looks like", keeps the window's
+    // sizes but not the millimetres a point)
+    const int display = SDL_GetWindowDisplayIndex(win);
+    SDL_Rect b {0, 0, 0, 0};
+    if (display >= 0) SDL_GetDisplayBounds(display, &b);
+    const int key[kAutoKey] = {display, ww, wh, ow, oh, b.w, b.h};
+    if (std::equal(key, key + kAutoKey, autoKey)) return autoScale;
+    std::copy(key, key + kAutoKey, autoKey);
     float mm, diag;
     // (the canvas as the window fits it: millimetres a canvas pixel)
     autoScale = DisplayMetrics(mm, diag) ? sims2wide::AutoUiScale(mm * CanvasFit::For(1280, 720, ow, oh).scale, diag) : 1;

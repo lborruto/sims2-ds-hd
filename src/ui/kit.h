@@ -124,7 +124,7 @@ Rect ChipRect(int x, int y, Button b, const std::string& label, float size, floa
 UiItem ChipItemAs(int x, int y, Face face, const std::string& glyph, const std::string& label, float size, Weight w = Weight::Bold);
 UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from);
 
-// The UI's size (the player's setting, Auto or 75-150 %, the window's; 1 headless unless
+// The UI's size (the player's setting, Auto or 60-150 %, the window's; 1 headless unless
 // --ui-scale): what the HD screens' builders zoom their groups of items by (console.cpp, the
 // shell, the window's toast and marks). The game's pictures in the HD UI: Smooth (the pixel-art
 // scaler) or Pixel (nearest, the default: every check's picture as it always was); ImageItem
@@ -144,8 +144,9 @@ void ZoomItem(UiItem& it, float z, float ax, float ay);
 // side it grows towards (z itself when it fits; never below 0).
 float FitZoom(Rect box, float z, float ax, float ay, Rect limit);
 // The pixel-art scaler's picture for an image item (Smooth): its `from` rectangle enlarged k times
-// (2-6), straight alpha, kept in a cache by its pixels and k (64 MB at most): the same pixels give
-// the same picture. Null for k outside 2-6 or a picture that does not read.
+// (2-6), straight alpha; an icon's (a picture of its own) kept in a cache by its pixels and k
+// (64 MB at most, the oldest out first): the same pixels give the same picture. A live crop of a
+// DS screen (a 256 × 192 picture) is made again each time and not kept. Null for k outside 2-6 or a picture that does not read.
 struct Enlarged { std::vector<u32> px; int w = 0, h = 0; };
 std::shared_ptr<const Enlarged> Enlarge(const UiItem& image, int k);
 void ClearEnlarged();

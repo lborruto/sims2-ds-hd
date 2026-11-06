@@ -189,10 +189,10 @@ void ChangeRow(Row r, int dir, Settings& s)
     case Row::Fullscreen: s.fullscreen = !s.fullscreen; break;
     case Row::Scaling: s.scaling = (Scaling)cycle((int)s.scaling, 3); break;
     case Row::UiSize:
-        // Auto (0), then 75 .. 150 % by 5; Left from Auto to 150, Right from 150 to Auto.
-        if (s.uiScale == 0) s.uiScale = d > 0 ? 75 : 150;
-        else if ((d > 0 && s.uiScale >= 150) || (d < 0 && s.uiScale <= 75)) s.uiScale = 0;
-        else s.uiScale = std::clamp(s.uiScale + 5 * d, 75, 150);
+        // Auto (0), then 60 .. 150 % by 5; Left from Auto to 150, Right from 150 to Auto.
+        if (s.uiScale == 0) s.uiScale = d > 0 ? 60 : 150;
+        else if ((d > 0 && s.uiScale >= 150) || (d < 0 && s.uiScale <= 60)) s.uiScale = 0;
+        else s.uiScale = std::clamp(s.uiScale + 5 * d, 60, 150);
         break;
     case Row::Pictures: s.smoothPictures = !s.smoothPictures; break;
     case Row::Res3D: s.resolution3D = std::clamp(s.resolution3D + d, 1, 4); break;

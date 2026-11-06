@@ -293,15 +293,16 @@ static void auto_ui_scale()
     auto at = [](float widthMm, float heightMm, float canvasMm) {
         return std::lround(AutoUiScale(canvasMm / 1280, std::hypot(widthMm, heightMm)) * 100);
     };
-    CHECK(at(708.4f, 398.5f, 708.4f) == 75);    // 32" 4K (16:9): 63 % wanted, the floor
+    CHECK(at(708.4f, 398.5f, 708.4f) == 65);    // 32" 4K (16:9): 63 % wanted (the capitals 7.6 mm)
     CHECK(at(708.4f, 398.5f, 354.2f) == 125);   // the same, a 1280 x 720 window at "looks like 2560 x 1440"
     CHECK(at(531.4f, 298.9f, 531.4f) == 75);    // 24" 1080p
-    CHECK(at(597.7f, 336.2f, 597.7f) == 75);    // 27" 1440p
+    CHECK(at(597.7f, 336.2f, 597.7f) == 70);    // 27" 1440p
     CHECK(at(286.5f, 179.1f, 286.5f) == 100);   // 13.3" 2560 x 1600 laptop (16:10: the canvas as wide as the screen)
     CHECK(at(286.5f, 179.1f, 254.7f) == 110);   // the same, a 1280 x 720 window at "looks like 1440 x 900"
     CHECK(at(344.2f, 193.6f, 344.2f) == 90);    // 15.6" 1080p laptop
     CHECK(at(150.8f, 94.2f, 150.8f) == 130);    // 7" 1280 x 800 handheld (the Steam Deck)
     CHECK(at(1209.6f, 680.4f, 1209.6f) == 115); // 55" TV
+    CHECK(AutoUiScale(1, 800) == 0.6f);          // (the floor: 60 %)
     CHECK(AutoUiScale(0, 0) == 1 && AutoUiScale(0.5f, 0) == 1 && AutoUiScale(0.5f, 5000) == 1 && AutoUiScale(10, 500) == 1);
     CHECK(UiZoomOf(0, 0.8f) == 0.8f && UiZoomOf(125, 0.8f) == 1.25f);
 }

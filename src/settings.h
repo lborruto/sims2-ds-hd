@@ -30,7 +30,7 @@ struct Settings
     // Comfort
     bool fullscreen = false;    // borderless, the desktop's size (F11)
     Scaling scaling = Scaling::Sharp;
-    // The HD interface's size: 0 Auto (from the window's physical size, AutoUiScale), else 75 to
+    // The HD interface's size: 0 Auto (from the window's physical size, AutoUiScale), else 60 to
     // 150 percent by 5. Headless: 100 % unless --ui-scale (settings are not loaded there).
     int uiScale = 0;
     // The game's pictures in the HD interface (icons, portraits): Smooth (the pixel-art scaler) or
@@ -77,7 +77,7 @@ void FitWindow(int usableW, int usableH, bool known, int& w, int& h);
 // A remembered place (x, y in and out) moved so that a w x h window lies within the usable area
 // (bx, by, bw, bh) when it can: a size made at this start, or shrunk, never runs off the screen.
 void FitPlace(int bx, int by, int bw, int bh, int w, int h, int& x, int& y);
-// The UI's size Auto picks (0.75 to 1.5 by 0.05) for a canvas mmPerPixel millimetres a canvas
+// The UI's size Auto picks (0.6 to 1.5 by 0.05) for a canvas mmPerPixel millimetres a canvas
 // pixel wide on a display diagonalMm across: the dialogue's capitals (30 px, Nunito's cap height
 // 0.705 em) as large as 0.53 degrees of sight at the distance a display that size is seen from
 // (AutoViewMm); 1 when either is unknown (0) or not believable.

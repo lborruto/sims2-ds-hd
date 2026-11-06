@@ -106,9 +106,12 @@ struct Video
     // from the panel's size, X11's physical one); false when the system does not say.
     bool DisplayMetrics(float& mmPerOutputPixel, float& diagonalMm) const;
     // The UI's size Auto gives for the window now (1 when the system does not say); asked of the
-    // system again only when the window's display or size changes.
+    // system again only when the window's display, its size or the display's mode changes.
     float AutoUiScale() const;
-    mutable int autoKey[5] = {-1, 0, 0, 0, 0};
+    // (Auto's last inputs: the display, the window's size in units and pixels, the display's
+    // bounds' size)
+    static constexpr int kAutoKey = 7;
+    mutable int autoKey[kAutoKey] = {-1, 0, 0, 0, 0, 0, 0};
     mutable float autoScale = 1;
     // Window points -> output pixels (they differ on HiDPI screens).
     void ToOutput(int wx, int wy, float& px, float& py) const;

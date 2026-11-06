@@ -88,7 +88,7 @@ static void Usage()
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
         "  --compose-scale N             --compose pictures N times the canvas (1 to 4; the UI drawn at that size)\n"
         "  --ui-demo                     (checks) the HD interface kit's demonstration over the picture\n"
-        "  --ui-scale N                  the HD interface's size, 75 to 150 percent by 5 (default: the settings', Auto; 100 headless)\n"
+        "  --ui-scale N                  the HD interface's size, 60 to 150 percent by 5 (default: the settings', Auto; 100 headless)\n"
         "  --game-pictures smooth|pixel  the game's icons and portraits in the HD interface: the pixel-art scaler or\n"
         "                                nearest pixels (default: the settings', smooth; pixel headless)\n"
         "  --res3d N                     3D drawn N times sharper (1 = the DS's own; default 2 in the window, 1 headless)\n"
@@ -181,7 +181,7 @@ int main(int argc, char** argv)
     bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, printConsole = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
-    int uiScaleArg = 0;     // --ui-scale N (75-150): the HD interface's size for this run; 0 the settings' (headless 100)
+    int uiScaleArg = 0;     // --ui-scale N (60-150): the HD interface's size for this run; 0 the settings' (headless 100)
     int picturesArg = -1;   // --game-pictures: 1 smooth, 0 pixel; -1 the settings' (headless pixel)
     bool uiDemo = false;
     int res3d = 0;
@@ -211,7 +211,7 @@ int main(int argc, char** argv)
         else if (a == "--ui-scale")
         {
             long n = 0;
-            if (!WholeNumber(next(), 1000, n) || n < 75 || n > 150 || n % 5) { Usage(); return 1; }
+            if (!WholeNumber(next(), 1000, n) || n < 60 || n > 150 || n % 5) { Usage(); return 1; }
             uiScaleArg = (int)n;
         }
         else if (a == "--game-pictures")

@@ -681,7 +681,7 @@ static void platform()
         Settings e;
         e.Load(path);
         CHECK(e.scaling == Scaling::Sharp && e.fastSpeed == 4 && e.cursorSpeed == 50);
-        // Task 10: the interface's size (auto or 75-150 by 5) and the game's pictures.
+        // Task 10: the interface's size (auto or 60-150 by 5) and the game's pictures.
         Settings u;
         CHECK(u.uiScale == 0 && u.smoothPictures);
         u.uiScale = 135;
@@ -699,10 +699,18 @@ static void platform()
         CHECK(w.uiScale == 150);
         { std::ofstream(path) << "ui_scale=12\n"; }
         w.Load(path);
-        CHECK(w.uiScale == 75);
+        CHECK(w.uiScale == 60);
         { std::ofstream(path) << "ui_scale=93\n"; }
         w.Load(path);
         CHECK(w.uiScale == 95);
+        // Garbage: Auto.
+        for (const char* bad : {"ui_scale=big\n", "ui_scale=\n", "ui_scale=120%\n", "ui_scale=-80\n", "ui_scale= 90\n", "ui_scale=99999999999\n"})
+        {
+            { std::ofstream(path) << bad; }
+            w.uiScale = 90;
+            w.Load(path);
+            CHECK(w.uiScale == 0);
+        }
     }
     fs::remove_all(dir);
     // The main page's banner: shown, the buttons still inside the panel and reachable.

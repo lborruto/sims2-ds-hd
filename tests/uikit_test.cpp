@@ -644,6 +644,33 @@ static void ui_scale_and_smooth()
     CHECK(!ImageItem({0, 0, 8, 8}, tile.data(), 16, 16, {0, 0, 8, 8}).smooth);
     ClearEnlarged();
     CHECK(Enlarge(sm, 4) != e1 && *Enlarge(sm, 4)->px.data() == *e1->px.data());
+    // A live crop of a DS screen (a 256 x 192 picture): made again each time, not kept, the same
+    // pixels all the same.
+    std::vector<u32> screen(256 * 192);
+    for (size_t i = 0; i < screen.size(); i++) screen[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    UiItem live = ImageItem({0, 0, 64, 64}, screen.data(), 256, 192, {40, 30, 16, 16});
+    live.smooth = true;
+    const auto l1 = Enlarge(live, 4), l2 = Enlarge(live, 4);
+    CHECK(l1 && l2 && l1 != l2 && l1->px == l2->px);
+    // The icons' cache (64 MB): full, the oldest out first; the newest kept.
+    ClearEnlarged();
+    std::vector<std::vector<u32>> bigs(8, std::vector<u32>(250 * 250));
+    std::vector<std::shared_ptr<const Enlarged>> made;
+    for (size_t n = 0; n < bigs.size(); n++)
+    {
+        for (size_t i = 0; i < bigs[n].size(); i++) bigs[n][i] = 0xFF000000u | (u32)((i + n * 7919) * 2654435761u >> 8);
+        UiItem big = ImageItem({0, 0, 1500, 1500}, bigs[n].data(), 250, 250, {0, 0, 250, 250});
+        big.smooth = true;
+        made.push_back(Enlarge(big, 6)); // (9 MB each: the eighth goes past 64 MB)
+        CHECK(made.back() && Enlarge(big, 6) == made.back());
+    }
+    for (size_t n = bigs.size(); n-- > 0;) // (newest first: a hit changes nothing; the first is out)
+    {
+        UiItem big = ImageItem({0, 0, 1500, 1500}, bigs[n].data(), 250, 250, {0, 0, 250, 250});
+        big.smooth = true;
+        CHECK((Enlarge(big, 6) == made[n]) == (n != 0));
+    }
+    ClearEnlarged();
 }
 
 int main()

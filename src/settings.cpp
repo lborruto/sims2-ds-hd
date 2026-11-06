@@ -20,6 +20,13 @@ std::string Settings::DefaultPath()
 }
 
 static const char* MicKey(MicMode m) { return m == MicMode::Off ? "off" : m == MicMode::Real ? "real" : "blow"; }
+// ui_scale=: "auto", or a whole number of percent (rounded to 5, held to 60-150); anything else
+// (garbage, empty, a number with words after it) is Auto.
+static int UiScaleKey(const std::string& v)
+{
+    if (v.empty() || v.size() > 6 || !std::all_of(v.begin(), v.end(), [](char ch) { return ch >= '0' && ch <= '9'; })) return 0;
+    return std::clamp((atoi(v.c_str()) + 2) / 5 * 5, 60, 150);
+}
 static const char* ScalingKey(Scaling c) { return c == Scaling::Smooth ? "smooth" : c == Scaling::Nearest ? "nearest" : "sharp"; }
 
 int LanguageOfLocale(const std::string& l)
@@ -87,7 +94,7 @@ bool Settings::Load(const std::string& path)
             scaling = v == "smooth" ? Scaling::Smooth : v == "nearest" ? Scaling::Nearest : Scaling::Sharp;
         }
         else if (k == "battery_saver") batterySaver = on;
-        else if (k == "ui_scale") uiScale = v == "auto" ? 0 : std::clamp((atoi(v.c_str()) + 2) / 5 * 5, 75, 150);
+        else if (k == "ui_scale") uiScale = UiScaleKey(v);
         else if (k == "game_pictures") smoothPictures = v != "pixel";
         else if (k == "mute") mute = on;
         else if (k == "run_in_background") runInBackground = on;
@@ -202,6 +209,6 @@ float AutoUiScale(float mmPerPixel, float diagonalMm)
     const float cap = 30 * 0.705f * mmPerPixel;                     // the dialogue's capitals at 100 %, mm
     const float want = AutoViewMm(diagonalMm) * std::tan(0.53f * 3.14159265f / 180); // 0.53 degrees there
     const float z = std::round(want / cap * 20) / 20;
-    return std::clamp(z, 0.75f, 1.5f);
+    return std::clamp(z, 0.6f, 1.5f);
 }
 }
