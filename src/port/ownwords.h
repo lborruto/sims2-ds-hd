@@ -87,6 +87,8 @@ enum class OwnWordId : int
     SetBattery, SetMute, SetBackground, SetFastSpeed, FastMax, SetFastKey, FastHold, FastPress, SetFastBoot, SetHidePointer,
     SetCursorSpeed, SetLeftHanded, ScaleSharp, ScaleSmooth, ScaleNearest,
     BatteryNote, BackgroundNote, FastBootNote, ScalingNote, SaveElsewhere, ToastShotAt,
+    // The save back beside the ROM (its folder writable again) from the settings folder's copy.
+    SaveMovedBack,
     Count
 };
 

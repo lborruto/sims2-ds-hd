@@ -495,6 +495,13 @@ static void platform()
     CasState sw = c;
     sw.nameKnown = false;
     CHECK(CasTypeAction(sw, rom, "\b").taps.empty());
+    // The other case through the game's charset pairs (not ASCII only): É / é, Ä / ä, Ñ / ñ; a
+    // capital the game has no small letter for, and the signs, stay as they are.
+    CHECK(GameLower("ABCxyz19") == "abcxyz19");
+    CHECK(GameLower("\xC3\x89") == "\xC3\xA9" && GameLower("\xC3\x84") == "\xC3\xA4" && GameLower("\xC3\x91") == "\xC3\xB1");
+    CHECK(GameLower("\xC3\xA9") == "\xC3\xA9" && GameLower("\xC3\x9F") == "\xC3\x9F");   // é, ß
+    CHECK(GameLower("\xC3\x9B") == "\xC3\x9B");   // Û: the game has û but not Û (no pair)
+    CHECK(GameLower("\xC3\x97") == "\xC3\x97" && GameLower("\xC2\xA7") == "\xC2\xA7"); // ×, §
     // Fast boot: nothing up yet, the video, the legal / EA / Maxis splashes, the zoom and the blank
     // go by; the last splash, a popup splash, the title or any other screen stop it.
     GameState g;

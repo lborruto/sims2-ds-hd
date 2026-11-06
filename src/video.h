@@ -49,7 +49,14 @@ struct Video
     // usable area on a first start; never larger than it), fullscreen as set.
     bool Open(const Settings& s);
     void SetFullscreen(bool on);  // borderless, the desktop's size
-    void SetScaling(Scaling c);
+    void SetScaling(Scaling c);   // (Sharp's targets freed when another is chosen)
+    void FreeSharp();
+    // Everything let go (the window closed), before SDL_Quit.
+    void Close();
+    // The keyboard's text (SDL_TEXTINPUT) on only while Create-a-Sim's Name page takes it, an
+    // input method's editor placed by the name well; off everywhere else (the menus, the game).
+    bool textInput = false;
+    void TextInput(bool on);
     // The window's size and place into the settings, when it is a window.
     // What lies over the game besides its composition: the stick cursor (a DS touch point, drawn
     // where the piece showing it draws it), the fast forward mark.

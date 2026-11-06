@@ -353,6 +353,10 @@ constexpr const char* kWords[][5] = {
      "La carpeta de la ROM es de solo lectura: el juego guarda en @1"},
     // A screenshot of the window
     {"Screenshot saved: @1", "Capture enregistrée : @1", "Bildschirmfoto gespeichert: @1", "Screenshot salvato: @1", "Captura guardada: @1"},
+    // The ROM's folder writable again: the save back beside it
+    {"The game saves beside the ROM again: @1", "Le jeu sauvegarde de nouveau à côté de la ROM : @1",
+     "Das Spiel speichert wieder neben dem ROM: @1", "Il gioco salva di nuovo accanto alla ROM: @1",
+     "El juego vuelve a guardar junto a la ROM: @1"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

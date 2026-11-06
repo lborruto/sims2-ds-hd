@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <vector>
 
+#include "port/cas.h"
 #include "shots.h"
 #include "ui/font.h"
 #include "ui/kit.h"
@@ -48,7 +49,12 @@ bool Video::Open(const Settings& s)
                 y = s.windowY;
             }
         }
-    if (SDL_GetDisplayUsableBounds(display, &usable) == 0) FitWindow(usable.w, usable.h, s.windowKnown, w, h);
+    if (SDL_GetDisplayUsableBounds(display, &usable) == 0)
+    {
+        FitWindow(usable.w, usable.h, s.windowKnown, w, h);
+        // A remembered place with a size made here (or shrunk): the whole window on that screen.
+        if (x != SDL_WINDOWPOS_CENTERED) FitPlace(usable.x, usable.y, usable.w, usable.h, w, h, x, y);
+    }
     win = SDL_CreateWindow("The Sims 2 DS - one screen", x, y, w, h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!win) { fprintf(stderr, "SDL window: %s\n", SDL_GetError()); return false; }
     ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE);
@@ -62,15 +68,60 @@ bool Video::Open(const Settings& s)
 
 void Video::SetFullscreen(bool on)
 {
-    // (The pointer stays visible: the mouse is the stylus.)
+    // (The pointer follows Settings::hidePointer as in a window: the mouse is the stylus.)
     SDL_SetWindowFullscreen(win, on ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0);
+}
+
+void Video::FreeSharp()
+{
+    for (int i = 0; i < 2; i++)
+    {
+        if (sharpTex[i]) SDL_DestroyTexture(sharpTex[i]);
+        sharpTex[i] = nullptr;
+        sharpW[i] = sharpH[i] = 0;
+    }
 }
 
 void Video::SetScaling(Scaling c)
 {
     if (c == scaling) return;
     scaling = c;
+    if (scaling != Scaling::Sharp) FreeSharp();
     for (SDL_Texture* t : tex) ScreenScaleMode(t, scaling);
+}
+
+void Video::Close()
+{
+    FreeSharp();
+    if (ren) SDL_DestroyRenderer(ren); // (its textures with it)
+    if (win) SDL_DestroyWindow(win);
+    ren = nullptr;
+    win = nullptr;
+    for (SDL_Texture*& t : tex) t = nullptr;
+    overlayTex.clear();
+    uiStill.clear();
+    uiImages.clear();
+    shellStill.clear();
+    shellImages.clear();
+}
+
+void Video::TextInput(bool on)
+{
+    if (on == textInput || !win) return;
+    textInput = on;
+    if (!on) { SDL_StopTextInput(); return; }
+    // An input method's editor by the name well (CONSOLE's canvas -> output pixels -> window points).
+    int ow, oh, ww, wh;
+    SDL_GetRendererOutputSize(ren, &ow, &oh);
+    SDL_GetWindowSize(win, &ww, &wh);
+    if (ow > 0 && oh > 0)
+    {
+        int x, y, w, h;
+        CanvasFit::For(kConsoleW, kConsoleH, ow, oh).ToOutput(kCasTitle, x, y, w, h);
+        SDL_Rect r {x * ww / ow, y * wh / oh, std::max(1, w * ww / ow), std::max(1, h * wh / oh)};
+        SDL_SetTextInputRect(&r);
+    }
+    SDL_StartTextInput();
 }
 
 void Video::RememberSize(Settings& s) const

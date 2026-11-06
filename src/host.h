@@ -2,6 +2,7 @@
 #pragma once
 #include <cstdint>
 #include <cstdio>
+#include <filesystem>
 #include <string>
 
 #include "settings.h"
@@ -21,7 +22,8 @@ inline bool MicForce = false; // the CONSOLE vacuum's Y: a blow in any mic mode
 // melonDS calls this whenever the game writes its save memory; written straight to disk.
 // Whether the last write failed (the window says so in a toast while it does). A write that fails
 // where the save is (a folder that became read-only, a drive pulled out) goes to SaveFallback (the
-// settings folder's saves/, main.cpp) from then on: SaveMoved says so (the pause menu's banner).
+// settings folder's saves/, made then; main.cpp) from then on: SaveMoved says so (the pause
+// menu's banner), and the backups follow it.
 inline bool SaveFailed = false;
 inline std::string SaveFallback;
 inline bool SaveMoved = false;
@@ -37,7 +39,10 @@ inline void SaveDirty(const uint8_t* data, uint32_t len)
 {
     if (SavePath.empty()) return;
     SaveFailed = !WriteSave(SavePath, data, len);
-    if (SaveFailed && !SaveFallback.empty() && SaveFallback != SavePath && WriteSave(SaveFallback, data, len))
+    if (!SaveFailed || SaveFallback.empty() || SaveFallback == SavePath) return;
+    std::error_code ec;
+    std::filesystem::create_directories(std::filesystem::path(SaveFallback).parent_path(), ec);
+    if (WriteSave(SaveFallback, data, len))
     {
         fprintf(stderr, "save: %s could not be written: saving to %s\n", SavePath.c_str(), SaveFallback.c_str());
         SavePath = SaveFallback;

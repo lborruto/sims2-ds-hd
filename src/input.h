@@ -82,7 +82,9 @@ struct Input
     // The window was asked to close (the shell asks first); a file was dropped on it.
     bool wantQuit = false;
     std::string droppedFile;
-    // The window is in front (keyboard focus): off, the game pauses unless it runs in the background.
+    // The window is in front (keyboard focus, not minimised; Poll reads it from the window's flags):
+    // off, the game pauses unless it runs in the background.
+    SDL_Window* window = nullptr;
     bool focused = true;
     Uint32 mouseMovedAt = 0;      // SDL ticks of the mouse's last move or click (the pointer's auto-hide)
     // Create-a-Sim's name typed on the keyboard (port/cas.h, CasTypeAction): the characters still to
@@ -90,9 +92,13 @@ struct Input
     // before the next (the game reads a tap within a few), and the tries at its page.
     std::vector<std::string> typed;
     int typeWait = 0, typeTries = 0;
-    // The Name page of Create-a-Sim is up in CONSOLE: printable keys type there (their bindings
-    // rest; arrows, Enter, Esc and Backspace stay what they are).
+    // The Name page of Create-a-Sim is up in CONSOLE: Enter is the navigator's A there (enterA),
+    // Backspace erases, and while the focus is on the game's keyboard (its keys, its page labels,
+    // its backspace: TypingKeys) printable keys type, their bindings resting; arrows and Esc stay
+    // what they are.
     static bool TypingName(const App& app);
+    bool TypingKeys(const App& app) const;
+    bool enterA = false;
 
     // An input script's window events for this turn of the loop (script.h), pushed as SDL events.
     void PushScript(const std::vector<InputEvent>& script, long iter, const Video& video) const;

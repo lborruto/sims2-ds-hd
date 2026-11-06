@@ -62,6 +62,8 @@ struct ShellHost
 private:
     void Do(App& app, Video& video, Input& input, const shell::Result& r);
     void ApplySetting(App& app, Video& video, int row);
-    void SaveSettings(App& app) const;
+    // The settings file written, the window's size and place taken first (a window just switched
+    // to or from fullscreen: taken before the switch, remember false).
+    void SaveSettings(App& app, const Video& video, bool remember = true) const;
 };
 }

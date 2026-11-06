@@ -9,9 +9,11 @@
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
 
+#include <chrono>
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <set>
 #include <string>
 
@@ -518,6 +520,7 @@ static void files()
 
 // Task 5's pure parts: the window's first size, a screenshot's name, the save's writability and
 // its fallback, the settings file's new keys, the main page's banner.
+static void SaveRules(const std::filesystem::path& dir);
 static void platform()
 {
     // The window: 1280 x 720 on a large screen, 16:9 within 85 % on a small one, a remembered
@@ -536,6 +539,24 @@ static void platform()
     w = 640, h = 480;
     FitWindow(0, 0, false, w, h);
     CHECK(w == 640 && h == 480);
+    // A remembered place: kept when the window fits there, moved onto the screen when it runs off.
+    {
+        int x = 100, y = 50;
+        FitPlace(0, 25, 1920, 1015, 1280, 720, x, y);
+        CHECK(x == 100 && y == 50);
+        x = 1500, y = 900;
+        FitPlace(0, 25, 1920, 1015, 1280, 720, x, y);
+        CHECK(x == 640 && y == 320);
+        x = -300, y = 0;
+        FitPlace(0, 25, 1920, 1015, 1280, 720, x, y);
+        CHECK(x == 0 && y == 25);
+        x = 2000, y = 100;   // a second screen at the right
+        FitPlace(1920, 0, 1440, 900, 1280, 720, x, y);
+        CHECK(x == 2000 && y == 100);
+        x = 3000;
+        FitPlace(1920, 0, 1440, 900, 1280, 720, x, y);
+        CHECK(x == 2080);
+    }
     // A screenshot's name: the date and time, a number for a second one in the same second.
     const std::string n1 = ShotName(1762430000), n2 = ShotName(1762430000, 2);
     CHECK(n1.rfind("sims2-", 0) == 0 && n1.size() == std::string("sims2-20251106-120000.png").size() && n1.substr(n1.size() - 4) == ".png");
@@ -565,6 +586,7 @@ static void platform()
     CHECK(SaveFallback(d, "/roms/game.sav").empty());
     d.root = (dir / "data").string() + "/";
     CHECK(SaveFallback(d, "/roms/game.sav") == d.root + "saves/game.sav" && fs::is_directory(d.root + "saves"));
+    SaveRules(dir);
     CHECK(fs::is_directory(d.Screenshots()));
     // The settings file: every new key round-trips; the old smooth_scaling on reads as Smooth, off as the default.
     {
@@ -595,6 +617,89 @@ static void platform()
     sh.Open(Page::Main);
     CheckBuild(sh, f.m, "main banner");
     CheckReach(sh, f.m, "main banner");
+}
+
+// The save's fallback copy at a start (ResolveSave, NewerSave, CopyVerified): which one leads, the
+// copy back beside the ROM once it can be written, nothing made by a check.
+static std::string Slurp(const std::filesystem::path& p)
+{
+    std::ifstream in(p, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(in)), {});
+}
+static void SaveRules(const std::filesystem::path& dir)
+{
+    namespace fs = std::filesystem;
+    using namespace std::chrono_literals;
+    auto put = [](const fs::path& p, const std::string& text, int age) {
+        { std::ofstream(p, std::ios::binary | std::ios::trunc) << text; }
+        // age: seconds before now (the dates decide when the contents differ)
+        fs::last_write_time(p, fs::file_time_type::clock::now() - std::chrono::seconds(age));
+    };
+    const fs::path rom = dir / "rom";
+    fs::create_directories(rom);
+    DataDir d;
+    d.root = (dir / "rules-data").string() + "/";
+    const std::string beside = (rom / "game.sav").string(), fb = d.root + "saves/game.sav";
+    // A check names the copy and makes nothing.
+    CHECK(SaveFallbackAt(d, beside) == fb && !fs::exists(d.root + "saves"));
+    CHECK(SaveFallbackAt(DataDir {}, beside).empty());
+    // Nothing there yet, the save beside writable: the save beside, no folder made.
+    put(beside, "beside", 100);
+    SaveStart st = ResolveSave(d, beside);
+    CHECK(st.path == beside && st.elsewhere.empty() && !st.movedBack && !fs::exists(d.root + "saves"));
+    CHECK(NewerSave(beside, fb) == beside);
+    fs::create_directories(d.root + "saves");
+    // NewerSave: the copy newer, the save beside newer, the same content, the save beside gone.
+    put(fb, "copy", 10);
+    CHECK(NewerSave(beside, fb) == fb);
+    put(fb, "copy", 1000);
+    CHECK(NewerSave(beside, fb) == beside);
+    put(fb, "beside", 10);
+    CHECK(NewerSave(beside, fb) == beside);
+    CHECK(NewerSave((rom / "none.sav").string(), fb) == fb);
+    // CopyVerified: the bytes, a read-only target made writable, no .tmp left.
+    {
+        const fs::path a = rom / "a.bin", b = rom / "b.bin";
+        put(a, std::string("\0\1\2 bytes", 9), 0);
+        put(b, "old", 0);
+        fs::permissions(b, fs::perms::owner_read, fs::perm_options::replace);
+        CHECK(CopyVerified(a.string(), b.string()) && Slurp(b) == Slurp(a) && !fs::exists(b.string() + ".tmp"));
+        CHECK(!CopyVerified((rom / "none").string(), b.string()) && Slurp(b) == Slurp(a));
+    }
+    // The copy newer and the folder writable again: it goes back beside, set aside as .moved.
+    put(beside, "old save", 100);
+    put(fb, "newer save", 10);
+    st = ResolveSave(d, beside);
+    CHECK(st.path == beside && st.movedBack && st.elsewhere.empty() && !st.copyFailed);
+    CHECK(Slurp(beside) == "newer save" && !fs::exists(fb) && Slurp(fb + ".moved") == "newer save");
+    // The save beside newer than a copy left there: the save beside kept, the copy set aside.
+    put(beside, "played elsewhere", 10);
+    put(fb, "stale copy", 100);
+    st = ResolveSave(d, beside);
+    CHECK(st.path == beside && st.movedBack && Slurp(beside) == "played elsewhere" && !fs::exists(fb) && Slurp(fb + ".moved") == "stale copy");
+    // The save beside read-only (unless this user writes it anyway: root).
+    put(beside, "read-only save", 100);
+    fs::permissions(beside, fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read, fs::perm_options::replace);
+    if (!CanWrite(beside))
+    {
+        fs::remove(fb + ".moved");
+        // No copy yet: the save copied to saves/, which leads.
+        st = ResolveSave(d, beside);
+        CHECK(st.path == fb && st.elsewhere == fb && !st.movedBack && Slurp(fb) == "read-only save");
+        // The copy newer (the game saved there): it stays and leads.
+        put(fb, "played in saves", 10);
+        st = ResolveSave(d, beside);
+        CHECK(st.path == fb && Slurp(fb) == "played in saves" && Slurp(beside) == "read-only save");
+        // The save beside newer (put there by hand): copied over the copy, the old copy kept as .old.
+        fs::permissions(beside, fs::perms::owner_write, fs::perm_options::add);
+        put(beside, "newer by hand", 5);
+        fs::permissions(beside, fs::perms::owner_read | fs::perms::group_read | fs::perms::others_read, fs::perm_options::replace);
+        put(fb, "played in saves", 100);
+        st = ResolveSave(d, beside);
+        CHECK(st.path == fb && Slurp(fb) == "newer by hand" && Slurp(fb + ".old") == "played in saves");
+    }
+    else fprintf(stderr, "shell_test: a read-only file is writable here (root): the read-only cases skipped\n");
+    fs::permissions(beside, fs::perms::owner_write, fs::perm_options::add);
 }
 
 int main(int, char**)

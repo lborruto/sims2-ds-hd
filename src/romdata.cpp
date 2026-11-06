@@ -285,6 +285,32 @@ std::string DropEscapes(const std::string& in)
 std::string GameTextToUtf8(const std::string& raw) { return ToUtf8(raw); }
 bool GameTextByte(unsigned char b) { return (b >= 0x20 && b < kCharsetFirst) || (b >= kCharsetFirst && b < kCharsetFirst + std::size(kCharset) && kCharset[b - kCharsetFirst]); }
 
+std::string GameLower(const std::string& utf8)
+{
+    auto inCharset = [](u32 cp) {
+        for (u16 c : kCharset)
+            if (c == cp) return true;
+        return false;
+    };
+    std::string out;
+    for (size_t i = 0; i < utf8.size();)
+    {
+        const u8 b = (u8)utf8[i];
+        // One code point (1 to 3 bytes: the game's charset has none past the BMP).
+        u32 cp = b;
+        size_t n = 1;
+        if (b >= 0xE0 && i + 2 < utf8.size()) { cp = ((b & 0x0F) << 12) | (((u8)utf8[i + 1] & 0x3F) << 6) | ((u8)utf8[i + 2] & 0x3F); n = 3; }
+        else if (b >= 0xC0 && i + 1 < utf8.size()) { cp = ((b & 0x1F) << 6) | ((u8)utf8[i + 1] & 0x3F); n = 2; }
+        // The pairs: A-Z / a-z, and a Latin-1 capital whose small letter (+ 0x20) the game has too.
+        if (cp >= 'A' && cp <= 'Z') cp += 0x20;
+        else if (cp >= 0xC0 && cp <= 0xDE && cp != 0xD7 && inCharset(cp) && inCharset(cp + 0x20)) cp += 0x20;
+        if (n == 1) out.push_back((char)cp);
+        else AppendUtf8(out, cp);
+        i += n;
+    }
+    return out;
+}
+
 std::string RomData::String(int id) const
 {
     if (id < 0 || id >= StringCount()) return "";

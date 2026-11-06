@@ -349,6 +349,9 @@ int main(int argc, char** argv)
         // can move them out of the way of a key the settings file gave another action.
         app.settings.controls.ResolveKeys();
         if (!video.Open(app.settings)) return 1;
+        input.window = video.win;
+        // (SDL starts with text input on: off until Create-a-Sim's Name page, Video::TextInput.)
+        SDL_StopTextInput();
         input.OpenPads(app.settings);
         // The words before the game's strings are read: the computer's language.
         if (SDL_Locale* loc = SDL_GetPreferredLocales())
@@ -391,12 +394,11 @@ int main(int argc, char** argv)
         }
         return in;
     };
-    // Where a ROM's game save is: beside it (or --save), else, when that cannot be written (a
-    // read-only folder), in the data folder's saves/ (Host::SaveFallback).
+    // Which save a ROM's start will load: the one beside it (or --save), or its copy in the data
+    // folder's saves/ when that one leads (ResolveSave's rule, NewerSave); nothing is made or moved.
     auto SaveOf = [&](const std::string& rom) {
         const std::string beside = savePath.empty() ? rom.substr(0, rom.rfind('.')) + ".sav" : savePath;
-        const std::string fallback = SaveFallback(host.data, beside);
-        return CanWrite(beside) || fallback.empty() ? beside : fallback;
+        return NewerSave(beside, SaveFallbackAt(host.data, beside));
     };
     auto launch = [&](const std::string& message) -> bool {
         host.model = shell::Model();
@@ -463,7 +465,13 @@ int main(int argc, char** argv)
             case shell::Act::OpenRecent: tryPath = paths[r.arg]; break;
             case shell::Act::ChooseFile: if (window) tryPath = PickRom(); break;
             case shell::Act::Exit: return false;
-            case shell::Act::Setting: if (!settingsPath.empty()) app.settings.Save(settingsPath); break;
+            case shell::Act::Setting:
+                if (!settingsPath.empty())
+                {
+                    if (window) video.RememberSize(app.settings);
+                    app.settings.Save(settingsPath);
+                }
+                break;
             default: break;
             }
             if (!tryPath.empty())
@@ -549,24 +557,26 @@ relaunch:
     Host::SavePath = savePath.empty() ? romBase + ".sav" : savePath;
     // A save that cannot be written there (a read-only folder: a write-protected card, a shared
     // folder, Program Files): in the data folder's saves/ instead, the one beside the ROM copied
-    // there first (once: after that the copy leads), said in the window and on the pause menu.
+    // there first, said in the window and on the pause menu. A copy left there from an earlier
+    // start goes back beside the ROM once it can be written again (the newer of the two leads:
+    // ResolveSave), said in a toast.
     Host::SaveMoved = false;
-    Host::SaveFallback = SaveFallback(host.data, Host::SavePath);
+    Host::SaveFallback = SaveFallbackAt(host.data, Host::SavePath);
     host.saveElsewhere.clear();
-    if (!Host::SaveFallback.empty() && !CanWrite(Host::SavePath))
+    bool saveMovedBack = false;
     {
-        std::error_code ec;
-        if (FileExists(Host::SavePath) && !FileExists(Host::SaveFallback))
-        {
-            std::filesystem::copy_file(Host::SavePath, Host::SaveFallback, ec);
-            // (The copy keeps the original's mode: a read-only file would stay read-only.)
-            std::error_code pe;
-            if (!ec) std::filesystem::permissions(Host::SaveFallback, std::filesystem::perms::owner_read | std::filesystem::perms::owner_write,
-                                                  std::filesystem::perm_options::add, pe);
-        }
-        fprintf(stderr, "save: %s cannot be written: the game saves to %s%s\n", Host::SavePath.c_str(), Host::SaveFallback.c_str(),
-                ec ? " (the save beside it could not be copied)" : "");
-        Host::SavePath = host.saveElsewhere = Host::SaveFallback;
+        const std::string beside = Host::SavePath;
+        const SaveStart start = ResolveSave(host.data, beside);
+        if (start.movedBack)
+            fprintf(stderr, "save: %s can be written again: the save is back there (the copy in saves/ set aside as .moved)\n", beside.c_str());
+        else if (!start.elsewhere.empty() && CanWrite(beside))
+            fprintf(stderr, "save: the copy in %s could not be put back beside the ROM: the game keeps saving there\n", start.elsewhere.c_str());
+        else if (!start.elsewhere.empty())
+            fprintf(stderr, "save: %s cannot be written: the game saves to %s%s\n", beside.c_str(), start.elsewhere.c_str(),
+                    start.copyFailed ? " (the save beside it could not be copied)" : "");
+        Host::SavePath = start.path;
+        host.saveElsewhere = start.elsewhere;
+        saveMovedBack = start.movedBack;
     }
     std::string quickState = romBase + ".quick.st";
     const std::string shotFile = romBase + "-shot.png";
@@ -869,10 +879,10 @@ relaunch:
     host.code = app.romCode;
     host.canUndo = FileExists(host.data.Undo(app.romCode)); // (a load from an earlier run can be undone too)
     host.Refresh(app, input); // (the toasts in the game's language before the menu is ever opened)
-    if (window && !host.saveElsewhere.empty())
+    if (window && (!host.saveElsewhere.empty() || saveMovedBack))
     {
-        std::string msg = OwnWordIn(host.model.language, OwnWordId::SaveElsewhere);
-        if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, host.saveElsewhere);
+        std::string msg = OwnWordIn(host.model.language, saveMovedBack ? OwnWordId::SaveMovedBack : OwnWordId::SaveElsewhere);
+        if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, saveMovedBack ? Host::SavePath : host.saveElsewhere);
         video.Toast(msg, 10000);
     }
     // The quick save state (F5 / F7) in the settings folder with the slots, not beside the ROM.
@@ -935,6 +945,9 @@ relaunch:
     // kFastBootFrames. Nothing is pressed for the player.
     constexpr long kFastBootFrames = 1500;
     bool fastBoot = (window ? app.settings.fastBoot : fastBootFlag) && stateLoad.empty() && !continueSuspend && app.portSupported;
+    // (Only a press that begins once it runs ends it: a key or button still held from the launch
+    // panel counts once let go, after a frame with nothing held.)
+    bool fastBootArmed = false;
     if (fastBoot) fprintf(stderr, "fast boot: on\n");
     std::string pendingShot;      // a window screenshot asked for: said once the picture is written
     bool pointerHidden = false;   // the mouse pointer hidden (still for a while: Settings::hidePointer)
@@ -1062,6 +1075,8 @@ relaunch:
             if (app.quit) break;
             host.frame = frame;
             input.Poll(app, host.Open());
+            // The keyboard's text only on Create-a-Sim's Name page (not under the pause menu).
+            video.TextInput(!host.Open() && Input::TypingName(app));
             // The mouse pointer hidden after three seconds still over the game (never over a menu).
             {
                 const bool hide = app.settings.hidePointer && !host.Open() && !input.mouseDown && !input.rightDown &&
@@ -1122,6 +1137,7 @@ relaunch:
             if (input.wantLayout >= 0) app.settings.layout = app.layout = (Layout)input.wantLayout;
             if (input.wantFullscreen)
             {
+                video.RememberSize(app.settings); // (the window's, before it fills the screen)
                 app.settings.fullscreen = !app.settings.fullscreen;
                 video.SetFullscreen(app.settings.fullscreen);
                 app.settings.Save(settingsPath);
@@ -1143,6 +1159,7 @@ relaunch:
             if (Host::SaveMoved && host.saveElsewhere != Host::SavePath)
             {
                 host.saveElsewhere = Host::SavePath;
+                backups.savePath = Host::SavePath; // (the copies follow the save: backups/ beside it)
                 std::string msg = OwnWordIn(lang, OwnWordId::SaveElsewhere);
                 if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, Host::SavePath);
                 video.Toast(msg, 10000);
@@ -1216,10 +1233,15 @@ relaunch:
                 fill(mg.mixer.valid && mg.mixer.phase == 9, before.minigame.mixer.valid && before.minigame.mixer.phase == 9, before.minigame.mixer.helpId, mg.mixer.helpId);
             }
             if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
-            if (fastBoot && (frame >= kFastBootFrames || keys || touching || !BootPassesBy(app.game)))
+            if (fastBoot)
             {
-                fastBoot = false;
-                fprintf(stderr, "frame %ld: fast boot: done (%s)\n", frame, keys || touching ? "a press" : frame >= kFastBootFrames ? "its time" : "the boot waits for a touch");
+                const bool held = keys || touching, pressed = held && fastBootArmed;
+                if (!held) fastBootArmed = true;
+                if (pressed || frame >= kFastBootFrames || !BootPassesBy(app.game))
+                {
+                    fastBoot = false;
+                    fprintf(stderr, "frame %ld: fast boot: done (%s)\n", frame, pressed ? "a press" : frame >= kFastBootFrames ? "its time" : "the boot waits for a touch");
+                }
             }
             if (app.portSupported && printHud)
             {
@@ -1632,7 +1654,11 @@ relaunch:
         launchFrames = frame;
         stateLoad.clear();
         shellPage = -1;
-        if (window) video.RememberSize(app.settings);
+        if (window)
+        {
+            video.RememberSize(app.settings);
+            video.TextInput(false);
+        }
         app.nds.reset();
         app.rom.reset();
         app.icons.reset();
@@ -1654,6 +1680,7 @@ relaunch:
         video.RememberSize(app.settings);
         if (!app.settings.Save(settingsPath)) fprintf(stderr, "cannot write %s\n", settingsPath.c_str());
         input.ClosePads();
+        video.Close();
         SDL_Quit();
     }
     return 0;
