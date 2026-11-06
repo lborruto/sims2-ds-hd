@@ -963,7 +963,7 @@ CheckInState ReadCheckIn(const Reader& m, u32 S, const HotelState& hotel)
     return v;
 }
 
-// A guest room's daily cost: base + the furniture's service charge + the score's bonus (x 1.05 without the Fortune aspiration).
+// A guest room's daily cost: base + the furniture's service charge + the score's bonus (x 1.05 with the Fortune aspiration, 0).
 bool RoomCost(const Reader& m, u32 G, u32 place, int score, RoomInfoState& v)
 {
     const auto& h = kEU.hotel; const auto& t = kEU.town;
