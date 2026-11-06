@@ -17,7 +17,7 @@
 ## What it does
 
 - **Like a console game (CONSOLE, the default).** In town the 3D world fills the window, widescreen
-  and sharper, with a small rail of the touch screen's tabs and phone beside it and the clock,
+  and sharper, with the clock,
   money and Sanity meter in a sharp HD status bar (in the game's language). One button
   (Back, or E) opens the touch screen's menu big over the town; conversations are redrawn in
   HD over the whole world (the speaker's name, the game's own words in large type, their
@@ -83,7 +83,7 @@ It is an early version: see [Good to know](#good-to-know).
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/console-town.webp" alt="CONSOLE: the town fills the window, the tabs' rail at the right and the HD status bar (clock, money, Sanity) below" width="700">
+  <img src="docs/screenshots/console-town.webp" alt="CONSOLE: the town fills the window, a small menu hint and the HD status bar (clock, money, Sanity) below" width="700">
 </p>
 
 <p align="center">

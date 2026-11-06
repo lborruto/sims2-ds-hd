@@ -27,9 +27,9 @@ FrontScreen ScreenOf(ScreenState s, const GameState& game)
     const FrontState& f = game.front;
     // The title and the main menu: the front end's GScreen (the title object in the top slot).
     if (s.screen == Screen::FrontEnd && f.title.valid && (f.kind == FrontKind::Title || f.kind == FrontKind::MainMenu)) return f.title.phase == 0 ? FrontScreen::Title : FrontScreen::Menu;
-    // The boot: the splash object (the video's or not), no HUD (its fades between splashes black:
+    // The boot (the legal splash too: GScreen FrontEnd, overlay -1 / vtable 0x02131A70): the splash object (the video's or not), no HUD (its fades between splashes black:
     // Loading); not its popup mode (4).
-    if ((s.screen == Screen::None || s.screen == Screen::Loading) && f.boot.valid && f.boot.mode != 4 && (f.kind == FrontKind::Boot || f.kind == FrontKind::Video)) return FrontScreen::Boot;
+    if ((s.screen == Screen::None || s.screen == Screen::Loading || s.screen == Screen::FrontEnd) && f.boot.valid && f.boot.mode != 4 && (f.kind == FrontKind::Boot || f.kind == FrontKind::Video)) return FrontScreen::Boot;
     return FrontScreen::None;
 }
 

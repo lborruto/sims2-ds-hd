@@ -147,6 +147,8 @@ constexpr const char* kWords[][5] = {
      "El juego inalámbrico necesita otra DS: no está en esta versión."},
     // A help text
     {"Close", "Fermer", "Schließen", "Chiudi", "Cerrar"},
+    // The town's menu hint
+    {"Menu", "Menu", "Menü", "Menu", "Menú"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

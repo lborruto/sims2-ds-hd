@@ -24,6 +24,7 @@
 #include "port/phone.h"
 #include "port/statusbar.h"
 #include "port/popup.h"
+#include "port/ownwords.h"
 #include "romdata.h"
 
 namespace sims2wide
@@ -256,9 +257,24 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     else if (s.screen == Screen::Panel)
     {
         c.pieces.push_back(World(topW, worldRows, bar));
-        c.overlays.push_back(Frame(kRailFrame, 1));
-        c.pieces.push_back(Bottom(kRailPhoneFrom, kRailPhoneTo));
-        c.pieces.push_back(Bottom(kRailTabsFrom, kRailTabsTo));
+        if (ConsoleView(s, game, rom).valid)
+        {
+            // The HD menu has the tabs: no rail, a small chip says how to open it, level with the bar.
+            const char* word = OwnWord(rom, OwnWordId::Menu);
+            const int tw = TextRect(0, 0, word, 2).w, bw = TextRect(0, 0, "BACK", 2).w + 14, h = kHintChipH;
+            const int w = 8 + bw + 10 + tw + 12, x = kConsoleW - 16 - w, y = kStatusBarY + (kStatusBarH - h - 8) / 2;
+            c.overlays.push_back({{x, y, w, h + 8}, kFrameArgb, 14, 3, kOutlineArgb});
+            c.overlays.push_back({{x + 8, y + 4 + 0, bw, h}, kPanelArgb, 9, 3, kOutlineArgb});
+            c.overlays.push_back(Text(x + 8 + 8, y + 4 + (h - 14) / 2, "BACK", 2));
+            c.overlays.push_back(Text(x + 8 + bw + 10, y + 4 + (h - 14) / 2, word, 2));
+        }
+        else
+        {
+            // Milestone 1 (no strings, another ROM): the rail, the only way to see the tabs.
+            c.overlays.push_back(Frame(kRailFrame, 1));
+            c.pieces.push_back(Bottom(kRailPhoneFrom, kRailPhoneTo));
+            c.pieces.push_back(Bottom(kRailTabsFrom, kRailTabsTo));
+        }
         if (bar)
         {
             const Rect r = AddStatusBar(c, *hud, *strings);
