@@ -274,13 +274,13 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             // focus, or the dimmed world.
             const ScreenState at = UnderScreen(s, *game);
             if (const MenuView u = ScreenView(at, game, rom); u.valid && (u.own || (at.screen == Screen::Panel && menuOpen))) screen(at, u, -1);
-            if (bar) AddStatusBar(c, *hud, *strings);
+            if (bar) AddStatusStrip(c, hud, *strings);
             BuildPopup(c, v, focus, *game, *rom);
         }
         else
         {
             screen(s, v, focus);
-            if (bar) AddStatusBar(c, *hud, *strings);
+            if (bar) AddStatusStrip(c, hud, *strings);
             // Room info's own hint box (a popup of the screen's: port/roominfo.h), over the bar too.
             if (s.screen == Screen::Unknown && RoomHintUp(*game)) BuildRoomHint(c, v, focus, *game, *rom);
         }
@@ -295,7 +295,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         world.touch = false;
         c.pieces.push_back(world);
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
-        if (bar) AddStatusBar(c, *hud, *strings);
+        if (bar) AddStatusStrip(c, hud, *strings);
         SortUi(c.ui);
         return c;
     }
@@ -307,7 +307,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         // screen; for kWorldOnlyMax frames in a row at most, then the cursor's screen below (a screen
         // that stays so is not a dead end: the stick cursor and its hints).
         c.pieces.push_back(World(topW, worldRows, bar));
-        if (bar) AddStatusBar(c, *hud, *strings);
+        if (bar) AddStatusStrip(c, hud, *strings);
     }
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {
@@ -332,40 +332,41 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(World(topW, worldRows, bar));
         // (The HD town whenever RAM and the game's strings read: a frame whose tab does not read yet,
         // the panel coming back from a minigame, never flashes milestone 1's rail.)
-        int hintsLeft = kConsoleW - 8; // (the hints' panel's left: the payout stays clear of it)
-        if (ConsoleView(s, game, rom).valid || (game && game->valid && rom && rom->StringCount() > 0 && bar))
-        {
-            // The HD menu has the tabs: no rail. A small kit panel level with the status bar says
-            // how to open it: the TOUCH MENU's button as the device used last prints it (the pad's
-            // Back / View, Share, -; the keyboard's key, E by default: ui::ChipLook) and the word;
-            // left of it the camera's, the right stick (navigator.h's world: it turns and zooms).
-            const char* word = OwnWord(rom, OwnWordId::Menu);
-            const char* camera = OwnWord(rom, OwnWordId::CtlCamera);
-            constexpr float kSize = 24;
-            constexpr int kPad = 14, kBetween = 22;
-            const Rect chip = ui::ChipRect(0, 0, ui::Button::Back, word, kSize);
-            const Rect cam = ui::ChipRect(0, 0, ui::Button::RStick, camera, kSize);
-            const int w = cam.w + kBetween + chip.w + 2 * kPad;
-            const Rect box {kConsoleW - 16 - w, kStatusBarY, w, kStatusBarH};
-            hintsLeft = box.x - 12;
-            const size_t first = c.ui.size();
-            c.ui.push_back(ui::PanelItem(box));
-            c.ui.push_back(ui::ChipItem(box.x + kPad, box.y + (box.h - cam.h) / 2, ui::Button::RStick, camera, kSize));
-            c.ui.push_back(ui::ChipItem(box.x + w - kPad - chip.w, box.y + (box.h - chip.h) / 2, ui::Button::Back, word, kSize));
-            for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
-        }
-        else
+        const bool hd = ConsoleView(s, game, rom).valid || (game && game->valid && rom && rom->StringCount() > 0 && bar);
+        if (!hd)
         {
             // Milestone 1 (no strings, another ROM): the rail, the only way to see the tabs.
             c.overlays.push_back(Frame(kRailFrame, 1));
             c.pieces.push_back(Bottom(kRailPhoneFrom, kRailPhoneTo));
             c.pieces.push_back(Bottom(kRailTabsFrom, kRailTabsTo));
         }
-        if (bar)
+        if (hd || bar)
         {
-            const Rect r = AddStatusBar(c, *hud, *strings);
-            // The money's last change (an animation's payout, a prize) beside the bar, in the game's words.
-            if (payout != 0 && rom && rom->StringCount() > kStrMgMoney) AddPayout(c, r, payout, *rom, hintsLeft);
+            // The strip under the world, the canvas's whole width (port/statusbar.h): the status at
+            // the left; with the HD menu (it has the tabs: no rail) the hints at the right, in the
+            // strip, no panel of their own: the camera's, the right stick (navigator.h's world: it
+            // turns and zooms), and how to open the menu: the TOUCH MENU's button as the device used
+            // last prints it (the pad's Back / View, Share, -; the keyboard's key, E by default:
+            // ui::ChipLook) and the word.
+            const char* word = OwnWord(rom, OwnWordId::Menu);
+            const char* camera = OwnWord(rom, OwnWordId::CtlCamera);
+            constexpr float kSize = 24;
+            constexpr int kRight = kConsoleW - 30, kBetween = 22;
+            const Rect chip = ui::ChipRect(0, 0, ui::Button::Back, word, kSize);
+            const Rect cam = ui::ChipRect(0, 0, ui::Button::RStick, camera, kSize);
+            const int hintsW = hd ? cam.w + kBetween + chip.w : 0;
+            static const HudStrings kNoWords;
+            const Rect r = AddStatusStrip(c, bar ? hud : nullptr, strings ? *strings : kNoWords, hintsW);
+            if (hd)
+            {
+                const size_t first = c.ui.size();
+                const int y = kStripContentY + kStatusBarH / 2;
+                c.ui.push_back(ui::ChipItem(kRight - hintsW, y - cam.h / 2, ui::Button::RStick, camera, kSize));
+                c.ui.push_back(ui::ChipItem(kRight - chip.w, y - chip.h / 2, ui::Button::Back, word, kSize));
+                for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
+            }
+            // The money's last change (an animation's payout, a prize) beside the status, in the game's words.
+            if (bar && payout != 0 && rom && rom->StringCount() > kStrMgMoney) AddPayout(c, r, payout, *rom, kRight - hintsW - 12);
         }
     }
     else if (s.screen == Screen::Dialogue && game && game->valid && rom && rom->StringCount() > 0 && bottom)

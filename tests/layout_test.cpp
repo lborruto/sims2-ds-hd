@@ -579,6 +579,33 @@ int main()
                     while (first < c.ui.size() && c.ui[first].layer != kStatusBarLayer) first++;
                     CHECK(first < c.ui.size());
                     if (first >= c.ui.size()) continue;
+                    // The town (no menu open): the strip, the canvas's whole width from kStripY to its
+                    // foot (its fill, then its outline and band along its top), inside the canvas; the
+                    // world down to it (widescreen: no black between); the status's items in the
+                    // strip below its band, at the left, no panel of their own; the hints (none here:
+                    // no HD view without RAM) at the right clear of it.
+                    if (st.screen == Screen::Panel && !menuOpen)
+                    {
+                        CHECK(c.ui.size() >= first + 3);
+                        if (c.ui.size() < first + 3) continue;
+                        const Rect sp = c.ui[first].to;
+                        CHECK(c.ui[first].plain && sp.x == 0 && sp.w == kConsoleW && sp.y == kStripY && sp.y + sp.h == kConsoleH);
+                        CHECK(c.ui[first + 1].to.y == kStripY && c.ui[first + 1].to.w == kConsoleW && c.ui[first + 2].to.y == kStripY + 1 && c.ui[first + 2].to.w == kConsoleW);
+                        CHECK(top.first * 3 == top.second * 4 || w.to.y + w.to.h == kStripY);
+                        int chips = 0, statusRight = 0, chipsLeft = kConsoleW;
+                        for (size_t i = first + 3; i < c.ui.size(); i++)
+                        {
+                            const Rect r = c.ui[i].to;
+                            CHECK(c.ui[i].layer == kStatusBarLayer);
+                            CHECK(r.x >= 16 && r.x + r.w <= kConsoleW - 16 && r.y >= kStripY + 1 + kStripBand && r.y + r.h <= kConsoleH - 2);
+                            if (c.ui[i].kind == ui::UiItem::Chip) { chips++; chipsLeft = std::min(chipsLeft, r.x); }
+                            else statusRight = std::max(statusRight, r.x + r.w);
+                            CHECK(c.ui[i].kind != ui::UiItem::Panel || c.ui[i].plain || r.h < kStatusBarH); // (no panel of its own: the strip is)
+                        }
+                        CHECK(chips == 0 || chips == 2);
+                        CHECK(statusRight > 200 && statusRight < chipsLeft);
+                        continue;
+                    }
                     const Rect b = c.ui[first].to;
                     CHECK(b.y == kStatusBarY && b.h == kStatusBarH && b.x >= std::max(w.to.x, 0) && b.x + b.w <= std::min(w.to.x + w.to.w, kConsoleW));
                     CHECK(b.y > kMenuTo.y + kMenuTo.h + 6);

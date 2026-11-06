@@ -333,28 +333,17 @@ def world_full(rows=192):
     fx = (256 - fw) // 2
     return lambda cx, cy: top(fx + (cx - x0) * fw // rw, cy * rows // 720)
 
-def menu_hint_chip():
-    """The menu hint is a kit panel (the status bar's, the TOUCH MENU's chip in it: headless has no
-    pad and never polls one, so the chip stays the kit's default look, the Xbox one: a BACK pill
-    with a dark body), level with the status bar and ending at the canvas's right edge less 16:
-    its dark outline at x 1263, its frame band (#6171B2) inside it, the panel's fill, the pill."""
-    expect("menu hint chip's outline", C(1263, 684), OUTLINE)
-    expect("menu hint chip's frame band", C(1260, 684), hexrgb("6171B2"))
-    expect("menu hint chip's fill", C(1256, 684), FRAME)
-    expect("menu hint chip's BACK pill", C(1124, 684), (46, 48, 99))
-
 def rail():
     """No rail (the owner: the HD menu, Back / E, replaced it): where it was is the backdrop at 4:3
-    (the world ends at 1163); and the menu hint chip, its outline, at the canvas's right edge level
-    with the status bar (x 1262, row 684)."""
+    (the world ends at 1163); the menu's hint is in the strip (strip(hints=True))."""
     BACK = (16, 18, 24)
     expect("no rail: backdrop where its frame was", C(1170, 360), BACK)
     expect("no rail: backdrop where its tabs were", C(1200, 300), BACK)
     expect("no rail: backdrop where its phone was", C(1210, 174), BACK)
-    menu_hint_chip()
-    # The world without the game's status bar (its last 16 rows): 176 rows 720 high.
+    # The world without the game's status bar (its last 16 rows): 176 rows 720 high, its last
+    # rows under the strip.
     w = world_full(176)
-    for cx, cy in ((400, 100), (700, 650), (1000, 300), (900, 715)):
+    for cx, cy in ((400, 100), (700, 650), (1000, 300), (900, 658)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
 
 WELL = hexrgb("6A72B8")
@@ -369,35 +358,9 @@ def hud_values():
             found = tuple(int(v) for v in m.groups())
     return found
 
-def status_bar(values=None, left=132):
-    """The HD status bar: its panel from x `left` (the 4:3 world's left + 16), rows 660-707, found
-    by its frame band (#6171B2) at both ends of row 684; inside it, and only there, white text;
-    with values (from --print-hud), the meter: its body in the tier's colour, filled cur / max of
-    the track (the well's inside less 2 pixels a side) within 2 pixels."""
-    BAND = hexrgb("6171B2")
-    x0, y0, y1 = left, 660, 708
-    expect("status bar band, top", C(x0 + 18, y0 + 2), BAND)
-    expect("status bar band, left", C(x0 + 2, 684), BAND)
-    band = [x for x in range(x0, 1160) if C(x, 684) == BAND]
-    # (the menu hint chip's panel, right of the bar, has the same band: the scan stops at x 1160,
-    # so it sees the chip's left edge, a run after the bar's own two)
-    runs = [[x] for x in band[:1]]
-    for x in band[1:]:
-        if x - runs[-1][-1] > 1: runs.append([x])
-        else: runs[-1].append(x)
-    if len(runs) >= 3: band = runs[0] + runs[1]
-    if not band or band[0] > x0 + 3:
-        errors.append("no status bar panel")
-        return
-    x1 = band[-1] + 2
-    if x1 - x0 < 200 or C(x1 - 1, 684) != OUTLINE:
-        errors.append(f"status bar panel {x0}..{x1}: no right edge")
-        return
-    inside = [C(x, y) for y in range(y0 + 4, y1 - 4) for x in range(x0 + 4, x1 - 4)]
-    if inside.count((255, 255, 255)) < 40:
-        errors.append("no status bar text")
-    if values is None:
-        return
+def meter(values, x0, x1, y0, y1):
+    """The Sanity meter in x0..x1, rows y0..y1: its body in the tier's colour, filled cur / max
+    of the track (the well's inside less 2 pixels a side) within 2 pixels."""
     money, hh, mm, cur, mx, tier = values
     body = BODY[tier]
     rows = {}
@@ -419,6 +382,35 @@ def status_bar(values=None, left=132):
     want = round(track_w * cur / mx)
     if abs(filled - want) > 2:
         errors.append(f"meter filled {filled} of {track_w} (want {want}: {cur}/{mx})")
+
+STRIP_Y = 661
+
+def strip(values=None, hints=False):
+    """The strip under the world (port/statusbar.h's AddStatusStrip): one kit panel the canvas's
+    whole width from row 661 (the widescreen world's foot): its dark outline, then the frame band
+    across, its fill below to the canvas's foot, never the backdrop; white text in the status at
+    the left (from x 16), no panel of its own there; with values (from --print-hud), the meter;
+    with hints (the town), at the right the BACK pill (headless: the kit's Xbox look)."""
+    BAND = hexrgb("6171B2")
+    for x in (0, 16, 640, 1263, 1279):
+        expect(f"strip's outline at {x}", C(x, STRIP_Y), OUTLINE)
+        expect(f"strip's band at {x}", C(x, STRIP_Y + 2), BAND)
+        expect(f"strip's fill at {x}", C(x, 717), FRAME)
+    back = sum(1 for y in range(STRIP_Y, 720, 2) for x in range(0, 1280, 4) if C(x, y) == (16, 18, 24))
+    if back:
+        errors.append(f"the backdrop in the strip ({back} samples)")
+    # (no panel of the status's own: the strip's fill left of its first value and between them)
+    expect("strip's fill left of the status", C(20, 691), FRAME)
+    inside = [C(x, y) for y in range(STRIP_Y + 6, 716) for x in range(16, 760)]
+    if inside.count((255, 255, 255)) < 40:
+        errors.append("no status text in the strip")
+    if values is not None:
+        meter(values, 16, 760, STRIP_Y + 4, 718)
+    if hints:
+        expect("the strip's BACK pill", C(1140, 698), (46, 48, 99))
+        right = [C(x, y) for y in range(STRIP_Y + 6, 716) for x in range(900, 1260)]
+        if right.count((255, 255, 255)) < 40:
+            errors.append("no hint words at the strip's right")
 
 def front():
     """No HUD: the top screen fitted in 24,72 568 x 480 (4:3: 568 x 426 at 24,99), the touch
@@ -845,26 +837,23 @@ def hd_popup(kind, title, menu):
 if case == "cityhall":
     expect("canvas", comp.size, (1280, 720))
     rail()
-    status_bar()
+    strip(hints=True)
 elif case == "cityhall-wide":
     # Widescreen: the world without the game's bar keeps its sides (never cut to make room for
-    # the crop): 341 x 176 fitted to the canvas's width, 1280 x 661, top-aligned; the backdrop
-    # in the strip below, where the bar sits.
+    # the crop): 341 x 176 fitted to the canvas's width, 1280 x 661, top-aligned; the strip right
+    # under it, the canvas's whole width: no black between (the owner's playtest).
     big = Image.open(raw_path.replace(".png", "-top.png")).convert("RGB")
     expect("wide picture", big.size, (341, 192))
-    for cx, cy in ((0, 300), (1279, 100), (640, 400), (300, 655), (780, 660)):
+    for cx, cy in ((0, 300), (1279, 100), (640, 400), (300, 655), (780, 660), (1000, 660)):
         expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * 341 // 1280, cy * 176 // 661)))
-    for cx, cy in ((780, 680), (1270, 715), (700, 700)):
-        expect(f"backdrop below the world at {cx},{cy}", C(cx, cy), (16, 18, 24))
-    menu_hint_chip()
-    status_bar(left=16)
+    strip(hints=True)
 elif case == "s7":
     hd_phone(None)
-    status_bar()
+    strip()
 elif case == "cityhall-menu":
     # City Hall: no target (the plumbob; the title "Interact" alone), no row, the focus on the phone.
     hd_menu(0, -1)
-    status_bar()
+    strip()
 elif case == "menu-m1":
     # Without the game's text (--no-romdata): milestone 1's menu, the touch screen 3x (and the
     # game's own status bar in the world: no HD bar without its words).
@@ -872,7 +861,7 @@ elif case == "menu-m1":
 elif case in ("casino-menu", "casino-menu-2x"):
     # Keelhaulin' Cards: three rows, the focus on the second (Hotseat).
     hd_menu(3, 1)
-    status_bar(hud_values())
+    strip(hud_values())
 elif case == "casino-menu-wide":
     hd_menu(3, 0, wide=True)
 elif case in ("casino", "casino-2x"):
@@ -882,7 +871,7 @@ elif case in ("casino", "casino-2x"):
         errors.append("no hud line from --print-hud")
     else:
         expect("tier", values[5], 2)
-        status_bar(values)
+        strip(values, hints=True)
         rail()
 elif case == "s7-menu":
     # --console-focus 0: the HD phone's first row (the game's own highlight).
