@@ -83,7 +83,7 @@ It is an early version: see [Good to know](#good-to-know).
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/console-town.webp" alt="CONSOLE: the town fills the window, a small menu hint and the HD status bar (clock, money, Sanity) below" width="700">
+  <img src="docs/screenshots/console-town.webp" alt="CONSOLE: the hotel lobby fills the window, the HD status bar (clock, money, Sanity) at the bottom left and the Menu chip at the right" width="700">
 </p>
 
 <p align="center">
@@ -329,7 +329,7 @@ in SETTINGS > GRAPHICS. The options below turn them on for one run.
 | **60 fps** | adds in-between frames: the game draws its 3D at 30 frames a second | `--interp` |
 
 <p align="center">
-  <img src="docs/screenshots/widescreen.webp" alt="Widescreen and three times sharper: the town at night in 16:9, the status bar in the middle at the bottom" width="800">
+  <img src="docs/screenshots/widescreen.webp" alt="Widescreen and sharper 3D: the General Store in 16:9 at twice the DS resolution, the HD status bar at the bottom" width="800">
 </p>
 
 Widescreen is a stretch for a game made for 4:3: the game is told to draw a wider view, and it
