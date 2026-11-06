@@ -1,6 +1,6 @@
 // CONSOLE's activities on buttons: the navigator (navigator.h) hands the social reaction, the
 // card game and the vacuum to ActivityInput, which turns the player's buttons into the touches
-// the game wants (research: docs/research/sims2ds-mechanics.md, 4.1, 4.5, 4.13):
+// the game wants (the stylus targets: docs/research/ram-map.md and hotspots.cpp):
 //   Social: LEFT / UP / RIGHT tap the left / middle / right answer (the focus follows); A taps
 //     the focused one.
 //   Cards: the D-pad moves the focus over the table (the navigator's, starting on the first
