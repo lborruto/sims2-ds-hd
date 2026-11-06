@@ -232,9 +232,9 @@ town_want m-B-cas-goals goals 'footer=1843/1842/100 entries=-$' "menus: the hote
 town_want m-B-hot-goals goals '^goals sel=0 first=0 lines=3 portrait=2168 .* entries=m1:1628:0\+3$' "menus: the hotel goal and the concierge's portrait"
 town_want m-B-cas-rel-next5 relations '^relations first=2 sel=5 sims=1:324/390/184/195/26,2:' "menus: 23 Sims, the sixth selected, first 2"
 town_want m-B-st-rel relations '^relations first=0 sel=0 sims=22:345/411/184/195/4257$' "menus: one Sim (id 22, Jebediah)"
-town_want m-C-cas-msg1 phone '^phone page=3 row=0 scroll=0 shown=0 .* menu=2066,2068,2069,2070 inbox=0:2311:368:read,1:1182:368:new$' "menus: the phone's message page, two messages, one unread"
+town_want m-C-cas-msg1 phone '^phone page=3 row=0 scroll=0 shown=0 .* menu=2066,2068,2069,2070 inbox=0:2311:368:read,1:1182:368:new date=11/5 end=10 maid=-1 reply=-1 caller=-1 list=\?$' "menus: the phone's message page, two messages, one unread, Next Message on row 10"
 town_want m-C-cas-msg1-dn4 phone 'page=3 row=4 scroll=3 ' "menus: the phone's scrolled message"
-town_want m-C-cas-pb1 phone 'page=7 .* contacts=22/2 ' "menus: the contact list, 22 rows, Sim 2"
-town_want m-C-s7-msgs phone 'page=2 .* inbox=-$' "menus: no messages"
+town_want m-C-cas-pb1 phone 'page=7 .* contacts=22/2 .* list=2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23$' "menus: the contact list, 22 rows, Sim 2, the list worked out agreeing"
+town_want m-C-s7-msgs phone 'page=2 .* inbox=- date=' "menus: no messages"
 town_want m-A-gift2-slot2 gift '^gift recipient=22 name=345 slot=1 refused=000000$' "menus: Give Gift to Jebediah, slot 2"
 exit $fail

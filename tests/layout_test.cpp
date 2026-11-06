@@ -4,6 +4,7 @@
 // screen is held to its edges.
 //   ninja -C build layout_test && ./build/layout_test
 #include <climits>
+#include <tuple>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -17,7 +18,10 @@
 #include "port/dialogue.h"
 #include "port/gift.h"
 #include "port/goals.h"
+#include "port/note.h"
 #include "port/options.h"
+#include "port/phone.h"
+#include "port/popup.h"
 #include "port/relations.h"
 #include "port/interact.h"
 #include "port/panelmenu.h"
@@ -1075,21 +1079,16 @@ int main()
                 e.town.saves.current = -1;
                 e.town.saves.used[0] = true;
                 CHECK(MenuFirst(SaveSlotsViewOf(ss, e)) == 2);
-                // The game's question over a used slot (popup kind 2): the slots wait, A its tick,
-                // B its cross, the answers' pieces on them; "Saving" (kind 3): nothing to press.
+                // The game's question over a used slot (popup kind 2) or "Saving" (kind 3): the slots
+                // wait (disabled, no B) under the popup (port/popup.h: its view takes the input).
                 GameState pq = h;
-                pq.town.popup = {true, 2, 2, "Overwrite this save?", "", -1, false};
+                pq.town.popup = {true, 2, 2, "Overwrite this save?", "", -1, false, 48, 160, 6};
                 const MenuView a = SaveSlotsViewOf(ss, pq);
-                CHECK(a.valid && a.items.size() == 4 && MenuFirst(a) == 3 && !a.items[0].enabled && !a.items[2].enabled);
-                CHECK(a.items[3].action[0].x == kSlotAskTickX && a.items[3].action[0].y == kSlotAskY);
-                CHECK(a.back.size() == 1 && a.back[0].x == kSlotAskCrossX && a.back[0].y == kSlotAskY);
-                const Composition qc = check(ss, a, pq, 3);
-                CHECK(TouchFromComposition(qc, fit, kSlotYes.x + kSlotYes.w / 2.0f, kSlotYes.y + kSlotYes.h / 2.0f, tx, ty));
-                CHECK(inside(tx, ty, {kSlotAskTickX - 12, kSlotAskY - 12, 24, 24}));
-                CHECK(TouchFromComposition(qc, fit, kSlotNo.x + kSlotNo.w / 2.0f, kSlotNo.y + kSlotNo.h / 2.0f, tx, ty));
-                CHECK(inside(tx, ty, {kSlotAskCrossX - 12, kSlotAskY - 12, 24, 24}));
-                CHECK(!TouchFromComposition(qc, fit, kPmContent.x + 40.5f, kSlotY0 + 20.5f, tx, ty)); // a row behind: nothing
-                pq.town.popup = {true, 2, 3, "Do not turn off", "Saving", -1, false};
+                CHECK(a.valid && a.items.size() == 3 && MenuFirst(a) == -1 && a.back.empty());
+                const MenuView ap = PopupViewOf(ss, pq);
+                CHECK(ap.valid && ap.popup && ap.own && ap.items.size() == 1 && !ap.replay);
+                CHECK(ap.items[0].action[0].x == 164 && ap.items[0].action[0].y == 108 && ap.back[0].x == 92 && ap.back[0].y == 108);
+                pq.town.popup = {true, 2, 3, "Do not turn off", "Saving", -1, false, 48, 160, 6};
                 const MenuView w = SaveSlotsViewOf(ss, pq);
                 CHECK(w.valid && MenuFirst(w) == -1 && w.back.empty());
                 check(ss, w, pq, -1);
@@ -1098,6 +1097,164 @@ int main()
                 h.town.saves.valid = false;
                 CHECK(!SaveSlotsViewOf(ss, h).valid);
             }
+        }
+        // Popups, the phone and notes (port/popup.h, phone.h, note.h) on made-up states.
+        {
+            const CanvasFit fit = CanvasFit::For(kConsoleW, kConsoleH, 1280, 720);
+            auto inside = [](int x, int y, Rect a) { return x >= a.x && x < a.x + a.w && y >= a.y && y < a.y + a.h; };
+            int tx, ty, bx, by;
+            // The game's buttons from its box (0x02057314): Game Paused / tips, the goal, the question.
+            PopupState pp {true, 2, 0, "Press START", "Game Paused", -1, false, 40, 160, 10};
+            CHECK(PopupButton(pp, 0, bx, by) && bx == 132 && by == 132 && !PopupButton(pp, 1, bx, by));
+            pp.boxY = 56; pp.boxTiles = 6;
+            CHECK(PopupButton(pp, 0, bx, by) && bx == 132 && by == 116);
+            pp.kind = 2;
+            CHECK(PopupButton(pp, 0, bx, by) && bx == 92 && by == 116 && PopupButton(pp, 1, bx, by) && bx == 164 && by == 116);
+            pp.kind = 3;
+            CHECK(!PopupButton(pp, 0, bx, by));
+            pp.kind = 0; pp.boxW = 0;
+            CHECK(!PopupButton(pp, 0, bx, by));
+            // Over the panel (its open menu drawn beneath), Options > Quit's (Unknown), over the
+            // phone; never over a screen the port does not redraw, nor without the box.
+            for (int kind : {0, 2, 3})
+                for (ScreenState on : {ScreenState {Screen::Popup, Tab::None}, ScreenState {Screen::Unknown, Tab::None}})
+                {
+                    GameState h;
+                    h.valid = true;
+                    h.screen = GScreen::Popup;
+                    h.tab = on.screen == Screen::Unknown ? 4 : 0;
+                    h.town.popup = {true, 2, kind, std::string(300, 'w'), kind == 2 ? "stale" : "Title", -1, false, 56, 160, 6};
+                    h.town.options = {true, 4096, 2048};
+                    const MenuView v = PopupViewOf(on, h);
+                    CHECK(v.valid && v.own && v.popup && (int)v.items.size() == (kind == 3 ? 0 : 1) && v.back.empty() == (kind == 3));
+                    CHECK(UnderScreen(on, h).screen == Screen::Panel);
+                    Composition comp {kConsoleW, kConsoleH, {}, {}};
+                    Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                    world.touch = false;
+                    comp.pieces.push_back(world);
+                    const ScreenState under = UnderScreen(on, h);
+                    const MenuView u = PanelMenuViewOf(under, h);
+                    if (u.valid) BuildPanelMenu(comp, under, u, 0, h, rom, nullptr, face.data());
+                    std::vector<u32> crop(SW * SH, 0xFF808080);
+                    comp.ui.push_back(ui::ImageItem({kPopBox.x + 10, kPopBox.y + 10, 60, 60}, crop.data(), SW, SH, {0, 0, 20, 20})); // (a picture under the box)
+                    BuildPopup(comp, v, 0, h, rom);
+                    SortUi(comp.ui);
+                    int layer = 0;
+                    for (const ui::UiItem& it : comp.ui)
+                    {
+                        if (it.kind == ui::UiItem::Image)
+                        {
+                            CHECK(!(it.to.x < kPopBox.x + kPopBox.w && kPopBox.x < it.to.x + it.to.w && it.to.y < kPopBox.y + kPopBox.h && kPopBox.y < it.to.y + it.to.h));
+                            continue;
+                        }
+                        CHECK(it.layer >= layer);
+                        layer = it.layer;
+                        if (it.layer == kPopLayer && it.to.w < kConsoleW)
+                            CHECK(it.to.x >= kPopBox.x - 8 && it.to.x + it.to.w <= kPopBox.x + kPopBox.w + 8 && it.to.y >= kPopTitle.y - 8 &&
+                                  it.to.y + it.to.h <= kPopBox.y + kPopBox.h + 8);
+                    }
+                    // The mouse: the HD buttons onto the game's; the menu beneath takes none.
+                    if (kind == 0)
+                    {
+                        CHECK(TouchFromComposition(comp, fit, kPopClose.x + kPopClose.w / 2.0f, kPopClose.y + kPopClose.h / 2.0f, tx, ty));
+                        CHECK(inside(tx, ty, {120, 104, 24, 24}));
+                    }
+                    if (kind == 2)
+                    {
+                        CHECK(TouchFromComposition(comp, fit, kPopYes.x + kPopYes.w / 2.0f, kPopYes.y + kPopYes.h / 2.0f, tx, ty) && inside(tx, ty, {152, 104, 24, 24}));
+                        CHECK(TouchFromComposition(comp, fit, kPopNo.x + kPopNo.w / 2.0f, kPopNo.y + kPopNo.h / 2.0f, tx, ty) && inside(tx, ty, {80, 104, 24, 24}));
+                    }
+                    CHECK(!TouchFromComposition(comp, fit, kPmPhoneWell.x + 10.5f, kPmPhoneWell.y + 10.5f, tx, ty)); // the menu's phone beneath
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        if (kind != 3) TestConsoleRoundtrip(on, true, 256, 192, o.first, o.second, true, &comp);
+                    GameState off = h;
+                    off.town.popup.state = 0;
+                    CHECK(!PopupViewOf(on, off).valid);
+                    off = h;
+                    off.screen = GScreen::Catalogue;
+                    CHECK(!PopupViewOf({Screen::Catalogue, Tab::None}, off).valid);
+                    off = h;
+                    off.town.popup.boxW = 0;
+                    CHECK(PopupViewOf(on, off).valid == (kind == 3));
+                    CHECK(!PopupView(on, &h, &rom).valid); // (no strings: milestone 1's)
+                }
+            // The phone: every page as rows the game counts, the selection the game's, Up / Down its
+            // DS keys (as many presses as rows between), A the keys then OK; B its X.
+            auto phone = [&](int page, int row, int scroll, int rows) {
+                GameState h;
+                h.valid = true;
+                h.screen = GScreen::Phone;
+                PhoneState& p = h.town.phone;
+                p.valid = true;
+                p.page = page; p.row = row; p.scroll = scroll;
+                p.month = 11; p.day = 5;
+                for (int i = 0; i < 4; i++) p.menuIds[i] = 0x812 + i;
+                for (int i = 0; i < rows && page == 2; i++) p.inbox.push_back({i, 0x907, 45, 368, i % 2 == 0, {}, {}});
+                if (page == 3) { p.inbox.push_back({0, 0x907, 45, 368, true, {}, {}}); p.shownSlot = 0; p.textEnd = 10; }
+                if (page == 7) { for (int i = 0; i < rows; i++) p.contactList.push_back(i); p.contacts = rows; p.contactsKnown = true; }
+                if (page == 9 || page == 6 || page == 8) { p.textEnd = 5; p.caller = 2; p.reply = 0x81F; p.callMood = 1; p.callPlace = 3; }
+                if (page == 5) p.maidCost = 2270;
+                return h;
+            };
+            auto presses = [](const MenuAction& a, int key) {
+                int n = 0;
+                for (const MenuStep& st : a) n += st.kind == MenuStep::Keys && st.keys == (1u << key);
+                return n;
+            };
+            const ScreenState ps {Screen::Phone, Tab::None};
+            for (auto [page, row, scroll, rows] : std::vector<std::tuple<int, int, int, int>> {
+                     {0, 0, 0, 0}, {0, 3, 0, 0}, {2, 1, 0, 3}, {2, 10, 7, 10}, {3, 0, 0, 0}, {3, 4, 3, 0}, {3, 12, 10, 0}, {4, 5, 2, 0}, {5, 1, 0, 0},
+                     {7, 20, 18, 24}, {7, 0, 0, 0}, {9, 0, 0, 0}, {6, 5, 2, 0}, {8, 1, 0, 0}, {10, 0, 0, 0}})
+            {
+                const GameState h = phone(page, row, scroll, rows);
+                const MenuView v = PhoneViewOf(ps, h, &rom);
+                CHECK(v.valid && v.own && !v.popup && v.back.size() == 1 && v.back[0].x == kPhoneClose.x && v.backCloses);
+                if (page == 10) { CHECK(v.items.empty()); continue; }
+                CHECK(MenuFocusable(v, v.selected));
+                const ViewItem& sel = v.items[v.selected];
+                CHECK(sel.action.back().kind == MenuStep::Keys && sel.action.back().keys == (1u << kA));
+                const PhonePage pg = PhonePageOf(h, rom);
+                CHECK(pg.valid && !pg.crop && !pg.rows.empty());
+                // The selection's row: the game's (or, in a text, the first row after it).
+                const int selRow = (int)(sel.id - kPhRowId);
+                CHECK(selRow == row || (row < pg.rows.front().row && selRow == pg.rows.front().row));
+                CHECK(presses(sel.action, kDown) == std::max(0, selRow - row) && presses(sel.action, kUp) == std::max(0, row - selRow));
+                if (!v.scrollDown.empty()) CHECK(presses(v.scrollDown, kDown) >= 1 && presses(v.scrollDown, kUp) == 0);
+                CHECK(v.scrollDown.empty() == (selRow == pg.rows.back().row));
+                CHECK((int)v.items.size() <= kPhRows);
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                BuildPhone(comp, v, v.selected, h, rom, nullptr, face.data(), nullptr);
+                for (const ui::UiItem& it : comp.ui)
+                    CHECK(it.to.x >= kPhPanel.x && it.to.y >= kPhPanel.y && it.to.x + it.to.w <= kPhPanel.x + kPhPanel.w && it.to.y + it.to.h <= kPhPanel.y + kPhPanel.h);
+                for (const ViewItem& it : v.items) CHECK(it.rect.y >= kPhList.y && it.rect.y + it.rect.h <= kPhList.y + kPhList.h);
+                CHECK(TouchFromComposition(comp, fit, kPhOk.x + kPhOk.w / 2.0f, kPhOk.y + kPhOk.h / 2.0f, tx, ty) && inside(tx, ty, {kPhOkX - 12, kPhBtnY - 12, 24, 24}));
+                CHECK(TouchFromComposition(comp, fit, kPhDown.x + kPhDown.w / 2.0f, kPhDown.y + kPhDown.h / 2.0f, tx, ty) && inside(tx, ty, {kPhDownX - 12, kPhBtnY - 12, 24, 24}));
+                CHECK(TouchFromComposition(comp, fit, kPhX.x + kPhX.w / 2.0f, kPhX.y + kPhX.h / 2.0f, tx, ty) && inside(tx, ty, kPhoneClose.area));
+            }
+            // A list the game's own count disagrees with: its LCD, live, the same keys.
+            GameState odd = phone(7, 2, 0, 5);
+            odd.town.phone.contactsKnown = false;
+            const MenuView ov = PhoneViewOf(ps, odd, &rom);
+            CHECK(ov.valid && ov.items.size() == 1 && ov.selected == 0 && presses(ov.scrollDown, kDown) == 1 && presses(ov.scrollUp, kUp) == 1);
+            CHECK(PhonePageOf(odd, rom).crop);
+            odd.town.phone.contacts = 0; // (the list being built: nothing yet)
+            CHECK(!PhonePageOf(odd, rom).crop && PhoneViewOf(ps, odd, &rom).items.empty());
+            CHECK(!PhoneViewOf({Screen::Panel, Tab::Interact}, phone(0, 0, 0, 0), &rom).valid);
+            CHECK(!PhoneView(ps, nullptr, &rom).valid && !PhoneView(ps, &odd, &rom).valid); // (no strings)
+            // A note: A and B press the DS's A (the game closes it so); its X onto the game's.
+            GameState n;
+            n.valid = true;
+            n.town.note = {true, 0x4A8, true};
+            const MenuView nv = NoteViewOf({Screen::Unknown, Tab::None}, n);
+            CHECK(nv.valid && nv.own && nv.items.size() == 1 && nv.items[0].action[0].kind == MenuStep::Keys && nv.back == nv.items[0].action);
+            CHECK(!NoteViewOf({Screen::Panel, Tab::Interact}, n).valid);
+            Composition nc {kConsoleW, kConsoleH, {}, {}};
+            BuildNote(nc, nv, 0, n, rom, nullptr);
+            for (const ui::UiItem& it : nc.ui)
+                CHECK(it.to.x >= kNotePanel.x - 6 && it.to.y >= kNotePanel.y - 6 && it.to.x + it.to.w <= kNotePanel.x + kNotePanel.w && it.to.y + it.to.h <= kNotePanel.y + kNotePanel.h);
+            CHECK(TouchFromComposition(nc, fit, kNoteX.x + kNoteX.w / 2.0f, kNoteX.y + kNoteX.h / 2.0f, tx, ty) && inside(tx, ty, {kNoteCloseX - 14, kNoteCloseY - 14, 28, 28}));
+            n.town.note.valid = false;
+            CHECK(!NoteViewOf({Screen::Unknown, Tab::None}, n).valid);
         }
         // BuildConsole: without the game's strings, milestone 1's menu (the touch screen 3x).
         const HudState hud = TestHud();

@@ -15,9 +15,8 @@
 // empty; the game's current slot's number in green, as the game draws it; the first focus the
 // current slot, else the first empty one). A on a slot taps its tick (232, 67 / 113 / 159): an
 // empty slot is saved into at once; a used one makes the game ask "Overwrite this save?" (2423,
-// its popup kind 2), drawn over the slots in a small box with the game's text and its answers
-// "No" (49, B: the game's cross 92,107) and "Yes" (48, A: its tick 164,107); "Saving" (kind 3)
-// shows in the same box. B taps the game's X (232,22). A press the gate held while the game was
+// its popup kind 2), drawn over the slots by port/popup.h with the game's answers "No" (49, B:
+// the game's cross) and "Yes" (48, A: its tick); "Saving" (kind 3) the same way. B taps the game's X (232,22). A press the gate held while the game was
 // not settled is dropped, never replayed (MenuView::replay). The time a slot was saved is not
 // shown (its encoding was not decoded).
 #pragma once
@@ -34,9 +33,6 @@ class RomData;
 constexpr int kOptSaveX = 57, kOptSaveY = 44, kOptQuitX = 234, kOptQuitY = 69;
 constexpr int kOptKnobX0 = 72, kOptKnobStep = 16, kOptMusicY = 121, kOptSfxY = 171; // knob at x0 + step k, k = 0..10
 constexpr int kSlotTickX = 232, kSlotTickY[3] = {67, 113, 159}, kSlotCloseX = 232, kSlotCloseY = 22;
-// The game's question over a used slot ("Overwrite this save?", kind 2): its cross and tick
-// (measured from B-cas-opt-save: 24 x 24 buttons on rows 96-119).
-constexpr int kSlotAskCrossX = 92, kSlotAskTickX = 164, kSlotAskY = 107;
 
 // The game's strings.
 constexpr int kStrQuit = 61, kStrMusic = 62, kStrSfx = 63, kStrSave = 64;
@@ -50,11 +46,6 @@ constexpr int kOptTrackX = 268, kOptTrackW = 744;   // a slider's track (0 % .. 
 // The Save slots' panel.
 constexpr Rect kSlotTitle {200, 44, 880, 64};
 constexpr int kSlotY0 = 124, kSlotH = 142, kSlotGap = 14;
-// The popup's box over the slots and the question's answers.
-constexpr Rect kSlotAsk {320, 214, 640, 300};
-constexpr Rect kSlotNo {kSlotAsk.x + 40, kSlotAsk.y + kSlotAsk.h - 112, 260, 80};
-constexpr Rect kSlotYes {kSlotAsk.x + kSlotAsk.w - 300, kSlotAsk.y + kSlotAsk.h - 112, 260, 80};
-constexpr u32 kSlotYesId = 0x620;
 constexpr u32 kOptSaveId = 0x600, kOptQuitId = 0x601, kOptMusicId = 0x602, kOptSfxId = 0x603, kSlotId = 0x610;
 
 // A volume (0..4096) as the game's tenth (0..10).

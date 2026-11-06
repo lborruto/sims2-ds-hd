@@ -1,0 +1,2 @@
+# From B-pause (Game Paused), CONSOLE: Start is passed on to the game (it resumes on Start).
+20 2 pad start

@@ -95,10 +95,11 @@ int CloseOf(const std::vector<Hotspot>& h)
 }
 }
 
-// The screen's mode, the HD Save slots (a valid view) a focus screen instead of the cursor's.
+// The screen's mode: an HD screen of its own (a valid view: Give Gift, the Save slots, the phone,
+// a popup, a note) a focus screen whatever the screen state says.
 static Mode ModeWith(ScreenState s, bool menuOpen, const MenuView* view)
 {
-    if (s.screen == Screen::SaveSlots && view && view->valid) return Mode::Focus;
+    if (view && view->valid && view->own) return Mode::Focus;
     return ModeOf(s.screen, menuOpen);
 }
 
@@ -207,9 +208,9 @@ const MenuAction* Navigator::DirAction(const MenuView& v, int dir, bool& scroll)
 
 bool Navigator::UsesView(ScreenState s) const
 {
-    // The panel's menu while open; Give Gift and the Save slots whenever they are up (port/gift.h,
-    // port/options.h).
-    return view_ && view_->valid && ((s.screen == Screen::Panel && menuOpen_) || s.screen == Screen::Gift || s.screen == Screen::SaveSlots);
+    // The panel's menu while open; a screen of its own (Give Gift, the Save slots, the phone, a
+    // popup, a note) whenever it is up.
+    return view_ && view_->valid && ((s.screen == Screen::Panel && menuOpen_) || view_->own);
 }
 
 void Navigator::Move(ScreenState s, int dx, int dy)
@@ -242,10 +243,25 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     }
     auto edge = [&](bool PadState::*b) { return pad.*b && !(prev_.*b); };
 
+    // A popup coming (over the panel, its menu open or not; over an HD screen): what was under it
+    // is remembered, to come back to when it goes.
+    const bool popupNow = view && view->valid && view->popup;
+    if (popupNow && !popupUp_)
+    {
+        resumeScreen_ = screen_;
+        resumeMenu_ = menuOpen_;
+        resumeValid_ = viewFocus_ && focus_ >= 0;
+        resumeId_ = focusId_;
+        resumeIndex_ = focus_;
+    }
+    const bool back = !popupNow && popupUp_ && resumeValid_ && s == resumeScreen_;
     if (!(s == screen_))
     {
-        // The menu stays up only while the panel changes tab; the focus starts again.
-        if (s.screen != Screen::Panel || screen_.screen != Screen::Panel) menuOpen_ = false;
+        // The menu stays up only while the panel changes tab, or under a popup (and again when
+        // the screen it was over is back); the focus starts again (or comes back: the resume).
+        if (popupNow) {}
+        else if (popupUp_ && s == resumeScreen_) menuOpen_ = resumeMenu_;
+        else if (s.screen != Screen::Panel || screen_.screen != Screen::Panel) menuOpen_ = false;
         focus_ = -1;
         closing_ = 0;
         screen_ = s;
@@ -256,6 +272,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         viewHash_ = 0;
     }
     else if (closing_ > 0) closing_--;
+    if (!popupNow && popupUp_) closing_ = 0; // (the popup went: its closing wait is over)
+    if (back) { restore_ = true; restoreFrames_ = 0; }
+    else if (popupNow) restore_ = false;
 
     // The gate: on a focus screen or a popup, a press that would tap waits while the game's
     // bottom slot is switching (the RAM leads the pixels) and is replayed on the first settled
@@ -268,6 +287,14 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     const bool viewChanged = useView && viewHash != viewHash_;
     if (useView && viewChanged && viewHash_ != 0 && focus_ >= 0) focus_ = MenuKeep(*view_, focusId_, focus_);
     if (!useView && viewFocus_) focus_ = -1; // (an index of the view means nothing to HotspotsFor)
+    // The resume: the item the focus was on before the popup, once its view is back.
+    if (restore_ && useView)
+    {
+        const int f = MenuKeep(*view_, resumeId_, resumeIndex_);
+        if (f >= 0) focus_ = f;
+        restore_ = false;
+    }
+    else if (restore_ && ++restoreFrames_ > kHoldFrames) restore_ = false;
     bool PadState::*replay = nullptr;
     if (held_ && ++heldFrames_ > kHoldFrames) held_ = nullptr;
     if (mode == Mode::Focus || mode == Mode::Popup)
@@ -355,7 +382,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
                     pendingFrames_ = 0;
                 }
             }
-            if (pressed(&PadState::a) && MenuFocusable(v, focus_)) Run(v.items[focus_].action, touch);
+            if (pressed(&PadState::a) && MenuFocusable(v, focus_) && Run(v.items[focus_].action, touch) && v.items[focus_].closes)
+                closing_ = kClosingFrames;
             if (pressed(&PadState::x))
             {
                 // An asking X (Pockets' bin): the first press arms the item (and runs its xArm),
@@ -370,8 +398,10 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             if (s.screen == Screen::Panel && pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
             else if (s.screen == Screen::Panel && pressed(&PadState::lb)) tap(kTabIcon[t < 0 ? 4 : (t + 4) % 5]);
             const bool back = pressed(&PadState::b), menu = pressed(&PadState::menu);
-            if (back && !v.back.empty()) Run(v.back, touch);
-            else if (back || menu) menuOpen_ = false;
+            if (back && !v.back.empty()) { if (Run(v.back, touch) && v.backCloses) closing_ = kClosingFrames; }
+            else if ((back || menu) && !v.own) menuOpen_ = false;
+            // DS buttons the view passes on (Game Paused's Start).
+            if (v.passKeys) dsKeys |= DsKeys(pad, true) & v.passKeys;
             break;
         }
         if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);
@@ -450,6 +480,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     // An armed X lasts while its item keeps the focus on the same HD view (a move, a tab change,
     // the item going, the menu closing: disarmed).
     if (!viewFocus_ || focusId_ != armed_) armed_ = 0;
+    popupUp_ = popupNow;
     prev_ = pad;
     view_ = nullptr; // (the caller's view lives for this call only)
 }
@@ -469,6 +500,7 @@ void Navigator::Leave(TouchScript& touch)
     viewFocus_ = false;
     viewHash_ = 0;
     armed_ = 0;
+    popupUp_ = resumeMenu_ = resumeValid_ = restore_ = false;
     screen_ = ScreenState();
     fresh_ = true;
 }

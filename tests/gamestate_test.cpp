@@ -459,6 +459,13 @@ static void popup()
     r.W32(kP + 0xD88, 1); r.W8(kP + 0xD8C, 1);
     PopupState p = ReadGameState(r.View()).town.popup;
     CHECK(p.valid && p.state == 2 && p.kind == 2 && p.text == "Quit?" && p.title.empty() && p.pressed == 1 && p.pressing);
+    CHECK(p.boxW == 0 && p.boxTiles == 0); // (no box read: no button place)
+    r.W32(kP + 0x544, 56); r.W32(kP + 0x550, 160); r.W32(kP + 0x554, 6);
+    p = ReadGameState(r.View()).town.popup;
+    CHECK(p.valid && p.boxY == 56 && p.boxW == 160 && p.boxTiles == 6);
+    r.W32(kP + 0x554, 40);
+    CHECK(ReadGameState(r.View()).town.popup.valid && ReadGameState(r.View()).town.popup.boxW == 0); // a box off the screen
+    r.W32(kP + 0x554, 6);
     put_text(r, kP + 0x434, "T"); r.W8(kP + 0x8, 1); r.W32(kP + 0x10, 3);
     p = ReadGameState(r.View()).town.popup;
     CHECK(p.valid && p.state == 1 && p.kind == 3 && p.title == "T");
@@ -645,8 +652,13 @@ static void phone_gift_note()
     r.W8(E1 + 0x1A, 1); r.W8(E1 + 0x1B, 0); r.W32(E1 + 0x14, 2311); r.W16(E1 + 0x18, 45); r.W32(E1 + 4 * 0, 0);
     for (int i = 0; i < 4; i++) r.W32(0x0211E99C + 4 * i, 2066 + i);
     r.W8(kGb + 0x31C5, 2);
+    r.W32(kGb + 0x47F4, 11); r.W32(kGb + 0x47F8, 5); r.W8(0x0213E428, 10);
     PhoneState p = ReadGameState(r.View()).town.phone;
     CHECK(p.valid && p.page == 3 && p.row == 4 && p.scroll == 3 && p.shownSlot == 1 && p.ringtone == 2 && p.menuIds[3] == 2069);
+    CHECK(p.month == 11 && p.day == 5 && p.textEnd == 10 && p.maidCost == -1);
+    r.W32(kGb + 0x47F4, 13); CHECK(!ReadGameState(r.View()).town.phone.valid);   // no 13th month
+    r.W32(kGb + 0x47F4, 11); r.W8(0x0213E428, 0); CHECK(!ReadGameState(r.View()).town.phone.valid);   // Next Message on the sender's row
+    r.W8(0x0213E428, 10);
     CHECK(p.inbox.size() == 1 && p.inbox[0].slot == 1 && p.inbox[0].textId == 2311 && p.inbox[0].senderNameId == 323 + 45 && !p.inbox[0].read);
     r.W8(kS + 0x56, 0xFF); r.W8(kS + 0x88, 2);   // stale fields off their pages are ignored
     CHECK(ReadGameState(r.View()).town.phone.valid && ReadGameState(r.View()).town.phone.shownSlot == -1);
@@ -658,7 +670,27 @@ static void phone_gift_note()
     r.W16(E1 + 0x18, 45); r.W8(kGb + 0x31C5, 9); CHECK(!ReadGameState(r.View()).town.phone.valid);
     r.W8(kGb + 0x31C5, 2); r.W8(kS + 0x88, 7); r.W8(kS + 0x86C, 22); r.W32(kS + 0x870, 2);
     p = ReadGameState(r.View()).town.phone;
-    CHECK(p.valid && p.contacts == 22 && p.contactSim == 2);
+    CHECK(p.valid && p.contacts == 22 && p.contactSim == 2 && !p.contactsKnown); // (the records list none: it disagrees)
+    // The records met (flags bit 0) and in town: Sims 2 and 5; the game's count and highlighted Sim agree.
+    r.W8(kGb + 0x21DC + 0x2C * 2 + 0x14, 1); r.W8(kGb + 0x21DC + 0x2C * 5 + 0x14, 1);
+    r.W8(kS + 0x86C, 2); r.W8(kS + 0x89, 1); r.W32(kS + 0x870, 5); r.W8(kS + 0x8A, 0);
+    for (int j = 0; j < 5; j++) r.W8(kGb + 0x2BC0 + 8 * j + 4, 0x3F);
+    p = ReadGameState(r.View()).town.phone;
+    CHECK(p.valid && p.contactsKnown && p.contactList == std::vector<int>({2, 5}));
+    r.W8(kGb + 0x21DC + 0x2C * 5 + 0x10, 8); // (Sim 5 away: the list disagrees)
+    CHECK(!ReadGameState(r.View()).town.phone.contactsKnown);
+    r.W8(kGb + 0x21DC + 0x2C * 5 + 0x10, 0);
+    // Page 5: the maid's price; page 9: the Sim called, mood and place (place 0x21: away).
+    r.W8(kS + 0x88, 5); r.W32(0x0213E430, 2270);
+    CHECK(ReadGameState(r.View()).town.phone.maidCost == 2270);
+    r.W8(kS + 0x88, 9); r.W8(0x0213E42C, 4); r.W16(kS + 0x864, 2); r.W8(kGb + 0x21DC + 0x2C * 2 + 0x10, 1);
+    r.W8(kGb + 0x21DC + 0x2C * 2 + 0x4, 13); r.W8(kGb + 0x21DC + 0x2C * 2 + 0x1A, 2);
+    p = ReadGameState(r.View()).town.phone;
+    CHECK(p.valid && p.textEnd == 4 && p.caller == 2 && p.callMood == 2 && p.callPlace == 13 && !p.callAway);
+    r.W8(kGb + 0x21DC + 0x2C * 2 + 0x4, 0x21);
+    CHECK(ReadGameState(r.View()).town.phone.callAway);
+    r.W16(kS + 0x864, 46); CHECK(!ReadGameState(r.View()).town.phone.valid);   // not a Sim
+    r.W8(kS + 0x88, 7); r.W8(kS + 0x86C, 22);
     r.W8(kS + 0x86C, 65); CHECK(!ReadGameState(r.View()).town.phone.valid);
 
     // Give Gift

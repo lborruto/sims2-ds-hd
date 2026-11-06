@@ -40,7 +40,10 @@
 #include "port/dialogue.h"
 #include "port/interact.h"
 #include "port/goals.h"
+#include "port/note.h"
 #include "port/options.h"
+#include "port/phone.h"
+#include "port/popup.h"
 #include "port/pockets.h"
 #include "port/relations.h"
 #include "script.h"
@@ -89,7 +92,7 @@ static void Usage()
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
-        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots) can show fitted to its box, in --language's\n"
+        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes) can show fitted to its box, in --language's\n"
         "                                words: how many shrink, how many need an ellipsis (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load), and stop\n"
@@ -401,9 +404,18 @@ int main(int argc, char** argv)
         printf("tabs: %d words, tallest text %d (%d lines), %d shrunk, %d cut", g.checked, g.tallestId, g.tallestLines, g.shrunk, g.cut);
         for (int id : g.cutIds) printf(" %d", id);
         printf("\n");
+        // Popups, the phone and notes: every popup text the game opens, the phone's rows, answers
+        // and messages, the notes the code names.
+        BlockMeasure q;
+        MeasurePopups(*app.rom, q);
+        MeasurePhone(*app.rom, q);
+        MeasureNotes(*app.rom, q);
+        printf("popups: %d words, tallest text %d (%d lines), %d shrunk, %d cut", q.checked, q.tallestId, q.tallestLines, q.shrunk, q.cut);
+        for (int id : q.cutIds) printf(" %d", id);
+        printf("\n");
         // A neighbour's name beside the plate may end in an ellipsis (the Italian table has a
         // sentence at an object's name, 463); every other box must hold its words.
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 ? 2 : 0;
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.
@@ -704,8 +716,11 @@ int main(int argc, char** argv)
                         std::string e;
                         for (const InboxMsg& x : v.inbox)
                             e += (e.empty() ? "" : ",") + std::to_string(x.slot) + ":" + std::to_string(x.textId) + ":" + std::to_string(x.senderNameId) + (x.read ? ":read" : ":new");
-                        fprintf(stderr, "frame %ld: phone page=%d row=%d scroll=%d shown=%d ring=%d contacts=%d/%d menu=%d,%d,%d,%d inbox=%s\n", frame, v.page, v.row, v.scroll, v.shownSlot, v.ringtone,
-                                v.contacts, v.contactSim, v.menuIds[0], v.menuIds[1], v.menuIds[2], v.menuIds[3], e.empty() ? "-" : e.c_str());
+                        std::string l;
+                        for (int k : v.contactList) l += (l.empty() ? "" : ",") + std::to_string(k);
+                        fprintf(stderr, "frame %ld: phone page=%d row=%d scroll=%d shown=%d ring=%d contacts=%d/%d menu=%d,%d,%d,%d inbox=%s date=%d/%d end=%d maid=%d reply=%d caller=%d list=%s\n", frame, v.page, v.row, v.scroll, v.shownSlot, v.ringtone,
+                                v.contacts, v.contactSim, v.menuIds[0], v.menuIds[1], v.menuIds[2], v.menuIds[3], e.empty() ? "-" : e.c_str(), v.month, v.day,
+                                v.textEnd, v.maidCost, v.reply, v.caller, v.contactsKnown ? (l.empty() ? "-" : l.c_str()) : "?");
                     }
                 }
                 if (!(t.gift == b.gift) || frame == 0)
@@ -740,9 +755,11 @@ int main(int argc, char** argv)
             ScreenState before = app.screens.Current();
             ScreenState now = app.screens.Update(top, bottom);
             // The navigator ran before this frame's screen was known: a new screen (CONSOLE's, the
-            // game's when it reads) starts without the old menu and focus.
+            // game's when it reads) starts without the old menu and focus (a popup coming over the
+            // panel keeps its menu beneath: port/popup.h).
             const ScreenState consoleNow = app.ConsoleScreen();
-            if (!(consoleNow == consoleBefore) && !app.consolePinned && consoleNow.screen != Screen::Panel)
+            if (!(consoleNow == consoleBefore) && !app.consolePinned && consoleNow.screen != Screen::Panel &&
+                !(app.portSupported && PopupOver(consoleNow, app.game)))
             {
                 app.consoleMenu = false;
                 app.consoleFocus = -1;

@@ -23,7 +23,8 @@
   HD over the whole world (the speaker's name, the game's own words in large type, their
   portrait; A turns the page); popups and the games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
 - **HD where it counts.** The status bar, the conversations, the menu's five tabs (Interact,
-  Pockets, Goals, Relationships, Options), Give Gift and the save slots are redrawn sharp, in the game's own style, with its own icons, and in the game's language (the words come from your copy of the game; with another
+  Pockets, Goals, Relationships, Options), Give Gift, the save slots, the popups, the phone and
+  the notes are redrawn sharp, in the game's own style, with its own icons, and in the game's language (the words come from your copy of the game; with another
   version of it, the old pictures stay). Everything else is still the game's own picture.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
@@ -125,7 +126,10 @@ the bin turns green; moving away cancels). In Give Gift, A gives the highlighted
 Relationships, Up / Down move the game's own selection; in Options, Left / Right turn a volume
 up or down a notch, and A on Save opens the save slots (A saves into the highlighted one: an
 empty slot at once, a used one after the game asks, A yes, B no; B closes).
-**A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or B.
+The phone's Up / Down / A are the phone's own buttons (A on a row goes there and presses OK); B
+hangs up. **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or
+B; a question (Quit?) takes A for yes and B for no; when a popup opens over the menu, the menu
+comes back on the same row after it. A note closes on A or B.
 
 **The activities** are played on the buttons too, with a box of hints beside them:
 

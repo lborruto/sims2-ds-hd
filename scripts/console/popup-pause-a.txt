@@ -1,0 +1,2 @@
+# From B-pause (Game Paused over the panel), CONSOLE: A taps the HD popup's button (the game's X).
+20 2 pad a

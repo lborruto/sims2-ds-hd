@@ -90,6 +90,9 @@ struct PopupState
     std::string text, title;
     int pressed = -1;                 // button under the stylus (0 X / cross, 1 tick)
     bool pressing = false;
+    // The box as the game places it (P+0x544 its y when shown, P+0x550 its width in pixels,
+    // P+0x554 its height in 8-pixel tiles): where its buttons are (PopupButton).
+    int boxY = 0, boxW = 0, boxTiles = 0;
     bool operator==(const PopupState&) const = default;
 };
 
@@ -218,6 +221,25 @@ struct PhoneState
     int shownSlot = -1;               // page 3: the inbox slot shown
     int ringtone = -1;                // the current one, 0..6
     int contacts = 0, contactSim = -1;   // page 7: rows and the Sim under the highlight
+    int month = 0, day = 0;           // the header's date (G+0x47F4 / +0x47F8)
+    // Pages 1, 3, 6, 8, 9: the game's row of page 3's "Next Message" (1 + its text's lines), of
+    // the Exit of pages 1, 6, 8, 9 (the statics 0x0213E41C..0x0213E42C; stale off their page).
+    int textEnd = -1;
+    int maidCost = -1;                // page 5: "Call Maid - $@1" (the static 0x0213E430)
+    int reply = -1;                   // page 6 the maid's answer (S+0x862), page 8 the prank's (S+0x868): a string id
+    int caller = -1;                  // pages 8, 9: the Sim called (S+0x864); page 1: the caller (S+0x44)
+    // Page 9: the Sim's mood (R+0x1A) and place (R+0x4), or away (R+0x10 == 0 or place 0x21:
+    // "Sorry, @1, …").
+    int callMood = -1, callPlace = -1;
+    bool callAway = false;
+    bool prank = false;               // page 7 lists for a prank call (S+0x866)
+    // Page 7: the contacts in the game's order (the hotel's guests checked in, then the Sims met
+    // and in town), as worked out from the Sim records; empty when that list disagrees with the
+    // game's own count (S+0x86C) or highlighted Sim (S+0x870).
+    std::vector<int> contactList;
+    bool contactsKnown = false;       // contactList is the game's (it agreed)
+    InboxMsg incoming;                // page 1: the call's record (S+0x2C, the inbox entry's layout)
+    bool customTones = false;         // page 4: a recorded ringtone slot (its name is not decoded)
     bool operator==(const PhoneState&) const = default;
 };
 

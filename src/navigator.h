@@ -12,13 +12,20 @@
 //     scroll) and the list's scroll apply (those taps held by the gate like A's), X runs the
 //     focused item's own X (Pockets' bin) or the view's, B runs the view's back action or closes
 //     the menu.
-//   Phone: the focus as in the menu; B or MENU tap the phone's X (back to the panel, menu closed).
+//   Phone: in HD (port/phone.h) whenever its view is valid: the game's own Up / Down / A on its
+//     rows, B its X; else the focus as in the menu; B or MENU tap the phone's X (back to the
+//     panel, menu closed).
+//   A popup over the panel or an HD screen, a note: in HD (port/popup.h, port/note.h) whenever its
+//     view is valid (MenuView::own). A popup over the open menu wins the focus and keeps the menu
+//     open beneath; when it goes and the screen is back, the focus returns to the item it was on
+//     (the resume).
 //   Gift: in HD (port/gift.h) whenever its view is valid, as the HD menu (B its back: the X; no
 //     tabs); else, like Catalogue and Build: the focus as in the menu; B taps the screen's X
 //     when it has one.
 //   Social, Cards, Vacuum: the activity's own buttons (activities.h); the cards' focus moves as
 //     in the menu, the vacuum's hand is the stick cursor.
-//   Popup (a goal, tips, Game Paused): A or B tap its X; Start stays the DS's (it resumes a pause).
+//   Popup (a goal, tips, Game Paused) without its HD view: A or B tap its X; Start stays the DS's
+//     (it resumes a pause).
 //   Dialogue: every button is the DS's (A is the game's own "next").
 //   FrontEnd, CreateASim (from RAM), None: touch-only (the DS's buttons change nothing there),
 //     no table yet: as Unknown.
@@ -146,5 +153,11 @@ private:
     u64 viewHash_ = 0;
     std::vector<MenuStep> running_;
     int pendingDir_ = -1, pendingFrames_ = 0;
+    // A popup's view last frame; what was under it when it came (the screen, the menu open, the
+    // focused item's id and index), and a focus to put back once that screen's view is there.
+    bool popupUp_ = false, resumeMenu_ = false, resumeValid_ = false, restore_ = false;
+    ScreenState resumeScreen_;
+    u32 resumeId_ = 0;
+    int resumeIndex_ = -1, restoreFrames_ = 0;
 };
 }

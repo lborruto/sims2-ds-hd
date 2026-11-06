@@ -85,6 +85,7 @@ u64 MenuView::Hash() const
         MixText(h, it.xWord);
         Mix(h, it.xAsks);
         MixAction(h, it.xArm);
+        Mix(h, it.closes);
     }
     for (const MenuAction& a : buttons) MixAction(h, a);
     MixAction(h, back);
@@ -93,6 +94,8 @@ u64 MenuView::Hash() const
     Mix(h, (u64)(u32)scrollGroup);
     Mix(h, ((u64)(u32)initial << 32) | (u32)selected);
     MixText(h, title);
+    Mix(h, ((u64)own << 2) | ((u64)popup << 1) | (u64)backCloses);
+    Mix(h, passKeys);
     return h;
 }
 

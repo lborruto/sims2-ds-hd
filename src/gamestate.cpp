@@ -142,6 +142,25 @@ constexpr EUTable kEU = {
         3127,
     },
 };
+// Milestone 3's popups' boxes and the phone's pages (research m3-town §3.4, §4.1).
+struct EUExtra
+{
+    u32 popBoxY, popBoxW, popBoxTiles;                       // from P
+    u32 phMonth, phDay;                                      // from G
+    u32 phEnd8, phEnd1, phEnd6, phNext3, phEnd9, phMaidCost; // absolute statics
+    u32 phMaidText, phCaller, phPrank, phPrankText, phIncoming;   // from S
+    u32 guests, guestStride, guestSim, guestN, simState, simPlace, guestState, awayPlace, noSim;
+    u32 tones, toneStride, toneNamed, toneN;                 // from G
+};
+constexpr EUExtra kEUX = {
+    0x544, 0x550, 0x554,
+    0x47F4, 0x47F8,
+    0x0213E41C, 0x0213E420, 0x0213E424, 0x0213E428, 0x0213E42C, 0x0213E430,
+    0x862, 0x864, 0x866, 0x868, 0x2C,
+    0x2BC0, 8, 4, 5, 0x10, 0x4, 5, 0x21, 0x3F,
+    0x46DC, 0x40, 0xF, 3,
+};
+
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
 
 struct Reader
@@ -327,6 +346,10 @@ PopupState ReadPopup(const Reader& m, u32 P)
     if (!m.R8(P + kEU.popup, st) || st < 1 || st > 3 || !m.R32(P + t.popKind, kind) || (kind != 0 && kind != 2 && kind != 3)) return p;
     if (!m.R32(P + t.popPressed, pressed) || !m.R8(P + t.popPressing, pressing) || pressing > 1) return p;
     if (!ReadCString(m, P + t.popText, t.popTextMax, p.text) || !ReadCString(m, P + t.popTitle, t.popTitleMax, p.title)) return PopupState{};
+    u32 by, bw, bt;
+    if (!m.R32(P + kEUX.popBoxY, by) || !m.R32(P + kEUX.popBoxW, bw) || !m.R32(P + kEUX.popBoxTiles, bt)) return PopupState{};
+    // (Out of range: kept at 0, no button place: PopupButton says so.)
+    if (by < 192 && bw >= 32 && bw <= 256 && bt >= 1 && bt <= 24) { p.boxY = (int)by; p.boxW = (int)bw; p.boxTiles = (int)bt; }
     p.valid = true;
     p.state = (int)st; p.kind = (int)kind;
     p.pressed = (int)pressed; p.pressing = pressing != 0;
@@ -604,23 +627,107 @@ PhoneState ReadPhone(const Reader& m, u32 S)
     // These two fields hold stale values off their pages: checked and kept only on page 3 (slot, -1 after a delete) and page 7 (rows, Sim index or 0x3F).
     if (page == 3 && shown != 0xFF && shown >= q.inboxN) return v;
     if (page == 7 && (contacts > 64 || (csim >= t.maxSims && csim != 0x3F))) return v;
-    for (u32 i = 0; i < q.inboxN; i++)
-    {
-        const u32 e = G + q.inboxBase + q.inboxStride * i;
-        u32 present, read, text, sender;
-        if (!m.R8(e + q.inbPresent, present) || present > 1) return PhoneState{};
-        if (!present) continue;
-        if (!m.R8(e + q.inbRead, read) || read > 1 || !m.R32(e + q.inbText, text) || text >= q.stringMax || !m.R16(e + q.inbSender, sender) || sender >= t.maxSims) return PhoneState{};
-        InboxMsg b;
-        b.slot = (int)i; b.textId = (int)text; b.sender = (int)sender; b.senderNameId = (int)(kEU.simNameBase + sender); b.read = read == 1;
+    // An inbox entry's layout at e (also page 1's call record in S): false when it does not read.
+    auto entry = [&](u32 e, InboxMsg& b) {
+        u32 read, text, sender;
+        if (!m.R8(e + q.inbRead, read) || read > 1 || !m.R32(e + q.inbText, text) || text >= q.stringMax || !m.R16(e + q.inbSender, sender) || sender >= t.maxSims) return false;
+        b.textId = (int)text; b.sender = (int)sender; b.senderNameId = (int)(kEU.simNameBase + sender); b.read = read == 1;
         for (int a = 0; a < 4; a++)
         {
             u32 arg, num;
-            if (!m.R32(e + q.inbArgs + 4 * a, arg) || !m.R8(e + q.inbArgNum + a, num)) return PhoneState{};
+            if (!m.R32(e + q.inbArgs + 4 * a, arg) || !m.R8(e + q.inbArgNum + a, num)) return false;
             b.args[a] = arg; b.argNum[a] = (int)num;
         }
+        return true;
+    };
+    for (u32 i = 0; i < q.inboxN; i++)
+    {
+        const u32 e = G + q.inboxBase + q.inboxStride * i;
+        u32 present;
+        if (!m.R8(e + q.inbPresent, present) || present > 1) return PhoneState{};
+        if (!present) continue;
+        InboxMsg b;
+        if (!entry(e, b)) return PhoneState{};
+        b.slot = (int)i;
         v.inbox.push_back(b);
     }
+    u32 month, day;
+    if (!m.R32(G + kEUX.phMonth, month) || !m.R32(G + kEUX.phDay, day) || month < 1 || month > 12 || day < 1 || day > 31) return PhoneState{};
+    v.month = (int)month; v.day = (int)day;
+    // The page's own fields (each read on its page only: off it they are stale).
+    const u32 endOf[11] = {0, kEUX.phEnd1, 0, kEUX.phNext3, 0, 0, kEUX.phEnd6, 0, kEUX.phEnd8, kEUX.phEnd9, 0};
+    if (endOf[page])
+    {
+        u32 end;
+        if (!m.R8(endOf[page], end) || end < 1 || end > q.maxPhoneRow) return PhoneState{};
+        v.textEnd = (int)end;
+    }
+    if (page == 5)
+    {
+        u32 cost;
+        if (!m.R32(kEUX.phMaidCost, cost) || cost > 99999999) return PhoneState{};
+        v.maidCost = (int)cost;
+    }
+    if (page == 6 || page == 8)
+    {
+        u32 r;
+        if (page == 6 ? !m.R16(S + kEUX.phMaidText, r) : !m.R32(S + kEUX.phPrankText, r)) return PhoneState{};
+        if (r >= q.stringMax) return PhoneState{};
+        v.reply = (int)r;
+    }
+    auto simAt = [&](u32 k, u32 off, u32& out) { return m.R8(G + kEU.simRecords + kEU.simRecordSize * k + off, out); };
+    if (page == 8 || page == 9)
+    {
+        u32 k;
+        if (!m.R16(S + kEUX.phCaller, k) || k >= t.maxSims) return PhoneState{};
+        v.caller = (int)k;
+        if (page == 9)
+        {
+            u32 state, place, mood;
+            if (!simAt(k, kEUX.simState, state) || !simAt(k, kEUX.simPlace, place) || !simAt(k, t.simMood, mood) || mood > 4) return PhoneState{};
+            v.callAway = state == 0 || place == kEUX.awayPlace;
+            v.callMood = (int)mood; v.callPlace = (int)place;
+        }
+    }
+    if (page == 1)
+    {
+        if (!entry(S + kEUX.phIncoming, v.incoming)) return PhoneState{};
+        v.caller = v.incoming.sender;
+    }
+    if (page == 7)
+    {
+        u32 prank;
+        if (!m.R8(S + kEUX.phPrank, prank) || prank > 1) return PhoneState{};
+        v.prank = prank == 1;
+        // The game's list (0x0205B…): the hotel's guests whose record says checked in (state 5),
+        // then the Sims 0..23 met (flags bit 0) and not away (state 7, 8, 9). The game also asks
+        // one more function (0x02077E08) not decoded: the list is kept only when it agrees with
+        // the game's count and its highlighted Sim.
+        std::vector<int> list;
+        for (u32 j = 0; j < kEUX.guestN; j++)
+        {
+            u32 sim, state;
+            if (!m.R8(G + kEUX.guests + kEUX.guestStride * j + kEUX.guestSim, sim)) return PhoneState{};
+            if (sim == kEUX.noSim || sim >= t.maxSims) continue;
+            if (simAt(sim, kEUX.simState, state) && state == kEUX.guestState) list.push_back((int)sim);
+        }
+        for (u32 k = 0; k < 24; k++)
+        {
+            u32 flags, state;
+            if (!m.R8(G + kEU.simRecords + kEU.simRecordSize * k + t.simFlags, flags) || !simAt(k, kEUX.simState, state)) return PhoneState{};
+            if ((flags & 1) && (state < 7 || state > 9)) list.push_back((int)k);
+        }
+        const bool agrees = (int)list.size() == (int)contacts &&
+                            (row < (int)list.size() ? list[row] == (int)csim : row == (int)list.size() && csim == kEUX.noSim);
+        if (agrees) { v.contactList = list; v.contactsKnown = true; }
+    }
+    if (page == 4)
+        for (u32 j = 0; j < kEUX.toneN; j++)
+        {
+            u32 named;
+            if (!m.R8(G + kEUX.tones + kEUX.toneStride * j + kEUX.toneNamed, named)) return PhoneState{};
+            if (named) v.customTones = true;
+        }
     for (int i = 0; i < 4; i++)
     {
         u32 id;
@@ -735,16 +842,19 @@ GameState ReadGameState(RamView ram)
     {
         int t = m.S32(S + kEU.panelTab);
         g.tab = (t >= 0 && t < 5) ? t : -1;
-        if (pop >= 1 && pop <= 3) { g.screen = GScreen::Popup; break; }
-        if (g.tab == 1) { u32 k; if (m.R32(S + kEU.pocketsObj, k)) g.selection = m.S32(k + kEU.pocketsSel); g.town.pockets = ReadPockets(m, S); }
+        // The tab's lists are read under a popup too (the HD menu stays drawn beneath it), the
+        // selection only without one (the screen is the popup's then).
+        const bool popupUp = pop >= 1 && pop <= 3;
+        if (g.tab == 1) { u32 k; if (!popupUp && m.R32(S + kEU.pocketsObj, k)) g.selection = m.S32(k + kEU.pocketsSel); g.town.pockets = ReadPockets(m, S); }
         else if (g.tab == 3)
         {
             u32 k;
-            if (Obj(m, S + kEU.relObj, kEU.menus.vtRel, 0xB4, k)) g.selection = m.S32(k + kEU.relSel);
+            if (!popupUp && Obj(m, S + kEU.relObj, kEU.menus.vtRel, 0xB4, k)) g.selection = m.S32(k + kEU.relSel);
             g.town.relations = ReadRelations(m, S);
         }
         else if (g.tab == 0) g.town.interact = ReadInteract(m, S);
         else if (g.tab == 2) g.town.goals = ReadGoals(m, S);
+        if (popupUp) g.screen = GScreen::Popup;
         break;
     }
     case GScreen::Phone: g.selection = m.S8(S + kEU.phoneSel); g.page = m.S8(S + kEU.phonePage); g.town.phone = ReadPhone(m, S); break;

@@ -1126,7 +1126,7 @@ static void view_item_x_and_gift()
 
     const ScreenState gift {Screen::Gift, Tab::None};
     MenuView g;
-    g.valid = true;
+    g.valid = g.own = true; // (a screen of its own, as GiftMenuViewOf makes it)
     for (int i = 0; i < 6; i++)
     {
         ViewItem it;
@@ -1168,7 +1168,7 @@ static void view_save_slots_and_slider()
 {
     const ScreenState slots {Screen::SaveSlots, Tab::None};
     MenuView v;
-    v.valid = true;
+    v.valid = v.own = true; // (as SaveSlotsViewOf makes it)
     for (int i = 0; i < 3; i++)
     {
         ViewItem it;
@@ -1311,6 +1311,7 @@ static void view_selection_phone_and_no_replay()
 
     const ScreenState slots {Screen::SaveSlots, Tab::None};
     MenuView s = ListView(3, -1);
+    s.own = true;
     s.replay = false;
     Rig q;
     q.view = &s;
@@ -1326,6 +1327,109 @@ static void view_selection_phone_and_no_replay()
     q.Frame(slots, pa, false);
     q.Frame(slots, {}, true);
     CHECK(q.touch.Owns()); // (replayed where the view allows it)
+}
+
+// A popup over the open HD menu (port/popup.h): it wins the focus, the menu stays open beneath, A
+// taps its button and then waits (its closing), Start is passed on; when it goes and the panel
+// is back, the focus is on the row it was on. A popup over a screen of its own (the Save slots):
+// the same without a screen change. The phone's view: Up / Down its keys, B its X.
+static void view_popup_resume_and_phone()
+{
+    MenuView menu = ListView(4, -1);
+    MenuView pop;
+    pop.valid = pop.own = pop.popup = true;
+    ViewItem close;
+    close.rect = {490, 420, 300, 80};
+    close.action = {TapStep(132, 132)};
+    close.closes = true;
+    close.id = 0x700;
+    pop.items.push_back(close);
+    pop.back = close.action;
+    pop.backCloses = true;
+    pop.passKeys = 1u << kStart;
+    Rig r;
+    r.view = &menu;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::down);
+    r.Press(kInteract, &PadState::down);
+    CHECK(r.nav.MenuOpen() && r.nav.Focus() == 2);
+    r.view = &pop;
+    r.Frame(kPopup);
+    CHECK(r.nav.MenuOpen() && r.nav.Focus() == 0 && r.nav.ViewFocus());
+    PadState st;
+    st.start = true;
+    CHECK(r.Frame(kPopup, st) & (1u << kStart));
+    r.Frame(kPopup);
+    r.Press(kPopup, &PadState::a);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 132 && y == 132);
+    r.Drain();
+    r.Press(kPopup, &PadState::a); // (closing: the box slides away, a second tap would miss)
+    CHECK(!r.touch.Owns());
+    r.Press(kPopup, &PadState::b);
+    CHECK(!r.touch.Owns());
+    r.view = &menu;
+    r.Frame(kInteract);
+    CHECK(r.nav.MenuOpen() && r.nav.Focus() == 2);
+    // A popup over the closed panel: the menu stays closed after.
+    Rig c;
+    c.view = &menu;
+    c.Frame(kInteract);
+    c.view = &pop;
+    c.Frame(kPopup);
+    CHECK(!c.nav.MenuOpen() && c.nav.Focus() == 0);
+    c.view = &menu;
+    c.Frame(kInteract);
+    CHECK(!c.nav.MenuOpen());
+    // Over the Save slots (no screen change): back on the slot it was on.
+    MenuView slots = ListView(3, -1);
+    slots.own = true;
+    Rig s;
+    s.view = &slots;
+    s.Frame(kSaveSlots);
+    s.Press(kSaveSlots, &PadState::down);
+    CHECK(s.nav.Focus() == 1);
+    s.view = &pop;
+    s.Frame(kSaveSlots);
+    CHECK(s.nav.Focus() == 0);
+    s.Press(kSaveSlots, &PadState::b);
+    CHECK(s.Touched(x, y) && x == 132);
+    s.Drain();
+    s.view = &slots;
+    s.Frame(kSaveSlots);
+    CHECK(s.nav.Focus() == 1);
+    s.Press(kSaveSlots, &PadState::a); // (the popup went: no closing wait)
+    CHECK(s.touch.Owns());
+    // The phone: a selection the game owns, Up / Down its keys over frames, A keys then OK, B its X.
+    MenuView ph;
+    ph.valid = ph.own = true;
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {400, 150 + 48 * i, 480, 48};
+        it.group = 1;
+        it.id = 0x800 + (u32)i;
+        it.action = {KeysStep(1u << kA, 2)};
+        ph.items.push_back(it);
+    }
+    ph.scrollGroup = 1;
+    ph.selected = 0;
+    ph.scrollDown = {KeysStep(1u << kDown, 2), WaitStep(4)};
+    ph.back = {TapStep(237, 15)};
+    ph.backCloses = true;
+    Rig p;
+    p.view = &ph;
+    p.Frame(kPhone);
+    PadState d;
+    d.down = true;
+    CHECK(p.Frame(kPhone, d) & (1u << kDown));
+    CHECK(p.Frame(kPhone) & (1u << kDown));
+    CHECK(!(p.Frame(kPhone) & (1u << kDown)));
+    CHECK(p.nav.Focus() == 0);
+    for (int i = 0; i < 6; i++) p.Frame(kPhone); // (its wait)
+    p.Press(kPhone, &PadState::b);
+    CHECK(p.Touched(x, y) && x == 237 && y == 15);
 }
 
 int main()
@@ -1362,6 +1466,7 @@ int main()
     view_item_left_right();
     view_item_x_and_gift();
     view_item_x_asks();
+    view_popup_resume_and_phone();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

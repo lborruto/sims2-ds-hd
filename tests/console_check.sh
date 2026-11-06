@@ -68,11 +68,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*) cp "$complete_save" "$save" || return ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*) cp "$complete_save" "$save" ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -120,11 +120,19 @@ run rel-menu-wide B-cas-rel "${late[@]}" --console-menu --console-focus 0 --wide
 run opt-menu B-cas-opt "${late[@]}" --console-menu --console-focus 2 &
 run slots-hd B-cas-opt-save "${late[@]}" --console-focus 2 &
 wait
+run popup-goal s6 "${town[@]}" --console-focus 0 &
+run popup-pause B-pause "${town[@]}" --console-focus 0 &
+run popup-quit B-ch-opt-quit "${town[@]}" --console-focus 0 &
+run popup-menu B-cas-opt "${late[@]}" --console-menu --console-focus 0 --input "$repo/scripts/console/popup-quit-no.txt" &
+run phone-msg C-cas-msg1 "${late[@]}" --console-focus 0 &
+run phone-contacts C-cas-pb1 "${late[@]}" --console-focus 0 &
+run phone-wide C-cas-msgs "${late[@]}" --console-focus 0 --wide &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
-    goals-menu rel-menu rel-menu-wide opt-menu slots-hd; do
+    goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -327,6 +335,50 @@ def hd_menu(rows, focus, wide=False):
             r, g, b = w(cx, cy)
             expect(f"dimmed world at {cx},{cy}", C(cx, cy), tuple(v * (255 - 0x8C) // 255 for v in (r, g, b)))
 
+INK, LCD, BAR = hexrgb("203020"), hexrgb("9AB29A"), hexrgb("384838")
+
+def not_big():
+    if C(256 + 3 * 120 + 1, 72 + 3 * 100 + 1) == bottom(120, 100) and C(256 + 3 * 30 + 1, 72 + 3 * 160 + 1) == bottom(30, 160):
+        errors.append("the touch screen 3x is drawn")
+
+def hd_phone(y, wide=False):
+    """The phone in HD (src/port/phone.*): the panel, the LCD's green, the game's highlight (a dark
+    bar with the focus's green halo) across canvas row `y` (None: no focus drawn), the rows'
+    letters, never the touch screen 3x."""
+    expect("phone outline", C(350, 300), OUTLINE)
+    expect("phone body", C(360, 300), FRAME)
+    expect("LCD", C(420, 500), LCD)
+    if y is not None:
+        expect("highlight bar", C(410, y), BAR)
+        r, g, b = C(393, y)
+        if not (g > r + 80 and g > b + 60):
+            errors.append(f"no focus halo at {y}")
+    if INK not in [C(x, yy) for yy in range(152, 500) for x in range(500, 780)]:
+        errors.append("no row letters")
+    not_big()
+
+def hd_popup(kind, title, menu):
+    """A popup in HD: its outline and fill, the text's well with white letters, the title plate,
+    the buttons (kind 0: Close focused; kind 2: No plain, Yes focused)."""
+    expect("popup outline", C(300, 350), OUTLINE)
+    expect("popup fill", C(310, 350), FRAME)
+    expect("popup well", C(340, 300), WELL)
+    if (255, 255, 255) not in [C(x, y) for y in range(240, 380) for x in range(360, 920)]:
+        errors.append("no popup text")
+    if title:
+        expect("title plate", C(450, 170), hexrgb("6171B2"))
+    if kind == 0:
+        r, g, b = C(477, 448)
+        if not (g > r + 60 and g > b + 40): errors.append("no focus ring around Close")
+    else:
+        expect("No", C(400, 448), WELL)
+        r, g, b = C(670, 448)
+        if not (g > r + 60 and g > b + 40): errors.append("no focus ring around Yes")
+    if menu:
+        r, g, b = C(190, 300)
+        if not b > r + 30: errors.append("no HD menu beneath")
+    not_big()
+
 if case == "cityhall":
     expect("canvas", comp.size, (1280, 720))
     rail()
@@ -344,7 +396,7 @@ elif case == "cityhall-wide":
     expect("rail outline", C(1170, 360), OUTLINE)
     status_bar(left=16)
 elif case == "s7":
-    big_over_dim()
+    hd_phone(None)
     status_bar()
 elif case == "cityhall-menu":
     # City Hall: no target (the plumbob; the title "Interact" alone), no row, the focus on the phone.
@@ -370,11 +422,25 @@ elif case in ("casino", "casino-2x"):
         status_bar(values)
         rail()
 elif case == "s7-menu":
-    big_over_dim()
-    # The ring around the phone's first button (up: x 12-79, y 140-189), 4 pixels outside it.
-    expect("focus ring left", C(256 + 36 - 2, 72 + 420 + 75), RING)
-    expect("focus ring top", C(256 + 36 + 100, 72 + 420 - 3), RING)
-    expect("inside the ring", C(256 + 36 + 1, 72 + 420 + 75), bottom(12, 165))
+    # --console-focus 0: the HD phone's first row (the game's own highlight).
+    hd_phone(176)
+elif case in ("phone-msg", "phone-wide", "phone-contacts"):
+    # A message (its sender, its text, then Next / Delete / Exit: the highlight on Next, the
+    # game's being on the sender); the messages' list; the contacts (7 rows of 23 shown).
+    hd_phone(380 if case == "phone-msg" else 176, wide=case == "phone-wide")
+    if case == "phone-msg":
+        text = [C(x, y) for y in range(210, 400) for x in range(410, 870)]
+        if INK not in text:
+            errors.append("no message text")
+    if case == "phone-contacts":
+        bar = [C(x, y) for y in range(150, 490) for x in range(892, 898)]
+        if not any(abs(p[0] - p[2]) > 30 for p in bar):
+            errors.append("no scroll bar")
+elif case in ("popup-goal", "popup-pause", "popup-quit", "popup-menu"):
+    # The game's popup in HD (src/port/popup.*): the box, its text white in the well, its title
+    # plate (Game Paused), its button(s): one focused "Close" (A / B) or No / Yes with Yes focused;
+    # over the HD Options menu for popup-menu (dimmed under the veil).
+    hd_popup(2 if case in ("popup-quit", "popup-menu") else 0, case == "popup-pause", case == "popup-menu")
 elif case in ("gift", "gift-items", "gift-items-2x", "gift-items-wide"):
     # Give Item in HD (src/port/gift.*): the panel, the title's well, the recipient's portrait as
     # the touch screen's own pixels 3x (DS 167,47 65 x 81), the bow the game's sprite; never the touch screen 3x.
@@ -597,6 +663,11 @@ pad_late pad-save B-cas-opt options-save 330 &
 pad pad-slot B-st-opt-save saveslots-save 300 &
 pad_late pad-ask-no B-cas-opt-save saveslots-ask-no 200 &
 pad_late pad-ask-yes B-cas-opt-save saveslots-ask-yes 200 &
+pad pad-pause-a B-pause popup-pause-a 120 &
+pad pad-pause-start B-pause popup-pause-start 120 &
+pad_late pad-quit-no B-cas-opt popup-quit-no 260 &
+pad pad-phone s7 phone-pages 380 &
+pad_late pad-phone-msg C-cas-msg1 phone-message 160 &
 pad pad-tabs s7 tabs 320 &
 pad pad-popup s6 popup 120 &
 pad pad-opening s6 popup-opening 200 &
@@ -700,12 +771,33 @@ check_pad pad-slot slot_save
 # Jun's slot → "Overwrite this save?" (kind 2), the HD focus on its Yes; B → its cross, the
 # question gone, nothing saved; A, A → its tick, "Saving", slot 3 written (Jun's money now).
 ask_no() {
-    in_order pad-ask-no 'saves current=2 .*2=Jun/9150/' 'console menu closed, focus 2' 'popup state=1 kind=2 .*Overwrite' 'focus 3' 'popup none' || return 1
+    in_order pad-ask-no 'saves current=2 .*2=Jun/9150/' 'console menu closed, focus 2' 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup none' || return 1
     if grep -q -E 'kind=3|2=Jun/14843' "$tmp/pad-ask-no.log"; then echo "  pad-ask-no: saved after B"; return 1; fi
 }
-ask_yes() { in_order pad-ask-yes 'popup state=1 kind=2 .*Overwrite' 'focus 3' 'popup state=1 kind=3' 'saves current=2 .*2=Jun/14843/'; }
+ask_yes() { in_order pad-ask-yes 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup state=1 kind=3' 'saves current=2 .*2=Jun/14843/'; }
 check_pad pad-ask-no ask_no
 check_pad pad-ask-yes ask_yes
+# Popups, the phone (src/port/popup.*, phone.*): from B-pause, A (the HD popup's button: the
+# game's X) or Start (passed on) → the panel; from B-cas-opt, MENU, Right, A → the game's quit
+# question over the open HD menu, B → its cross: the menu open again on Quit (focus 1), never the
+# title; from s7, Down, A → the phonebook (page 5), A → the contacts (7), A → the call's answer
+# (9, the Sim), A → the game's Down five times to Exit, then its A (back to 7), B → the panel; from
+# C-cas-msg1, A → ten Downs past the text to "Next Message", then A: the next message (slot 1).
+pause_a() { in_order pad-pause-a 'popup state=2 kind=0 .*Game Paused' 'popup state=3' 'game Panel/Interact'; }
+pause_start() { in_order pad-pause-start 'popup state=2 kind=0' 'popup state=3' 'game Panel/Interact'; }
+quit_no() {
+    in_order pad-quit-no 'console menu open, focus 1' 'popup state=1 kind=2 .*Quit' 'popup state=3' 'game Panel/Options' 'console menu open, focus 1' || return 1
+    if grep -q -E 'game FrontEnd|console menu closed' "$tmp/pad-quit-no.log"; then echo "  pad-quit-no: the menu closed or the game quit"; return 1; fi
+}
+phone_pages() {
+    in_order pad-phone 'phone page=0 row=1' 'phone page=5' 'phone page=7 .*list=22' 'phone page=9 .*caller=22' 'phone page=9 row=5' 'phone page=7' 'game Panel/Interact'
+}
+phone_msg() { in_order pad-phone-msg 'phone page=3 row=0 .*shown=0' 'phone page=3 row=10 ' 'phone page=3 row=0 .*shown=1'; }
+check_pad pad-pause-a pause_a
+check_pad pad-pause-start pause_start
+check_pad pad-quit-no quit_no
+check_pad pad-phone phone_pages
+check_pad pad-phone-msg phone_msg
 
 # The activities on buttons (src/activities.*): act NAME STATE SCRIPT FRAMES SHOTS CLOCK, a
 # CONSOLE run with --print-screen and shots of the two screens at SHOTS (NAME/f*.png).

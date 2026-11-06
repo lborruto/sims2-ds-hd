@@ -51,6 +51,7 @@ MenuView GiftMenuViewOf(ScreenState s, const GameState& game, const RomData* rom
     }
     v.back = {TapStep(kGiftCloseX, kGiftCloseY)};
     v.initial = g.slot;
+    v.own = true;
     v.valid = true;
     return v;
 }

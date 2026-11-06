@@ -67,6 +67,9 @@ struct ViewItem
     // The word A's hint shows while it has the focus (the game's own, e.g. the row's verb); empty:
     // the chip alone.
     std::string word;
+    // A performs a tap that closes the screen (a popup's X): A and B then wait for the screen to
+    // change (the navigator's closing wait), as after the phone's X.
+    bool closes = false;
 };
 
 // Screen-wide buttons (not the focused item's).
@@ -97,6 +100,16 @@ struct MenuView
     // A press the gate held while the game was not settled is replayed once it settles (true), or
     // dropped (false: a screen where a late tap would do harm, the Save slots).
     bool replay = true;
+    // A screen of its own (Give Gift, the Save slots, the phone, a popup, a note): the navigator
+    // takes it as a focus screen whatever the screen state says (the panel's menu: only while open).
+    bool own = false;
+    // A popup over the screen (port/popup.h): it wins the focus, and when it goes the screen under
+    // it comes back as it was (the panel's menu open on the same row: the navigator's resume).
+    bool popup = false;
+    // B (`back`) closes the screen (the phone's X, a popup's): A and B then wait as after `closes`.
+    bool backCloses = false;
+    // DS buttons passed on while held (Game Paused's Start), whatever the focus.
+    u32 passKeys = 0;
     // (Drawing only, not hashed: set by CONSOLE from the navigator) the id of the item whose X is
     // armed (xAsks), 0 none.
     u32 armed = 0;
