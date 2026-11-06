@@ -497,9 +497,18 @@ static void cards_quit_question()
     CHECK(r.Touched(x, y));
     CHECK(x == HotspotsFor(kCards)[Index(kCards, "deck")].x);
     r.Drain();
-    // B, then A: yes (the tick).
+    // B, then A: no (the question opens on its safe answer: A A never quits).
     r.Press(kCards, &PadState::b);
     r.Drain();
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y));
+    CHECK(x == kCardsQuitNo.x && y == kCardsQuitNo.y);
+    r.Drain();
+    // B, Right, A: yes (the tick).
+    r.Press(kCards, &PadState::b);
+    r.Drain();
+    r.Press(kCards, &PadState::right);
+    CHECK(!r.touch.Owns());
     r.Press(kCards, &PadState::a);
     CHECK(r.Touched(x, y));
     CHECK(x == kCardsQuitYes.x && y == kCardsQuitYes.y);
@@ -931,6 +940,10 @@ static void moogoo_scheme()
     ram.mooGooQuitAsk = true;
     q.nav.SetActivityRam(ram);
     q.Frame(kMooGoo);
+    q.Press(kMooGoo, &PadState::a);   // (No first: the safe answer)
+    CHECK(q.Touched(x, y) && x == kMooGooNo.x && y == kMooGooNo.y);
+    q.Drain();
+    q.Press(kMooGoo, &PadState::right);
     q.Press(kMooGoo, &PadState::a);
     CHECK(q.Touched(x, y) && x == kMooGooYes.x && y == kMooGooYes.y);
     q.Drain();
@@ -1312,6 +1325,8 @@ static void mixer_scheme()
     // The save question and help.
     ram.mixerPhase = 0xA;
     r.nav.SetActivityRam(ram);
+    CHECK(tapped(&PadState::a, kMixNo));    // (No first: the safe answer)
+    r.Press(kMixer, &PadState::right);
     CHECK(tapped(&PadState::a, kMixYes));
     CHECK(tapped(&PadState::b, kMixNo));
     CHECK(tapped(&PadState::x, kMixPreview));
@@ -1429,6 +1444,8 @@ static void art_scheme()
     ram.ask = true;
     r.nav.SetActivityRam(ram);
     r.Frame(kArt);
+    CHECK(tapped(&PadState::a, ram.askNo));   // (No first: the safe answer)
+    r.Press(kArt, &PadState::right);
     CHECK(tapped(&PadState::a, ram.askYes));
     CHECK(tapped(&PadState::b, ram.askNo));
     PadState a;

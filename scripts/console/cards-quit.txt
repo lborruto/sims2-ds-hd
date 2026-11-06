@@ -1,4 +1,5 @@
-# From act-cards, CONSOLE: B taps the quit button (the game asks first), A answers yes: back to
-# the casino through a black load.
+# From act-cards, CONSOLE: B taps the quit button (the game asks first), Right then A answer yes (the
+# question opens on No): back to the casino through a black load.
 20 2 pad b
+70 2 pad right
 80 2 pad a

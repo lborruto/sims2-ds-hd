@@ -1,3 +1,4 @@
-# From G-B-mg-r1-full (the player's bet): B asks the game's question, A its Yes.
+# From G-B-mg-r1-full (the player's bet): B asks the game's question, Right and A its Yes (it opens on No).
 20 2 pad b
+50 2 pad right
 60 2 pad a

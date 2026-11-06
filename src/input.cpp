@@ -320,7 +320,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         app.consoleArmed = navigator.Armed();
         app.consolePictureClosed = navigator.PictureClosed();
         app.consolePointer = {navigator.PointerShown(), navigator.PointerDown(), navigator.QuitArmed(), navigator.PointerX(), navigator.PointerY(),
-                              navigator.Mark()};
+                              navigator.Mark(), navigator.AskFocus()};
         // The money's last change, shown on the panel's world for kPayoutFrames frames (an
         // animation's payout: the slot machine's coin then its win; a ticket's prize).
         // (Only on the panel and the activities: the front end, Create-a-Sim and a load show another save's money.)

@@ -1287,7 +1287,11 @@ static void cards_and_vacuum()
     CardsState k = g.minigame.cards;
     CHECK(g.screen == GScreen::Cards && k.valid && k.deck == 39 && k.total == 60 && k.hand == 9 && k.opponent == 5 && k.score == -10 && k.opponentScore == 30 &&
           k.treasure == 10 && k.name == "Jun" && !k.box && !k.message && !k.quitAsk);
-    CHECK(MinigameLine(g) == "cards deck=39/60 hand=9 opponent=5 score=-10,30 treasure=10 box=0 message=0 quit=0 name=\"Jun\"");
+    CHECK(MinigameLine(g) == "cards deck=39/60 hand=9 opponent=5 score=-10,30 treasure=10 box=0 message=0 quit=0 phase=0 turn=0 name=\"Jun\"");
+    // The turn: its step and whose it is (the opponent's play: "Other Player's Turn").
+    { Ram q = r; q.W8(kS + 0x2F0, 1); q.W8(kS + 0x2F1, 1); k = ReadGameState(q.View()).minigame.cards; CHECK(k.valid && k.phase == 1 && k.turn == 1); }
+    { Ram q = r; q.W8(kS + 0x2F0, 16); CHECK(!ReadGameState(q.View()).minigame.cards.valid); }
+    { Ram q = r; q.W8(kS + 0x2F1, 2); CHECK(!ReadGameState(q.View()).minigame.cards.valid); }
     r.W8(kS + 0x306, 1); r.W8(kS + 0x307, 1);
     k = ReadGameState(r.View()).minigame.cards;
     CHECK(k.valid && k.box && k.quitAsk && !k.message);

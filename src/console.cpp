@@ -287,6 +287,14 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         SortUi(c.ui); // (the bar's layer after the screen's, a popup's after it, the images last)
         return c;     // (the focus is the view's: no ring from HotspotsFor)
     }
+    else if (s.screen == Screen::Unknown && !menuOpen && game && (game->valid || game->between) && rom && rom->StringCount() > 0 &&
+             (game->between || game->screen == GScreen::Panel || game->vtable == 0))
+    {
+        // The panel coming (its tab not read yet) or no bottom object at all (between two, after a
+        // minigame): the town's world (and bar when it reads), never the cursor's framed black touch screen.
+        c.pieces.push_back(World(topW, worldRows, bar));
+        if (bar) AddStatusBar(c, *hud, *strings);
+    }
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {
         // The world dimmed behind the touch screen: not playable, the mouse does nothing there.
@@ -308,7 +316,9 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     else if (s.screen == Screen::Panel)
     {
         c.pieces.push_back(World(topW, worldRows, bar));
-        if (ConsoleView(s, game, rom).valid)
+        // (The HD town whenever RAM and the game's strings read: a frame whose tab does not read yet,
+        // the panel coming back from a minigame, never flashes milestone 1's rail.)
+        if (ConsoleView(s, game, rom).valid || (game && game->valid && rom && rom->StringCount() > 0 && bar))
         {
             // The HD menu has the tabs: no rail. A small kit panel level with the status bar says
             // how to open it: the TOUCH MENU's button as the device used last prints it (the pad's
@@ -384,7 +394,9 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         }
         if (hudHere) AddStatusBar(c, *hud, *strings, topTo.x - 6, topTo.y + topTo.h + kActivityBarGap, topTo.w + 12);
     }
-    AddRing(c, s, focus);
+    // (The cards' focus only while the player's turn takes a card: never on the opponent's hand.)
+    const CardsState* k = game && s.screen == Screen::Cards && game->minigame.cards.valid ? &game->minigame.cards : nullptr;
+    if (!k || (k->turn == 0 && k->phase <= 2)) AddRing(c, s, focus);
     return c;
 }
 }

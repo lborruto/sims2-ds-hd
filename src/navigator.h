@@ -140,6 +140,7 @@ public:
     float PointerY() const { return activity_.py; }
     // MooGoo's focus on the playfield (DS pixels; w 0 none).
     Rect Mark() const { return activity_.mark; }
+    int AskFocus() const { return activity_.askOpen ? activity_.askFocus : -1; }
     // The autopsy's or the lottery's quit asked once (a second B / Start quits); the mixer's save
     // page asking before it saves over a slot.
     bool QuitArmed() const { return activity_.quitArmed > 0 || activity_.armedSlot >= 0; }

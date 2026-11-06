@@ -153,6 +153,7 @@ struct EUTable
         // Keelhaulin' Cards (u16 total and deck; the hands' slots {+0 flags, +4 card pointer, ...}; u8 flags; the name's bytes)
         u32 cdTotal, cdDeck, cdHand, cdOpponent, cdSlotStride, cdCardFrom, cdCardTo, cdBox, cdMessage, cdQuitAsk, cdName, cdNameMax, cdSize;
         u32 cdScore, cdOppScore, cdTreasure, cdScoreMax;   // s32 each
+        u32 cdPhase, cdTurn;   // u8: the turn's step (the top screen's line), whose turn (0 the player, 1 the opponent)
         // The vacuum (u8 clog; the earnings are the stat panel's hotel.stVacuum, from G)
         u32 vcClog, vcSize;
     } mg;
@@ -297,6 +298,7 @@ constexpr EUTable kEU = {
         0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40, 0x650, 0xC68, 0xC60, 0xC64,
         0x4C, 0x4E, 0xC0, 0x188, 0x14, 0x200, 0x300, 0x306, 0x2F7, 0x307, 0x308, 8, 1000,
         0x2CC, 0x2D0, 0x2E4, 9999,
+        0x2F0, 0x2F1,
         0x158, 0x194,
     },
     {
@@ -1588,6 +1590,9 @@ CardsState ReadCards(const Reader& m, u32 S)
     const int score = m.S32(S + q.cdScore), opp = m.S32(S + q.cdOppScore), chest = m.S32(S + q.cdTreasure), lim = (int)q.cdScoreMax;
     if (score < -lim || score > lim || opp < -lim || opp > lim || chest < 0 || chest > lim) return CardsState{};
     v.score = score; v.opponentScore = opp; v.treasure = chest;
+    u32 phase, turn;
+    if (!m.R8(S + q.cdPhase, phase) || phase > 15 || !m.R8(S + q.cdTurn, turn) || turn > 1) return CardsState{};
+    v.phase = (int)phase; v.turn = (int)turn;
     v.total = (int)total; v.deck = (int)deck; v.box = box == 1; v.message = msg == 1; v.quitAsk = ask == 1;
     v.valid = true;
     return v;
@@ -2045,14 +2050,14 @@ std::string MinigameLine(const GameState& g)
         const DrencherState& v = a.drencher;
         if (!v.valid) return "";
         snprintf(b, sizeof b, "drencher pump=%d target=%d/%d pumping=%d firing=%d targetmode=%d help=%d%d water=%d pressure=%d", v.pump, v.target, v.targetType, v.pumping, v.firing, v.targetMode, v.help, v.helpText, v.water, v.pressure);
-        return b;
+        return v.helpId >= 0 ? std::string(b) + " helpid=" + n(v.helpId) : std::string(b);
     }
     case GScreen::Crime:
     {
         const CrimeState& v = a.crime;
         if (!v.valid) return "";
         snprintf(b, sizeof b, "crime help=%d text=%d drag=%d phase=%d angle=%d scare=%d armed=%d subdue=%d down=%d%d hit=%d", v.help, v.helpText, v.dragging, v.phase, v.angle, v.canScare, v.armed, v.canSubdue, v.scarePressed, v.subduePressed, v.hit);
-        return b;
+        return v.helpId >= 0 ? std::string(b) + " helpid=" + n(v.helpId) : std::string(b);
     }
     case GScreen::Mixer:
     {
@@ -2062,7 +2067,7 @@ std::string MinigameLine(const GameState& g)
         for (int s : v.unlocked) u.push_back(n(s));
         snprintf(b, sizeof b, "mixer mode=%d phase=%d tracks=0x%02x keys=%d,%d,%d octave=%d instrument=%d sustain=%d sliders=%d,%d tempo=%d variation=%d song=%d events=%d/%d prep=%d preview=%d micfull=%d unlocked=%s", v.mode, v.phase, v.tracks,
                  v.keys[0], v.keys[1], v.keys[2], v.octave, v.instrument, v.sustain, v.sliderA, v.sliderB, v.tempo, v.variation, v.song, v.controlEvents, v.noteEvents, v.prep, v.previewing, v.micFull, join(u).c_str());
-        return b;
+        return v.helpId >= 0 ? std::string(b) + " helpid=" + n(v.helpId) : std::string(b);
     }
     case GScreen::MixerSave:
     {
@@ -2077,7 +2082,7 @@ std::string MinigameLine(const GameState& g)
     {
         const CardsState& v = a.cards;
         if (!v.valid) return "";
-        snprintf(b, sizeof b, "cards deck=%d/%d hand=%d opponent=%d score=%d,%d treasure=%d box=%d message=%d quit=%d name=\"%s\"", v.deck, v.total, v.hand, v.opponent, v.score, v.opponentScore, v.treasure, v.box, v.message, v.quitAsk, TextEsc(v.name).c_str());
+        snprintf(b, sizeof b, "cards deck=%d/%d hand=%d opponent=%d score=%d,%d treasure=%d box=%d message=%d quit=%d phase=%d turn=%d name=\"%s\"", v.deck, v.total, v.hand, v.opponent, v.score, v.opponentScore, v.treasure, v.box, v.message, v.quitAsk, v.phase, v.turn, TextEsc(v.name).c_str());
         return b;
     }
     case GScreen::Vacuum:

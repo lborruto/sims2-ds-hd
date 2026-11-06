@@ -185,6 +185,15 @@ PhonePage PhonePageOf(const GameState& game, const RomData& rom)
     return pg;
 }
 
+// The row B goes back one level by (the page's Exit, the game's own way up: a message to the list,
+// the ringtones / phonebook / list to the menu, the contacts to the phonebook, an answer to the
+// contacts), -1 none (the menu: B hangs up; the game's own LCD; no page).
+static int PhoneBackRow(const PhonePage& pg, int page, const RomData& rom)
+{
+    if (page == 0 || page == 10 || !pg.valid || pg.crop || pg.rows.empty()) return -1;
+    return pg.rows.back().text == MenuWords(rom, kStrPhExit) ? pg.rows.back().row : -1;
+}
+
 MenuView PhoneView(ScreenState s, const GameState* game, const RomData* rom)
 {
     if (!game || !rom || rom->StringCount() <= kStrPhDate) return {};
@@ -238,8 +247,17 @@ MenuView PhoneViewOf(ScreenState s, const GameState& game, const RomData* rom)
         if (sel > 0) v.scrollUp = Presses(ph.row, pg.rows[sel - 1].row);
         if (sel + 1 < (int)pg.rows.size()) v.scrollDown = Presses(ph.row, pg.rows[sel + 1].row);
     }
-    v.back = {TapStep(kPhoneClose.x, kPhoneClose.y)};
-    v.backCloses = true;
+    if (const int back = PhoneBackRow(pg, ph.page, *rom); back >= 0)
+    {
+        // B back one level: the game's highlight to Exit, then its A (as A on Exit).
+        v.back = Presses(ph.row, back);
+        v.back.push_back(ok);
+    }
+    else
+    {
+        v.back = {TapStep(kPhoneClose.x, kPhoneClose.y)};
+        v.backCloses = true;
+    }
     v.title = MenuWords(*rom, kStrPhone);
     v.own = true;
     v.valid = true;
@@ -363,7 +381,7 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
     {
         const Rect hb {kPhPanel.x + 24, kPhPanel.y + kPhPanel.h - 46, kPhPanel.w - 48, 36};
         std::vector<std::pair<Button, std::string>> hs = {{Button::DPadV, ""}, {Button::A, MenuFocusable(v, focus) ? FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, 270, Weight::ExtraBold).text : ""},
-                                                          {Button::B, MenuWords(rom, kStrClose)}};
+                                                          {Button::B, MenuWords(rom, v.backCloses ? kStrClose : kStrPhExit)}};
         int total = 0;
         std::vector<Rect> rs;
         for (auto& [b, w] : hs) { rs.push_back(ChipRect(0, 0, b, w, kPmHintSize, 0, Weight::ExtraBold)); total += rs.back().w; }

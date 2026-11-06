@@ -62,6 +62,8 @@ enum class OwnWordId : int
     // The menus: a shop cell's A (it selects; Pay buys), the bin armed (X again throws the item
     // away), an empty Goals / Interact tab.
     Select, TrashAgain, NoGoals, NoActions,
+    // MooGoo's line for a bet (the game's says "Touch a Monkey!").
+    MooGooBetLine,
     Count
 };
 

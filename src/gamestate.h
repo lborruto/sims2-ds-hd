@@ -598,6 +598,7 @@ struct DrencherState
     bool pumping = false, firing = false;
     bool targetMode = false;          // the target button is lit
     bool help = false, helpText = false;   // help mode / a help text is up (the next tap closes it)
+    int helpId = -1;                  // the text up (1661..1666), not in RAM: main.cpp fills it from the stylus's last point down (MinigameHelpAt)
     int water = 0;                    // the tank, whole units of 100 (G)
     int pressure = 0;                 // the pressure, whole units of 125 (G)
     bool operator==(const DrencherState&) const = default;
@@ -609,6 +610,7 @@ struct CrimeState
     bool valid = false;
     bool help = false;                // help mode
     bool helpText = false;            // a help text is up (S+0x4D: the next press closes it)
+    int helpId = -1;                  // the text up (1667..1669): main.cpp's, from the stylus's last point down (MinigameHelpAt)
     bool dragging = false;            // the aim slider is held
     int phase = 0;                    // the throw: 0 idle, 1 grabbed, 2 aiming, 3 released
     int angle = 0;                    // -90..90 degrees
@@ -627,6 +629,7 @@ struct MixerState
     bool valid = false;
     int mode = 0;                     // 0 song, 1 ringtone, 2 resumed from the save menu
     int phase = 0;                    // 0 idle, 1 playing, 2 recording, 5 VOX (microphone) recording, 7 song select, 8 help, 9 a help text, 0xA the save prompt
+    int helpId = -1;                  // phase 9's text: its title 1778 + 2h (the body the next id), main.cpp's from the stylus's last point down (MinigameHelpAt)
     int tracks = 0xFF;                // bit t: track t+1 is audible
     int keys[kMixerKeys] = {-1, -1, -1};   // the keys held (0..12 C4..C5: note 60 + key + 12 * octave), -1 none
     int octave = 0;                   // -1..1
@@ -687,6 +690,11 @@ struct CardsState
     bool message = false;             // the "End of Turn. Touch for @1's turn." message (any touch goes on)
     bool quitAsk = false;             // "Are you sure you want to quit?" (its tick and cross: kCardsQuitYes / No)
     std::string name;                 // the player's name as the board shows it (ASCII; empty: unreadable)
+    // The turn (S+0x2F0, S+0x2F1): its step, the top screen's line (0 "Draw a card!" 1673, 1 "Play your
+    // cards or discard!" 1674, 2 "Discard a card!", 3 "Walkin' the plank!", 4 "Firing the cannon!", 5
+    // "Drawing two cards!", 6 the end of a turn ("Switching Players"), 8 a card drawn ("Drawing Card");
+    // measured), and whose turn it is (0 the player, 1 the opponent: "Other Player's Turn").
+    int phase = 0, turn = 0;
     bool operator==(const CardsState&) const = default;
 };
 
@@ -713,6 +721,9 @@ struct MinigameState
     MixerState mixer;
     MixerSaveState mixerSave;
     ArtState art;
+    // Not RAM's: main.cpp's copy of the game's popup on the frame after it went over a minigame (its
+    // box is still in the touch screen that frame: the HD box stays over it), else not valid.
+    PopupState popupGone;
     bool operator==(const MinigameState&) const = default;
 };
 

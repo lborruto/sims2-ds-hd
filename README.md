@@ -188,11 +188,11 @@ and A (Left / Right past the edge show more, as the game's arrows do). On the la
 aspiration, then A on the tick starts the game; A on the cross goes back to the title (B first
 moves to the cross, B again presses it: one stray B never throws your Sim away).
 The phone's Up / Down / A are the phone's own buttons (A on a row goes there and presses OK); B
-hangs up. **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or
+goes back one page (a message to the list, the ringtones to the menu) and hangs up from the menu. **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or
 B; a question (Quit? Overwrite this save?) opens on No (Right then A for yes; B is always no); when a popup opens over the menu, the menu
 comes back on the same row after it. A note closes on A or B.
 
-**The activities** are all played on the buttons, each in its own HD frame with the buttons' hints in a bar below (they follow what the game asks):
+**The activities** are all played on the buttons, each in its own HD frame with the buttons' hints in a bar below (they follow what the game asks). Their messages (a win, the end of a turn, a help text) and questions are HD boxes too; a question opens on No (Right then A for yes, B is always no):
 
 | Activity | Key | Controller | Does |
 |---|---|---|---|
@@ -202,7 +202,7 @@ comes back on the same row after it. A note closes on A or B.
 | | X | A | pick the card up; again: play it on the stairs |
 | | S | X | draw from the deck |
 | | A | Y | discard the chosen card |
-| | Z | B | quit (then X / A: yes, Z / B: no) |
+| | Z | B | quit (it asks: No first) |
 | | X | A | at the end of your turn: go on |
 | Vacuum | Arrows | left stick (or D-pad) | drive |
 | | S + arrows | right stick (or X + D-pad) | move the hand over the bowl |
@@ -220,10 +220,10 @@ comes back on the same row after it. A note closes on A or B.
 | Painting | Q / W | LB / RB | the previous / next tool |
 | | S / A | X / Y | the next color / undo |
 | | E | Back | the next palette (16 of them: all 240 colors) |
-| | Z / Enter | B / Start | done (then X / A: yes, Z / B: no) |
+| | Z / Enter | B / Start | done (it asks: No first) |
 | Moogoo Monkey | Left / Right | D-pad or left stick | on your turn: choose the monkey to bet on, the card to play, the monkey a special card goes on (a green ring shows it) |
 | | X | A | bet, play the card; otherwise go on (the rules, the banners, the number of players) |
-| | Z | B | take the bet or the special card back; else quit (then X / A: yes, Z / B: no); a bet placed or a card picked: undo |
+| | Z | B | take the bet or the special card back; else quit (it asks: No first); a bet placed or a card picked: undo |
 | | Enter | Start | quit |
 | Super Drencher | Arrows | left stick or D-pad | walk |
 | | X (hold) | A (hold) | fire |
@@ -249,7 +249,7 @@ comes back on the same row after it. A note closes on A or B.
 | | A (hold) | Y (hold) | record your voice (VOX): the microphone while held |
 | | Z | B | quit; in the song list: back |
 | | Enter | Start | the game's help: point at a control and X / A; Z / B leaves help |
-| | X / Z / S | A / B / X | "save your song?": yes / no / preview |
+| | Arrows, X / Z / S | D-pad, A / B / X | "save your song?" (No first): choose, answer / no / preview |
 | Saving a song | Arrows | D-pad or left stick | choose a letter, a page, a slot |
 | | X | A | type it, or save into the slot (a used slot asks: again to save over it) |
 | | A / Z | Y / B | erase a letter / back to the mixer |

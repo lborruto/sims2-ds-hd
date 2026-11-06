@@ -1,0 +1,4 @@
+# From G-B-mg-r1-full: B asks the game's question, A A: No (it opens on No), then the bet: never quit.
+20 2 pad b
+60 2 pad a
+120 2 pad a

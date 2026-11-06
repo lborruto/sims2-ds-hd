@@ -11,13 +11,13 @@
 // resumes on Start (passed on). A popup over the panel's open menu wins the focus; when it
 // goes, the menu is back on the same tab and row (the navigator's resume).
 //
-// A popup over a screen the HD port does not redraw (the catalogue, the activities) keeps
-// milestone 1's composition: the game's own box in the touch screen.
+// A popup over a minigame is port/minigame.*'s (BuildGameBox below, over its HD frame).
 #pragma once
 #include "compose.h"
 #include "gamestate.h"
 #include "port/menuview.h"
 #include "screens.h"
+#include "ui/kit.h"
 
 namespace sims2wide
 {
@@ -74,6 +74,27 @@ void BuildPopup(Composition& c, const MenuView& v, int focus, const GameState& g
 // button (A and B chips, the focus on it when `focus` is 0) whose mouse piece maps onto the DS
 // rectangle `from` (none when empty). Everything on kPopLayer, as BuildPopup.
 void BuildHintBox(Composition& c, int focus, const std::string& title, const std::string& text, const RomData& rom, Rect from);
+
+// A box of a minigame's own (the cards' and MooGoo's quit questions, the end of a turn, the mixer's
+// save question, a help text; port/minigame.h) or the game's popup over a minigame, in the popups'
+// look: a button's chips (the activity's own buttons: no focus, each answer its button) and the
+// mouse's piece onto the game's DS rectangle `from` (none when empty).
+struct GameBoxButton
+{
+    std::vector<std::pair<ui::Button, std::string>> chips;
+    Rect from {};
+    bool pressed = false;   // the game's held button (green)
+    bool focused = false;   // the answer A gives (a question's: the focus's halo)
+};
+// A button's word alone, no chip (an answer A does not press until it has the focus).
+constexpr ui::Button kChipWordOnly = (ui::Button)-1;
+// The box's place: at least the popups' box (no buttons: lower), as large as `cover` (the game's own
+// box on the canvas, which it hides) and a margin, centred across `area`, level with `cover`, held inside it.
+Rect GameBoxAt(Rect cover, Rect area, int buttons);
+// The box at `box` over what c holds, as BuildPopup: the veil, the title on its plate (none when
+// empty), the text in its well, the buttons in a row at its foot (one centred; two the No / Yes
+// places; three across). Everything on kPopLayer.
+void BuildGameBox(Composition& c, Rect box, const std::string& title, const std::string& text, const std::vector<GameBoxButton>& buttons);
 
 // (A check, --measure-menu) every popup text the game opens (the ids at its call sites) in the
 // box, in rom's language.

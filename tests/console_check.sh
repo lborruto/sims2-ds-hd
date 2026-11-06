@@ -646,18 +646,33 @@ def big_over_dim(rows=176):
         r, g, b = w(cx, cy)
         expect(f"dimmed world at {cx},{cy}", C(cx, cy), tuple(v * (255 - 0x8C) // 255 for v in (r, g, b)))
 
-def activity(rows=192, hd=True):
+def activity(rows=192, hd=True, skip=0):
+    if case in ("cards-ask", "art-ask"):
+        # A question of the game's: the HD box over the playfield, everything else under its veil;
+        # the box's fill, its words and the focus's halo (No first).
+        fill = sum(1 for y in range(70, 640, 3) for x in range(40, 800, 3) if C(x, y) == FRAME)
+        if fill < 3000:
+            errors.append(f"no HD box over the playfield ({fill} fill pixels)")
+        white_text("question box", 80, 150, 760, 600)
+        if not any(C(x, y) == RING for y in range(150, 640, 2) for x in range(60, 800, 2)):
+            errors.append("no focus halo on the question's No")
+        return
     expect("background", C(10, 10), PANEL)
     expect("touch screen frame", C(32, 300), OUTLINE)
     expect("touch screen 3x top-left", C(36, 68), bottom(0, 0))
-    piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
+    if case in ("moogoo", "moogoo-2x"):
+        # (MooGoo's line, DS rows 2-21, is the HD plate's: the table below it.)
+        piece("touch screen 3x", 0, 27, 256, 165, 36, 68 + 81, 3, step=9)
+    else:
+        piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
     expect("world frame", C(855, 200), OUTLINE)
     # The small world, 384 wide; without the game's status bar (176 rows: 264 high) where the
     # HD bar sits under it.
-    h = round(384 * rows / 256)
+    # (skip: the social game's own bar, its top rows, left out.)
+    h = round(384 * (rows - skip) / 256)
     # (At --compose-scale 2 the small world is sampled from twice as many pixels: not compared.)
     for x, y in ((0, 0), (100, 50), (383, h - 1), (200, h - 8)) if not case.endswith("-2x") else ():
-        expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, y * rows // h))
+        expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, skip + y * (rows - skip) // h))
     if rows < 192:
         region = [C(x, y) for y in range(68 + h + 14, 68 + h + 58) for x in range(852, 1248)]
         if (255, 255, 255) not in region or OUTLINE not in region:
@@ -707,8 +722,9 @@ def minigame_frame(side_top):
     if case == "cards-ask":
         if not has(green) or not has(red) or has(blue):
             errors.append("the question's prompts are not A and B alone")
-    elif case.startswith("cards") and not (has(green) and has(red) and has(blue)):
-        errors.append("the cards' prompts lack A, B or X")
+    elif case.startswith("cards") and not (has(red) and has(blue)):
+        # (The turn's first step: draw, X, and quit, B.)
+        errors.append("the cards' prompts lack X or B")
     # (Lit too: the autopsy's tweezers while a parasite eats, G-A-para; the detector's dig with a find in range.)
     if (case in ("vacuum-clog", "autopsy", "autopsy-2x", "detector", "detector-wide")) != has(lit):
         errors.append("a hint lit when the game asks for nothing, or not lit when it does")
@@ -1131,7 +1147,9 @@ elif case in ("s5-hd", "s5-hd-wide"):
         h = round(1280 * rows / tw)
         for cx, cy in ((2, 100), (1277, 100), (640, 300), (40, 440)):
             expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * tw // 1280, cy * rows // h)))
-elif case in ("social", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",
+elif case == "social":
+    activity(176, skip=16)
+elif case in ("vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",
               "moogoo", "moogoo-2x", "drencher", "crime", "scratch", "mixer", "mixer-save", "trading"):
     activity(176)
 elif case in ("cards", "cards-ask", "cards-m1"):
@@ -1143,7 +1161,7 @@ elif case in ("cards-wide", "social-wide", "detector-wide", "drencher-wide", "mi
     expect("background", C(10, 10), PANEL)
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
     expect("world frame", C(855, 100), OUTLINE)
-    minigame_frame(round(384 * (192 if case == "cards-wide" else 176) / 341) + (18 if case == "cards-wide" else 72))
+    minigame_frame(round(384 * (192 if case == "cards-wide" else 160 if case == "social-wide" else 176) / 341) + (18 if case == "cards-wide" else 72))
 elif case == "s2":
     front_menu(0)
 elif case in ("menu-2x", "menu-wide", "menu-de"):
@@ -1356,7 +1374,7 @@ pad_late pad-ask-yes B-cas-opt-save saveslots-ask-yes 200 &
 pad pad-pause-a B-pause popup-pause-a 120 &
 pad pad-pause-start B-pause popup-pause-start 120 &
 pad_late pad-quit-no B-cas-opt popup-quit-no 260 &
-pad pad-phone s7 phone-pages 380 &
+pad pad-phone s7 phone-pages 540 &
 pad_late pad-phone-msg C-cas-msg1 phone-message 160 &
 pad pad-tabs s7 tabs 320 &
 pad pad-popup s6 popup 120 &
@@ -1573,7 +1591,7 @@ quit_no() {
     if grep -q -E 'game FrontEnd|console menu closed' "$tmp/pad-quit-no.log"; then echo "  pad-quit-no: the menu closed or the game quit"; return 1; fi
 }
 phone_pages() {
-    in_order pad-phone 'phone page=0 row=1' 'phone page=5' 'phone page=7 .*list=22' 'phone page=9 .*caller=22' 'phone page=9 row=5' 'phone page=7' 'game Panel/Interact'
+    in_order pad-phone 'phone page=0 row=1' 'phone page=5' 'phone page=7 .*list=22' 'phone page=9 .*caller=22' 'phone page=9 row=5' 'phone page=7' 'phone page=5' 'phone page=0' 'game Panel/Interact'
 }
 phone_msg() { in_order pad-phone-msg 'phone page=3 row=0 .*shown=0' 'phone page=3 row=10 ' 'phone page=3 row=0 .*shown=1'; }
 check_pad pad-pause-a pause_a
@@ -2266,5 +2284,122 @@ stat_held() { grep -q -E 'stat page=0 .* held=[1-4]' "$tmp/pad-stat.log" || { ec
 check_pad pad-stat stat_held
 load_done() { in_order pad-load-slot 'popup state=[1-3] kind=3 .*title="Loading"' 'load .* loading' 'front None'; }
 check_pad pad-load-slot load_done
+# The minigames' messages in HD (the remake's polish, task 3; copies of the complete save, pad only): a
+# question of a minigame (the cards' and MooGoo's quit, the painting's "done?", the mixer's save
+# question) opens on No, so A A never answers Yes (the question closed, the game goes on); the HD box
+# hides the game's (its words, its buttons, the focus's halo on No); the cards' end of a turn in an HD
+# box, then the opponent's turn with no focus ring on its cards; MooGoo's line in HD over the game's
+# ("Touch a Monkey!" in the port's words); the help texts read back from the stylus's point (the
+# Drencher's fire 1666, the crime game's scare 1667, the mixer's variations 1798); the phone's B goes
+# back one level (the ringtones → the menu), then hangs up; the detector powered off never shows
+# milestone 1's rail.
+pad_t3() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 clock=$5; shift 5
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-game --print-town --print-minigame --clock "$clock" --input "$input" "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+t3shots() { echo --compose --shot-dir "$tmp/$1" --shot-at "$2"; }
+pad_t3 t3-cards-aa act-cards cards-quit-aa 220 "2026-01-01 12:00" $(t3shots t3-cards-aa 70) &
+pad_t3 t3-cards-turn act-cards cards-turn 700 "2026-01-01 12:00" $(t3shots t3-cards-turn 10,230,640) &
+pad_t3 t3-art-aa G-X-artgal art-done-aa 160 "2026-11-05 12:05" $(t3shots t3-art-aa 40) &
+pad_t3 t3-moogoo-aa G-B-mg-r1-full moogoo-quit-aa 200 "2026-11-05 12:05" $(t3shots t3-moogoo-aa 5,50) &
+wait
+pad_t3 t3-mixer-aa G-X-music mixer-save-aa 300 "2026-11-05 12:05" $(t3shots t3-mixer-aa 170) &
+pad_t3 t3-mixer-help G-X-music mixer-help-text 200 "2026-11-05 12:05" $(t3shots t3-mixer-help 100) &
+pad_t3 t3-phone-back s7 phone-back 300 "2026-01-01 12:00" &
+pad_t3 t3-detector-off G-A-md-walk detector-off 120 "2026-11-05 12:05" --compose --shot-dir "$tmp/t3-detector-off" --shot-every 1 &
+wait
+pad_t3 t3-scratch-win G-B-sc-two-p10 scratch-win 480 "2026-11-05 12:05" $(t3shots t3-scratch-win 330) &
+wait
+# A picture's HD box over the playfield: the kit's fill and white words inside it, the focus's halo
+# (#309A41) on its No when `halo`, none when not; `ring_free`: no green ring over the playfield.
+t3_pic() {
+    "$python" -I - "$@" <<'PYEOF'
+import sys
+from PIL import Image
+path, what = sys.argv[1], sys.argv[2]
+im = Image.open(path).convert("RGB")
+px = lambda x, y: im.getpixel((x, y))
+area = [(x, y) for y in range(70, 640, 3) for x in range(40, 800, 3)]
+green = sum(1 for x, y in area if px(x, y) == (0x30, 0x9A, 0x41))
+fill = sum(1 for x, y in area if px(x, y) == (0x82, 0x8A, 0xCB))
+white = sum(1 for x, y in area if px(x, y) == (255, 255, 255))
+err = []
+if what in ("box", "halo"):
+    if fill < 3000: err.append(f"no HD box ({fill} fill pixels)")
+    if white < 20: err.append("no white words in the box")
+    if what == "halo" and green < 50: err.append("no focus halo on No")
+if what == "ring_free" and green > 0: err.append(f"a green ring over the playfield ({green} pixels)")
+if what == "moo_line":
+    plate = sum(1 for y in range(74, 134, 2) for x in range(100, 740, 4) if px(x, y) == (0x5A, 0x20, 0x38))
+    if plate < 200: err.append(f"no HD line over MooGoo's ({plate} plate pixels)")
+if err: print(f"  {path.rsplit('/', 2)[-2]}: {'; '.join(err)}")
+sys.exit(1 if err else 0)
+PYEOF
+}
+t3_cards_aa() {
+    in_order t3-cards-aa 'cards .*quit=1 ' 'cards .*quit=0 ' || return 1
+    if grep -q -E 'game (Panel|Loading)' "$tmp/t3-cards-aa.log"; then echo "  t3-cards-aa: quit by A A"; return 1; fi
+    t3_pic "$tmp/t3-cards-aa/f000070.png" halo
+}
+t3_cards_turn() {
+    in_order t3-cards-turn 'cards .*message=1 .*phase=6 turn=0 ' 'cards .*message=0 .*turn=1 ' || return 1
+    t3_pic "$tmp/t3-cards-turn/f000230.png" box && t3_pic "$tmp/t3-cards-turn/f000640.png" ring_free
+}
+t3_art_aa() {
+    in_order t3-art-aa 'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=0,1' 'popup none' 'minigame art .*painted=[1-9]' || return 1
+    if grep -q 'pressed=1,1' "$tmp/t3-art-aa.log"; then echo "  t3-art-aa: Yes by A A"; return 1; fi
+    t3_pic "$tmp/t3-art-aa/f000040.png" halo
+}
+t3_moogoo_aa() {
+    in_order t3-moogoo-aa 'moogoo .*quit=01 ' 'moogoo .*quit=00 ' 'moogoo phase=13 sub=[2-4] ' || return 1
+    if grep -q 'game Panel' "$tmp/t3-moogoo-aa.log"; then echo "  t3-moogoo-aa: quit by A A"; return 1; fi
+    t3_pic "$tmp/t3-moogoo-aa/f000005.png" moo_line && t3_pic "$tmp/t3-moogoo-aa/f000050.png" halo
+}
+t3_mixer_aa() {
+    in_order t3-mixer-aa 'mixer .*phase=10 ' 'mixer .*phase=0 ' || return 1
+    if grep -q -E 'game MixerSave|mixer .*phase=1 ' "$tmp/t3-mixer-aa.log"; then echo "  t3-mixer-aa: saved or played by A A"; return 1; fi
+    t3_pic "$tmp/t3-mixer-aa/f000170.png" halo
+}
+t3_mixer_help() { in_order t3-mixer-help 'mixer .*phase=8 ' 'mixer .*phase=9 .*helpid=1798' 'mixer .*phase=0 ' && t3_pic "$tmp/t3-mixer-help/f000100.png" box; }
+t3_help() {
+    grep -q 'drencher .*help=11 .*helpid=1666' "$tmp/mg-drencher-help.log" || { echo "  mg-drencher-help: the fire's text not read back (1666)"; return 1; }
+    grep -q 'crime help=1 text=1 .*helpid=1667' "$tmp/mg-crime-help.log" || { echo "  mg-crime-help: the scare's text not read back (1667)"; return 1; }
+}
+t3_phone_back() {
+    in_order t3-phone-back 'phone page=4 ' 'phone page=0 ' 'phone page=10 ' 'game Panel/Interact' || return 1
+    [ "$(first_frame t3-phone-back 'phone page=10 ')" -ge 250 ] || { echo "  t3-phone-back: the first B hung up"; return 1; }
+}
+t3_detector_off() {
+    in_order t3-detector-off 'game Detector' 'game Panel/Interact' || return 1
+    # (From the first frame on the panel, its tab read or not: the town's world, never a black rail.)
+    "$python" -I - "$tmp/t3-detector-off" "$(first_frame t3-detector-off 'game Panel')" <<'PYEOF'
+import glob, sys
+from PIL import Image
+bad = []
+for f in sorted(glob.glob(sys.argv[1] + "/f*.png")):
+    if int(f.rsplit("/f", 1)[1][:-4]) < int(sys.argv[2]):
+        continue
+    im = Image.open(f).convert("RGB")
+    # milestone 1's rail: a tall black box at the right where the town's world shows
+    if sum(1 for y in range(100, 600, 10) for x in range(1190, 1270, 10) if sum(im.getpixel((x, y))) < 30) > 5:
+        bad.append(f.rsplit("/", 1)[1])
+if bad: print(f"  t3-detector-off: milestone 1's rail in {bad[:3]}")
+sys.exit(1 if bad else 0)
+PYEOF
+}
+t3_scratch_win() { in_order t3-scratch-win 'popup state=2 kind=0 .*Congratulations' 'game Panel' && t3_pic "$tmp/t3-scratch-win/f000330.png" box; }
+check_pad t3-cards-aa t3_cards_aa
+check_pad t3-cards-turn t3_cards_turn
+check_pad t3-art-aa t3_art_aa
+check_pad t3-moogoo-aa t3_moogoo_aa
+check_pad t3-mixer-aa t3_mixer_aa
+check_pad t3-mixer-help t3_mixer_help
+check_pad mg-drencher-help t3_help
+check_pad t3-phone-back t3_phone_back
+check_pad t3-detector-off t3_detector_off
+check_pad t3-scratch-win t3_scratch_win
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

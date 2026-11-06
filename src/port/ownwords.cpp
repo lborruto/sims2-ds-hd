@@ -163,6 +163,8 @@ constexpr const char* kWords[][5] = {
     {"Again: throw it away", "Encore : le jeter", "Nochmal: wegwerfen", "Ancora: buttalo", "Otra vez: tirarlo"},
     {"No goals for now.", "Aucun objectif pour l'instant.", "Zurzeit keine Ziele.", "Nessun obiettivo per ora.", "Ningún objetivo por ahora."},
     {"Nothing to do here.", "Rien à faire ici.", "Hier gibt es nichts zu tun.", "Niente da fare qui.", "Aquí no hay nada que hacer."},
+    // MooGoo's bet
+    {"Place a bet on a monkey!", "Pariez sur un singe !", "Setz auf einen Affen!", "Scommetti su una scimmia!", "¡Apuesta por un mono!"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

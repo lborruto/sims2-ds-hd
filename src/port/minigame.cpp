@@ -30,6 +30,14 @@ constexpr u32 kLitFill = 0xFFB8323A;       // a hint the game asks for now (the 
 constexpr u32 kRowFill = 0xFF6A72B8;       // the board's rows (Interact's)
 constexpr u32 kNowFill = 0xFF8C5FB8;       // MooGoo: the row of the player whose turn it is
 constexpr u32 kMarkColour = 0xFF309A41;    // MooGoo's focus: the game's selection green
+constexpr u32 kMooPlate = 0xFF5A2038;      // MooGoo's line: a plate in its table's maroon
+
+// A DS rectangle of the playfield on the canvas (3x at kActivityBottomTo), grown by `grow` pixels.
+Rect ToCanvas(Rect d, int grow)
+{
+    const Rect to = kActivityBottomTo;
+    return {to.x + d.x * to.w / SW - grow, to.y + d.y * to.h / SH - grow, d.w * to.w / SW + 2 * grow, d.h * to.h / SH + 2 * grow};
+}
 
 // One hint of the prompt bar: its chips (a separator between two: "/" or "+"), then its label.
 // lit: the game asks for it now (a red plate behind it).
@@ -119,7 +127,18 @@ HdHint SlowHint(const RomData& rom) { return {{C(Button::LT)}, Own(rom, OwnWordI
 // A popup of the game's is up (opening, shown or closing: it holds the stylus).
 bool GamePopup(const GameState& game) { const PopupState& p = game.town.popup; return p.valid && p.state >= 1 && p.state <= 3; }
 
-std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, bool quitArmed = false, int focus = -1)
+bool CardsPlayerActs(int phase) { return phase == 0 || phase == 1 || phase == 2; }
+
+// A question's hints (its box shows the answers): the D-pad between them, A the focused one (No
+// first), B No, the mixer's X Preview.
+std::vector<HdHint> AskHints(const RomData& rom, int askFocus, bool preview = false)
+{
+    std::vector<HdHint> h {{{C(Button::DPadH)}, ""}, {{C(Button::A)}, Words(rom, askFocus == 1 ? kStrMgYes : kStrMgNo)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
+    if (preview) h.push_back({{C(Button::X)}, Words(rom, kStrMgMixPreview)});
+    return h;
+}
+
+std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, bool quitArmed = false, int focus = -1, int askFocus = -1)
 {
     auto own = [&](OwnWordId w) { return std::string(Own(rom, w)); };
     switch (s)
@@ -137,7 +156,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         const int phase = m.valid ? m.phase : 0;
         const HdHint touch {{C(Button::A)}, own(OwnWordId::MixerTouch)}, octave {{C(Button::DPadV)}, own(OwnWordId::MixerOctave)};
         if (phase == 0xA)
-            return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}, {{C(Button::X)}, Words(rom, kStrMgMixPreview)}};
+            return AskHints(rom, askFocus, true);
         if (phase == 7)
             return {{{C(Button::DPadV)}, own(OwnWordId::MixerChoose)}, {{C(Button::A)}, Words(rom, kStrMgMixSelect)}, {{C(Button::B)}, own(OwnWordId::MixerBack)}};
         // Help: the pointer and A pick the control the game explains (8); its text, A closes it (9).
@@ -192,7 +211,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     {
         const ArtWords w(rom);
         const PopupState& p = game.town.popup;
-        if (p.valid && p.state >= 1 && p.state <= 3 && p.kind == 2) return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
+        if (p.valid && p.state >= 1 && p.state <= 3 && p.kind == 2) return AskHints(rom, askFocus);
         // (the pointer and A as one hint, as the mixer's: the bar holds eight hints in no language)
         return {{{C(Button::LStick), Sep("+"), C(Button::A)}, w.paint}, {{C(Button::LB), C(Button::RB)}, w.tool},
                 {{C(Button::X)}, w.colour}, {{C(Button::Back)}, Own(rom, OwnWordId::ArtNextPalette)}, {{C(Button::Y)}, w.undo}, {{C(Button::B)}, w.done}};
@@ -204,7 +223,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         const HdHint choose {{C(Button::DPadH)}, Own(rom, OwnWordId::MooGooChooseMonkey)};
         if (!g.valid) return {{{C(Button::A)}, Own(rom, OwnWordId::CardsContinue)}, quit};
         if (g.intro) return {{{C(Button::A)}, Own(rom, OwnWordId::MooGooPlay)}, quit};
-        if (g.quitAsk) return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
+        if (g.quitAsk) return AskHints(rom, askFocus);
         const bool human = !g.players[std::clamp(g.current, 0, kMooGooPlayers - 1)].ai;
         if (human && (g.phase == 6 || g.phase == 0xD))
         {
@@ -255,10 +274,15 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     case Screen::Cards:
     {
         const CardsState& k = game.minigame.cards;
-        if (k.valid && k.quitAsk) return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
+        if (k.valid && k.quitAsk) return AskHints(rom, askFocus);
         if (k.valid && k.message) return {{{C(Button::A)}, Own(rom, OwnWordId::CardsContinue)}};
-        return {{{C(Button::DPad)}, Own(rom, OwnWordId::CardsChoose)}, {{C(Button::A)}, Own(rom, OwnWordId::CardsPickUp)}, {{C(Button::X)}, Own(rom, OwnWordId::CardsDraw)},
-                {{C(Button::Y)}, Own(rom, OwnWordId::CardsDiscard)}, {{C(Button::B)}, Words(rom, kStrMgQuit)}};
+        const HdHint quit {{C(Button::B)}, Words(rom, kStrMgQuit)};
+        // The turn's step (what the game's line says): draw, then play or discard; the opponent's
+        // turn and the game's animations take nothing but the quit.
+        if (k.valid && (k.turn != 0 || !CardsPlayerActs(k.phase))) return {quit};
+        if (k.valid && k.phase == 0) return {{{C(Button::X)}, Own(rom, OwnWordId::CardsDraw)}, quit};
+        return {{{C(Button::DPad)}, Own(rom, OwnWordId::CardsChoose)}, {{C(Button::A)}, Own(rom, OwnWordId::CardsPickUp)}, {{C(Button::Y)}, Own(rom, OwnWordId::CardsDiscard)},
+                quit};
     }
     case Screen::Vacuum:
     {
@@ -297,6 +321,13 @@ constexpr int kColW = 78;
 // score), then the deck (a thumbnail of the game's own, its count) and the treasure chest.
 int CardsValues(Composition& c, int y, const CardsState& k, const RomData& rom, const u32* bottom)
 {
+    // The game's line (its top screen's, 1x there): what the turn asks now, readable, over the board.
+    const int lineId = CardsLineId(k);
+    const int lineH = lineId >= 0 ? 40 : 0;
+    if (lineId >= 0)
+        PanelText(c, {kMgInnerX + 4, y, kMgInnerW - 8, lineH - 6}, Words(rom, lineId), 26, kMgValueMin, Align::Centre, Weight::ExtraBold,
+                  k.turn != 0 ? kHeadColour : kValueColour);
+    y += lineH;
     const int x = kMgInnerX, w = kMgInnerW, head = 24, row = 34, last = 40, h = 10 + head + 2 * row + 6 + last + 10;
     UiItem well = WellItem({x, y, w, h});
     c.ui.push_back(well);
@@ -329,7 +360,7 @@ int CardsValues(Composition& c, int y, const CardsState& k, const RomData& rom, 
     const int tx = ix + 4 + tw + 10 + 70;
     PanelText(c, {tx, yy, sx - tx - 4, last}, Words(rom, kStrMgTreasure), kMgHeadSize + 2, 13, Align::Right, Weight::Bold, kHeadColour);
     PanelText(c, {sx, yy, kColW - 8, last}, std::to_string(k.treasure), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, kValueColour);
-    return h;
+    return lineH + h;
 }
 
 int EarningsValues(Composition& c, int y, int index, int amount, const RomData& rom);
@@ -854,6 +885,248 @@ void AddPrompts(Composition& c, const std::vector<HdHint>& hints)
 }
 }
 
+int CardsLineId(const CardsState& k)
+{
+    if (!k.valid) return -1;
+    // (The opponent's own steps but its plays: "Other Player's Turn".)
+    if (k.turn != 0 && k.phase != 3 && k.phase != 4 && k.phase != 5 && k.phase != 6) return kStrMgCardsOther;
+    switch (k.phase)
+    {
+    case 0: case 1: case 2: case 3: case 4: case 5: return kStrMgCardsLine0 + k.phase;
+    case 6: return kStrMgCardsSwitching;
+    case 8: return kStrMgCardsDrawing;
+    default: return -1;
+    }
+}
+
+int MinigameHelpAt(Screen s, int x, int y)
+{
+    auto in = [&](int x0, int y0, int x1, int y1) { return x > x0 && x < x1 && y > y0 && y < y1; };   // (the game's strict bounds)
+    if (s == Screen::Drencher)
+    {
+        if (in(35, 7, 81, 85)) return kStrMgDrHelp0;            // the water gauge
+        if (in(96, 7, 110, 85)) return kStrMgDrHelp0 + 1;       // the pressure gauge
+        if (in(137, 46, 171, 80)) return kStrMgDrHelp0 + 3;     // target
+        if (in(13, 159, 51, 197)) return kStrMgDrHelp0 + 4;     // refill
+        if (in(219, 159, 253, 193)) return kStrMgDrHelp0 + 5;   // fire
+        if (y > 94 && y < 146) return kStrMgDrHelp0 + 2;        // the pump's band
+        return -1;
+    }
+    if (s == Screen::Crime)
+    {
+        if (in(94, 13, 161, 56)) return kStrMgCrHelp0;          // scare
+        if (in(94, 135, 161, 178)) return kStrMgCrHelp0 + 2;   // subdue
+        if (in(40, 70, 215, 125)) return kStrMgCrHelp0 + 1;    // the Rat-A-Rang
+        return -1;
+    }
+    if (s == Screen::Mixer)
+    {
+        // The game's regions (first match, research m6 §8) → its help page h: the title 1778 + 2h.
+        struct R { int x, y, w, h, page; };
+        static constexpr R kRegions[] = {
+            {63, 31, 38, 18, 0}, {63, 59, 38, 18, 1}, {3, 4, 28, 18, 2}, {29, 3, 28, 18, 3}, {108, 4, 38, 18, 4}, {6, 138, 28, 18, 5}, {62, 88, 28, 18, 6},
+            {3, 33, 24, 72, 7}, {31, 33, 24, 72, 7}, {109, 27, 35, 20, 8}, {109, 63, 35, 20, 8},
+            {156, 16, 60, 90, 9}, {94, 88, 28, 18, 10}, {125, 88, 28, 18, 10}, {223, 16, 28, 90, 11}, {32, 121, 224, 71, 12},
+        };
+        for (const R& r : kRegions)
+            if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return kStrMgMixHelp0 + 2 * r.page;
+        return -1;
+    }
+    return -1;
+}
+
+namespace
+{
+// A box of the minigame's own, or the game's popup over it, as the HD port draws it: its words,
+// its buttons (each the activity's own, activities.cpp), the game's box it hides (DS pixels).
+struct MgBox
+{
+    Rect cover {};
+    std::string title, text;
+    std::vector<GameBoxButton> buttons;   // a question's: No, Yes (then the mixer's Preview)
+    bool question = false;
+};
+
+// A question's buttons as its focus makes them (ActivityState::askFocus: No first): the focused
+// answer takes the A chip and the halo, No keeps B, Yes unfocused its word alone.
+void FocusQuestion(MgBox& b, int focus, const RomData& rom)
+{
+    if (!b.question || b.buttons.size() < 2) return;
+    const int f = focus == 1 ? 1 : 0;
+    const std::string no = Words(rom, kStrMgNo), yes = Words(rom, kStrMgYes);
+    b.buttons[0].chips = f == 0 ? std::vector<std::pair<Button, std::string>> {{Button::A, ""}, {Button::B, no}} : std::vector<std::pair<Button, std::string>> {{Button::B, no}};
+    b.buttons[1].chips = f == 1 ? std::vector<std::pair<Button, std::string>> {{Button::A, yes}} : std::vector<std::pair<Button, std::string>> {{kChipWordOnly, yes}};
+    b.buttons[0].focused = f == 0;
+    b.buttons[1].focused = f == 1;
+}
+Rect Around(Point p, int r) { return {p.x - r, p.y - r, 2 * r, 2 * r}; }
+GameBoxButton Btn(Button b, const std::string& word, Rect from, bool pressed = false) { return {{{b, word}}, from, pressed}; }
+
+// The game's first line of a string with its own line breaks ("\n\n\n End of Turn. \n\n Touch for…": "End of Turn.").
+std::string FirstLine(const std::string& s)
+{
+    size_t a = 0;
+    while (a < s.size())
+    {
+        size_t b = s.find('\n', a);
+        if (b == std::string::npos) b = s.size();
+        std::string l = s.substr(a, b - a);
+        const size_t f = l.find_first_not_of(' '), e = l.find_last_not_of(' ');
+        if (f != std::string::npos) return l.substr(f, e - f + 1);
+        a = b + 1;
+    }
+    return "";
+}
+
+bool BoxOf(Screen s, const GameState& game, const RomData& rom, MgBox& b)
+{
+    const MinigameState& m = game.minigame;
+    // The game's own popup (its manager's: the lottery's results and hint, the painting's question).
+    // (Its box slides in and out from below: opening and closing, and the frame after it went, the
+    // cover reaches the playfield's foot.)
+    const bool gone = !GamePopup(game) && m.popupGone.valid;
+    const PopupState& p = gone ? m.popupGone : game.town.popup;
+    if ((GamePopup(game) || gone) && p.boxW > 0 && p.boxTiles > 0)
+    {
+        b.cover = {128 - p.boxW / 2, p.boxY, p.boxW, 8 * p.boxTiles + 32};
+        if (gone || p.state != 2) b.cover.h = SH - p.boxY;
+        b.text = MenuText(GameTextToUtf8(p.text));
+        for (size_t at; (at = b.text.find('$')) != std::string::npos;) b.text.replace(at, 1, "\xC2\xA7");   // (the game's simoleon)
+        int x, y;
+        auto from = [&](int i) { return PopupButton(p, i, x, y) ? Rect {x - 12, y - 12, 24, 24} : Rect {}; };
+        if (p.kind == 0) b.buttons = {Btn(Button::A, Words(rom, kStrMgClose), from(0), p.pressing && p.pressed == 0)};
+        else if (p.kind == 2)
+        {
+            b.buttons = {Btn(Button::B, Words(rom, kStrMgNo), from(0), p.pressing && p.pressed == 0), Btn(Button::A, Words(rom, kStrMgYes), from(1), p.pressing && p.pressed == 1)};
+            b.question = true;
+        }
+        return !b.text.empty();
+    }
+    if (s == Screen::Cards && m.cards.valid && (m.cards.quitAsk || m.cards.message))
+    {
+        b.cover = kMgCardsBox;
+        if (m.cards.quitAsk)
+        {
+            b.text = Words(rom, kStrMgQuitAsk);
+            b.buttons = {Btn(Button::B, Words(rom, kStrMgNo), Around(kCardsQuitNo, 16)), Btn(Button::A, Words(rom, kStrMgYes), Around(kCardsQuitYes, 16))};
+            b.question = true;
+        }
+        else
+        {
+            // "End of Turn." and whose turn comes, in the game's words (MooGoo's "@1's turn"): not its "Touch for…".
+            const std::string next = m.cards.turn == 0 ? Words(rom, kStrMgOpponent) : m.cards.name.empty() ? Words(rom, kStrMgPlayer) : m.cards.name;
+            b.text = FirstLine(rom.String(kStrMgEndOfTurn)) + "\n" + MenuWordsWith(rom, kStrMgTurnOf, next);
+            b.buttons = {Btn(Button::A, Own(rom, OwnWordId::CardsContinue), Around(kCardsMessage, 20))};
+        }
+        return true;
+    }
+    if (s == Screen::MooGoo && m.mooGoo.valid && !m.mooGoo.intro && m.mooGoo.quitAsk)
+    {
+        b.cover = kMgMooGooBox;
+        b.text = Words(rom, kStrMgQuitAsk);
+        b.buttons = {Btn(Button::B, Words(rom, kStrMgNo), Around(kMooGooNo, 16)), Btn(Button::A, Words(rom, kStrMgYes), Around(kMooGooYes, 16))};
+        b.question = true;
+        return true;
+    }
+    if (s == Screen::Mixer && m.mixer.valid)
+    {
+        if (m.mixer.phase == 0xA)
+        {
+            b.cover = kMgMixerBox;
+            b.text = Words(rom, kStrMgMixSaveAsk);
+            b.buttons = {Btn(Button::B, Words(rom, kStrMgNo), {111, 94, 34, 16}), Btn(Button::A, Words(rom, kStrMgYes), {69, 94, 34, 16}),
+                         Btn(Button::X, Words(rom, kStrMgMixPreview), {153, 94, 34, 16})};
+            b.question = true;
+            return true;
+        }
+        if (m.mixer.phase == 5)
+        {
+            b.cover = kMgMicBox;
+            b.text = Words(rom, kStrMgMixMic);
+            b.buttons = {Btn(Button::Y, Own(rom, OwnWordId::MixerVoxStop), {6, 138, 28, 18})};
+            return true;
+        }
+        if (m.mixer.phase == 9 && m.mixer.helpId >= kStrMgMixHelp0 && m.mixer.helpId < kStrMgMixHelpEnd)
+        {
+            b.cover = kMgHelpBox;
+            b.title = Words(rom, m.mixer.helpId);
+            b.text = MenuText(rom.String(m.mixer.helpId + 1));
+            b.buttons = {Btn(Button::A, Own(rom, OwnWordId::Close), {118, 86, 20, 20})};
+            return true;
+        }
+    }
+    const int help = s == Screen::Drencher && m.drencher.valid && m.drencher.helpText ? m.drencher.helpId
+                   : s == Screen::Crime && m.crime.valid && m.crime.helpText ? m.crime.helpId : -1;
+    if (help >= kStrMgDrHelp0 && help < kStrMgCrHelp0 + 3)
+    {
+        b.cover = kMgHelpBox;
+        b.text = MenuText(rom.String(help));
+        b.buttons = {Btn(Button::A, Own(rom, OwnWordId::Close), {118, 86, 20, 20})};
+        return true;
+    }
+    return false;
+}
+
+// MooGoo's line at the top of its table (the game's 1x words, "Place a Bet - Touch a Monkey!"): what
+// the turn asks, in HD over it while the game shows one; the bet's in the controller's words.
+std::string MooGooLine(const MooGooState& g, const RomData& rom)
+{
+    // (Measured: the line's letters against the phase, every 5 frames of a whole round.)
+    if (!g.valid || g.intro) return "";
+    if (g.phase == 7 || g.phase == 8) return Words(rom, kStrMgMooShuffling);
+    if (g.phase == 0x16) return Words(rom, kStrMgMooDealing);
+    if (g.phase == 0xD)
+    {
+        if (g.sub <= 2) return Own(rom, OwnWordId::MooGooBetLine);
+        if (g.sub == 5 || g.sub == 6) return Words(rom, kStrMgMooTarget);
+        return Words(rom, kStrMgMooPlayCard);   // (3, 4, and the card's animation, draw and end: 7, 8, 9)
+    }
+    if (g.phase >= 4 && g.phase <= 0xC) return Own(rom, OwnWordId::MooGooBetLine);   // (the bets, the banners)
+    return "";
+}
+
+// Whether the game draws its line now: light letters on the table's top rows.
+bool MooGooLineShown(const u32* bottom)
+{
+    if (!bottom) return false;
+    int n = 0;
+    for (int y = kMgMooLineFrom.y; y < kMgMooLineFrom.y + kMgMooLineFrom.h; y++)
+        for (int x = kMgMooLineFrom.x; x < kMgMooLineFrom.x + kMgMooLineFrom.w; x++)
+        {
+            const u32 c = bottom[y * SW + x];
+            if (((c >> 16) & 0xFF) > 200 && ((c >> 8) & 0xFF) > 200 && (c & 0xFF) > 180) n++;
+        }
+    return n >= 12;
+}
+
+// MooGoo's line in HD: a plate over the game's, its words centred.
+void AddMooGooLine(Composition& c, const std::string& line)
+{
+    const Rect r = ToCanvas(kMgMooLineFrom, 0);   // (its shadow clear of the table's first row)
+    UiItem plate = PanelItem(r);
+    plate.fill = kMooPlate;
+    plate.borderArgb = 0xFF2A0E1A;
+    plate.radius = 14;
+    plate.layer = 1;
+    c.ui.push_back(plate);
+    PanelText(c, {r.x + 16, r.y, r.w - 32, r.h}, line, 30, 20, Align::Centre, Weight::ExtraBold, 0xFFFFFFFF, 1);
+}
+
+// MooGoo's turn banner ("@1's turn", the game's words) in HD over the game's.
+void AddMooGooBanner(Composition& c, const MooGooState& g, const RomData& rom)
+{
+    const MooGooPlayer& pl = g.players[std::clamp(g.current, 0, kMooGooPlayers - 1)];
+    std::string name = SafeWords(rom, pl.nameId);
+    if (name.empty()) name = Words(rom, kStrMgMooPlayer1 + std::clamp(g.current, 0, kMooGooPlayers - 1));
+    const Rect r = ToCanvas(kMgMooBannerFrom, 6);
+    UiItem box = PanelItem(r);
+    box.radius = 18;
+    box.layer = 1;
+    c.ui.push_back(box);
+    PanelText(c, {r.x + 20, r.y, r.w - 40, r.h}, MenuWordsWith(rom, kStrMgTurnOf, name), 32, 20, Align::Centre, Weight::ExtraBold, 0xFFFFFFFF, 1);
+}
+}
+
 ActivityRam MinigameRam(const GameState* game)
 {
     ActivityRam r;
@@ -919,14 +1192,17 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
     // The playfield and the secondary panel as milestone 1 placed them (the stylus's piece, the
     // checks' pixels): the touch screen 3x at the left, the top screen 384 wide at the right.
     const bool bar = hud && strings && strings->ok && s.screen != Screen::Cards;
-    const int rows = bar ? HudCropRows(topH) : topH;
+    // (The social game's own bar at the top screen's top, the Sim's name and the relationship's
+    // meter at 1x, unreadable that small: left out, as its status bar is.)
+    const int skip = s.screen == Screen::Social ? topH * kMgSocialBarRows / 192 : 0;
+    const int rows = (bar ? HudCropRows(topH) : topH) - skip;
     const int h = (int)std::lround((double)kActivityTopW * rows / topW);
     const Rect topTo {kActivityTopX, kActivityTopY, kActivityTopW, h};
     c.overlays.push_back({{0, 0, kConsoleW, kConsoleH}, kPanelArgb, 0, 0, 0, 0});
     c.overlays.push_back({{kActivityBottomTo.x - 6, kActivityBottomTo.y - 6, kActivityBottomTo.w + 12, kActivityBottomTo.h + 12}, kFrameArgb, 14, 6, kOutlineArgb, 0});
     c.overlays.push_back({{topTo.x - 6, topTo.y - 6, topTo.w + 12, topTo.h + 12}, kFrameArgb, 14, 6, kOutlineArgb, 0});
     c.pieces.push_back({Src::Bottom, {0, 0, SW, SH}, kActivityBottomTo});
-    c.pieces.push_back({Src::Top, {0, 0, topW, rows}, topTo});
+    c.pieces.push_back({Src::Top, {0, skip, topW, rows}, topTo});
 
     // The title plate, over the playfield's frame.
     if (const std::string title = Title(s.screen, game, rom); !title.empty())
@@ -966,9 +1242,27 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
     if (content > 0) c.ui[panel].to.h = std::min(content + 2 * kMgPad, kMgSideBottom - y);
     else c.ui.erase(c.ui.begin() + (long)panel);
     // The prompt bar: the controller's hints.
-    AddPrompts(c, Hints(s.screen, game, rom, pointer && pointer->quitArmed, focus));
-    if (pointer && pointer->shown && OwnScheme(s.screen)) AddPointer(c, *pointer);
-    if (pointer) AddMark(c, pointer->mark);   // (MooGoo's focus, the mixer's song list)
+    AddPrompts(c, Hints(s.screen, game, rom, pointer && pointer->quitArmed, focus, pointer ? pointer->askFocus : -1));
+    // MooGoo's line and turn banner in HD over the game's (its letters 1x: "Touch a Monkey!").
+    if (s.screen == Screen::MooGoo && game.minigame.mooGoo.valid && !game.minigame.mooGoo.intro && !game.minigame.mooGoo.quitAsk)
+    {
+        const MooGooState& g = game.minigame.mooGoo;
+        if (const std::string line = MooGooLine(g, rom); !line.empty() && MooGooLineShown(bottom)) AddMooGooLine(c, line);
+        if (g.phase == 0xB || g.phase == 0xC) AddMooGooBanner(c, g, rom);
+    }
+    // A box of the game's (its popup, a question, a message, a help text) in HD over the playfield:
+    // the hints under the veil, no pointer or focus over it.
+    MgBox box;
+    if (BoxOf(s.screen, game, rom, box))
+    {
+        FocusQuestion(box, pointer ? pointer->askFocus : -1, rom);
+        BuildGameBox(c, GameBoxAt(ToCanvas(box.cover, 0), kMgBoxArea, (int)box.buttons.size()), box.title, box.text, box.buttons);
+    }
+    else
+    {
+        if (pointer && pointer->shown && OwnScheme(s.screen)) AddPointer(c, *pointer);
+        if (pointer) AddMark(c, pointer->mark);   // (MooGoo's focus, the mixer's song list)
+    }
     SortUi(c.ui);
 }
 

@@ -724,6 +724,21 @@ int main(int argc, char** argv)
                     ri.hintId = before.roomInfo.valid && before.roomInfo.hint && before.roomInfo.hintId >= 0 ? before.roomInfo.hintId
                                 : lastTouchX >= 0 ? RoomInfoHintAt(lastTouchX, lastTouchY, ri.occupied) : -1;
             }
+            {   // a minigame's help text (the Drencher's, the crime game's, the mixer's): which control the stylus
+                // asked about (not in RAM), kept while it is up; a text up with no touch since the screen rose: none
+                MinigameState& mg = app.game.minigame;
+                if (app.game.screen != before.screen) lastTouchX = lastTouchY = -1;
+                // the game's popup over a minigame just gone: its box still drawn this frame
+                const PopupState& p0 = before.town.popup;
+                const bool upBefore = p0.valid && p0.state >= 1 && p0.state <= 3, upNow = app.game.town.popup.valid && app.game.town.popup.state >= 1 && app.game.town.popup.state <= 3;
+                if (upBefore && !upNow && app.game.screen == before.screen && !before.minigame.popupGone.valid) mg.popupGone = p0;
+                auto fill = [&](bool up, bool wasUp, int was, int& id) {
+                    if (up) id = wasUp && was >= 0 ? was : lastTouchX >= 0 ? MinigameHelpAt(app.ConsoleScreen().screen, lastTouchX, lastTouchY) : -1;
+                };
+                fill(mg.drencher.valid && mg.drencher.helpText, before.minigame.drencher.valid && before.minigame.drencher.helpText, before.minigame.drencher.helpId, mg.drencher.helpId);
+                fill(mg.crime.valid && mg.crime.helpText, before.minigame.crime.valid && before.minigame.crime.helpText, before.minigame.crime.helpId, mg.crime.helpId);
+                fill(mg.mixer.valid && mg.mixer.phase == 9, before.minigame.mixer.valid && before.minigame.mixer.phase == 9, before.minigame.mixer.helpId, mg.mixer.helpId);
+            }
             if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
             if (app.portSupported && printHud)
             {

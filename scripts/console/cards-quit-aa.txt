@@ -1,0 +1,5 @@
+# From act-cards, CONSOLE: B asks to quit, A A: the question opens on No, so the first A answers No
+# and the second lifts a card: never quit.
+20 2 pad b
+80 2 pad a
+140 2 pad a

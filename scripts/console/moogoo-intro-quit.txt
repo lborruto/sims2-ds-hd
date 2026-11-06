@@ -1,3 +1,4 @@
-# From G-X-moogoo-intro: B goes on and asks the game's question, A its Yes.
+# From G-X-moogoo-intro: B goes on and asks the game's question, Right and A its Yes (it opens on No).
 20 2 pad b
+140 2 pad right
 150 2 pad a

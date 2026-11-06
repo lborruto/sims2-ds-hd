@@ -30,7 +30,7 @@ using namespace ui;
 
 constexpr u32 kBtnFill = 0xFF6A72B8, kBtnFocusFill = 0xFF9AA2E3, kBtnPressed = 0xFF309A41; // the game's green while held
 constexpr u32 kVeil = 0x8C181C38;
-constexpr Button kWordOnly = (Button)-1;
+constexpr Button kWordOnly = kChipWordOnly;
 constexpr Rect kCanvas {0, 0, 1280, 720};
 
 bool Overlaps(Rect a, Rect b) { return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h; }
@@ -176,8 +176,9 @@ namespace
 // go (they would be drawn over it) and the others are dimmed with the rest; the veil, the box,
 // the title on its plate (none when empty), the text in its well (`buttons`: the well leaves
 // their row free). Everything on kPopLayer.
-void BoxBase(Composition& c, const std::string& title, const std::string& text, bool buttons)
+void BoxBase(Composition& c, const std::string& title, const std::string& text, bool buttons, Rect boxAt = kPopBox)
 {
+    const Rect titleAt {boxAt.x + 120, boxAt.y - 26, boxAt.w - 240, 56};
     const Theme& th = GameTheme();
     for (Piece& q : c.pieces) q.touch = false;
     std::vector<UiItem> kept;
@@ -187,7 +188,7 @@ void BoxBase(Composition& c, const std::string& title, const std::string& text, 
         // The status bar stays clear: above the veil, never dimmed.
         if (u.layer == kStatusBarLayer) { u.layer = kPopLayer + 1; kept.push_back(u); continue; }
         if (u.kind != UiItem::Image) { kept.push_back(u); continue; }
-        if (Overlaps(u.to, {kPopBox.x - 8, kPopTitle.y - 8, kPopBox.w + 16, kPopBox.y + kPopBox.h - kPopTitle.y + 24})) continue;
+        if (Overlaps(u.to, {boxAt.x - 8, titleAt.y - 8, boxAt.w + 16, boxAt.y + boxAt.h - titleAt.y + 24})) continue;
         UiItem d = u;
         d.fill = 0x50000000; // (its opacity)
         kept.push_back(d);
@@ -199,23 +200,23 @@ void BoxBase(Composition& c, const std::string& title, const std::string& text, 
     veil.plain = true;
     veil.fill = kVeil;
     add(veil);
-    UiItem box = PanelItem(kPopBox);
+    UiItem box = PanelItem(boxAt);
     box.radius = 26;
     add(box);
-    const Rect well = buttons ? kPopWell : kPopWellTall;
+    const Rect well = buttons ? Rect {boxAt.x + 28, boxAt.y + 42, boxAt.w - 56, boxAt.h - 162} : Rect {boxAt.x + 28, boxAt.y + 42, boxAt.w - 56, boxAt.h - 70};
     UiItem w = WellItem(well);
     w.radius = 16;
     add(w);
     if (!title.empty())
     {
-        UiItem plate = PanelItem(kPopTitle);
+        UiItem plate = PanelItem(titleAt);
         plate.fill = th.frame;
         plate.borderArgb = 0xFFB2B2E3;
         plate.border = 2;
-        plate.radius = kPopTitle.h / 2.0f;
+        plate.radius = titleAt.h / 2.0f;
         add(plate);
-        const FittedText t = FitLine(title, 30, 22, kPopTitle.w - 40, Weight::ExtraBold);
-        UiItem tt = TextItem({kPopTitle.x + 20, kPopTitle.y, kPopTitle.w - 40, kPopTitle.h}, t.text, t.size, Align::Centre, Weight::ExtraBold);
+        const FittedText t = FitLine(title, 30, 22, titleAt.w - 40, Weight::ExtraBold);
+        UiItem tt = TextItem({titleAt.x + 20, titleAt.y, titleAt.w - 40, titleAt.h}, t.text, t.size, Align::Centre, Weight::ExtraBold);
         tt.wrap = false;
         tt.middle = true;
         add(tt);
@@ -300,6 +301,34 @@ void BuildHintBox(Composition& c, int focus, const std::string& title, const std
 {
     BoxBase(c, title, text, true);
     BoxButton(c, kPopClose, false, focus == 0, {{Button::A, ""}, {Button::B, MenuWords(rom, kStrPopClose)}}, from);
+}
+
+Rect GameBoxAt(Rect cover, Rect area, int buttons)
+{
+    // At least the popups' box, as large as the game's box it hides, centred on the area, held inside it.
+    const int w = std::min(area.w - 16, std::max(kPopBox.w, cover.w + 48));
+    const int h = std::min(area.h - 40, std::max(buttons > 0 ? kPopBox.h : 240, cover.h + 48));
+    // (Level with the box it hides, held below the title plate's room and above the area's foot.)
+    const int y = std::clamp(cover.y + cover.h / 2 - h / 2, area.y + 30, area.y + area.h - h - 8);
+    return {area.x + (area.w - w) / 2, y, w, h};
+}
+
+void BuildGameBox(Composition& c, Rect box, const std::string& title, const std::string& text, const std::vector<GameBoxButton>& buttons)
+{
+    BoxBase(c, title, text, !buttons.empty(), box);
+    const int n = (int)buttons.size(), y = box.y + box.h - 104;
+    for (int i = 0; i < n; i++)
+    {
+        Rect r;
+        if (n == 1) r = {box.x + (box.w - 320) / 2, y, 320, kPopBtnH};
+        else if (n == 2) r = i == 0 ? Rect {box.x + 48, y, 260, kPopBtnH} : Rect {box.x + box.w - 308, y, 260, kPopBtnH};
+        else
+        {
+            const int gap = 20, bw = (box.w - 72 - gap * (n - 1)) / n;
+            r = {box.x + 36 + i * (bw + gap), y, bw, kPopBtnH};
+        }
+        BoxButton(c, r, buttons[i].pressed, buttons[i].focused, buttons[i].chips, buttons[i].from);
+    }
 }
 
 void MeasurePopups(const RomData& rom, BlockMeasure& m)

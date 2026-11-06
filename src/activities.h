@@ -195,6 +195,11 @@ struct ActivityState
     bool voice = false;
     // The save page: the slot whose overwrite was asked (-1 none).
     int armedSlot = -1;
+    // A yes / no question of the game's over the activity (the cards' and MooGoo's quit, the
+    // painting's "done?", the mixer's save question): it opens on No (the safe answer: A A never
+    // says Yes), Left / Right move between No (0) and Yes (1), A answers the focused one, B is No.
+    bool askOpen = false;
+    int askFocus = 0;
 };
 
 // What CONSOLE draws of a pointing minigame's pointer (App::consolePointer, from the navigator):
@@ -204,6 +209,7 @@ struct PointerView
     bool shown = false, down = false, quitArmed = false;
     float x = 0, y = 0;
     Rect mark {0, 0, 0, 0};           // MooGoo's focus on the playfield (DS pixels; w 0 none)
+    int askFocus = -1;                // a question's focused answer (0 No, 1 Yes; ActivityState::askFocus), -1 none up
 };
 
 // The screens ActivityInput plays.

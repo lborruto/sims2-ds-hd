@@ -52,6 +52,8 @@ void Social(const PadState& pad, TouchScript& touch, ActivityState& st, bool can
     if (canTap) touch.Tap(h[pick].x, h[pick].y);
 }
 
+int Question(const PadState& pad, ActivityState& st, bool up);
+
 void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap)
 {
     const std::vector<Hotspot>& h = HotspotsFor({Screen::Cards, Tab::None});
@@ -81,11 +83,13 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
     }
     if (st.confirm)
     {
-        // The question: A yes, B no (the other buttons wait for the answer).
-        if (pressed(&PadState::a)) { touch.Tap(kCardsQuitYes.x, kCardsQuitYes.y); st.confirm = false; }
-        else if (pressed(&PadState::b)) { touch.Tap(kCardsQuitNo.x, kCardsQuitNo.y); st.confirm = false; }
+        // The question: No first (Question), A the focused answer, B no (the other buttons wait).
+        const int ans = Question(pad, st, true);
+        if (ans == 1) { touch.Tap(kCardsQuitYes.x, kCardsQuitYes.y); st.confirm = false; }
+        else if (ans == 0) { touch.Tap(kCardsQuitNo.x, kCardsQuitNo.y); st.confirm = false; }
         return;
     }
+    Question(pad, st, false);
     if (pressed(&PadState::a))
     {
         if (card < 0)
@@ -146,6 +150,21 @@ void Vacuum(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState&
 }
 
 bool Pressed(const PadState& pad, const ActivityState& st, bool PadState::*b) { return pad.*b && !(st.prev.*b); }
+
+// A yes / no question up (`up`): the focus opens on No, Left / Right (the D-pad or the left stick
+// past half) move it, A answers the focused one, B is No. The answer this frame: -1 none, 0 No, 1 Yes.
+int Question(const PadState& pad, ActivityState& st, bool up)
+{
+    if (!up) { st.askOpen = false; st.askFocus = 0; return -1; }
+    if (!st.askOpen) { st.askOpen = true; st.askFocus = 0; }
+    const bool left = (pad.left && !st.prev.left) || (pad.lx < -0.5f && st.prev.lx >= -0.5f);
+    const bool right = (pad.right && !st.prev.right) || (pad.lx > 0.5f && st.prev.lx <= 0.5f);
+    if (left) st.askFocus = 0;
+    else if (right) st.askFocus = 1;
+    if (Pressed(pad, st, &PadState::a)) return st.askFocus;
+    if (Pressed(pad, st, &PadState::b)) return 0;
+    return -1;
+}
 
 // Any face button, shoulder or Start newly pressed (a help text closes on any press).
 bool AnyPressed(const PadState& pad, const ActivityState& st)
@@ -245,12 +264,15 @@ void Art(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap
     st.pointer = true;
     if (st.ram.askUp)
     {
-        // "Are you done painting?": A its tick, B its cross; the rest waits.
+        // "Are you done painting?": No first (Question), A the focused answer (the tick or the cross),
+        // B its cross; the rest waits.
+        const int ans = Question(pad, st, true);
         if (!canTap || !st.ram.ask) return;   // (opening and closing: nothing to tap)
-        if (Pressed(pad, st, &PadState::a)) { touch.Tap(st.ram.askYes.x, st.ram.askYes.y); st.latch = true; }
-        else if (Pressed(pad, st, &PadState::b)) { touch.Tap(st.ram.askNo.x, st.ram.askNo.y); st.latch = true; }
+        if (ans == 1) { touch.Tap(st.ram.askYes.x, st.ram.askYes.y); st.latch = true; }
+        else if (ans == 0) { touch.Tap(st.ram.askNo.x, st.ram.askNo.y); st.latch = true; }
         return;
     }
+    Question(pad, st, false);
     MovePointer(pad, st, pad.a ? kPtrDrag : kPtrMax, true);
     PressPointer(pad, st, canTap);
     if (pad.a || !canTap) return;
@@ -316,12 +338,14 @@ void MooGoo(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState&
     }
     if (r.mooGooQuitAsk)
     {
-        // "Are you sure you want to quit?": A its Yes, B its No; the rest waits.
+        // "Are you sure you want to quit?": No first (Question), A the focused answer, B its No; the rest waits.
+        const int ans = Question(pad, st, true);
         if (!canTap) return;
-        if (a) tap(kMooGooYes);
-        else if (b) tap(kMooGooNo);
+        if (ans == 1) tap(kMooGooYes);
+        else if (ans == 0) tap(kMooGooNo);
         return;
     }
+    Question(pad, st, false);
     const int sub = r.mooGooSub;
     const bool turn = r.mooGooHuman && (r.mooGooPhase == 6 || r.mooGooPhase == 0xD) && (sub == 1 || sub == 3 || sub == 5);
     if (!turn)
@@ -563,13 +587,15 @@ void Mixer(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& 
     const bool a = Pressed(pad, st, &PadState::a), b = Pressed(pad, st, &PadState::b), x = Pressed(pad, st, &PadState::x);
     if (phase == 0xA)
     {
-        // "Do you want to save your song?": A Yes, B No, X Preview.
+        // "Do you want to save your song?": No first (Question), A the focused answer, B No, X Preview.
+        const int ans = Question(pad, st, true);
         if (!canTap) return;
-        if (a) { Tap(touch, kMixYes); st.latch = true; }
-        else if (b) Tap(touch, kMixNo);
+        if (ans == 1) { Tap(touch, kMixYes); st.latch = true; }
+        else if (ans == 0) Tap(touch, kMixNo);
         else if (x) Tap(touch, kMixPreview);
         return;
     }
+    Question(pad, st, false);
     if (phase == 7)
     {
         // The song's list: Up / Down a focus over its rows, A picks, B cancels.
