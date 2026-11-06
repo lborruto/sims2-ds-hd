@@ -148,6 +148,112 @@ std::string SaveFallback(const DataDir& d, const std::string& savePath)
     return dir.empty() || name.empty() ? "" : dir + name;
 }
 
+std::string SaveFallbackAt(const DataDir& d, const std::string& savePath)
+{
+    const std::string name = BaseName(savePath);
+    return !d.Ok() || name.empty() ? "" : d.root + "saves/" + name;
+}
+
+std::string NewerSave(const std::string& beside, const std::string& fallback)
+{
+    std::error_code ec;
+    if (fallback.empty() || !fs::is_regular_file(fs::path(fallback), ec)) return beside;
+    if (!fs::is_regular_file(fs::path(beside), ec)) return fallback;
+    if (HashFile(beside) == HashFile(fallback)) return beside;
+    std::error_code e1, e2;
+    const auto tb = fs::last_write_time(fs::path(beside), e1), tf = fs::last_write_time(fs::path(fallback), e2);
+    if (e1 || e2) return fallback; // (no dates: the copy the program last wrote)
+    return tf >= tb ? fallback : beside;
+}
+
+static bool ReadFile(const std::string& path, std::vector<char>& out)
+{
+    std::ifstream in(fs::path(path), std::ios::binary);
+    if (!in) return false;
+    out.assign(std::istreambuf_iterator<char>(in), {});
+    return !in.bad();
+}
+
+static bool WriteFile(const std::string& path, const std::vector<char>& data)
+{
+    std::ofstream out(fs::path(path), std::ios::binary | std::ios::trunc);
+    if (!out) return false;
+    out.write(data.data(), (std::streamsize)data.size());
+    out.close();
+    return !out.fail();
+}
+
+bool CopyVerified(const std::string& from, const std::string& to)
+{
+    std::vector<char> data, back;
+    if (from.empty() || to.empty() || !ReadFile(from, data)) return false;
+    std::error_code ec;
+    const fs::path target(to);
+    // A read-only target (the save beside, its folder writable again) made writable first.
+    if (fs::exists(target, ec)) fs::permissions(target, fs::perms::owner_read | fs::perms::owner_write, fs::perm_options::add, ec);
+    const std::string tmp = to + ".tmp";
+    if (WriteFile(tmp, data) && ReadFile(tmp, back) && back == data)
+    {
+        fs::rename(fs::path(tmp), target, ec);
+        if (!ec) return ReadFile(to, back) && back == data;
+    }
+    fs::remove(fs::path(tmp), ec);
+    // (No temporary there: the file itself, read back.)
+    return WriteFile(to, data) && ReadFile(to, back) && back == data;
+}
+
+// A file renamed out of the way (an older one of that name replaced).
+static void SetAside(const std::string& path, const char* suffix)
+{
+    std::error_code ec;
+    const fs::path to(path + suffix);
+    fs::remove(to, ec);
+    fs::rename(fs::path(path), to, ec);
+}
+
+SaveStart ResolveSave(const DataDir& d, const std::string& beside)
+{
+    SaveStart r;
+    r.path = beside;
+    const std::string fallback = SaveFallbackAt(d, beside);
+    if (fallback.empty()) return r;
+    const bool writable = CanWrite(beside);
+    if (FileExists(fallback))
+    {
+        const bool fallbackLeads = NewerSave(beside, fallback) == fallback;
+        if (writable)
+        {
+            // Back beside the ROM: the fallback copied there when it leads, then set aside.
+            if (fallbackLeads && !CopyVerified(fallback, beside))
+            {
+                r.copyFailed = true;
+                r.path = r.elsewhere = fallback;
+                return r;
+            }
+            SetAside(fallback, ".moved");
+            r.movedBack = true;
+            return r;
+        }
+        // Still read-only beside: the fallback, the save beside over it when that one leads.
+        if (!fallbackLeads && FileExists(beside) && HashFile(beside) != HashFile(fallback))
+        {
+            const std::string old = fallback + ".old";
+            std::error_code ec;
+            fs::remove(fs::path(old), ec);
+            fs::copy_file(fs::path(fallback), fs::path(old), ec);
+            if (!CopyVerified(beside, fallback)) r.copyFailed = true;
+        }
+        r.path = r.elsewhere = fallback;
+        return r;
+    }
+    if (writable) return r;
+    const std::string made = SaveFallback(d, beside); // (saves/ made now)
+    if (made.empty()) return r;
+    if (FileExists(beside) && !CopyVerified(beside, made)) r.copyFailed = true;
+    r.path = r.elsewhere = made;
+    return r;
+}
+
 std::string ShotName(long long t, int n)
 {
     const time_t tt = (time_t)t;

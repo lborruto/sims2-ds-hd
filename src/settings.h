@@ -68,6 +68,9 @@ struct Settings
 // usableW x usableH: 16:9, at most 85 % of it, 1280 x 720 when that fits, never past it; a size
 // remembered from another screen made to fit the same way (w, h in and out; aspect kept).
 void FitWindow(int usableW, int usableH, bool known, int& w, int& h);
+// A remembered place (x, y in and out) moved so that a w x h window lies within the usable area
+// (bx, by, bw, bh) when it can: a size made at this start, or shrunk, never runs off the screen.
+void FitPlace(int bx, int by, int bw, int bh, int w, int h, int& x, int& y);
 // The language a locale names ("fr_FR", "de"…): 1-5, else 1 (English).
 int LanguageOfLocale(const std::string& locale);
 }

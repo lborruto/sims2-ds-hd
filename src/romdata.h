@@ -105,6 +105,10 @@ std::string GameTextToUtf8(const std::string& raw);
 // accented letters and signs from 0x7B): what a name typed on its keyboard may hold (the French,
 // German, Italian and Spanish keyboards have é è à î ë ê, ä ü ö Ä Ü Ö ß, ò à ù ì è é, ¡ ñ Ñ).
 bool GameTextByte(unsigned char b);
+// A text (UTF-8) with its capitals made small by the game's own pairs: A-Z, and each accented
+// capital whose small letter the game's charset has (É / é, Ä / ä, Ñ / ñ…); everything else as is.
+// (Typing the Sim's name: a letter found on the keyboard page of the other case.)
+std::string GameLower(const std::string& utf8);
 
 // The language the game shows: the firmware's user language (0 Japanese to 5 Spanish), which
 // the game reads at start; any other value (Chinese, reserved) is taken as English.

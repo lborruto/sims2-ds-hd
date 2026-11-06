@@ -114,6 +114,8 @@ public:
     int Focus() const { return focus_; }
     // The focus is over the last Update's MenuView.
     bool ViewFocus() const { return viewFocus_; }
+    // The id of the focused MenuView item (ViewFocus), 0 none.
+    u32 FocusId() const { return viewFocus_ && focus_ >= 0 ? focusId_ : 0; }
     // The focus the next Update would put on view v (an index of v): the focused item's id there,
     // else (a popup gone, its screen back) the item it was on before the popup, else the view's
     // first focus (a question's initial No). For drawing the frame after the game changed screen.

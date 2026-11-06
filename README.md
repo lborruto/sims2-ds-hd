@@ -190,7 +190,8 @@ page) go to the previous / next one, B goes back to the first page, then closes.
 **In Create-a-Sim** LB / RB change page and Start goes to the next one; the right stick (or the
 mouse's right drag) turns your Sim, and so do X / Y after the first page. On the first page the D-pad and A type the name on the
 game's keyboard (seven letters at most), Y erases a letter and X changes the letters (ABC, abc,
-123!); the gender and skin buttons are above it. Hair, face and clothes are picked with the D-pad
+123!); the gender and skin buttons are above it. With the highlight on the game's keyboard you can
+also type the name on the computer's keyboard (Enter is A there, Backspace erases). Hair, face and clothes are picked with the D-pad
 and A (Left / Right past the edge show more, as the game's arrows do). On the last page pick an
 aspiration, then A on the tick starts the game; A on the cross goes back to the title (B first
 moves to the cross, B again presses it: one stray B never throws your Sim away).
@@ -270,7 +271,8 @@ comes back on the same row after it. A note closes on A or B.
 The game's own save goes beside the ROM, with the same name and `.sav`. A `.sav` from another
 emulator or a flash cart works if you put it there. A copy is made in `backups/` beside it when
 the program starts and every half hour (the last eight are kept). When the ROM's folder cannot be
-written, the save goes to the saves folder's `saves/` instead, and the pause menu says where.
+written, the save goes to the saves folder's `saves/` instead, and the pause menu says where; once
+the ROM's folder can be written again, the newer save goes back beside the ROM by itself.
 
 ## Controllers
 
@@ -285,7 +287,7 @@ screen's cursor hint shows it too.
 `sims2wide.exe` (or `sims2wide` on Linux), and leave Steam Input on. To skip the launch panel, put
 the ROM's path in its *Properties > Launch Options*, in quotes: `"C:\Games\Sims 2.nds"`. The Deck's
 own buttons then work as a controller; the game fills its 1280 × 800 screen with thin bars above
-and below.
+and below. The Steam overlay does not pause the game: open the pause menu first.
 
 **A controller that does nothing** has no mapping yet: the program says which one on its console
 output. Make one with [SDL2 Gamepad Tool](https://generalarcade.com/gamepadtool/) or Steam's

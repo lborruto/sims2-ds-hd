@@ -80,8 +80,34 @@ bool FileExists(const std::string& path);
 // removed again (nothing is left behind, nothing is changed).
 bool CanWrite(const std::string& path);
 // The game's save when its own place cannot be written: saves/ in the data folder, the same file
-// name ("" without a data folder).
+// name ("" without a data folder). SaveFallback makes saves/ (the save is going there);
+// SaveFallbackAt only names it (a check: nothing is made).
 std::string SaveFallback(const DataDir& d, const std::string& savePath);
+std::string SaveFallbackAt(const DataDir& d, const std::string& savePath);
+// Of the save beside the ROM and its fallback copy, the one that leads: the fallback when it
+// exists and holds something else than the save beside (by content) and is not older than it (by
+// date; the save beside missing: the fallback); else the save beside. (The launch panel's
+// Continue check and ResolveSave.)
+std::string NewerSave(const std::string& beside, const std::string& fallback);
+// A file copied and read back (through a temporary beside it, renamed over the target, or in
+// place when no temporary can be made there); the copy left owner-writable. False: the target
+// is as it was or the copy did not read back the same.
+bool CopyVerified(const std::string& from, const std::string& to);
+// Where the game's save goes at a start, its folders made and files moved as needed:
+// - a fallback copy in saves/ and the save beside writable again: the newer one beside (the
+//   fallback copied back, verified, when it leads), the fallback renamed to .moved (movedBack);
+// - a fallback copy and the save beside still read-only: the fallback, the save beside copied
+//   over it first when that one leads (the old copy kept as .old);
+// - no fallback copy: the save beside when it can be written, else the fallback, the save beside
+//   copied there first.
+// elsewhere: the save's path when it is not beside the ROM (the toast, the pause menu's banner).
+struct SaveStart
+{
+    std::string path, elsewhere;
+    bool movedBack = false;
+    bool copyFailed = false; // a copy that should have been made was not (said in the terminal)
+};
+SaveStart ResolveSave(const DataDir& d, const std::string& beside);
 // A window screenshot's file name: "sims2-YYYYMMDD-HHMMSS.png" in the local time of t, "-2", "-3"…
 // before ".png" for n > 1 (two in one second).
 std::string ShotName(long long t, int n = 1);

@@ -2720,5 +2720,20 @@ save_elsewhere() {
     [ -f "$tmp/ro-data/saves/game.sav" ] && [ "$(cksum < "$tmp/ro-data/saves/game.sav")" != "$ro_before" ] || { echo "  save-elsewhere: the game's save not in saves/"; return 1; }
 }
 check_pad save-elsewhere save_elsewhere
+# Round 2: the folder writable again (above) and the copy in saves/ newer (the game saved there):
+# at the next start the newer save goes back beside the ROM (verified), loads from there, and the
+# copy is set aside as .moved.
+copy_sum=$(cksum < "$tmp/ro-data/saves/game.sav" 2>/dev/null)
+"$bin" "$rom" --headless --frames 5 --save "$tmp/ro/game.sav" --data-dir "$tmp/ro-data" --layout console > "$tmp/save-back.log" 2>&1 &&
+    grep -q '^clock: ' "$tmp/save-back.log" && touch "$tmp/save-back.ok"
+save_back() {
+    [ -n "$copy_sum" ] || { echo "  save-back: no copy in saves/ from round 1"; return 1; }
+    in_order save-back '/ro/game.sav can be written again: the save is back there' 'save: .*/ro/game.sav \([0-9]+ bytes\)' || return 1
+    ! grep -q 'cannot be written' "$tmp/save-back.log" || { echo "  save-back: still saving elsewhere"; return 1; }
+    [ "$(cksum < "$tmp/ro/game.sav")" = "$copy_sum" ] || { echo "  save-back: the save beside the ROM is not the newer copy"; return 1; }
+    [ ! -f "$tmp/ro-data/saves/game.sav" ] && [ "$(cksum < "$tmp/ro-data/saves/game.sav.moved")" = "$copy_sum" ] ||
+        { echo "  save-back: the copy not set aside as .moved"; return 1; }
+}
+check_pad save-back save_back
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

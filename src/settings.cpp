@@ -43,6 +43,13 @@ void FitWindow(int usableW, int usableH, bool known, int& w, int& h)
     h = std::max(240, (int)(h * k) & ~1);
 }
 
+void FitPlace(int bx, int by, int bw, int bh, int w, int h, int& x, int& y)
+{
+    if (bw <= 0 || bh <= 0) return;
+    x = std::max(bx, std::min(x, bx + bw - w));
+    y = std::max(by, std::min(y, by + bh - h));
+}
+
 bool Settings::Load(const std::string& path)
 {
     std::ifstream in(path);

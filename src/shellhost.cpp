@@ -204,9 +204,11 @@ void ShellHost::Say(Video& video, const std::string& text) const
     if (!headless) video.Toast(text, 3000);
 }
 
-void ShellHost::SaveSettings(App& app) const
+void ShellHost::SaveSettings(App& app, const Video& video, bool remember) const
 {
-    if (!settingsPath.empty() && !app.settings.Save(settingsPath)) fprintf(stderr, "cannot write %s\n", settingsPath.c_str());
+    if (settingsPath.empty()) return;
+    if (remember) video.RememberSize(app.settings);
+    if (!app.settings.Save(settingsPath)) fprintf(stderr, "cannot write %s\n", settingsPath.c_str());
 }
 
 void ShellHost::ApplySetting(App& app, Video& video, int row)
@@ -215,13 +217,20 @@ void ShellHost::ApplySetting(App& app, Video& video, int row)
     switch ((shell::Row)row)
     {
     case shell::Row::Layout: app.layout = s.layout; break;
-    case shell::Row::Fullscreen: if (video.win) video.SetFullscreen(s.fullscreen); break;
+    case shell::Row::Fullscreen:
+        if (video.win)
+        {
+            video.RememberSize(app.settings); // (the window's, before it fills the screen)
+            video.SetFullscreen(s.fullscreen);
+        }
+        SaveSettings(app, video, false);
+        return;
     case shell::Row::Scaling: if (video.win) video.SetScaling(s.scaling); break;
     // (The language: the DS's firmware and the strings are chosen when the game starts; the row's
     // note says so. The battery saver, the volume, mute and the rest are read where they are used.)
     default: break; // (read where they are used, every frame)
     }
-    SaveSettings(app);
+    SaveSettings(app, video);
 }
 
 void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
@@ -310,13 +319,13 @@ void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
         if (model.keyboard) app.settings.controls.key[r.arg] = Controls::kNone;
         else app.settings.controls.pad[r.arg] = Controls::kNone;
         log("clear", r.arg, true);
-        SaveSettings(app);
+        SaveSettings(app, video);
         break;
     case Act::ResetBindings:
         app.settings.controls.Reset();
         if (!headless) app.settings.controls.ResolveKeys();
         log("reset", 0, true);
-        SaveSettings(app);
+        SaveSettings(app, video);
         break;
     case Act::Setting:
         log("setting", r.arg, true);
@@ -350,7 +359,7 @@ void ShellHost::Frame(App& app, Video& video, Input& input, const shell::Input& 
         {
             model.capturing = -1;
             input.capturing = false;
-            if (!cancelled) SaveSettings(app);
+            if (!cancelled) SaveSettings(app, video);
             if (print || headless) fprintf(stderr, "frame %ld: shell captured %s\n", frame, cancelled ? "nothing" : "a binding");
             const shell::Result n = shell.CaptureDone(cancelled);
             if (n.act == Act::Capture) Do(app, video, input, n);

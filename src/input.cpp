@@ -96,15 +96,10 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
     // Controllers plugged in or out, and which one drives (the last used).
     if (pads.Event(ev, PadOptionsOf(s))) lastKeyboard = false;
     if (ev.type == SDL_QUIT) wantQuit = true;
-    else if (ev.type == SDL_WINDOWEVENT)
-    {
-        if (ev.window.event == SDL_WINDOWEVENT_FOCUS_LOST || ev.window.event == SDL_WINDOWEVENT_MINIMIZED) focused = false;
-        else if (ev.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) focused = true;
-    }
     else if (ev.type == SDL_TEXTINPUT)
     {
         // Create-a-Sim's name: each character (UTF-8) in turn, a few queued at most.
-        if (!menuOpen && TypingName(app))
+        if (!menuOpen && TypingKeys(app))
             for (const char* p = ev.text.text; *p;)
             {
                 const char* q = p + 1;
@@ -127,6 +122,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
         if (!down)
         {
             if (a >= 0) held[a] = false;
+            if (k == SDLK_RETURN || k == SDLK_KP_ENTER) enterA = false;
             return;
         }
         if (capturing)
@@ -151,12 +147,15 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
             else if (a == MENU && !ev.key.repeat) wantMenu = true;
             return;
         }
-        // Create-a-Sim's Name page: a key that types (a letter, a digit, a sign) types, its action
-        // resting; Backspace erases. (The text comes as SDL_TEXTINPUT, after this.)
+        // Create-a-Sim's Name page: Enter is the navigator's A (the focused key types, a gender or
+        // skin is chosen); Backspace erases; with the focus on the game's keyboard, a key that types
+        // (a letter, a digit, a sign) types, its action resting. (The text comes as SDL_TEXTINPUT,
+        // after this.)
         if (TypingName(app) && ev.key.windowID != kScriptedWindow)
         {
+            if (k == SDLK_RETURN || k == SDLK_KP_ENTER) { enterA = true; return; }
             if (k == SDLK_BACKSPACE) { if (typed.size() < 16) typed.emplace_back("\b"); return; }
-            if (k >= SDLK_SPACE && !(k & SDLK_SCANCODE_MASK) && k != SDLK_DELETE) return;
+            if (TypingKeys(app) && k >= SDLK_SPACE && !(k & SDLK_SCANCODE_MASK) && k != SDLK_DELETE) return;
         }
         if (a >= 0) held[a] = true;
         if (ev.key.repeat) return;
@@ -249,6 +248,13 @@ bool Input::PadPressed(const Settings& s, int action) const
 void Input::Poll(const App& app, bool menuOpen)
 {
     const Settings& s = app.settings;
+    // In front: the window's own flags (keyboard focus, not minimised), read every frame (an event
+    // missed or a window that never got focus leaves no stale state).
+    if (window)
+    {
+        const Uint32 f = SDL_GetWindowFlags(window);
+        focused = (f & SDL_WINDOW_INPUT_FOCUS) && !(f & SDL_WINDOW_MINIMIZED);
+    }
     prevPad = pad;
     panelPulse = false;
     // The HD chips: the keys when the keyboard was used last, else the driving pad's buttons.
@@ -336,7 +342,7 @@ PadState Input::Actions(const Settings& s) const
 {
     auto on = [&](int a) { return held[a] || PadOn(s, a); };
     PadState p = scriptPad;
-    p.a |= on(A);
+    p.a |= on(A) || enterA;
     p.b |= on(B);
     p.x |= on(X);
     p.y |= on(Y);
@@ -443,6 +449,13 @@ bool Input::TypingName(const App& app)
     if (app.shown != Layout::Console || !app.portSupported || !app.rom) return false;
     const CasState& cs = app.game.front.cas;
     return app.game.valid && cs.valid && cs.page == 0;
+}
+
+bool Input::TypingKeys(const App& app) const
+{
+    if (!TypingName(app)) return false;
+    const u32 id = navigator.FocusId();
+    return id >= kCasKeyId && id < kCasKbPageId + 3;
 }
 
 void Input::TypeName(App& app)
