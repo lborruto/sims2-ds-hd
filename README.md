@@ -17,9 +17,14 @@
 ## What it does
 
 - **Like a console game (CONSOLE, the default).** In town the 3D world fills the window, widescreen
-  and sharper, with a small rail of the touch screen's tabs and phone beside it. One button
-  (Back, or E) opens the touch screen's menu big over the town; conversations, popups and the
-  games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
+  and sharper, with a small rail of the touch screen's tabs and phone beside it and the clock,
+  money and Sanity meter in a sharp HD status bar (in the game's language). One button
+  (Back, or E) opens the touch screen's menu big over the town; conversations are redrawn in
+  HD over the whole world (the speaker's name, the game's own words in large type, their
+  portrait; A turns the page); popups and the games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
+- **HD where it counts.** The status bar and the conversations are redrawn sharp, in the game's
+  own style and in the game's language (the words come from your copy of the game; with another
+  version of it, the old pictures stay). Everything else is still the game's own picture.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
   nothing to set, and it never falls back to the bare two-screen layout. Title, menus and
@@ -46,7 +51,11 @@ It is an early version: see [Good to know](#good-to-know).
 
 <p align="center">
   <img src="docs/screenshots/console-menu.webp" alt="CONSOLE: the touch screen's menu opened big over the dimmed town" width="440">
-  <img src="docs/screenshots/console-dialogue.webp" alt="CONSOLE: a conversation, the world wide with the dialogue box below" width="440">
+  <img src="docs/screenshots/console-dialogue.webp" alt="CONSOLE: a conversation in HD, the speaker's name on a plate, the words in large type, their portrait" width="440">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/console-town.webp" alt="CONSOLE: the town fills the window, the tabs' rail at the right and the HD status bar (clock, money, Sanity) below" width="700">
 </p>
 
 <p align="center">
@@ -233,8 +242,10 @@ state.
 ## Licence and credits
 
 GPLv3, see [LICENSE](LICENSE), as melonDS. Built on [melonDS](https://github.com/melonDS-emu/melonDS)
-1.1, [SDL2](https://www.libsdl.org/), [stb_image_write](https://github.com/nothings/stb) and
-[tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/).
+1.1, [SDL2](https://www.libsdl.org/), [stb_image_write and stb_truetype](https://github.com/nothings/stb) and
+[tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/). The interface's font is
+[Nunito](https://github.com/googlefonts/nunito) (SIL Open Font License 1.1,
+[assets/fonts/OFL.txt](assets/fonts/OFL.txt)).
 The idea comes from [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex), which does
 this for the DS Pokémon games; `src/platform.cpp`, the remappable controls (`src/controls.*`),
 the menu's drawing and font (`src/ui.*`) and the sound stretching (`src/audiostretch.h`) are

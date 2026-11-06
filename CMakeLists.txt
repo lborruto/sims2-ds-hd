@@ -56,14 +56,27 @@ FetchContent_Declare(sdl2
     URL_HASH SHA256=24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4)
 FetchContent_MakeAvailable(sdl2)
 
+# The UI kit (src/ui): the HD interface's panels, text and chips, rasterised in software. Its
+# font (assets/fonts, Nunito, SIL OFL 1.1) is embedded as byte arrays generated at build time
+# by cmake/embed.cmake, so the program stays one file.
+set(SIMS2WIDE_FONT_NAMES "nunito_bold|nunito_extrabold")
+set(SIMS2WIDE_FONT_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Nunito-Bold.ttf|${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Nunito-ExtraBold.ttf")
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp"
+    COMMAND "${CMAKE_COMMAND}" "-DOUT=${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp" "-DNAMES=${SIMS2WIDE_FONT_NAMES}"
+        "-DFILES=${SIMS2WIDE_FONT_FILES}" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake"
+    DEPENDS cmake/embed.cmake assets/fonts/Nunito-Bold.ttf assets/fonts/Nunito-ExtraBold.ttf
+    COMMENT "Embedding the UI's font" VERBATIM)
+add_library(uikit STATIC src/ui/kit.cpp src/ui/font.cpp "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp")
+target_include_directories(uikit PUBLIC melonDS/src src PRIVATE src/thirdparty)
+
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
     src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/controls.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
-    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
+    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
-target_link_libraries(sims2wide PRIVATE core SDL2::SDL2-static)
+target_link_libraries(sims2wide PRIVATE core uikit SDL2::SDL2-static)
 target_compile_definitions(sims2wide PRIVATE SIMS2WIDE_VERSION="${PROJECT_VERSION}")
 
 # macOS: an app to double-click (the release builds it, for Apple silicon and Intel at once with
@@ -102,8 +115,9 @@ endif()
 
 # Checks of the layouts' touch mapping (not built by default): ninja -C build layout_test && ./build/layout_test
 add_executable(layout_test EXCLUDE_FROM_ALL tests/layout_test.cpp src/layout.cpp src/activities.cpp src/compose.cpp src/console.cpp src/hotspots.cpp src/screens.cpp
-    src/touchscript.cpp src/ui.cpp)
+    src/touchscript.cpp src/ui.cpp src/port/dialogue.cpp src/port/statusbar.cpp src/romdata.cpp)
 target_include_directories(layout_test PRIVATE melonDS/src src)
+target_link_libraries(layout_test PRIVATE uikit)
 
 # Checks of the synthesised touches (not built by default): ninja -C build touchscript_test && ./build/touchscript_test
 add_executable(touchscript_test EXCLUDE_FROM_ALL tests/touchscript_test.cpp src/touchscript.cpp)
@@ -132,5 +146,10 @@ add_executable(gamestate_test EXCLUDE_FROM_ALL tests/gamestate_test.cpp src/game
 target_include_directories(gamestate_test PRIVATE melonDS/src src)
 
 # Checks of the ROM's archive and string tables on a synthetic ROM (not built by default): ninja -C build romdata_test && ./build/romdata_test
-add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp)
+add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp src/port/statusbar.cpp)
 target_include_directories(romdata_test PRIVATE melonDS/src src)
+target_link_libraries(romdata_test PRIVATE uikit)
+
+# Checks of the UI kit (wrap, the raster's pixels and determinism; not built by default): ninja -C build uikit_test && ./build/uikit_test
+add_executable(uikit_test EXCLUDE_FROM_ALL tests/uikit_test.cpp)
+target_link_libraries(uikit_test PRIVATE uikit)

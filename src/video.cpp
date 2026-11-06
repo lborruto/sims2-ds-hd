@@ -1,6 +1,7 @@
 #include "video.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <vector>
 
@@ -109,6 +110,7 @@ void Video::Present(const App& app, const Canvas* over)
         SDL_RenderCopy(ren, t, &f, &d);
     }
     overlaysBefore((int)comp.pieces.size());
+    if (!comp.ui.empty()) DrawUi(comp, fit);
     if (over && over->Dirty())
     {
         if (!overlay || overlayW != over->w || overlayH != over->h)
@@ -159,6 +161,55 @@ SDL_Texture* Video::OverlayTexture(const Overlay& o, int w, int h)
     SDL_UpdateTexture(t, nullptr, px.data(), w * 4);
     overlayTex.push_back({o, w, h, t});
     return t;
+}
+
+void Video::DrawUi(const Composition& c, const CanvasFit& fit)
+{
+    auto texture = [&](SDL_Texture*& t, int& tw, int& th, int w, int h) {
+        if (t && tw == w && th == h) return t;
+        if (t) SDL_DestroyTexture(t);
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "nearest");
+        t = SDL_CreateTexture(ren, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+        SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, smooth ? "linear" : "nearest");
+        if (t) SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);
+        tw = w;
+        th = h;
+        return t;
+    };
+    std::vector<u32> px;
+    size_t image = 0;
+    for (const ui::LayerAt& l : ui::LayersAt(c.ui, fit.scale, fit.ox, fit.oy))
+    {
+        SDL_Texture* t = nullptr;
+        bool draw = true;
+        if (l.still)
+        {
+            u64 hash = ui::Hash(l.items);
+            for (u64 v : {(u64)(u32)l.x, (u64)(u32)l.y, (u64)l.w, (u64)l.h, (u64)std::lround(fit.scale * 65536)}) hash = (hash ^ v) * 0x100000001B3ull;
+            draw = !uiTex || hash != uiHash || uiTexW != l.w || uiTexH != l.h;
+            t = texture(uiTex, uiTexW, uiTexH, l.w, l.h);
+            uiHash = t ? hash : 0;
+        }
+        else
+        {
+            if (image == uiImages.size()) uiImages.push_back({nullptr, 0, 0, 0});
+            ImageTex& e = uiImages[image++];
+            u64 hash = ui::HashImage(l.items[0]);
+            for (u64 v : {(u64)(u32)l.x, (u64)(u32)l.y, (u64)l.w, (u64)l.h, (u64)std::lround(fit.scale * 65536)}) hash = (hash ^ v) * 0x100000001B3ull;
+            draw = !e.tex || hash != e.hash || e.w != l.w || e.h != l.h;
+            t = texture(e.tex, e.w, e.h, l.w, l.h);
+            e.hash = t ? hash : 0;
+        }
+        if (!t) continue;
+        if (draw)
+        {
+            px.assign((size_t)l.w * l.h, 0);
+            ui::Rasterise(l.items, fit.scale, px.data(), l.w, l.h, l.ox, l.oy);
+            SDL_UpdateTexture(t, nullptr, px.data(), l.w * 4);
+        }
+        const SDL_Rect d {l.x, l.y, l.w, l.h};
+        SDL_RenderCopy(ren, t, nullptr, &d);
+    }
 }
 
 bool Video::TouchAt(const App& app, int wx, int wy, int& tx, int& ty, int* pieceIndex) const

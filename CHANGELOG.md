@@ -19,6 +19,16 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
+- The status bar in HD: in CONSOLE the clock, money and Sanity meter are redrawn sharp in the
+  game's own style and language, read from the game's memory; the town keeps its sides in the
+  widescreen world, with the bar in a strip below it.
+- Conversations in HD: the speaker's name, the game's own words in large type, and the speaker's
+  portrait, in a panel over the whole world; A turns the page. The words are read from your copy
+  of the game (nothing of them in the program); with another version of it, the old picture stays.
+- A shared HD interface kit (panels, text, button chips) with the Nunito font built in (SIL Open
+  Font License, shipped with every download). Checks and tools: `--print-hud`, `--ui-demo`,
+  `--compose-scale`, `--measure-string`, `--no-romdata`; `--language` also picks the HD words.
+
 - CONSOLE now asks the game what it is showing, read from its memory, instead of guessing from
   the pixels: every screen is known, the front end (title, menus, Create-a-Sim, save slots) and
   screens not yet named are framed, never the bare two-screen layout, a black load shows only

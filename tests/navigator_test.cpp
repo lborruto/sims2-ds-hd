@@ -243,6 +243,14 @@ static void town_and_dialogue_keep_the_buttons()
     m.menu = true;
     r.Frame(kDialogue, m);
     CHECK(!r.nav.MenuOpen()); // no menu over a conversation
+    // No stick cursor on a conversation (it has a table: the arrow), so none is drawn over the HD
+    // panel's invisible tap piece, with or without a controller.
+    PadState c;
+    c.cursor = true;
+    c.a = true;
+    CHECK(!r.nav.CursorScreen());
+    CHECK(r.Frame(kDialogue, c) & (1u << kA));
+    CHECK(!r.nav.CursorScreen() && !r.nav.CursorPress());
     CHECK(r.Frame(kInteract, p) & (1u << kA));
 }
 

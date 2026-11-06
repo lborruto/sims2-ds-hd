@@ -22,6 +22,15 @@ struct Video
     std::vector<OverlayTex> overlayTex;
     SDL_Texture* OverlayTexture(const Overlay& o, int w, int h);
     int overlayW = 0, overlayH = 0;
+    // The composition's UI (ui/kit.h) at output size: the still items' layer over their bounds,
+    // made again only when its hash (items, size, place) changes; the pictures (live crops) each
+    // over their own bounds in their own texture, made again when that picture's pixels change.
+    SDL_Texture* uiTex = nullptr;
+    int uiTexW = 0, uiTexH = 0;
+    u64 uiHash = 0;
+    struct ImageTex { SDL_Texture* tex; int w, h; u64 hash; };
+    std::vector<ImageTex> uiImages;
+    void DrawUi(const Composition& c, const CanvasFit& fit);
     bool smooth = false;
 
     bool Open(const Settings& s); // after SDL_Init(SDL_INIT_VIDEO): the remembered size, fullscreen as set
@@ -40,8 +49,11 @@ struct Video
     {
         int tw, th;
         app.TopImage(tw, th);
-        if (app.shown == Layout::Console) return BuildConsole(app.ConsoleScreen(), app.consoleMenu, app.consoleFocus, tw, th);
-        return Compose(app.shown, app.mainIsTop, app.topAspect, tw, th);
+        Composition c = app.shown == Layout::Console ? BuildConsole(app.ConsoleScreen(), app.consoleMenu, app.consoleFocus, tw, th, app.Hud(), &app.hudStrings,
+                                                                    app.portSupported ? &app.game : nullptr, app.rom.get(), app.Bottom())
+                                                     : Compose(app.shown, app.mainIsTop, app.topAspect, tw, th);
+        if (app.uiDemo) c.ui = ui::DemoItems(app.Bottom());
+        return c;
     }
     void OutputSize(int& ow, int& oh) const;
     // Window points -> output pixels (they differ on HiDPI screens).

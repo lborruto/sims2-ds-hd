@@ -17,6 +17,13 @@ struct EUTable
     u32 panelTab, pocketsObj, pocketsSel, relSel;           // from S (pocketsSel from *(S+pocketsObj))
     u32 phoneSel, phonePage, dlgPage, dlgSpeech;
     u32 catSel, catScroll, catList, cardsSel;
+    u32 gameBlock;                                          // G = u32 at `gameBlock` (0x021670A4 on every state)
+    u32 money, hour, minute, sanCur, sanMax, sanTier, simName;   // offsets from G (money s32, the clock u32, sanity 20.12 fixed)
+    u32 simRecords, simRecordSize, simRecordName, simNameBase;   // Sim records from G; name id = simNameBase + u16 at +simRecordName
+    u32 speechTable, speechCount;                           // 8-byte entries {u32 pages ptr, u8 count}, 216 of them
+    u32 dlgOneOff, dlgOneOffSpeaker;                        // from S: u8 flag (1 = one-off), u8 speaker (dlgPage is the u16 1-based counter)
+    u32 dlgMaxPages, dlgSpeakers;                           // bounds: pages per speech, Sim records
+    u32 simNameMax;                                         // name field bytes incl. the NUL (assumed)
     VtScreen plain[5];
     OvScreen overlays[8];
 };
@@ -24,8 +31,15 @@ constexpr EUTable kEU = {
     0x02000000, 0x02139FA4,
     0xDAC, 0xE34, 0x8, 0xE42,
     0x64, 0x38, 0xE0, 0xD0,
-    0x89, 0x88, 0x34, 0x0C,
+    0x89, 0x88, 0x36, 0x34,
     0x254, 0x268, 0x258, 0x2E0,
+    0x0213E434,
+    0x2F60, 0x4800, 0x4804, 0x2164, 0x2168, 0x216C, 0x53,
+    0x21DC, 0x2C, 0x18, 323,
+    0x0211F16C, 216,
+    0x41, 0x3C,
+    16, 46,
+    8,
     {
         {0x0213203C, GScreen::Panel}, {0x02131F08, GScreen::Phone}, {0x02135004, GScreen::Social},
         {0x0212F98C, GScreen::Cards}, {0x02131960, GScreen::FrontEnd},
@@ -62,6 +76,89 @@ struct Reader
     int S16(u32 a) const { u32 v; return R16(a, v) ? (int)v : -1; }
     int S32(u32 a) const { u32 v; return R32(a, v) ? (int)v : -1; }
 };
+
+constexpr int kSpeakerNone = 0x3F, kSpeakerPlayer = 0x40;
+
+HudState ReadHud(const Reader& m)
+{
+    HudState h;
+    u32 G, money, hour, minute, cur, max, tier;
+    if (!m.R32(kEU.gameBlock, G)) return h;
+    if (!m.R32(G + kEU.money, money) || !m.R32(G + kEU.hour, hour) || !m.R32(G + kEU.minute, minute) || !m.R32(G + kEU.sanCur, cur) ||
+        !m.R32(G + kEU.sanMax, max) || !m.R32(G + kEU.sanTier, tier))
+        return h;
+    if (hour > 23 || minute > 59 || tier > 3 || max == 0 || cur > max || max > (999u << 12)) return h;
+    // The name field is assumed 8 bytes including the NUL (research: layout, not checked against
+    // the CAS limit): printable ASCII then a NUL within it. Anything else blanks the name only.
+    std::string name;
+    bool terminated = false;
+    for (u32 i = 0; i < kEU.simNameMax && !terminated; i++)
+    {
+        u32 ch;
+        if (!m.R8(G + kEU.simName + i, ch) || (ch != 0 && (ch < 0x20 || ch > 0x7E))) { name.clear(); break; }
+        if (ch == 0) terminated = true; else name += (char)ch;
+    }
+    if (!terminated) name.clear();
+    h.valid = true;
+    h.money = (int)money;
+    h.hour = (int)hour; h.minute = (int)minute;
+    h.sanity = (int)(cur >> 12); h.sanityMax = (int)(max >> 12);
+    h.tier = (int)tier;
+    h.simName = name;
+    return h;
+}
+
+DialogueState ReadDialogue(const Reader& m, u32 S)
+{
+    DialogueState d;
+    u32 G, speech, counter, oneOff, speaker = kSpeakerNone, sid;
+    if (!m.R32(kEU.gameBlock, G) || !m.R16(S + kEU.dlgSpeech, speech) || !m.R16(S + kEU.dlgPage, counter) ||
+        !m.R8(S + kEU.dlgOneOff, oneOff))
+        return d;
+    if (oneOff == 1)
+    {   // a game-built page: S+0x34 is the string id, the speaker S+0x3C
+        if (speech == 0 || !m.R8(S + kEU.dlgOneOffSpeaker, speaker)) return d;
+        sid = speech;
+        d.pages = 1; d.page = 1;
+    }
+    else
+    {
+        u32 entry = kEU.speechTable + 8 * speech, pages, count, pe;
+        if (speech >= kEU.speechCount || !m.R32(entry, pages) || !m.R8(entry + 4, count)) return d;
+        if (count == 0 || count > kEU.dlgMaxPages || counter < 1 || counter > count) return d;   // counter 0: no page drawn yet
+        pe = pages + 4 * (counter - 1);
+        if (!m.R16(pe, sid) || !m.R8(pe + 2, speaker)) return d;
+        d.pages = (int)count; d.page = (int)counter;
+    }
+    d.speech = (int)speech;
+    d.stringId = (int)sid;
+    d.speaker = (int)speaker;
+    d.last = d.page == d.pages;
+    if (speaker < kEU.dlgSpeakers)
+    {
+        u32 nm;
+        if (!m.R16(G + kEU.simRecords + kEU.simRecordSize * speaker + kEU.simRecordName, nm)) return DialogueState{};
+        d.speakerNameId = (int)(kEU.simNameBase + nm);
+    }
+    else if (speaker != kSpeakerNone && speaker != kSpeakerPlayer) return DialogueState{};
+    d.valid = true;
+    return d;
+}
+}
+
+std::vector<int> SpeechStringIds(RamView ram)
+{
+    const Reader m {ram};
+    std::vector<int> ids;
+    for (u32 speech = 0; speech < kEU.speechCount; speech++)
+    {
+        u32 entry = kEU.speechTable + 8 * speech, pages, count, sid;
+        if (!m.R32(entry, pages) || !m.R8(entry + 4, count)) return {};
+        if (pages == 0 || count == 0 || count > kEU.dlgMaxPages) continue; // a game-built one-off (entry 67)
+        for (u32 p = 0; p < count; p++)
+            if (m.R16(pages + 4 * p, sid)) ids.push_back((int)sid);
+    }
+    return ids;
 }
 
 GameState ReadGameState(RamView ram)
@@ -78,6 +175,7 @@ GameState ReadGameState(RamView ram)
     }
     if (!m.R32(S, vt) || !m.R32(P + kEU.overlay, ovRaw) || !m.R8(P + kEU.popup, pop)) return g;
     g.valid = true;
+    g.hud = ReadHud(m);
     g.vtable = vt;
     g.overlay = (int)ovRaw;   // 0xFFFFFFFF is -1
     g.popup = (u8)pop;
@@ -102,7 +200,7 @@ GameState ReadGameState(RamView ram)
         break;
     }
     case GScreen::Phone: g.selection = m.S8(S + kEU.phoneSel); g.page = m.S8(S + kEU.phonePage); break;
-    case GScreen::Dialogue: g.page = m.S16(S + kEU.dlgPage); g.speech = m.S8(S + kEU.dlgSpeech); break;
+    case GScreen::Dialogue: g.page = m.S16(S + kEU.dlgPage); g.speech = m.S16(S + kEU.dlgSpeech); g.dialogue = ReadDialogue(m, S); break;
     case GScreen::Catalogue: g.selection = m.S32(S + kEU.catSel); g.scroll = m.S32(S + kEU.catScroll); g.list = m.S32(S + kEU.catList); break;
     case GScreen::Cards: g.selection = m.S32(S + kEU.cardsSel); break;
     default: break;

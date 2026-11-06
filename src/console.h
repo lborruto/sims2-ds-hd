@@ -4,16 +4,19 @@
 // right; the menu, the phone, popups and Give Item are the whole touch screen 3x over the dimmed
 // world (framed for SaveSlots, ItemHand and Unknown); a black load is the bare backdrop; without a
 // HUD (the front end) the top screen at the left and the touch screen 2.5x at the right, each in its frame; a conversation is the world with the
-// game's dialogue box rebuilt wide at the bottom; an activity is the touch screen 3x at the left
+// game's dialogue redrawn in HD at the bottom (port/dialogue.h; without the game's text, its own box rebuilt wide); an activity is the touch screen 3x at the left
 // with the world small at the top right. DS pieces are drawn as the game draws them, 2x or 3x;
 // frames and the focus ring are overlays in the game's colours.
 #pragma once
 #include "activities.h"
 #include "compose.h"
+#include "gamestate.h"
+#include "port/statusbar.h"
 #include "screens.h"
 
 namespace sims2wide
 {
+class RomData;
 constexpr int kConsoleW = 1280, kConsoleH = 720;
 
 // The game's colours (frame, panel, outline, highlight).
@@ -50,6 +53,9 @@ constexpr Rect kDialogueTextBox {124, 516, 776, 188};
 constexpr Rect kActivityBottomTo {36, 68, SW * 3, SH * 3};
 constexpr int kActivityTopX = 858, kActivityTopY = 68, kActivityTopW = 384;
 constexpr Rect kHintBox {850, 400, 400, 252};
+// The HD status bar under the small world (its frame's 6 pixels and a gap), as wide as that
+// frame: 4:3, rows 344-391, above the hints' box (400) with the bar's shadow.
+constexpr int kActivityBarGap = 12;
 // Inside it: the padding, the gap between rows, the buttons' chips' height and the column the
 // texts start at (after the widest chip, a 7-letter word at 2x); a text line at 3x is 18 pixels
 // a character, so 14 fit beside a chip and 20 in a note (activities.cpp wraps them by hand).
@@ -64,6 +70,10 @@ constexpr Rect kFrontTopBox {24, 72, 568, SH * 5 / 2};
 constexpr int kFrontHintY = 600, kFrontHintPad = 14;
 constexpr const char* kFrontHint = "STICK: CURSOR - A: TOUCH";
 
+// The top picture's rows without the game's status bar (its last 16 of 192, whatever the
+// picture's size): the world CONSOLE shows wherever the HD bar or a conversation's box replaces it.
+constexpr int HudCropRows(int topH) { return topH * 176 / 192 > 1 ? topH * 176 / 192 : 1; }
+
 // The hints' box for an activity, at kHintBox's top, as high as its rows (at most kHintBox's):
 // a row per hint, its button in a chip of the panel's colour (round for one letter), what it
 // does beside it at 3x; a hint without a button is a note across the box.
@@ -75,5 +85,21 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // Screen::Loading (a black load): the bare backdrop, no piece.
 // Screen::None, FrontEnd, CreateASim: the front end's view (kFront*); SaveSlots, ItemHand, Unknown:
 // the menu composition with a frame (the stick cursor's screens); never SIDE's bare pair of screens.
-Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH);
+// hud, strings (both given and strings->ok: the game's RAM and text read): the HD status bar
+// (port/statusbar.h) wherever the world shows the game's HUD, the game's own bar (the top
+// picture's last 16 of 192 rows) cropped off that world: town, the menu over the dimmed world,
+// and under the small world of the activities that keep the HUD (Social, Vacuum, Catalogue,
+// Build; not Cards). Without them: milestone 1's compositions, the game's HUD left in the world.
+// game, rom, bottom (the RAM's state, read, the game's strings, the DS's touch screen; all
+// given): a conversation is the HD one (port/dialogue.h; its panel alone while the game has no
+// page drawn, dialogue not valid); without them, milestone 1's (the game's own box rebuilt wide
+// from pieces).
+Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
+                         const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
+                         const u32* bottom = nullptr);
+
+// The world (the top picture's first `rows` rows, topW wide) as CONSOLE draws it: 720 high,
+// centred when narrower than the canvas; keepSides: never cut at its sides (fitted to the
+// canvas's width, top-aligned, when wider), else cropped to 16:9.
+Piece ConsoleWorld(int topW, int rows, bool keepSides);
 }

@@ -2,7 +2,8 @@
 // file table, an archive and a tiny string table of made-up text, a few hundred bytes, no
 // game data and no melonDS NDS. The valid ROM decodes; every truncation, oversize,
 // out-of-range or cyclic table is refused without a crash (run once under
-// -fsanitize=address,undefined too).
+// -fsanitize=address,undefined too). Then the status bar's words (HudStringsFrom) from such a
+// table of made-up text.
 //   ninja -C build romdata_test && ./build/romdata_test
 #include <algorithm>
 #include <cstdio>
@@ -10,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "port/statusbar.h"
 #include "romdata.h"
 
 using namespace sims2wide;
@@ -157,6 +159,9 @@ int main()
         CHECK(!d.LoadStrings(2) && d.StringCount() == 0 && d.StringsFile() == -1); // the French file is not in this table
         CHECK(!d.LoadStrings(6) && !d.LoadStrings(-1));
         CHECK(d.Open(rom.b) && d.StringCount() == 0);                                // opening again forgets the strings
+        CHECK(d.LoadStrings(1) && d.StringCount() == 4);
+        d.DropArchive();                                                             // the strings stay, the archive goes
+        CHECK(!d.IsOpen() && d.Resource(123).empty() && d.StringCount() == 4 && d.String(0) == "Hi!\n\xC2\xA9");
     }
     // The bit order: a tree by hand (pair 0: bit 0 'a', bit 1 pair 1; pair 1: bit 0 the end,
     // bit 1 'b'), one string whose bits 0, 1 1, 1 0 read "ab".
@@ -248,6 +253,45 @@ int main()
         CHECK(!Loads(k));
         Bytes m(file.begin(), file.begin() + n + 16);          // the streams cut away
         CHECK(!Loads(m));
+    }
+
+    // The status bar's words (port/statusbar.h) from a table of made-up text at the game's ids:
+    // 30 the clock's format, 178 / 179 am / pm, 28 the money's, 2421 the meter's label.
+    {
+        auto hudTable = [](const Bytes& clock, const Bytes& money, const Bytes& label, size_t count = 2422) {
+            std::vector<Bytes> v(count);
+            auto set = [&](size_t id, const Bytes& b) { if (id < v.size()) v[id] = b; };
+            set(30, clock);
+            set(178, {'a', 'm'});
+            set(179, {'p', 'm'});
+            set(28, money);
+            set(2421, label);
+            StringTable t;
+            return t.Make(v);
+        };
+        const Bytes clock = {'@', 'h', 'h', ':', '@', 'm', 'm', ' ', '@', 'a', 'm'};
+        const Bytes money = {'@', '1', 0xB9, '$'};         // a no-break space (0xB9) before the sign
+        const Bytes label = {' ', 'M', 'e', 't', 'e', 'r', 0xB9, ':', ' '};
+        auto words = [](const Bytes& file) {
+            RomData d;
+            const bool ok = d.Open(MakeRom(file).b) && d.LoadStrings(1);
+            return ok ? HudStringsFrom(&d) : HudStrings {};
+        };
+        const HudStrings h = words(hudTable(clock, money, label));
+        CHECK(h.ok && h.clock == "@hh:@mm @am" && h.am == "am" && h.pm == "pm" && h.money == "@1\xC2\xA0$");
+        CHECK(h.label == "Meter"); // the colon, the no-break space and the outer spaces trimmed
+        // A label with a placeholder in it is dropped (no label), the words still ok.
+        const HudStrings at = words(hudTable(clock, money, {'M', '@', '1', ':'}));
+        CHECK(at.ok && at.label.empty());
+        // Formats without their placeholders: not ok (no bar, the game's own HUD).
+        CHECK(!words(hudTable({'@', 'h', 'h', ':', '0', '0'}, money, label)).ok);
+        CHECK(!words(hudTable({'@', 'm', 'm'}, money, label)).ok);
+        CHECK(!words(hudTable(clock, {'$', '1'}, label)).ok);
+        // A table too short for the label's id, or none at all: not ok.
+        CHECK(!words(hudTable(clock, money, label, 2421)).ok);
+        CHECK(!HudStringsFrom(nullptr).ok);
+        RomData closed;
+        CHECK(!HudStringsFrom(&closed).ok);
     }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }

@@ -3,6 +3,7 @@
 // is never touchable, FOCUS's panel wins over the world under it, and a drag past the touch
 // screen is held to its edges.
 //   ninja -C build layout_test && ./build/layout_test
+#include <climits>
 #include <cstdio>
 #include <cstdlib>
 #include <string>
@@ -13,6 +14,10 @@
 #include "console.h"
 #include "hotspots.h"
 #include "layout.h"
+#include "port/dialogue.h"
+#include "port/statusbar.h"
+#include "romdata.h"
+#include "ui/kit.h"
 
 using namespace sims2wide;
 
@@ -118,9 +123,37 @@ static std::vector<ScreenState> AllStates()
     return v;
 }
 
-static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int topH, int ow, int oh)
+// The status bar's words, made up (no game text here): the game's placeholders in its formats.
+static HudStrings TestStrings()
 {
-    const Composition c = BuildConsole(s, menuOpen, -1, topW, topH);
+    HudStrings h;
+    h.ok = true;
+    h.clock = "@hh:@mm @am";
+    h.am = "am";
+    h.pm = "pm";
+    h.money = "$@1";
+    h.label = "Meter";
+    return h;
+}
+static HudState TestHud()
+{
+    HudState h;
+    h.valid = true;
+    h.money = 14843;
+    h.hour = 15;
+    h.minute = 37;
+    h.sanity = 150;
+    h.sanityMax = 225;
+    h.tier = 2;
+    return h;
+}
+
+// given: test that composition (the HD conversation's, built apart) instead of BuildConsole's.
+static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int topH, int ow, int oh, bool withHud, const Composition* given = nullptr)
+{
+    const HudState hud = TestHud();
+    const HudStrings strings = TestStrings();
+    const Composition c = given ? *given : withHud ? BuildConsole(s, menuOpen, -1, topW, topH, &hud, &strings) : BuildConsole(s, menuOpen, -1, topW, topH);
     const CanvasFit fit = CanvasFit::For(c.cw, c.ch, ow, oh);
     int bottoms = 0;
     for (int i = 0; i < (int)c.pieces.size(); i++)
@@ -164,7 +197,8 @@ int main()
         for (bool menuOpen : {false, true})
             for (const auto& top : {std::pair<int, int> {SW, SH}, {341, 192}, {682, 384}})
                 for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}, {800, 1000}})
-                    TestConsoleRoundtrip(s, menuOpen, top.first, top.second, o.first, o.second);
+                    for (bool withHud : {false, true})
+                        TestConsoleRoundtrip(s, menuOpen, top.first, top.second, o.first, o.second, withHud);
     // Where the mockup puts things.
     {
         const Composition town = BuildConsole({Screen::Panel, Tab::Goals}, false, -1, 341, 192);
@@ -187,6 +221,118 @@ int main()
         const Composition act = BuildConsole({Screen::Vacuum, Tab::None}, false, -1, SW, SH);
         CHECK(act.pieces[0].src == Src::Bottom && act.pieces[0].to.x == 36 && act.pieces[0].to.y == 68 && act.pieces[0].to.w == SW * 3);
         CHECK(act.pieces[1].src == Src::Top && act.pieces[1].to.x == 858 && act.pieces[1].to.w == 384 && act.pieces[1].to.h == 288);
+    }
+    // The HD status bar: the game's bar cropped off the world (its last 16 of 192 rows, whatever
+    // the picture's size), the world keeping its shape; the bar at the bottom left of the world,
+    // inside it and the canvas, below the menu's frame; under the small world of the activities
+    // that keep the HUD, not the cards'; nothing without the game's words or values.
+    {
+        const HudState hud = TestHud();
+        const HudStrings strings = TestStrings();
+        for (const auto& top : {std::pair<int, int> {SW, SH}, {341, 192}, {682, 384}})
+        {
+            const int rows = HudCropRows(top.second);
+            for (ScreenState st : {ScreenState {Screen::Panel, Tab::Goals}, ScreenState {Screen::Phone, Tab::None}, ScreenState {Screen::Popup, Tab::None},
+                                   ScreenState {Screen::Gift, Tab::None}, ScreenState {Screen::SaveSlots, Tab::None}})
+                for (bool menuOpen : {false, true})
+                {
+                    const Composition c = BuildConsole(st, menuOpen, -1, top.first, top.second, &hud, &strings);
+                    const Piece& w = c.pieces[0];
+                    // The whole width of the picture (the crop never cuts its sides), at its shape
+                    // (within a pixel's rounding): 720 high at 4:3, the canvas's width and
+                    // top-aligned when wider (widescreen: 1280 x 661), the bar below it.
+                    CHECK(w.src == Src::Top && w.from.x == 0 && w.from.y == 0 && w.from.w == top.first && w.from.h == rows);
+                    CHECK(std::abs(w.to.w * w.from.h - w.to.h * w.from.w) <= w.from.h + w.from.w);
+                    CHECK(w.to.y == 0 && w.to.x >= 0 && w.to.x + w.to.w <= kConsoleW && w.to.h <= kConsoleH);
+                    CHECK(top.first * 3 == top.second * 4 ? w.to.h == kConsoleH : (w.to.w == kConsoleW && w.to.h == 661));
+                    CHECK(!c.ui.empty());
+                    const Rect b = c.ui[0].to;
+                    CHECK(b.y == kStatusBarY && b.h == kStatusBarH && b.x >= std::max(w.to.x, 0) && b.x + b.w <= std::min(w.to.x + w.to.w, kConsoleW));
+                    CHECK(b.y > kMenuTo.y + kMenuTo.h + 6);
+                    for (const ui::UiItem& it : c.ui)
+                        CHECK(it.to.x >= b.x && it.to.y >= b.y && it.to.x + it.to.w <= b.x + b.w && it.to.y + it.to.h <= b.y + b.h);
+                }
+            for (Screen sc : {Screen::Social, Screen::Vacuum, Screen::Catalogue, Screen::Build, Screen::Cards})
+            {
+                const Composition c = BuildConsole({sc, Tab::None}, false, -1, top.first, top.second, &hud, &strings);
+                const Piece& w = c.pieces[1];
+                CHECK(w.src == Src::Top && w.from.h == (sc == Screen::Cards ? top.second : rows));
+                bool bar = false;
+                for (const ui::UiItem& it : c.ui)
+                    if (it.kind == ui::UiItem::Panel && it.to.h == kStatusBarH)
+                    {
+                        bar = true;
+                        CHECK(it.to.y >= w.to.y + w.to.h + 6 && it.to.y + it.to.h + 8 <= kHintBox.y && it.to.x + it.to.w <= kConsoleW);
+                    }
+                CHECK(bar == (sc != Screen::Cards));
+            }
+            // The conversation as before (its own box hides the bar), and without the words or
+            // without RAM's values, milestone 1's world, the game's HUD in it.
+            CHECK(BuildConsole({Screen::Dialogue, Tab::None}, false, -1, top.first, top.second, &hud, &strings).ui.empty());
+            HudStrings none;
+            const Composition m1 = BuildConsole({Screen::Panel, Tab::Goals}, false, -1, top.first, top.second, &hud, &none);
+            CHECK(m1.pieces[0].from.h == top.second && m1.ui.empty());
+            CHECK(BuildConsole({Screen::Panel, Tab::Goals}, false, -1, top.first, top.second, nullptr, &strings).pieces[0].from.h == top.second);
+        }
+        // The values: 12-hour clock, the money grouped, the simoleon sign for the game's '$'.
+        std::string clock, money;
+        float fill = 0;
+        CHECK(FormatHud(hud, strings, clock, money, fill) && clock == "3:37 pm" && money == "\xC2\xA7" "14,843" && std::abs(fill - 150.0f / 225) < 1e-6f);
+        HudState h = hud;
+        h.hour = 0; h.minute = 5;
+        CHECK(FormatHud(h, strings, clock, money, fill) && clock == "12:05 am");
+        h.hour = 12;
+        CHECK(FormatHud(h, strings, clock, money, fill) && clock == "12:05 pm");
+        CHECK(GroupThousands(0) == "0" && GroupThousands(999) == "999" && GroupThousands(1000) == "1,000" && GroupThousands(12345678) == "12,345,678");
+        // Escapes and unknown placeholders in the words never show.
+        HudStrings odd = strings;
+        odd.clock = "{F012}@hh:@mm @am @zz";
+        odd.money = "@1\xC2\xA0$";
+        CHECK(FormatHud(hud, odd, clock, money, fill) && clock == "3:37 pm" && money == "14,843\xC2\xA0\xC2\xA7");
+        // Garbage (a load's): not valid, out of range, max 0, huge: nothing drawn, no division.
+        std::vector<HudState> bad;
+        for (int i = 0; i < 9; i++) bad.push_back(hud);
+        bad[0].valid = false;
+        bad[1].hour = 24;
+        bad[2].minute = -1;
+        bad[3].tier = 7;
+        bad[4].sanityMax = 0;
+        bad[5].money = -5;
+        bad[6].money = INT_MAX;
+        bad[7].sanity = -1;
+        bad[8].hour = INT_MIN;
+        for (const HudState& g : bad)
+        {
+            Composition c {kConsoleW, kConsoleH, {}, {}};
+            const Rect r = AddStatusBar(c, g, strings, 100, 600, 600);
+            CHECK(c.ui.empty() && r.w == 0);
+        }
+        // Valid but extreme (sanity over max, the most money, long words, a narrow box): every
+        // item stays inside the bar's box, every drawn pixel inside it and its soft drop shadow
+        // (the kit's panel shadow: 3 + 4 canvas pixels down, its 4-pixel blur around).
+        HudState x = hud;
+        x.sanity = 100000; x.sanityMax = 1; x.money = 99999999; x.tier = 3;
+        HudStrings longWords = strings;
+        longWords.label = "Averyveryverylongmeterlabelthatcannotfit";
+        longWords.am = longWords.pm = "o'clock in the afternoon";
+        for (int maxW : {600, 300, 200, 120, 104})
+        {
+            Composition c {kConsoleW, kConsoleH, {}, {}};
+            const Rect b = AddStatusBar(c, x, longWords, 40, 40, maxW);
+            CHECK(!c.ui.empty() && b.w <= maxW && b.w > 0);
+            for (const ui::UiItem& it : c.ui)
+                CHECK(it.to.x >= b.x && it.to.y >= b.y && it.to.x + it.to.w <= b.x + b.w && it.to.y + it.to.h <= b.y + b.h);
+            const int W = 800, H = 160;
+            std::vector<u32> px((size_t)W * H);
+            ui::Rasterise(c.ui, 1.0f, px.data(), W, H);
+            int outside = 0;
+            for (int y = 0; y < H; y++)
+                for (int xx = 0; xx < W; xx++)
+                    if ((px[(size_t)y * W + xx] >> 24) && (xx < b.x - 5 || xx >= b.x + b.w + 5 || y < b.y - 2 || y >= b.y + b.h + 8)) outside++;
+            CHECK(outside == 0);
+        }
+        Composition tiny {kConsoleW, kConsoleH, {}, {}};
+        CHECK(AddStatusBar(tiny, hud, strings, 0, 0, 50).w == 0 && tiny.ui.empty());
     }
     // No HUD (title, main menu, Create-a-Sim, black loads): never the two screens side by side.
     // The top screen framed at the left at its shape, the touch screen 2.5x framed at the right,
@@ -453,6 +599,75 @@ int main()
     CHECK(Place(Layout::Side, true, 16.0f / 9.0f).top.w == 341);
     CHECK(Place(Layout::Stacked, true, 16.0f / 9.0f).cw == 341);
     CHECK(Place(Layout::Side, true, kDSAspect).cw == SW * 2);
+
+    // The HD conversation's text (port/dialogue.h): placeholders and escapes never shown raw.
+    {
+        HudState hud;
+        hud.valid = true; hud.hour = 15; hud.minute = 7; hud.simName = "Jun";
+        CHECK(DialogueText("There's a reason, @1. Go!", hud) == "There's a reason, Jun. Go!");
+        CHECK(DialogueText("the @2 was repossessed", hud) == "the was repossessed");
+        CHECK(DialogueText("Looks like a @2! Amazing.", hud) == "Looks like a! Amazing.");
+        CHECK(DialogueText("by @3.", hud) == "by.");
+        CHECK(DialogueText("at @hh:@mm @am today", hud, "am", "pm") == "at 3:07 pm today");
+        CHECK(DialogueText("day:@DD @ss @ll end", hud) == "day: end");
+        CHECK(DialogueText("{F012}Hello{0b} there{F0}", hud) == "Hello there");
+        CHECK(DialogueText("lone @ sign @", hud) == "lone sign");
+        CHECK(DialogueText("  @2 starts\n@1\n\n", hud) == "starts\nJun");
+        CHECK(DialogueText("Bonjour !", hud) == "Bonjour !"); // the string's own space before '!' stays
+        HudState none; // no clock, no name: dropped
+        CHECK(DialogueText("@1, it is @hh:@mm.", none) == ", it is:.");
+        // Wrapped to the box: a word longer than a line breaks; a long page grows the panel up,
+        // never past the canvas; every line within the text box.
+        const DialogueLayout a = LayoutDialogue("Short.", true);
+        CHECK(a.fits && a.lines.size() == 1 && a.size == kDlgTextSize && a.rows == kDlgRows);
+        CHECK(a.panel.x == kDlgPanelX && a.panel.y + a.panel.h == kConsoleH - kDlgBottomGap && a.panel.y > 0);
+        const DialogueLayout b = LayoutDialogue(std::string(150, 'W'), true);
+        CHECK(b.fits && b.lines.size() > 4 && b.panel.y >= 0 && b.panel.h > a.panel.h);
+        std::string longText;
+        for (int i = 0; i < 60; i++) longText += "word ";
+        const DialogueLayout c = LayoutDialogue(longText, false);
+        CHECK(c.fits && c.size >= kDlgTextMin && c.textW > a.textW);
+        for (const std::string& l : c.lines) CHECK(ui::TextWidth(l, c.size) <= c.textW);
+        const DialogueLayout huge = LayoutDialogue(std::string(4000, 'W'), true); // clipped, never past the panel
+        CHECK(!huge.fits && huge.rows == kDlgMaxRows && huge.panel.y >= 0);
+        CHECK(!PortraitShown(nullptr));
+        std::vector<u32> flat(SW * SH, 0xFF5961A2), black(SW * SH, 0xFF000000), face(SW * SH, 0xFFC08060);
+        CHECK(!PortraitShown(flat.data()) && !PortraitShown(black.data()) && PortraitShown(face.data()));
+
+        // BuildDialogue (a RomData without strings: no text, the player's name on the plate):
+        // the world whole, every UI item inside the canvas, a click on the panel taps the game's
+        // arrow; BuildConsole keeps milestone 1's box without the game's strings.
+        RomData rom;
+        GameState g;
+        g.valid = true;
+        g.hud = hud;
+        g.dialogue.valid = true; g.dialogue.page = 1; g.dialogue.pages = 2; g.dialogue.stringId = 5; g.dialogue.speaker = 0x40;
+        for (int topW : {256, 341})
+        {
+            Composition comp {kConsoleW, kConsoleH, {}, {}};
+            BuildDialogue(comp, g, rom, face.data(), topW, 192);
+            CHECK(comp.pieces.size() == 2 && comp.pieces[0].src == Src::Top && comp.pieces[0].from.x == 0 && comp.pieces[0].from.w == topW);
+            CHECK(comp.pieces[0].from.h == HudCropRows(192));
+            bool plate = false;
+            for (const ui::UiItem& it : comp.ui)
+            {
+                CHECK(it.to.x >= 0 && it.to.y >= 0 && it.to.x + it.to.w <= kConsoleW && it.to.y + it.to.h <= kConsoleH);
+                plate |= it.kind == ui::UiItem::Text && it.text == "Jun";
+            }
+            CHECK(plate);
+            const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+            const Rect P = comp.pieces[1].to;
+            int tx, ty;
+            CHECK(TouchFromComposition(comp, fit, P.x + 5.5f, P.y + 5.5f, tx, ty) && tx >= 219 && tx < 250 && ty >= 155 && ty < 187);
+            CHECK(TouchFromComposition(comp, fit, P.x + P.w - 2.5f, P.y + P.h - 2.5f, tx, ty) && tx >= 219 && tx < 250 && ty >= 155 && ty < 187);
+            CHECK(OverTopComposition(comp, fit, 640.5f, 100.5f));
+            // Every pixel of its touchable pieces (the invisible tap piece) round trips, at every size.
+            for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}, {800, 1000}})
+                TestConsoleRoundtrip({Screen::Dialogue}, false, topW, 192, o.first, o.second, true, &comp);
+        }
+        const Composition m1 = BuildConsole({Screen::Dialogue}, false, -1, 256, 192, &hud, nullptr, &g, &rom, face.data());
+        CHECK(m1.ui.empty() && m1.pieces.size() == 5);
+    }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("layout_test: ok\n");

@@ -9,6 +9,7 @@ namespace sims2wide
 using melonDS::u8;
 using melonDS::u16;
 using melonDS::u32;
+using melonDS::u64;
 using melonDS::s16;
 
 // One DS screen.

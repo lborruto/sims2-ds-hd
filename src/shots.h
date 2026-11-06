@@ -11,9 +11,10 @@ void WriteShot(const std::string& path, const u32* top, const u32* bottom);
 // Any RGB picture (the window's, from video.cpp).
 void WriteRgb(const std::string& path, int w, int h, const u8* rgb);
 // The window's picture on the CPU (nearest scaling): composition c (Video::Composed) drawn with
-// its overlays. The top screen's picture is topW x topH (App::TopImage: bigger than 256 x 192
-// with the looks on).
-void WriteCompose(const std::string& path, const Composition& c, const u32* top, int topW, int topH, const u32* bottom);
+// its overlays and its UI items. The top screen's picture is topW x topH (App::TopImage: bigger
+// than 256 x 192 with the looks on). scale: output pixels per canvas pixel (--compose-scale: the
+// pieces nearest, the overlays and the UI drawn at that size).
+void WriteCompose(const std::string& path, const Composition& c, const u32* top, int topW, int topH, const u32* bottom, int scale = 1);
 // One picture of w x h pixels (0xAARRGGBB).
 void WriteImage(const std::string& path, const u32* px, int w, int h);
 }

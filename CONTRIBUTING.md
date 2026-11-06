@@ -57,10 +57,11 @@ Before opening a pull request:
     bash tests/hotspots_check.sh             # each touch target tapped in the game does what it says (ROM, shots/, the complete save)
     ninja -C build navigator_test && ./build/navigator_test   # CONSOLE's navigator on synthetic screens
     ninja -C build controls_test && ./build/controls_test     # one action per key and input, settings files loaded through the swap (SDL's dummy video driver)
-    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts (ROM, shots/, the complete save, Pillow)
+    bash tests/console_check.sh              # CONSOLE's pictures hold the DS pixels where they belong (and the hints), the navigator's and the activities' pad scripts, the HD conversation (its page follows the game's, A turns two pages, every language's conversations fit the box, no game text: milestone 1's box) (ROM, shots/, the complete save, Pillow)
     ninja -C build gamestate_test && ./build/gamestate_test   # the RAM reader and its screen names on a synthetic RAM
     bash tests/gamestate_check.sh            # each save state's game state read from RAM, the recorder's captures (ROM, shots/, the complete save)
     ninja -C build romdata_test && ./build/romdata_test       # the ROM's archive and string tables on a synthetic ROM: decoded, and every broken table refused
+    ninja -C build uikit_test && ./build/uikit_test           # the UI kit: text wrapping, the raster's determinism and hash, panels, text and chips (no ROM, no window)
     bash tests/romdata_check.sh              # the game's strings read from the ROM in its five languages (ROM; RESEARCH= the decoded lines to compare with, else that part is skipped)
 
 and look at the shots (`tools/sheet.py`). A layout change is checked with `--compose` from save
@@ -102,7 +103,7 @@ issue.
   change nothing (the check below). Another change to it needs an issue first; most belong
   upstream.
 - **No new dependency without discussion.** Today: melonDS, SDL2, stb_image_write,
-  tinyfiledialogs (and Pillow
+  stb_truetype, tinyfiledialogs, the Nunito font (and Pillow
   for `tools/sheet.py` only).
 - **Measure performance claims**, more than once, on the same save state, with `--headless`.
 - **Playable from the keyboard and mouse alone.**
@@ -129,7 +130,12 @@ The headless mode runs the game without a window, about four times faster than r
 | `--print-screen` | print the recognised bottom screen (`screens.h`) when it changes: `frame N: screen Panel/Pockets` |
 | `--print-game` | print what the game says is up, read from its RAM (European ROM only), at frame 0 and whenever it changes: `frame N: game X` |
 | `--record-dir DIR` | where unmapped screens are recorded (a window run records by default; headless only with this) |
-| `--strings-count`, `--dump-string ID`, `--language N` | the game's own strings read from the ROM (`romdata.h`), printed; they stop the run |
+| `--strings-count`, `--dump-string ID`, `--language N` | the game's own strings read from the ROM (`romdata.h`), printed; they stop the run; `--language` also picks the HD interface's words |
+| `--print-hud` | print the status bar's values and the conversation read from RAM when they change (`frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..`, `frame N: dialogue ..`) |
+| `--measure-string ID\|all` | lay a string out in the HD conversation's box (lines, size, fits); `all` every page of the game's conversations (from a `--state-load`); stops the run |
+| `--no-romdata` | do not read the game's text: CONSOLE as in milestone 1 (the old status bar and conversation) |
+| `--compose-scale N` | `--compose` pictures N times the canvas (1 to 4), the UI drawn at that size |
+| `--ui-demo` | the UI kit's demonstration drawn over the picture |
 | `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
 
 A headless run ends with a line that says what the DS clock reads, how often the hold wrote
@@ -151,7 +157,7 @@ over the last picture). Each part has its own file pair: `app.h` (the shared sta
 the layout chosen and shown, fast forward), `settings.*` (every option, the file),
 `controls.*` (the key and button bindings), `input.*` (keyboard, mouse, controller),
 `video.*` (the window), `audio.*` (with `audiostretch.h`), `layout.*`, `screens.*` (which
-bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*` (the overlay and the pause menu), `backup.*`, `script.*`,
+bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*` (the overlay and the pause menu), `ui/` (the HD UI kit and its font), `port/` (the HD status bar and conversations), `backup.*`, `script.*`,
 `shots.*`, `state.*`, `picker.*`.
 
 - **Input script** (`script.*`): parses `--input` files; the window events in it are pushed as
@@ -187,6 +193,7 @@ bottom screen the game shows), `scene.*` (AUTO's detection), `ui.*` and `menu.*`
   piece showing it draws it. The navigator (below) opens the menu and moves the ring;
   `--console-menu` and `--console-focus N` pin them for the checks' pictures (`tests/console_check.sh`); `tests/layout_test.cpp` maps every pixel of every piece
   of every CONSOLE composition back to itself.
+- **The HD interface** (`ui/`, `port/`, `romdata.*`): the kit (`ui/kit.*`) draws items (panels, text, chips, live crops of the DS pictures) in canvas pixels, with the embedded Nunito (`ui/font.*`, `assets/fonts/`, SIL OFL: the releases carry its licence); a composition's `ui` list is drawn after its pieces, by the window and `--compose` alike, deterministically (`--compose-scale N` draws it at N times). `port/statusbar.*` and `port/dialogue.*` build the status bar and the conversation from `GameState` (read from RAM) and the game's own words, read from your ROM at run time by `romdata.*` (in the language `--language` or the firmware names); without them (another version of the game, `--no-romdata`) CONSOLE keeps milestone 1's pictures. Nothing of the game's text is in the repository.
 - **The navigator** (`navigator.*`): in CONSOLE the buttons go through it (`Input::Steer`, from
   the keyboard, the controllers and a script's `pad` events alike, as a `PadState` of actions).
   For each recognised screen it either passes them on as the DS's (town, conversations) or keeps

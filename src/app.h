@@ -10,6 +10,8 @@
 #include "common.h"
 #include "gamestate.h"
 #include "layout.h"
+#include "port/statusbar.h"
+#include "romdata.h"
 #include "scene.h"
 #include "screens.h"
 #include "settings.h"
@@ -31,6 +33,8 @@ struct App
     // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
     // pinned them for a check's picture.
     bool consolePinned = false;
+    // (A check) the UI kit's demonstration drawn over every composition (--ui-demo).
+    bool uiDemo = false;
     // CONSOLE's screen: the game's own (RAM) when it reads, else the pixel tracker's (gamestate.h).
     ScreenState ConsoleScreen() const { return ConsoleScreenOf(game, screens.Current(), HudVisible(Top()), (game.valid || game.between) && ScreensBlack(Top(), Bottom())); }
     // The game's bottom slot is not switching (true without a RAM reading): the navigator's gate.
@@ -42,6 +46,16 @@ struct App
     // (ASJP) has its addresses; any other: GameState is never read (not valid, not between).
     std::string romCode;
     bool portSupported = false;
+    // The game's own words for the HD status bar (clock, money, Sanity), read once at start from
+    // the ROM's string table in the game's language (port/statusbar.h); not ok when the ROM's
+    // data does not read: CONSOLE then keeps milestone 1's compositions (the game's own HUD).
+    HudStrings hudStrings;
+    // The game's strings (and archive), opened once at start in the game's language (or
+    // --language's): the HD conversation's words. Null when the ROM's data does not read (or
+    // --no-romdata): CONSOLE's conversation is then milestone 1's.
+    std::unique_ptr<RomData> rom;
+    // The status bar's values for CONSOLE: the game's (RAM) on the European ROM, else none.
+    const HudState* Hud() const { return portSupported ? &game.hud : nullptr; }
 
     bool fast = false;             // fast forward held
     bool quit = false;

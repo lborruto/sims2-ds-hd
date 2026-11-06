@@ -6,7 +6,10 @@
 #   sit-cityhall (the panel, in town): the world, the rail of the touch screen's tab column and
 #   phone icon; the same with --console-menu: the menu, 3x over the dimmed world; s7 (the phone): the touch screen 3x over the dimmed world; the same with
 #   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item): 3x over the
-#   dimmed world; s5 (a conversation): the dialogue rebuilt wide;
+#   dimmed world; s5 with --no-romdata (no game text: milestone 1's conversation): the dialogue
+#   rebuilt wide from the game's pieces; s5-hd (the HD conversation, src/port/dialogue.*): the
+#   world whole, the panel, the name plate's and the text's white pixels, the portrait as the
+#   touch screen's own pixels 2x; s5-hd-wide (--wide): the world not cut at its sides;
 #   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
 #   top right, the hints' box; s2, s3, s4 (the main menu, Create-a-Sim, Keep this Sim?: no HUD):
 #   the front end's view, the top screen framed at the left at its shape and the touch screen
@@ -55,11 +58,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
+    case $state in act-cards|sit-casino) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    [ "$state" = act-cards ] && cp "$complete_save" "$save"
+    case $state in act-cards|sit-casino) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -68,12 +71,15 @@ run() {
 town=(--clock "2026-01-01 12:00")
 hotel=(--clock "2026-01-01 14:00")
 late=(--clock "2026-11-05 12:05")
-run s7 s7 "${town[@]}" &
+run s7 s7 --clock "2026-01-01 15:37" &
 run cityhall sit-cityhall "${town[@]}" &
+run cityhall-wide sit-cityhall "${town[@]}" --wide &
 run s7-menu s7 "${town[@]}" --console-focus 0 &
 run cityhall-menu sit-cityhall "${town[@]}" --console-menu &
 run gift sit-gift "${town[@]}" &
-run s5 s5 "${town[@]}" &
+run s5 s5 "${town[@]}" --no-romdata &
+run s5-hd s5 "${town[@]}" --print-hud &
+run s5-hd-wide s5 "${town[@]}" --wide &
 run social act-social "${town[@]}" &
 wait
 run vacuum act-vacuum "${hotel[@]}" &
@@ -85,20 +91,31 @@ run s4 s4 "${town[@]}" &
 run slots sit-store "${town[@]}" --input "$repo/scripts/hotspots/options-save.txt" &
 run load act-cards "${late[@]}" --input "$repo/scripts/console/cards-quit.txt" &
 wait
+run casino sit-casino "${late[@]}" --print-hud &
+run casino-2x sit-casino "${late[@]}" --print-hud --compose-scale 2 &
+wait
 
 fails=0
-for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots load; do
+for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
         continue
     fi
-    if "$python" -I - "$tmp/$name/c/f000119.png" "$tmp/$name/r/f000119.png" "$name" <<'EOF'
+    if "$python" -I - "$tmp/$name/c/f000119.png" "$tmp/$name/r/f000119.png" "$name" "$tmp/$name.log" <<'EOF'
+import re
 import sys
 from PIL import Image
 
-comp_path, raw_path, case = sys.argv[1:4]
+comp_path, raw_path, case, log_path = sys.argv[1:5]
 comp = Image.open(comp_path).convert("RGB")
+if case.endswith("-2x"):
+    # --compose-scale 2: the canvas at twice its size (pieces nearest): read it at canvas points.
+    expect_size = (2560, 1440)
+    if comp.size != expect_size:
+        print(f"  {case}: size {comp.size}")
+        sys.exit(1)
+    comp = comp.resize((1280, 720), Image.NEAREST)
 raw = Image.open(raw_path).convert("RGB")
 top = lambda x, y: raw.getpixel((x, y))
 bottom = lambda x, y: raw.getpixel((x, 192 + y))
@@ -132,9 +149,66 @@ def rail():
     expect("rail frame", C(1175, 360), FRAME)
     piece("rail tabs", 0, 6, 35, 184, 1177, 208, 2, step=2)
     piece("rail phone", 222, 4, 30, 30, 1182, 144, 2)
-    w = world_full()
-    for cx, cy in ((400, 100), (700, 650), (1000, 300)):
+    # The world without the game's status bar (its last 16 rows): 176 rows 720 high.
+    w = world_full(176)
+    for cx, cy in ((400, 100), (700, 650), (1000, 300), (900, 715)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
+
+WELL = hexrgb("6A72B8")
+BODY = [hexrgb(h) for h in ("EB0000", "38BA38", "DBA230", "B2B2E3")]
+
+def hud_values():
+    """The last status bar --print-hud logged: (money, hh, mm, cur, max, tier)."""
+    found = None
+    for line in open(log_path, encoding="utf-8", errors="replace"):
+        m = re.search(r"hud money=(\d+) time=(\d+):(\d+) sanity=(\d+)/(\d+) tier=(\d+)", line)
+        if m:
+            found = tuple(int(v) for v in m.groups())
+    return found
+
+def status_bar(values=None, left=132):
+    """The HD status bar: its panel from x `left` (the 4:3 world's left + 16), rows 660-707, found
+    by its frame band (#6171B2) at both ends of row 684; inside it, and only there, white text;
+    with values (from --print-hud), the meter: its body in the tier's colour, filled cur / max of
+    the track (the well's inside less 2 pixels a side) within 2 pixels."""
+    BAND = hexrgb("6171B2")
+    x0, y0, y1 = left, 660, 708
+    expect("status bar band, top", C(x0 + 18, y0 + 2), BAND)
+    expect("status bar band, left", C(x0 + 2, 684), BAND)
+    band = [x for x in range(x0, 1160) if C(x, 684) == BAND]
+    if not band or band[0] > x0 + 3:
+        errors.append("no status bar panel")
+        return
+    x1 = band[-1] + 2
+    if x1 - x0 < 200 or C(x1 - 1, 684) != OUTLINE:
+        errors.append(f"status bar panel {x0}..{x1}: no right edge")
+        return
+    inside = [C(x, y) for y in range(y0 + 4, y1 - 4) for x in range(x0 + 4, x1 - 4)]
+    if inside.count((255, 255, 255)) < 40:
+        errors.append("no status bar text")
+    if values is None:
+        return
+    money, hh, mm, cur, mx, tier = values
+    body = BODY[tier]
+    rows = {}
+    for y in range(y0, y1):
+        xs = [x for x in range(x0, x1) if C(x, y) == body]
+        if xs:
+            rows[y] = xs
+    if not rows:
+        errors.append(f"no meter body in tier {tier}'s colour")
+        return
+    y = sorted(rows)[len(rows) // 2 + 1] if len(rows) > 2 else sorted(rows)[0]
+    xs = rows[y]
+    wells = [x for x in range(x0, x1) if C(x, y) == WELL]
+    if not wells:
+        errors.append("no meter well")
+        return
+    track_w = (max(max(wells), max(xs)) - min(wells) + 1) - 4
+    filled = (max(xs) - min(xs) + 1) + 2
+    want = round(track_w * cur / mx)
+    if abs(filled - want) > 2:
+        errors.append(f"meter filled {filled} of {track_w} (want {want}: {cur}/{mx})")
 
 def front():
     """No HUD: the top screen fitted in 24,72 568 x 480 (4:3: 568 x 426 at 24,99), the touch
@@ -159,19 +233,27 @@ def front():
 def big_over_dim():
     piece("touch screen 3x", 0, 0, 256, 192, 256, 72, 3, step=9)
     expect("touch screen 3x top-left", C(256, 72), bottom(0, 0))
-    w = world_full()
-    for cx, cy in ((200, 100), (1100, 650)):
+    # The world without the game's status bar (176 rows): row 174 at the canvas's foot.
+    w = world_full(176)
+    for cx, cy in ((200, 100), (1100, 650), (900, 715), (1050, 700)):
         r, g, b = w(cx, cy)
         expect(f"dimmed world at {cx},{cy}", C(cx, cy), tuple(v * (255 - 0x8C) // 255 for v in (r, g, b)))
 
-def activity():
+def activity(rows=192):
     expect("background", C(10, 10), PANEL)
     expect("touch screen frame", C(32, 300), OUTLINE)
     expect("touch screen 3x top-left", C(36, 68), bottom(0, 0))
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
     expect("world frame", C(855, 200), OUTLINE)
-    for x, y in ((0, 0), (100, 50), (383, 287), (200, 280)):
-        expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, y * 192 // 288))
+    # The small world, 384 wide; without the game's status bar (176 rows: 264 high) where the
+    # HD bar sits under it.
+    h = round(384 * rows / 256)
+    for x, y in ((0, 0), (100, 50), (383, h - 1), (200, h - 8)):
+        expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, y * rows // h))
+    if rows < 192:
+        region = [C(x, y) for y in range(68 + h + 14, 68 + h + 58) for x in range(852, 1248)]
+        if (255, 255, 255) not in region or OUTLINE not in region:
+            errors.append("no status bar text under the small world")
     # The hints' box (kHintBox, 850,400): its outline, its fill, the first button's chip and,
     # in the first row's text (x 972 on), white letters with the outline's shadow.
     expect("hints outline", C(851, 500), OUTLINE)
@@ -184,8 +266,34 @@ def activity():
 if case == "cityhall":
     expect("canvas", comp.size, (1280, 720))
     rail()
-elif case in ("s7", "cityhall-menu"):
+    status_bar()
+elif case == "cityhall-wide":
+    # Widescreen: the world without the game's bar keeps its sides (never cut to make room for
+    # the crop): 341 x 176 fitted to the canvas's width, 1280 x 661, top-aligned; the backdrop
+    # in the strip below, where the bar sits.
+    big = Image.open(raw_path.replace(".png", "-top.png")).convert("RGB")
+    expect("wide picture", big.size, (341, 192))
+    for cx, cy in ((0, 300), (1279, 100), (640, 400), (300, 655), (1000, 660)):
+        expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * 341 // 1280, cy * 176 // 661)))
+    for cx, cy in ((1000, 680), (1270, 715), (700, 700)):
+        expect(f"backdrop below the world at {cx},{cy}", C(cx, cy), (16, 18, 24))
+    expect("rail outline", C(1170, 360), OUTLINE)
+    status_bar(left=16)
+elif case == "s7":
     big_over_dim()
+    status_bar()
+elif case == "cityhall-menu":
+    big_over_dim()
+    status_bar()
+elif case in ("casino", "casino-2x"):
+    # The complete save (yellow tier): the casino's panel, the meter filled cur / max in yellow.
+    values = hud_values()
+    if values is None:
+        errors.append("no hud line from --print-hud")
+    else:
+        expect("tier", values[5], 2)
+        status_bar(values)
+        rail()
 elif case == "s7-menu":
     big_over_dim()
     # The ring around the phone's first button (up: x 12-79, y 140-189), 4 pixels outside it.
@@ -206,7 +314,45 @@ elif case == "s5":
     w = world_full(176)
     for cx, cy in ((400, 100), (1000, 300)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
-elif case in ("social", "vacuum", "cards"):
+elif case in ("s5-hd", "s5-hd-wide"):
+    # The HD conversation (port/dialogue.h): the panel 1060 wide from x 110 (its frame band
+    # #6171B2), the text well, white text in it, the name plate's white text above it, the
+    # portrait: the touch screen's x 174-240, rows 38-121, 2x from (1006, 504) (a page of
+    # four rows: the panel 254 high from y 452), nothing of the game's own box.
+    BAND, TWELL = hexrgb("6171B2"), hexrgb("6A72B8")
+    expect("panel band", C(112, 600), BAND)
+    expect("text well", C(560, 676), TWELL)
+    white = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1) for x in range(x0, x1) if min(C(x, y)) > 235)
+    if white(150, 500, 960, 680) < 1000:
+        errors.append("no text in the panel")
+    if white(140, 430, 400, 476) < 300:
+        errors.append("no name on the plate")
+    grid = [(x, y) for y in range(0, 84, 3) for x in range(0, 67, 3)]
+    bad = sum(1 for x, y in grid if C(1006 + 2 * x, 504 + 2 * y) != bottom(174 + x, 38 + y))
+    if bad:
+        errors.append(f"portrait: {bad} pixels not the touch screen's")
+    if sum(1 for x, y in grid if max(C(1006 + 2 * x, 504 + 2 * y)) > 40) < len(grid) // 2:
+        errors.append("portrait black")
+    if case == "s5-hd":
+        w = world_full(176)
+        for cx, cy in ((400, 100), (1000, 300), (130, 420)):
+            expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
+        if not re.search(r"frame \d+: hd dialogue id=\d+ lines=\d+", open(log_path).read()):
+            errors.append("no hd dialogue line in the log")
+    else:
+        # --wide: the world's whole width on the canvas (1280 wide, top-aligned, its status bar's
+        # rows dropped), as the HD status bar's town: never cut at its sides.
+        big = Image.open(raw_path.replace(".png", "-top.png")).convert("RGB")
+        tw, th = big.size
+        rows = th * 176 // 192
+        h = round(1280 * rows / tw)
+        for cx, cy in ((2, 100), (1277, 100), (640, 300), (40, 440)):
+            expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * tw // 1280, cy * rows // h)))
+elif case in ("social", "vacuum"):
+    expect("canvas", comp.size, (1280, 720))
+    activity(176)
+elif case == "cards":
+    # The card game has no HUD: its world whole, no status bar.
     expect("canvas", comp.size, (1280, 720))
     activity()
 elif case in ("s2", "s3", "s4"):
@@ -301,7 +447,7 @@ act() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 at=$5 clock=$6 file save=$tmp/$1.sav
     file=$shots/$state.st
     [ -f "$file" ] || file=$more_shots/$state.st
-    if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
+    case $state in act-cards|sit-casino) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$save" --layout console \
         --print-screen --print-game --clock "$clock" --input "$input" --shot-at "$at" --shot-dir "$tmp/$name" \
         > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
@@ -377,5 +523,102 @@ cancelled() {
 }
 check_pad act-cancel cancelled
 check_pad act-blow pixels act-blow blow
+# The HD conversation's pages (src/port/dialogue.*): from s5 tapping the arrow through the first
+# speech (scripts/dlg-taps.txt), the HD text follows the game's page counter the same frame:
+# --print-hud logs the page and the HD box's string on the same frame, and the box's text
+# changes between the frame before and that frame; on every page the text, the name and a
+# portrait that is not black. From s5, A pressed twice (scripts/console/dialogue-a.txt) turns
+# exactly two pages. Then each language's conversations (every page of the game's speech table,
+# --measure-string all; a layout check: the game itself stays in its firmware's language) fit
+# the box with no placeholder or escape left in their text, the longest one too (--measure-string ID), and its picture (--dialogue-string) keeps
+# every white text pixel of the panel inside the text well.
+dlg() {
+    local name=$1; shift
+    "$bin" "$rom" --headless --state-load "$shots/s5.st" --save "$tmp/$name.sav" --layout console --clock "2026-01-01 12:00" \
+        --print-hud "$@" > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+dlg dlg-pages --frames 160 --input "$repo/scripts/dlg-taps.txt" --compose --shot-at 28,29,88,89,149,150 --shot-dir "$tmp/dlg-pages" &
+dlg dlg-a --frames 160 --input "$repo/scripts/console/dialogue-a.txt" &
+dlg dlg-norom --frames 240 --input "$repo/scripts/dlg-taps.txt" --no-romdata &
+wait
+pages() {
+    local f
+    for f in 29 89 150; do
+        grep -q -E "^frame $f: dialogue .*page=" "$tmp/dlg-pages.log" && grep -q -E "^frame $f: hd dialogue " "$tmp/dlg-pages.log" ||
+            { echo "  dlg-pages: no page change and HD text both at frame $f"; return 1; }
+    done
+    "$python" -I - "$tmp/dlg-pages" <<'EOF'
+import sys
+from PIL import Image
+
+d = sys.argv[1]
+shot = lambda f: Image.open(f"{d}/f{f:06d}.png").convert("RGB")
+errors = []
+white = lambda im, x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if min(im.getpixel((x, y))) > 235)
+for f in (28, 29, 88, 89, 149, 150):
+    im = shot(f)
+    if white(im, 150, 500, 960, 680) < 250:
+        errors.append(f"frame {f}: no text")
+    if white(im, 140, 430, 400, 476) < 75:
+        errors.append(f"frame {f}: no name")
+    if sum(1 for y in range(504, 672, 6) for x in range(1006, 1140, 6) if max(im.getpixel((x, y))) > 40) < 300:
+        errors.append(f"frame {f}: no portrait")
+for a, b in ((28, 29), (88, 89), (149, 150)):
+    A, B = shot(a), shot(b)
+    if sum(1 for y in range(500, 680, 2) for x in range(150, 960, 2) if A.getpixel((x, y)) != B.getpixel((x, y))) < 200:
+        errors.append(f"the text did not change from frame {a} to {b}")
+for e in errors:
+    print(f"  dlg-pages: {e}")
+sys.exit(1 if errors else 0)
+EOF
+}
+check_pad dlg-pages pages
+two_pages() {
+    in_order dlg-a 'dialogue speech=0 page=1/4' 'dialogue speech=0 page=2/4' 'dialogue speech=0 page=3/4' || return 1
+    if grep -q 'page=4/4' "$tmp/dlg-a.log"; then echo "  dlg-a: A turned more than two pages"; return 1; fi
+}
+check_pad dlg-a two_pages
+# Without the game's text, --print-hud still logs the pages, and "dialogue none" only when the
+# conversation is not up (never on a frame that logged a page).
+norom() {
+    in_order dlg-norom 'dialogue speech=0 page=1/4' 'dialogue speech=0 page=4/4' 'dialogue none' 'dialogue speech=1 page=1/3' || return 1
+    local f
+    for f in $(sed -n 's/^frame \([0-9]*\): dialogue speech=.*/\1/p' "$tmp/dlg-norom.log"); do
+        if grep -q "^frame $f: dialogue none" "$tmp/dlg-norom.log"; then echo "  dlg-norom: frame $f logged a page and none"; return 1; fi
+    done
+    if grep -q 'hd dialogue' "$tmp/dlg-norom.log"; then echo "  dlg-norom: an HD line without the game's text"; return 1; fi
+}
+check_pad dlg-norom norom
+for lang in 1 2 3 4 5; do
+    name=measure-$lang
+    if ! out=$("$bin" "$rom" --headless --frames 1 --state-load "$shots/s5.st" --save "$tmp/$name.sav" --language $lang --measure-string all 2> "$tmp/$name.log"); then
+        echo "FAIL $name: $out $(tail -n 1 "$tmp/$name.log")"; fails=$((fails + 1)); continue
+    fi
+    id=$(echo "$out" | sed -n 's/.*longest string \([0-9]*\).*/\1/p')
+    one=$("$bin" "$rom" --headless --frames 1 --state-load "$shots/s5.st" --save "$tmp/$name.sav" --language $lang --measure-string "$id" 2>/dev/null)
+    if [ "$(echo "$one" | grep -c ' fits$')" != 2 ]; then echo "FAIL $name: string $id: $one"; fails=$((fails + 1)); continue; fi
+    dlg "$name" --frames 40 --language $lang --dialogue-string "$id" --compose --shot-at 30 --shot-dir "$tmp/$name"
+    if [ ! -f "$tmp/$name.ok" ]; then echo "FAIL $name: the picture's run did not end well"; fails=$((fails + 1)); continue; fi
+    # Every white text pixel of the panel's rows inside the text well (x 132-974) or on the
+    # name plate (above the well's top edge); the portrait's column left out.
+    if "$python" -I - "$tmp/$name/f000030.png" <<'EOF'
+import sys
+from PIL import Image
+
+im = Image.open(sys.argv[1]).convert("RGB")
+# The well's top edge: the first row of the well's colour at x 600, from y 380 down.
+top = next((y for y in range(380, 700) if im.getpixel((600, y)) == (0x6A, 0x72, 0xB8)), None)
+if top is None:
+    print("  no text well")
+    sys.exit(1)
+out = [(x, y) for y in range(top, 706) for x in range(110, 1170)
+       if not (132 <= x < 975) and not (996 <= x < 1150) and min(im.getpixel((x, y))) > 245]
+if out:
+    print(f"  text outside the well at {out[:3]}")
+    sys.exit(1)
+EOF
+    then echo "ok   $name: $(echo "$out" | head -n 1)"
+    else echo "FAIL $name"; fails=$((fails + 1)); fi
+done
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

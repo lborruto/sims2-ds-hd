@@ -115,8 +115,8 @@ static void plain_screens()
 static void overlay_screens()
 {
     Ram r = Make(0x0214AA18, 15);
-    r.W16(kS + 0x34, 3);
-    r.W8(kS + 0x0C, 1);
+    r.W16(kS + 0x36, 3);
+    r.W16(kS + 0x34, 1);
     GameState g = ReadGameState(r.View());
     CHECK(g.screen == GScreen::Dialogue && g.page == 3 && g.speech == 1);
 
@@ -266,8 +266,102 @@ static void console_screen()
     CHECK(ConsoleScreenOf(g, {Screen::None}, false, true) == (ScreenState{Screen::FrontEnd}));
 }
 
+constexpr u32 kG = 0x021670A4, kTab = 0x0211F16C, kPages = 0x02200000;
+
+static void put_hud(Ram& r)
+{
+    r.W32(0x0213E434, kG);
+    r.W32(kG + 0x2F60, 14843);
+    r.W32(kG + 0x4800, 15);
+    r.W32(kG + 0x4804, 37);
+    r.W32(kG + 0x2164, 50u << 12);
+    r.W32(kG + 0x2168, 225u << 12);
+    r.W32(kG + 0x216C, 2);
+    const char* n = "Jun";
+    for (int i = 0; i < 4; i++) r.W8(kG + 0x53 + i, n[i]);
+    r.W8(kG + 0x53 + 4, 'x');   // junk after the NUL
+}
+
+static void hud()
+{
+    Ram r = Make(0x0213203C, -1);
+    CHECK(!ReadGameState(r.View()).hud.valid);   // no G block: zeros (max 0)
+    put_hud(r);
+    HudState h = ReadGameState(r.View()).hud;
+    CHECK(h.valid && h.money == 14843 && h.hour == 15 && h.minute == 37);
+    CHECK(h.sanity == 50 && h.sanityMax == 225 && h.tier == 2 && h.simName == "Jun");
+    r.W32(kG + 0x2F60, (u32)-120);
+    CHECK(ReadGameState(r.View()).hud.money == -120);
+    // garbage: each field out of range invalidates
+    auto bad = [&](u32 off, u32 v) { Ram q = r; q.W32(kG + off, v); return !ReadGameState(q.View()).hud.valid; };
+    CHECK(bad(0x4800, 24) && bad(0x4804, 60) && bad(0x216C, 4) && bad(0x2168, 0) && bad(0x2164, 226u << 12));
+    // a bad name byte or no NUL within the 8-byte field blanks the name only
+    auto blank = [&](Ram q) { HudState x = ReadGameState(q.View()).hud; return x.valid && x.simName.empty() && x.money == -120 && x.hour == 15 && x.sanityMax == 225; };
+    { Ram q = r; q.W8(kG + 0x53, 0x01); CHECK(blank(q)); }
+    { Ram q = r; q.W8(kG + 0x54, 0xC3); CHECK(blank(q)); }
+    { Ram q = r; for (int i = 0; i < 8; i++) q.W8(kG + 0x53 + i, 'A'); CHECK(blank(q)); }
+    { Ram q = r; for (int i = 0; i < 7; i++) q.W8(kG + 0x53 + i, 'A'); q.W8(kG + 0x53 + 7, 0); CHECK(ReadGameState(q.View()).hud.simName == "AAAAAAA"); }
+    { Ram q = r; q.W32(0x0213E434, 0xFFFFFF00); CHECK(!ReadGameState(q.View()).hud.valid); }
+    { Ram q = r; q.W32(0x0213E434, 0); CHECK(!ReadGameState(q.View()).hud.valid); }
+    // screen identity ignores the hud
+    GameState a = ReadGameState(r.View()), b = a;
+    b.hud.minute = 38;
+    CHECK(a == b);
+}
+
+// A speech table with speech 2 = 3 pages {1183 spk 63, 1184 spk 22, 1185 spk 0x40}; Sim record 22 -> name id 345.
+static Ram dialogue_ram()
+{
+    Ram r = Make(0x0214AA18, 15);
+    put_hud(r);
+    r.W32(kTab + 8 * 2, kPages);
+    r.W8(kTab + 8 * 2 + 4, 3);
+    const u32 ids[] = {1183, 1184, 1185}, spk[] = {0x3F, 22, 0x40};
+    for (int i = 0; i < 3; i++) { r.W16(kPages + 4 * i, ids[i]); r.W8(kPages + 4 * i + 2, spk[i]); }
+    r.W16(kG + 0x21DC + 0x2C * 22 + 0x18, 22);
+    r.W16(kS + 0x34, 2);
+    r.W16(kS + 0x36, 1);
+    return r;
+}
+
+static void dialogue()
+{
+    Ram r = dialogue_ram();
+    DialogueState d = ReadGameState(r.View()).dialogue;
+    CHECK(d.valid && d.speech == 2 && d.page == 1 && d.pages == 3 && d.stringId == 1183 && d.speaker == 0x3F);
+    CHECK(d.speakerNameId == -1 && !d.last);
+    r.W16(kS + 0x36, 2);
+    d = ReadGameState(r.View()).dialogue;
+    CHECK(d.valid && d.page == 2 && d.stringId == 1184 && d.speaker == 22 && d.speakerNameId == 345 && !d.last);
+    r.W16(kS + 0x36, 3);
+    d = ReadGameState(r.View()).dialogue;
+    CHECK(d.valid && d.stringId == 1185 && d.speaker == 0x40 && d.speakerNameId == -1 && d.last);
+    // not read outside the Dialogue screen
+    { Ram q = Make(0x0213203C, -1); put_hud(q); CHECK(!ReadGameState(q.View()).dialogue.valid); }
+    // garbage
+    auto bad = [&](auto f) { Ram q = r; f(q); return !ReadGameState(q.View()).dialogue.valid; };
+    CHECK(bad([](Ram& q) { q.W16(kS + 0x36, 0); }));                 // nothing drawn yet
+    CHECK(bad([](Ram& q) { q.W16(kS + 0x36, 4); }));                 // past the count
+    CHECK(bad([](Ram& q) { q.W16(kS + 0x34, 216); }));               // speech index out of the table
+    CHECK(bad([](Ram& q) { q.W8(kTab + 8 * 2 + 4, 17); }));          // count over 16
+    CHECK(bad([](Ram& q) { q.W8(kTab + 8 * 2 + 4, 0); }));
+    CHECK(bad([](Ram& q) { q.W32(kTab + 8 * 2, 0x10000000); }));     // pages pointer outside RAM
+    CHECK(bad([](Ram& q) { q.W32(kTab + 8 * 2, 0); }));              // null (speech 67 style)
+    CHECK(bad([](Ram& q) { q.W8(kPages + 4 * 2 + 2, 46); }));        // speaker not a Sim record, none or player
+    CHECK(bad([](Ram& q) { q.W16(kS + 0x36, 2); q.W32(0x0213E434, 0); }));   // no G for a named speaker
+    // one-off mode: S+0x34 is the string id, speaker S+0x3C
+    Ram o = dialogue_ram();
+    o.W8(kS + 0x41, 1); o.W16(kS + 0x34, 1190); o.W8(kS + 0x3C, 22); o.W16(kS + 0x36, 0);
+    d = ReadGameState(o.View()).dialogue;
+    CHECK(d.valid && d.stringId == 1190 && d.page == 1 && d.pages == 1 && d.last && d.speaker == 22 && d.speakerNameId == 345);
+    o.W16(kS + 0x34, 0);
+    CHECK(!ReadGameState(o.View()).dialogue.valid);
+}
+
 int main()
 {
+    hud();
+    dialogue();
     between_screens();
     panel_and_popup();
     settled_only_for_3();

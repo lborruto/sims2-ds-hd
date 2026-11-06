@@ -77,13 +77,32 @@ table is reported as `Unknown(ov=N,vt=0x...)`: log it, it is a new screen to map
 | Catalogue | `S+0x258` | | list: 1 shop, 2 owned | high |
 | Phone | `S+0x89` | u8 | highlighted entry 0..3 | high |
 | Phone | `S+0x88` | u8 | page (0 menu, 2 when Messages opened, 0x0A leaving) | medium |
-| Dialogue | `S+0x0C` (= u16 `S+0x36`) | u8 | speech index | medium |
-| Dialogue | `S+0x34` | u16 | page, 1-based | medium |
+| Dialogue | `S+0x34` | u16 | speech index into the table at `0x0211F16C` (216 entries `{u32 pages ptr, u8 count}`); in one-off mode (`S+0x41` = 1) a bare string id | high |
+| Dialogue | `S+0x36` | u16 | page counter, 1-based while a page is shown (0 before the first draw); last page = counter == count | high |
+| Dialogue | `S+0x0C` | u8 | copy of the speech index (not read) | high |
+| Dialogue | `S+0x3C` | u8 | speaker in one-off mode | medium |
+| Dialogue | `pages[S+0x36-1]` | `{u16 string id, u8 speaker}` | text id and speaker of the shown page; speaker < 46 = Sim record, 0x3F none, 0x40 the player; name string id = 323 + u16 at `G+0x21DC+0x2C*k+0x18` | high |
 | Cards | `S+0x2E0` | s32 | lifted card 0..8, -1 none | medium |
 | Cards | `S+0xD0 + 0x14*i` | | card i lifted flag | medium |
 | Cards | `S+0x4C` | u8 | deck count | medium |
 | Cards | `S+0x306` / `S+0x2F7` | | 1 when help or quit is up / quit is up | low-medium |
 | Social | `Q = *(0x0213E70C)`; `Q+4/+8/+0xC` | | answers left/middle/right; byte `+2` = 1 when chosen; stale after the game | low-medium |
+
+## Status bar and conversation (`HudState`, `DialogueState`)
+
+`G` = `*(0x0213E434)` = 0x021670A4 (static, the game-state block). Read by `ReadGameState` into
+`GameState::hud` (any screen) and `GameState::dialogue` (screen Dialogue only), every field
+range-checked (else `valid` false); `--print-hud` logs changes. Offsets are in `kEU`.
+
+| Field | Address | Type | Meaning |
+| --- | --- | --- | --- |
+| money | `G+0x2F60` (0x0216A004) | s32 | plain binary |
+| hour / minute | `G+0x4800` / `G+0x4804` (0x0216B8A4 / A8) | u32 | 0-23 / 0-59, the DS RTC the game shows (`--clock` drives it; a fresh state load shows the old time for a few frames) |
+| sanity cur / max | `G+0x2164` / `G+0x2168` (0x02169208 / 0C) | u32, 20.12 fixed | bar = cur*104/max px |
+| sanity tier | `G+0x216C` (0x02169210) | u32 0..3 | bar colour red, green, yellow, lavender |
+| Sim name | `G+0x53` | ASCII, NUL within 8 | the `@1` text substitution |
+
+Not mapped: motives and the mood meter; the progressive text reveal (the page is complete as soon as its counter shows).
 
 ## Backup signal
 

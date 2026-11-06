@@ -37,6 +37,7 @@
 #include "mic.h"
 #include "picker.h"
 #include "romdata.h"
+#include "port/dialogue.h"
 #include "script.h"
 #include "shots.h"
 #include "recorder.h"
@@ -53,6 +54,8 @@ static void Usage()
         "usage: sims2wide [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
         "  --layout console|auto|focus|side|stacked  window layout (default console)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
+        "  --compose-scale N             --compose pictures N times the canvas (1 to 4; the UI drawn at that size)\n"
+        "  --ui-demo                     (checks) the HD interface kit's demonstration over the picture\n"
         "  --res3d N                     3D drawn N times sharper (1 = the DS's own; default 2 in the window, 1 headless)\n"
         "  --wide                        widescreen 16:9 world\n"
         "  --interp                      60 fps in-between frames for the 3D\n"
@@ -67,6 +70,8 @@ static void Usage()
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
+        "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
+        "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
         "  --record-dir DIR              where unmapped screens are recorded (a state + a picture each; default: the\n"
         "                                settings folder's captures/; on in the window, off headless unless given)\n"
         "  --print-screen                print the recognised bottom screen when it changes (frame N: screen X)\n"
@@ -76,8 +81,12 @@ static void Usage()
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --strings-count               print how many strings the game's text table has, and stop\n"
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
-        "  --language N                  the text's language for those: 0 Japanese (the English file), 1 English,\n"
-        "                                2 French, 3 German, 4 Italian, 5 Spanish (default: the firmware's)\n"
+        "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
+        "                                or all: every page of the game's conversations (needs --state-load), and stop\n"
+        "  --language N                  the text's language for those and the HD interface's words: 0 Japanese (the\n"
+        "                                English file), 1 English, 2 French, 3 German, 4 Italian, 5 Spanish (default:\n"
+        "                                the firmware's; the game itself keeps the firmware's)\n"
+        "  --no-romdata                  (checks) do not read the game's text: milestone 1's CONSOLE\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
         "      Esc menu (settings, save states, quit), Space fast forward, Tab swaps the big screen\n"
@@ -113,12 +122,16 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
+    int composeScale = 1;
+    bool uiDemo = false;
     int res3d = 0;
     bool wide = false, interp = false;
     int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
-    bool stringsCount = false;
+    bool stringsCount = false, noRomData = false;
+    std::string measure; // --measure-string ID|all
+    int dialogueString = -1; // (a check) the HD conversation shows this string instead of the page's
     for (int i = 1; i < argc; i++)
     {
         std::string a = argv[i];
@@ -127,6 +140,8 @@ int main(int argc, char** argv)
         else if (a == "--version") { printf("sims2wide %s\n", SIMS2WIDE_VERSION); return 0; }
         else if (a == "--headless") headless = true;
         else if (a == "--compose") compose = true;
+        else if (a == "--compose-scale") composeScale = std::clamp(atoi(next().c_str()), 1, 4);
+        else if (a == "--ui-demo") uiDemo = true;
         else if (a == "--res3d") res3d = std::clamp(atoi(next().c_str()), 1, 8);
         else if (a == "--wide") wide = true;
         else if (a == "--interp") interp = true;
@@ -142,6 +157,7 @@ int main(int argc, char** argv)
         else if (a == "--fast") fast = true;
         else if (a == "--print-screen") printScreen = true;
         else if (a == "--print-game") printGame = true;
+        else if (a == "--print-hud") printHud = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -156,9 +172,28 @@ int main(int argc, char** argv)
             char* rest = nullptr;
             const long number = strtol(v.c_str(), &rest, 10);
             if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            if (a == "--language" && number > 5) { Usage(); return 1; }
             (a == "--language" ? language : dumpString) = (int)number;
         }
         else if (a == "--strings-count") stringsCount = true;
+        else if (a == "--no-romdata") noRomData = true;
+        // For checks only (not in --help): the HD conversation shows string ID on every page (the
+        // longest strings' pictures, tests/console_check.sh).
+        else if (a == "--dialogue-string")
+        {
+            const std::string v = next();
+            char* rest = nullptr;
+            const long number = strtol(v.c_str(), &rest, 10);
+            if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            dialogueString = (int)number;
+        }
+        else if (a == "--measure-string")
+        {
+            measure = next();
+            char* rest = nullptr;
+            const long number = strtol(measure.c_str(), &rest, 10);
+            if (measure != "all" && (measure.empty() || *rest || number < 0 || number > 1000000)) { Usage(); return 1; }
+        }
         else if (a == "--layout")
         {
             std::string l = next();
@@ -210,6 +245,7 @@ int main(int argc, char** argv)
     app.consoleMenu = consoleMenu;
     app.consoleFocus = consoleFocus;
     app.consolePinned = consolePinned;
+    app.uiDemo = uiDemo;
     app.quickState = quickState;
     app.shotFile = shotFile;
     // The settings file (not headless: those runs stay the same on every machine).
@@ -265,7 +301,67 @@ int main(int argc, char** argv)
         }
         return 0;
     }
+    // The game's words for the HD status bar and conversations, once, in the game's language
+    // (--language: another, a layout check only): a ROM whose data does not read keeps
+    // milestone 1's CONSOLE (the game's own HUD in the world, its own dialogue box).
+    if (!noRomData)
+    {
+        auto data = std::make_unique<RomData>();
+        if (data->Open(rom) && data->LoadStrings(language >= 0 ? language : GameLanguage(nds)))
+        {
+            app.hudStrings = HudStringsFrom(data.get());
+            data->DropArchive(); // only the strings are kept
+            app.rom = std::move(data);
+        }
+    }
+    if (!app.hudStrings.ok) fprintf(stderr, "no status bar text in this ROM: CONSOLE shows the game's own\n");
+    if (!app.rom) fprintf(stderr, "no conversation text in this ROM: CONSOLE shows the game's own box\n");
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
+    // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.
+    if (!measure.empty())
+    {
+        if (!app.rom) return 1;
+        std::vector<int> ids;
+        if (measure == "all")
+        {
+            if (app.portSupported) ids = SpeechStringIds({nds.MainRAM, nds.MainRAMMask});
+            if (ids.empty()) { fprintf(stderr, "no speech table in RAM (a state of the European ROM is needed)\n"); return 1; }
+        }
+        else ids.push_back(atoi(measure.c_str()));
+        HudState hud;
+        hud.valid = true; hud.hour = 22; hud.minute = 58; hud.simName = "WWWWWWWW"; // the widest name and clock
+        int worst = -1, bad = 0, raw = 0;
+        size_t worstLines = 0, worstLen = 0;
+        for (int id : ids)
+        {
+            if (id < 0 || id >= app.rom->StringCount()) { fprintf(stderr, "no string %d\n", id); return 1; }
+            const std::string text = DialogueText(app.rom->String(id), hud, app.rom->String(kDlgAmId), app.rom->String(kDlgPmId));
+            // Nothing raw may be left: a placeholder or an escape in the shown text.
+            if (text.find_first_of("@{}") != std::string::npos)
+            {
+                printf("string %d: a placeholder or escape left in the text\n", id);
+                raw++;
+            }
+            for (bool portrait : {true, false})
+            {
+                const DialogueLayout L = LayoutDialogue(text, portrait);
+                const bool inside = L.fits && L.panel.y >= 0 && L.panel.y + L.panel.h <= kConsoleH;
+                if (!inside) bad++;
+                if (ids.size() == 1)
+                    printf("string %d portrait %d: %zu lines of %d, size %g, text box %d wide, panel %d,%d %dx%d, %s\n", id, portrait ? 1 : 0, L.lines.size(),
+                           L.rows, L.size, L.textW, L.panel.x, L.panel.y, L.panel.w, L.panel.h, inside ? "fits" : "overflows");
+                if (portrait && (L.lines.size() > worstLines || (L.lines.size() == worstLines && text.size() > worstLen)))
+                {
+                    worst = id;
+                    worstLines = L.lines.size();
+                    worstLen = text.size();
+                }
+            }
+        }
+        // (The longest is measured with the portrait's column, the narrower box; both are checked.)
+        if (ids.size() > 1) printf("%zu pages, longest string %d (%zu lines), %d overflow%s, %d raw\n", ids.size(), worst, worstLines, bad, bad == 1 ? "" : "s", raw);
+        return bad || raw ? 2 : 0;
+    }
 
     std::vector<InputEvent> script;
     if (!inputPath.empty()) script = LoadScript(inputPath);
@@ -396,6 +492,32 @@ int main(int argc, char** argv)
                 app.game.valid = true; app.game.between = false; app.game.settled = true;
                 app.game.screen = GScreen::Unknown; app.game.overlay = 90; app.game.vtable = 0x02000000 + (u32)((frame - unknownAfter) / 200);
             }
+            if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
+            if (app.portSupported && printHud)
+            {
+                const HudState& h = app.game.hud;
+                if (h.valid != before.hud.valid || (h.valid && !(h == before.hud)))
+                {
+                    if (h.valid) fprintf(stderr, "frame %ld: hud money=%d time=%02d:%02d sanity=%d/%d tier=%d name=%s\n", frame, h.money, h.hour, h.minute, h.sanity, h.sanityMax, h.tier, h.simName.c_str());
+                    else fprintf(stderr, "frame %ld: hud none\n", frame);
+                }
+                const DialogueState& d = app.game.dialogue;
+                if (d.valid != before.dialogue.valid || (d.valid && !(d == before.dialogue)))
+                {
+                    if (d.valid)
+                    {
+                        fprintf(stderr, "frame %ld: dialogue speech=%d page=%d/%d id=%d speaker=%d name=%d last=%d\n", frame, d.speech, d.page, d.pages, d.stringId, d.speaker, d.speakerNameId, d.last ? 1 : 0);
+                        // What the HD box shows from this frame on (CONSOLE builds it from the same
+                        // reading; the line counts are for the box with the portrait's column).
+                        if (app.rom && d.stringId < app.rom->StringCount())
+                        {
+                            const DialogueLayout L = LayoutDialogue(DialogueText(app.rom->String(d.stringId), app.game.hud, app.rom->String(kDlgAmId), app.rom->String(kDlgPmId)), true);
+                            fprintf(stderr, "frame %ld: hd dialogue id=%d lines=%zu size=%g\n", frame, d.stringId, L.lines.size(), L.size);
+                        }
+                    }
+                    else fprintf(stderr, "frame %ld: dialogue none\n", frame);
+                }
+            }
             if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
         }
         if (recorder) recorder->Frame(app, frame, nds);
@@ -443,7 +565,12 @@ int main(int argc, char** argv)
             int tw, th;
             const u32* big = app.TopImage(tw, th);
             // (The other layouts sized from the picture itself, as they always were here.)
-            if (compose) WriteCompose(shotDir + name, app.shown == Layout::Console ? video.Composed(app) : Compose(app.shown, app.mainIsTop, (float)tw / th, tw, th), big, tw, th, bottom);
+            if (compose)
+            {
+                Composition c = app.shown == Layout::Console ? video.Composed(app) : Compose(app.shown, app.mainIsTop, (float)tw / th, tw, th);
+                if (app.uiDemo) c.ui = ui::DemoItems(bottom);
+                WriteCompose(shotDir + name, c, big, tw, th, bottom, composeScale);
+            }
             else WriteShot(shotDir + name, top, bottom);
             // The looks' top picture at its size, beside the DS's screens.
             if (!compose && !app.topBig.empty())
