@@ -4,7 +4,11 @@
 // and taps them through a TouchScript:
 //   Panel, menu closed: every button is the DS's (L and R turn the camera); MENU opens the menu.
 //   Panel, menu open: the D-pad (or the left stick) moves the focus, A taps the focused target,
-//     L / R tap the previous / next tab's icon, B or MENU close the menu.
+//     L / R tap the previous / next tab's icon, B or MENU close the menu. When the tab is redrawn
+//     in HD (a valid MenuView, port/menuview.h), the focus is over the view's items instead of
+//     HotspotsFor: A runs the focused item's action (taps, DS buttons, drags, in order), greyed
+//     items are skipped and never run, the view's screen-wide buttons (Left / Right: Interact's
+//     targets) and list scroll apply, B runs the view's back action or closes the menu.
 //   Phone: the focus as in the menu; B or MENU tap the phone's X (back to the panel, menu closed).
 //   Gift, Catalogue, Build: the focus as in the menu; B taps the screen's X when it has one.
 //   Social, Cards, Vacuum: the activity's own buttons (activities.h); the cards' focus moves as
@@ -24,6 +28,7 @@
 #include "activities.h"
 #include "common.h"
 #include "padstate.h"
+#include "port/menuview.h"
 #include "screens.h"
 #include "touchscript.h"
 
@@ -59,7 +64,11 @@ public:
     // taps are queued on touch. settled: the game's bottom slot is not switching
     // (GameState::settled; true without a RAM reading); while it is, a press that would tap is
     // held (the latest wins) and replayed on the first settled frame, or dropped after 90.
-    void Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys, bool settled = true);
+    // view: the screen's HD menu (port/menuview.h), rebuilt every frame from the game's state;
+    // used while the menu is open on the panel when valid (else, or null, HotspotsFor as before).
+    // A press held by the gate is dropped when the view's Hash changes before it runs (no stale
+    // taps); the focus follows its item's id across rebuilds.
+    void Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys, bool settled = true, const MenuView* view = nullptr);
     // CONSOLE left (another layout): the touch script cancelled, the menu closed, nothing held;
     // buttons still held when CONSOLE comes back are not taken as presses.
     void Leave(TouchScript& touch);
@@ -68,8 +77,13 @@ public:
 
     // The panel's menu is up (the touch screen 3x over the dimmed world).
     bool MenuOpen() const { return menuOpen_; }
-    // The focused target, an index in HotspotsFor(screen), or -1 (no focus on this screen).
+    // The focused target, an index in HotspotsFor(screen) or, when ViewFocus, in the MenuView's
+    // items; -1: no focus on this screen.
     int Focus() const { return focus_; }
+    // The focus is over the last Update's MenuView.
+    bool ViewFocus() const { return viewFocus_; }
+    // An action of the view runs (its steps not all done).
+    bool Running() const { return !running_.empty(); }
     // Unknown: A asks for the stick cursor's press.
     bool CursorPress() const { return cursorPress_; }
     // The stick cursor is the way to touch here (no table of targets: the front end, None,
@@ -86,6 +100,12 @@ public:
 
 private:
     void Move(ScreenState s, int dx, int dy);
+    // Starts a view's action (nothing when one runs or the stylus is busy); false when not started.
+    bool Run(const MenuAction& a, const TouchScript& touch);
+    // One frame of the running action: taps and drags queued when the stylus is free, keys held.
+    void Step(TouchScript& touch, u32& dsKeys);
+    // The panel's menu is open and the view given is valid: the focus is over it.
+    bool UsesView(ScreenState s) const;
     // Whether a press of b would tap on s (the gate holds only those).
     bool WouldTap(ScreenState s, bool PadState::*b) const;
 
@@ -100,5 +120,14 @@ private:
     int repeatDir_ = -1, repeatFrames_ = 0; // the held direction (0-3) and how long, for the repeat
     bool PadState::*held_ = nullptr; // a press that would tap, waiting for a settled screen
     int heldFrames_ = 0;
+    u64 heldHash_ = 0;   // the view's Hash when the held press was made (0: no view)
+    // The HD menu (MenuView): the view this frame (null: none), the focused item's id, the view's
+    // hash last frame, the action running, a focus move waiting for the list's scroll.
+    const MenuView* view_ = nullptr;
+    bool viewFocus_ = false;
+    u32 focusId_ = 0;
+    u64 viewHash_ = 0;
+    std::vector<MenuStep> running_;
+    int pendingDir_ = -1, pendingFrames_ = 0;
 };
 }

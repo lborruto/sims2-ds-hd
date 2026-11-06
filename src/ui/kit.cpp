@@ -403,6 +403,7 @@ u64 Hash(const std::vector<UiItem>& items)
         Mix(h, FloatBits(it.labelAt));
         Mix(h, it.text.size());
         for (char c : it.text) Mix(h, (u8)c);
+        if (it.layer != 0) Mix(h, 0x4C41594552ull ^ (u64)(u32)it.layer); // (layer 0 hashes as before)
     }
     return h;
 }
@@ -439,16 +440,29 @@ std::vector<LayerAt> LayersAt(const std::vector<UiItem>& items, float scale, flo
     if (!(scale > 0)) return out;
     std::vector<UiItem> still, images;
     Layers(items, still, images);
-    auto add = [&](std::vector<UiItem> part, bool isStill) {
+    auto add = [&](std::vector<UiItem> part, bool isStill, int layer) {
         const Rect b = Bounds(part);
         if (b.w <= 0 || b.h <= 0) return;
         const int x0 = (int)std::floor(originX + b.x * scale), y0 = (int)std::floor(originY + b.y * scale);
         const int x1 = (int)std::ceil(originX + (b.x + b.w) * scale), y1 = (int)std::ceil(originY + (b.y + b.h) * scale);
         if (x1 <= x0 || y1 <= y0) return;
-        out.push_back({std::move(part), isStill, x0, y0, x1 - x0, y1 - y0, (x0 - originX) / scale, (y0 - originY) / scale});
+        out.push_back({std::move(part), isStill, layer, x0, y0, x1 - x0, y1 - y0, (x0 - originX) / scale, (y0 - originY) / scale});
     };
-    add(still, true);
-    for (const UiItem& im : images) add({im}, false);
+    // The still items by layer, ascending (one layer: exactly as before).
+    std::vector<int> layers;
+    for (const UiItem& it : still)
+        if (std::find(layers.begin(), layers.end(), it.layer) == layers.end()) layers.push_back(it.layer);
+    std::sort(layers.begin(), layers.end());
+    if (layers.size() <= 1) add(still, true, layers.empty() ? 0 : layers[0]);
+    else
+        for (int layer : layers)
+        {
+            std::vector<UiItem> part;
+            for (const UiItem& it : still)
+                if (it.layer == layer) part.push_back(it);
+            add(std::move(part), true, layer);
+        }
+    for (const UiItem& im : images) add({im}, false, 0);
     return out;
 }
 

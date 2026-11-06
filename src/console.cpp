@@ -6,6 +6,7 @@
 #include "activities.h"
 #include "hotspots.h"
 #include "port/dialogue.h"
+#include "port/panelmenu.h"
 #include "romdata.h"
 
 namespace sims2wide
@@ -97,7 +98,7 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
 }
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
-                         const GameState* game, const RomData* rom, const u32* bottom)
+                         const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons)
 {
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
@@ -125,6 +126,17 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset, bx = (kConsoleW - bw) / 2;
         c.overlays.push_back({{bx, kFrontHintY, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
         c.overlays.push_back(Text(bx + inset, kFrontHintY + inset, kFrontHint, 3));
+    }
+    else if (MenuView v; s.screen == Screen::Panel && menuOpen && (v = PanelMenuView(s, game, rom)).valid)
+    {
+        // The panel's menu redrawn in HD (port/panelmenu.h) over the dimmed world.
+        Piece world = World(topW, worldRows, bar);
+        world.touch = false;
+        c.pieces.push_back(world);
+        c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
+        BuildPanelMenu(c, s, v, focus, *game, *rom, icons, bottom);
+        if (bar) AddStatusBar(c, *hud, *strings);
+        return c; // (the focus is the view's: no ring from HotspotsFor)
     }
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {

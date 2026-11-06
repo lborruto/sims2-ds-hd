@@ -4,7 +4,11 @@
 # them (the same run without --compose gives the two screens), and the frames, the dimmed
 # backdrop and the focus ring in the game's colours:
 #   sit-cityhall (the panel, in town): the world, the rail of the touch screen's tab column and
-#   phone icon; the same with --console-menu: the menu, 3x over the dimmed world; s7 (the phone): the touch screen 3x over the dimmed world; the same with
+#   phone icon; the same with --console-menu: the HD menu (src/port/panelmenu.*: no target, no
+#   row) and with --no-romdata (menu-m1) milestone 1's menu, the touch screen 3x over the dimmed
+#   world; casino-menu (sit-casino, --console-menu, the focus on row 2), at 2x and --wide: the HD
+#   Interact tab (the portrait the touch screen's pixels 3x, three labelled rows, the focus ring on
+#   the second only, the world dimmed); s7 (the phone): the touch screen 3x over the dimmed world; the same with
 #   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item): 3x over the
 #   dimmed world; s5 with --no-romdata (no game text: milestone 1's conversation): the dialogue
 #   rebuilt wide from the game's pieces; s5-hd (the HD conversation, src/port/dialogue.*): the
@@ -23,7 +27,9 @@
 # from s6, A closes the popup; from s6, a touch closes the popup and A, pressed while the next
 # one opens (the game reads Popup before the box is drawn), waits and closes it; from s7,
 # CONSOLE -> FOCUS -> CONSOLE with the menu open and A held: the menu closes on leaving, nothing
-# is tapped on coming back, MENU opens it again. In none of them do the pixels disagree with the
+# is tapped on coming back, MENU opens it again; the HD Interact tab: from sit-casino, MENU, Down
+# and A start Hotseat (Cards); from D-cas-right2, Left and Right switch the target (--print-town);
+# from sit-store, A on Buy opens the catalogue. In none of them do the pixels disagree with the
 # game for long ("pixels disagree").
 # Then the activities on buttons (src/activities.*, scripts/console/): from act-social, RIGHT
 # answers with the right icon (it lights green; the game itself plays on for about 1600
@@ -94,9 +100,15 @@ wait
 run casino sit-casino "${late[@]}" --print-hud &
 run casino-2x sit-casino "${late[@]}" --print-hud --compose-scale 2 &
 wait
+run menu-m1 sit-cityhall "${town[@]}" --console-menu --no-romdata &
+run casino-menu sit-casino "${late[@]}" --console-menu --console-focus 1 --print-hud &
+run casino-menu-2x sit-casino "${late[@]}" --console-menu --console-focus 1 --print-hud --compose-scale 2 &
+run casino-menu-wide sit-casino "${late[@]}" --console-menu --console-focus 0 --wide &
+wait
 
 fails=0
-for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x; do
+for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
+    menu-m1 casino-menu casino-menu-2x casino-menu-wide; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -230,11 +242,11 @@ def front():
     if (255, 255, 255) not in row or OUTLINE not in row:
         errors.append("no hint text")
 
-def big_over_dim():
+def big_over_dim(rows=176):
     piece("touch screen 3x", 0, 0, 256, 192, 256, 72, 3, step=9)
     expect("touch screen 3x top-left", C(256, 72), bottom(0, 0))
     # The world without the game's status bar (176 rows): row 174 at the canvas's foot.
-    w = world_full(176)
+    w = world_full(rows)
     for cx, cy in ((200, 100), (1100, 650), (900, 715), (1050, 700)):
         r, g, b = w(cx, cy)
         expect(f"dimmed world at {cx},{cy}", C(cx, cy), tuple(v * (255 - 0x8C) // 255 for v in (r, g, b)))
@@ -263,6 +275,33 @@ def activity(rows=192):
     if (255, 255, 255) not in row or OUTLINE not in row:
         errors.append("no hint text in the first row")
 
+def hd_menu(rows, focus, wide=False):
+    """The panel's HD menu (src/port/panelmenu.*, interact.*): the panel's outline and frame band,
+    the target's portrait as the touch screen's own pixels 3x (DS x 63-127, rows 47-127), the
+    title's well, a white label on each action row, the focus ring around row `focus` only, the
+    world dimmed outside the panel; never the touch screen 3x (the milestone 1 menu)."""
+    expect("panel outline", C(176, 300), OUTLINE)
+    expect("panel band", C(180, 300), hexrgb("6171B2"))
+    expect("panel fill", C(190, 300), FRAME)
+    expect("title well", C(640, 166), hexrgb("6A72B8"))
+    piece("portrait 3x", 63, 47, 65, 81, 220, 230, 3, step=4)
+    for i in range(4):
+        row = [C(x, y) for y in range(214 + 76 * i, 268 + 76 * i) for x in range(488, 900)]
+        white = (255, 255, 255) in row
+        if white != (i < rows):
+            errors.append(f"row {i}: label {'missing' if i < rows else 'drawn'}")
+        r, g, b = C(456, 241 + 76 * i)
+        ring = g > r + 80 and g > b + 60  # the ring's green (its edge softened by the row's shadow)
+        if ring != (i == focus):
+            errors.append(f"row {i}: focus ring {'missing' if i == focus else 'drawn'}")
+    if C(256 + 3 * 120 + 1, 72 + 3 * 100 + 1) == bottom(120, 100) and C(256 + 3 * 30 + 1, 72 + 3 * 160 + 1) == bottom(30, 160):
+        errors.append("the touch screen 3x is drawn")
+    if not wide:
+        w = world_full(176)
+        for cx, cy in ((150, 100), (1140, 400)):
+            r, g, b = w(cx, cy)
+            expect(f"dimmed world at {cx},{cy}", C(cx, cy), tuple(v * (255 - 0x8C) // 255 for v in (r, g, b)))
+
 if case == "cityhall":
     expect("canvas", comp.size, (1280, 720))
     rail()
@@ -283,8 +322,19 @@ elif case == "s7":
     big_over_dim()
     status_bar()
 elif case == "cityhall-menu":
-    big_over_dim()
+    # City Hall: no target (the plumbob; the title "Interact" alone), no row, the focus on the phone.
+    hd_menu(0, -1)
     status_bar()
+elif case == "menu-m1":
+    # Without the game's text (--no-romdata): milestone 1's menu, the touch screen 3x (and the
+    # game's own status bar in the world: no HD bar without its words).
+    big_over_dim(192)
+elif case in ("casino-menu", "casino-menu-2x"):
+    # Keelhaulin' Cards: three rows, the focus on the second (Hotseat).
+    hd_menu(3, 1)
+    status_bar(hud_values())
+elif case == "casino-menu-wide":
+    hd_menu(3, 0, wide=True)
 elif case in ("casino", "casino-2x"):
     # The complete save (yellow tier): the casino's panel, the meter filled cur / max in yellow.
     values = hud_values()
@@ -400,6 +450,17 @@ in_order() {
         from=$((from + n))
     done
 }
+# pad_late NAME STATE SCRIPT FRAMES: the same on the complete save (its clock).
+pad_late() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
+        --layout console --print-screen --print-game --print-town "${late[@]}" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_late pad-hotseat sit-casino interact-hotseat 300 &
+pad_late pad-target D-cas-right2 interact-target 220 &
+pad pad-buy sit-store interact-buy 200 &
 pad pad-tabs s7 tabs 320 &
 pad pad-popup s6 popup 120 &
 pad pad-opening s6 popup-opening 200 &
@@ -440,6 +501,15 @@ check_pad pad-tabs tabs
 check_pad pad-popup popup
 check_pad pad-opening opening
 check_pad pad-leave leave
+# The HD Interact tab (src/port/interact.*): from sit-casino, MENU, Down, A → Hotseat → Cards; from
+# D-cas-right2 (Music Panel, the cards before it), Left → the cards (object 29), Right → the
+# panel again (object 15); from sit-store, A on Buy → the catalogue.
+hotseat() { in_order pad-hotseat 'console menu open, focus 0' 'console menu open, focus 1' 'game Cards'; }
+target() { in_order pad-target 'interact target=obj15' 'console menu open' 'interact target=obj29' 'interact target=obj15.*prev=obj29'; }
+buy() { in_order pad-buy 'console menu open, focus 0' 'game Catalogue'; }
+check_pad pad-hotseat hotseat
+check_pad pad-target target
+check_pad pad-buy buy
 
 # The activities on buttons (src/activities.*): act NAME STATE SCRIPT FRAMES SHOTS CLOCK, a
 # CONSOLE run with --print-screen and shots of the two screens at SHOTS (NAME/f*.png).
@@ -619,6 +689,13 @@ if out:
 EOF
     then echo "ok   $name: $(echo "$out" | head -n 1)"
     else echo "FAIL $name"; fails=$((fails + 1)); fi
+done
+# The HD Interact tab's words in each language (src/port/interact.*: --measure-menu): every verb
+# in its row and in the A hint, every Sim's and object's name in the title and the strip, held in
+# their boxes (shrunk at most; a neighbour's name beside the plate may end in an ellipsis).
+for lang in 1 2 3 4 5; do
+    if out=$("$bin" "$rom" --language $lang --measure-menu 2> "$tmp/menu-$lang.log"); then echo "ok   menu-words-$lang: $out"
+    else echo "FAIL menu-words-$lang: $out $(tail -n 1 "$tmp/menu-$lang.log")"; fails=$((fails + 1)); fi
 done
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

@@ -1,0 +1,3 @@
+# From sit-store, CONSOLE: MENU opens the HD menu (Interact: Johnny Smith), A taps "Buy": the catalogue.
+20 2 pad menu
+60 2 pad a

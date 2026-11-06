@@ -1,0 +1,5 @@
+# From D-cas-right2 (the complete save, Interact: Music Panel, the cards before it), CONSOLE: MENU
+# opens the HD menu, Left taps the strip's previous slot (the cards), Right the next (the panel).
+20 2 pad menu
+60 2 pad left
+140 2 pad right

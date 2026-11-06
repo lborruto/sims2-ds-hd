@@ -15,6 +15,8 @@
 #include "hotspots.h"
 #include "layout.h"
 #include "port/dialogue.h"
+#include "port/interact.h"
+#include "port/panelmenu.h"
 #include "port/statusbar.h"
 #include "romdata.h"
 #include "ui/kit.h"
@@ -667,6 +669,91 @@ int main()
         }
         const Composition m1 = BuildConsole({Screen::Dialogue}, false, -1, 256, 192, &hud, nullptr, &g, &rom, face.data());
         CHECK(m1.ui.empty() && m1.pieces.size() == 5);
+    }
+
+
+    // The panel's HD menu (port/panelmenu.h, port/interact.h) on a made-up Interact state: four
+    // actions (the third greyed), a previous and a next target. Its mouse pieces (invisible,
+    // touchable) map each HD item onto the game's own target: every pixel round trips at every
+    // size; a click on a row lands on its arrow, on a tab on its icon, on the phone on the phone;
+    // a click on the panel elsewhere, or on the dimmed world, touches nothing. Every UI item lies
+    // inside the panel; the still items come in ascending layers (the frame on 0, the rest above).
+    {
+        RomData rom;
+        GameState g;
+        g.valid = true;
+        InteractState& in = g.town.interact;
+        in.valid = true;
+        in.target = {TargetRef::Object, 29, 492, 6638, false};
+        in.prev = {TargetRef::Sim, 3, 326, 1, false};
+        in.next = {TargetRef::Object, 15, 478, 5744, false};
+        for (int i = 0; i < 4; i++) in.actions.push_back({i, 1845 + i, i == 2});
+        const ScreenState it {Screen::Panel, Tab::Interact};
+        const MenuView v = PanelMenuViewOf(it, g);
+        CHECK(v.valid && v.items.size() == 5);
+        CHECK(!v.items[2].enabled && v.items[0].enabled && v.items[3].enabled);
+        CHECK(!v.buttons[(int)MenuButton::Left].empty() && !v.buttons[(int)MenuButton::Right].empty());
+        CHECK(MenuFirst(v) == 0 && MenuNeighbour(v, 1, 0, 1) == 3); // the greyed row skipped
+        CHECK(!PanelMenuView(it, &g, &rom).valid);                  // no strings: milestone 1's
+        CHECK(!PanelMenuViewOf({Screen::Panel, Tab::Goals}, g).valid);
+        GameState bad = g;
+        bad.town.interact.valid = false;
+        CHECK(!PanelMenuViewOf(it, bad).valid);
+        std::vector<u32> face(SW * SH, 0xFFC08060);
+        for (int topW : {256, 341})
+            for (int focus : {-1, 0, 3, 4})
+            {
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                Piece world = ConsoleWorld(topW, HudCropRows(192), true);
+                world.touch = false;
+                comp.pieces.push_back(world);
+                BuildPanelMenu(comp, it, v, focus, g, rom, nullptr, face.data());
+                int layer = 0;
+                for (const ui::UiItem& u : comp.ui)
+                {
+                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                    if (u.kind == ui::UiItem::Image) continue;
+                    CHECK(u.layer >= layer);
+                    layer = u.layer;
+                }
+                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}, {800, 1000}})
+                    TestConsoleRoundtrip(it, true, topW, 192, o.first, o.second, true, &comp);
+                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                int tx, ty;
+                for (int i = 0; i < 4; i++)
+                {
+                    const Rect r = v.items[i].rect;
+                    CHECK(TouchFromComposition(comp, fit, r.x + 3.5f, r.y + r.h / 2.0f, tx, ty));
+                    CHECK(tx >= 219 && tx <= 251 && ty >= 46 + 34 * i && ty <= 78 + 34 * i);
+                }
+                for (int t = 0; t < 5; t++)
+                {
+                    CHECK(TouchFromComposition(comp, fit, kPmTabsX + t * kPmTabCell + kPmTabCell / 2.0f, kPmTabBar.y + kPmTabBar.h / 2.0f, tx, ty));
+                    const Rect a = kTabIcon[t].area;
+                    CHECK(tx >= a.x && tx < a.x + a.w && ty >= a.y && ty < a.y + a.h);
+                }
+                const Rect ph = v.items[4].rect;
+                CHECK(TouchFromComposition(comp, fit, ph.x + ph.w / 2.0f, ph.y + ph.h / 2.0f, tx, ty));
+                CHECK(tx >= kPhoneIcon.area.x && tx < kPhoneIcon.area.x + kPhoneIcon.area.w);
+                CHECK(!TouchFromComposition(comp, fit, kPmTitle.x + 10.5f, kPmTitle.y + 10.5f, tx, ty)); // the title: nothing
+                CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty));                          // the dimmed world: nothing
+                CHECK(!OverTopComposition(comp, fit, 20.5f, 360.5f));
+            }
+        // BuildConsole: without the game's strings, milestone 1's menu (the touch screen 3x).
+        const HudState hud = TestHud();
+        const HudStrings strings = TestStrings();
+        const Composition m1 = BuildConsole(it, true, 0, 256, 192, &hud, &strings, &g, &rom, face.data());
+        bool whole = false;
+        for (const Piece& q : m1.pieces) whole |= q.src == Src::Bottom && q.from.w == SW && q.from.h == SH && q.to.w == SW * 3;
+        CHECK(whole);
+        // FitLine: shrinks, then cuts with an ellipsis, never wider than asked.
+        const FittedText f1 = FitLine("Hotseat", 30, 22, 400);
+        CHECK(f1.fits && f1.size == 30 && f1.text == "Hotseat");
+        const FittedText f2 = FitLine(std::string(60, 'W'), 30, 22, 300);
+        CHECK(!f2.fits && f2.size == 22 && ui::TextWidth(f2.text, 22) <= 300 && f2.text.size() > 3);
+        const FittedText f3 = FitLine("\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9\xC3\xA9", 30, 30, 40); // accents never split
+        CHECK(!f3.fits && f3.text.size() % 2 == 1);
     }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }

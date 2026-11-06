@@ -25,9 +25,9 @@ struct Video
     // The composition's UI (ui/kit.h) at output size: the still items' layer over their bounds,
     // made again only when its hash (items, size, place) changes; the pictures (live crops) each
     // over their own bounds in their own texture, made again when that picture's pixels change.
-    SDL_Texture* uiTex = nullptr;
-    int uiTexW = 0, uiTexH = 0;
-    u64 uiHash = 0;
+    // The UI's still layers (ui::LayersAt), each kept until its own items change.
+    struct StillTex { SDL_Texture* tex; int w, h; u64 hash; };
+    std::vector<StillTex> uiStill;
     struct ImageTex { SDL_Texture* tex; int w, h; u64 hash; };
     std::vector<ImageTex> uiImages;
     void DrawUi(const Composition& c, const CanvasFit& fit);
@@ -50,7 +50,7 @@ struct Video
         int tw, th;
         app.TopImage(tw, th);
         Composition c = app.shown == Layout::Console ? BuildConsole(app.ConsoleScreen(), app.consoleMenu, app.consoleFocus, tw, th, app.Hud(), &app.hudStrings,
-                                                                    app.portSupported ? &app.game : nullptr, app.rom.get(), app.Bottom())
+                                                                    app.portSupported ? &app.game : nullptr, app.rom.get(), app.Bottom(), app.icons.get())
                                                      : Compose(app.shown, app.mainIsTop, app.topAspect, tw, th);
         if (app.uiDemo) c.ui = ui::DemoItems(app.Bottom());
         return c;

@@ -30,6 +30,12 @@ struct UiItem
 {
     enum Kind { Panel, Text, Chip, Image } kind = Panel;
     Rect to {};         // canvas pixels (Text: the box it is laid out and clipped in)
+    // The still layer it belongs to (Panel, Text, Chip): the window keeps each layer's raster
+    // apart and redraws only the layers whose items changed (a menu's frame on layer 0, its list
+    // and focus on layer 1: a focus move does not raster the frame again). Layers are drawn in
+    // ascending order, the items of one in list order; give items in ascending layer order so
+    // Rasterise (all at once, list order) draws what the layers draw. Images ignore it.
+    int layer = 0;
 
     // Panel: a rounded box, `border` wide band of `borderArgb` inside `to`, a dark one-pixel
     // outline and, raised, a soft drop shadow under it.
@@ -82,7 +88,7 @@ u64 Hash(const std::vector<UiItem>& items);
 // An image item's hash, its pixels included (the window redraws a picture only when it changes).
 u64 HashImage(const UiItem& image);
 // The still items (Panel, Text, Chip, in order) and the images (in order), as drawn: the images
-// above the still items.
+// above the still items. (LayersAt splits the still items further by their `layer`.)
 void Layers(const std::vector<UiItem>& items, std::vector<UiItem>& still, std::vector<UiItem>& images);
 
 // The items drawn into argb (w x h, straight alpha, cleared first): canvas point (cx, cy) lands
@@ -90,13 +96,14 @@ void Layers(const std::vector<UiItem>& items, std::vector<UiItem>& still, std::v
 // The still items first, then the images (Layers).
 void Rasterise(const std::vector<UiItem>& items, float scale, u32* argb, int w, int h, float ox = 0, float oy = 0);
 
-// What the window and --compose both draw: the still layer over its bounds, then each image
-// over its own, as whole output pixels (x, y, w, h) for a canvas whose origin is output pixel
+// What the window and --compose both draw: each still layer (by `layer`, ascending) over its
+// bounds, then each image over its own, as whole output pixels (x, y, w, h) for a canvas whose origin is output pixel
 // (originX, originY); Rasterise(items, scale, …, w, h, ox, oy) draws one. Empty ones are left out.
 struct LayerAt
 {
     std::vector<UiItem> items;
-    bool still;          // the still items (else one image)
+    bool still;          // still items of one layer (else one image)
+    int layer = 0;       // that layer
     int x, y, w, h;
     float ox, oy;
 };

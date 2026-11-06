@@ -22,8 +22,8 @@
   (Back, or E) opens the touch screen's menu big over the town; conversations are redrawn in
   HD over the whole world (the speaker's name, the game's own words in large type, their
   portrait; A turns the page); popups and the games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
-- **HD where it counts.** The status bar and the conversations are redrawn sharp, in the game's
-  own style and in the game's language (the words come from your copy of the game; with another
+- **HD where it counts.** The status bar, the conversations and the menu's Interact tab are
+  redrawn sharp, in the game's own style, with its own icons, and in the game's language (the words come from your copy of the game; with another
   version of it, the old pictures stay). Everything else is still the game's own picture.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
@@ -118,7 +118,8 @@ BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation
 controllers are known by their own button names.
 
 **In town** the buttons are the DS's. **The menu** (phone, tabs, shop, the rest of the touch
-screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes.
+screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes. On the
+Interact tab, A does the highlighted action and Left / Right pick the next thing or person nearby.
 **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or B.
 
 **The activities** are played on the buttons too, with a box of hints beside them:

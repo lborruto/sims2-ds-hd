@@ -177,18 +177,20 @@ void Video::DrawUi(const Composition& c, const CanvasFit& fit)
         return t;
     };
     std::vector<u32> px;
-    size_t image = 0;
+    size_t image = 0, still = 0;
     for (const ui::LayerAt& l : ui::LayersAt(c.ui, fit.scale, fit.ox, fit.oy))
     {
         SDL_Texture* t = nullptr;
         bool draw = true;
         if (l.still)
         {
+            if (still == uiStill.size()) uiStill.push_back({nullptr, 0, 0, 0});
+            StillTex& e = uiStill[still++];
             u64 hash = ui::Hash(l.items);
             for (u64 v : {(u64)(u32)l.x, (u64)(u32)l.y, (u64)l.w, (u64)l.h, (u64)std::lround(fit.scale * 65536)}) hash = (hash ^ v) * 0x100000001B3ull;
-            draw = !uiTex || hash != uiHash || uiTexW != l.w || uiTexH != l.h;
-            t = texture(uiTex, uiTexW, uiTexH, l.w, l.h);
-            uiHash = t ? hash : 0;
+            draw = !e.tex || hash != e.hash || e.w != l.w || e.h != l.h;
+            t = texture(e.tex, e.w, e.h, l.w, l.h);
+            e.hash = t ? hash : 0;
         }
         else
         {

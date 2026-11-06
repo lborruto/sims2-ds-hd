@@ -2,7 +2,10 @@
 // fill where they belong at scale 1 and 2, text kept inside its box, chips growing with their
 // label, the picture scaler. Made-up text only.
 //   ninja -C build uikit_test && ./build/uikit_test
+#include <algorithm>
+#include <cmath>
 #include <cstdio>
+#include <cstdlib>
 #include <string>
 #include <vector>
 
@@ -304,6 +307,63 @@ static void edges()
     CHECK(first[(size_t)40 * 100 + 40] == 0xFF336699);
 }
 
+// Still layers (UiItem::layer): each its own LayerAt, ascending, the items of one in list order;
+// a change on layer 1 leaves layer 0's hash alone (the window keeps its raster); one layer is
+// exactly the single still layer as before (layer 0 hashes as it always did).
+static void still_layers()
+{
+    UiItem frame = PanelItem({10, 10, 300, 200});
+    UiItem row = PanelItem({40, 40, 100, 30});
+    row.layer = 1;
+    UiItem label = TextItem({50, 40, 80, 30}, "Row", 20);
+    label.layer = 1;
+    const std::vector<UiItem> items {frame, row, label};
+    const std::vector<LayerAt> ls = LayersAt(items, 1, 0, 0);
+    CHECK(ls.size() == 2);
+    CHECK(ls[0].still && ls[0].layer == 0 && ls[0].items.size() == 1);
+    CHECK(ls[1].still && ls[1].layer == 1 && ls[1].items.size() == 2 && ls[1].items[1].kind == UiItem::Text);
+    // The focus moved (layer 1 changed): layer 0's items and hash the same.
+    std::vector<UiItem> moved = items;
+    moved[1].to.y += 30;
+    moved[2].to.y += 30;
+    const std::vector<LayerAt> lm = LayersAt(moved, 1, 0, 0);
+    CHECK(Hash(lm[0].items) == Hash(ls[0].items) && Hash(lm[1].items) != Hash(ls[1].items));
+    // Layer 0 alone: one still layer, its hash as without the field.
+    UiItem plain = PanelItem({10, 10, 300, 200});
+    CHECK(LayersAt({plain}, 1, 0, 0).size() == 1);
+    UiItem other = plain;
+    other.layer = 2;
+    CHECK(Hash({other}) != Hash({plain}));
+    // The layers over each other draw what the whole raster draws, within rounding.
+    std::vector<u32> whole(320 * 220), split(320 * 220, 0);
+    Rasterise(items, 1, whole.data(), 320, 220);
+    for (const LayerAt& l : ls)
+    {
+        std::vector<u32> part((size_t)l.w * l.h);
+        Rasterise(l.items, 1, part.data(), l.w, l.h, l.ox, l.oy);
+        for (int y = 0; y < l.h; y++)
+            for (int x = 0; x < l.w; x++)
+            {
+                const int X = l.x + x, Y = l.y + y;
+                if (X < 0 || Y < 0 || X >= 320 || Y >= 220) continue;
+                const u32 src = part[(size_t)y * l.w + x], dst = split[(size_t)Y * 320 + X];
+                const float a = (src >> 24) / 255.0f, b = (dst >> 24) / 255.0f, o = a + b * (1 - a);
+                u32 out = 0;
+                if (o > 0)
+                    for (int sh : {16, 8, 0})
+                    {
+                        const float c = (((src >> sh) & 255) * a + ((dst >> sh) & 255) * b * (1 - a)) / o;
+                        out |= (u32)std::lround(c) << sh;
+                    }
+                split[(size_t)Y * 320 + X] = out | (u32)std::lround(o * 255) << 24;
+            }
+    }
+    int worst = 0;
+    for (size_t i = 0; i < whole.size(); i++)
+        for (int sh : {24, 16, 8, 0}) worst = std::max(worst, std::abs((int)((whole[i] >> sh) & 255) - (int)((split[i] >> sh) & 255)));
+    CHECK(worst <= 2);
+}
+
 int main()
 {
     wrap_cases();
@@ -313,6 +373,7 @@ int main()
     chips();
     image_scaler();
     edges();
+    still_layers();
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("uikit_test: all passed\n");
     return 0;

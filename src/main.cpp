@@ -38,6 +38,7 @@
 #include "picker.h"
 #include "romdata.h"
 #include "port/dialogue.h"
+#include "port/interact.h"
 #include "script.h"
 #include "shots.h"
 #include "recorder.h"
@@ -84,6 +85,8 @@ static void Usage()
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
+        "  --measure-menu                (checks) every word the HD Interact tab can show fitted to its box, in --language's\n"
+        "                                words: how many shrink, how many need an ellipsis (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load), and stop\n"
         "  --language N                  the text's language for those and the HD interface's words: 0 Japanese (the\n"
@@ -136,6 +139,7 @@ int main(int argc, char** argv)
     int dumpResource = -1, dumpSprite = -1, dumpFrame = -1; // the archive's data (--dump-resource, --dump-sprite)
     std::string dumpFile;
     std::string measure; // --measure-string ID|all
+    bool measureMenu = false;
     int dialogueString = -1; // (a check) the HD conversation shows this string instead of the page's
     for (int i = 1; i < argc; i++)
     {
@@ -207,6 +211,7 @@ int main(int argc, char** argv)
             if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
             dialogueString = (int)number;
         }
+        else if (a == "--measure-menu") measureMenu = true;
         else if (a == "--measure-string")
         {
             measure = next();
@@ -369,6 +374,19 @@ int main(int argc, char** argv)
     }
     if (!app.hudStrings.ok) fprintf(stderr, "no status bar text in this ROM: CONSOLE shows the game's own\n");
     if (!app.rom) fprintf(stderr, "no conversation text in this ROM: CONSOLE shows the game's own box\n");
+    // (A check) the HD Interact tab's words in their boxes: print and stop.
+    if (measureMenu)
+    {
+        if (!app.rom) return 1;
+        const MenuMeasure m = MeasureInteract(*app.rom);
+        printf("interact: %d words, widest verb %d (%.0f px), %d shrunk, %d cut (row %d, hint %d, title %d, strip %d, strip sides %d)",
+               m.checked, m.widestId, m.widestW, m.shrunk, m.cut, m.cutIn[0], m.cutIn[1], m.cutIn[2], m.cutIn[3], m.cutIn[4]);
+        for (int id : m.cutIds) printf(" %d", id);
+        printf("\n");
+        // A neighbour's name beside the plate may end in an ellipsis (the Italian table has a
+        // sentence at an object's name, 463); every other box must hold its words.
+        return m.cut - m.cutIn[4] > 0 ? 2 : 0;
+    }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.
     if (!measure.empty())
