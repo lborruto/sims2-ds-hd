@@ -172,13 +172,21 @@ int main(int argc, char** argv)
             char* rest = nullptr;
             const long number = strtol(v.c_str(), &rest, 10);
             if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            if (a == "--language" && number > 5) { Usage(); return 1; }
             (a == "--language" ? language : dumpString) = (int)number;
         }
         else if (a == "--strings-count") stringsCount = true;
         else if (a == "--no-romdata") noRomData = true;
         // For checks only (not in --help): the HD conversation shows string ID on every page (the
         // longest strings' pictures, tests/console_check.sh).
-        else if (a == "--dialogue-string") dialogueString = atoi(next().c_str());
+        else if (a == "--dialogue-string")
+        {
+            const std::string v = next();
+            char* rest = nullptr;
+            const long number = strtol(v.c_str(), &rest, 10);
+            if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            dialogueString = (int)number;
+        }
         else if (a == "--measure-string")
         {
             measure = next();
@@ -302,6 +310,7 @@ int main(int argc, char** argv)
         if (data->Open(rom) && data->LoadStrings(language >= 0 ? language : GameLanguage(nds)))
         {
             app.hudStrings = HudStringsFrom(data.get());
+            data->DropArchive(); // only the strings are kept
             app.rom = std::move(data);
         }
     }
@@ -321,12 +330,18 @@ int main(int argc, char** argv)
         else ids.push_back(atoi(measure.c_str()));
         HudState hud;
         hud.valid = true; hud.hour = 22; hud.minute = 58; hud.simName = "WWWWWWWW"; // the widest name and clock
-        int worst = -1, bad = 0;
+        int worst = -1, bad = 0, raw = 0;
         size_t worstLines = 0, worstLen = 0;
         for (int id : ids)
         {
             if (id < 0 || id >= app.rom->StringCount()) { fprintf(stderr, "no string %d\n", id); return 1; }
-            const std::string text = DialogueText(app.rom->String(id), hud);
+            const std::string text = DialogueText(app.rom->String(id), hud, app.rom->String(kDlgAmId), app.rom->String(kDlgPmId));
+            // Nothing raw may be left: a placeholder or an escape in the shown text.
+            if (text.find_first_of("@{}") != std::string::npos)
+            {
+                printf("string %d: a placeholder or escape left in the text\n", id);
+                raw++;
+            }
             for (bool portrait : {true, false})
             {
                 const DialogueLayout L = LayoutDialogue(text, portrait);
@@ -343,8 +358,9 @@ int main(int argc, char** argv)
                 }
             }
         }
-        if (ids.size() > 1) printf("%zu pages, longest string %d (%zu lines), %d overflow%s\n", ids.size(), worst, worstLines, bad, bad == 1 ? "" : "s");
-        return bad ? 2 : 0;
+        // (The longest is measured with the portrait's column, the narrower box; both are checked.)
+        if (ids.size() > 1) printf("%zu pages, longest string %d (%zu lines), %d overflow%s, %d raw\n", ids.size(), worst, worstLines, bad, bad == 1 ? "" : "s", raw);
+        return bad || raw ? 2 : 0;
     }
 
     std::vector<InputEvent> script;
@@ -488,12 +504,16 @@ int main(int argc, char** argv)
                 const DialogueState& d = app.game.dialogue;
                 if (d.valid != before.dialogue.valid || (d.valid && !(d == before.dialogue)))
                 {
-                    if (d.valid) fprintf(stderr, "frame %ld: dialogue speech=%d page=%d/%d id=%d speaker=%d name=%d last=%d\n", frame, d.speech, d.page, d.pages, d.stringId, d.speaker, d.speakerNameId, d.last ? 1 : 0);
-                    // What the HD box shows from this frame on (CONSOLE builds it from the same reading).
-                    if (d.valid && app.rom && d.stringId < app.rom->StringCount())
+                    if (d.valid)
                     {
-                        const DialogueLayout L = LayoutDialogue(DialogueText(app.rom->String(d.stringId), app.game.hud), true);
-                        fprintf(stderr, "frame %ld: hd dialogue id=%d lines=%zu size=%g\n", frame, d.stringId, L.lines.size(), L.size);
+                        fprintf(stderr, "frame %ld: dialogue speech=%d page=%d/%d id=%d speaker=%d name=%d last=%d\n", frame, d.speech, d.page, d.pages, d.stringId, d.speaker, d.speakerNameId, d.last ? 1 : 0);
+                        // What the HD box shows from this frame on (CONSOLE builds it from the same
+                        // reading; the line counts are for the box with the portrait's column).
+                        if (app.rom && d.stringId < app.rom->StringCount())
+                        {
+                            const DialogueLayout L = LayoutDialogue(DialogueText(app.rom->String(d.stringId), app.game.hud, app.rom->String(kDlgAmId), app.rom->String(kDlgPmId)), true);
+                            fprintf(stderr, "frame %ld: hd dialogue id=%d lines=%zu size=%g\n", frame, d.stringId, L.lines.size(), L.size);
+                        }
                     }
                     else fprintf(stderr, "frame %ld: dialogue none\n", frame);
                 }

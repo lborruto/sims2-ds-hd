@@ -530,7 +530,7 @@ check_pad act-blow pixels act-blow blow
 # portrait that is not black. From s5, A pressed twice (scripts/console/dialogue-a.txt) turns
 # exactly two pages. Then each language's conversations (every page of the game's speech table,
 # --measure-string all; a layout check: the game itself stays in its firmware's language) fit
-# the box, the longest one too (--measure-string ID), and its picture (--dialogue-string) keeps
+# the box with no placeholder or escape left in their text, the longest one too (--measure-string ID), and its picture (--dialogue-string) keeps
 # every white text pixel of the panel inside the text well.
 dlg() {
     local name=$1; shift
@@ -539,6 +539,7 @@ dlg() {
 }
 dlg dlg-pages --frames 160 --input "$repo/scripts/dlg-taps.txt" --compose --shot-at 28,29,88,89,149,150 --shot-dir "$tmp/dlg-pages" &
 dlg dlg-a --frames 160 --input "$repo/scripts/console/dialogue-a.txt" &
+dlg dlg-norom --frames 240 --input "$repo/scripts/dlg-taps.txt" --no-romdata &
 wait
 pages() {
     local f
@@ -577,6 +578,17 @@ two_pages() {
     if grep -q 'page=4/4' "$tmp/dlg-a.log"; then echo "  dlg-a: A turned more than two pages"; return 1; fi
 }
 check_pad dlg-a two_pages
+# Without the game's text, --print-hud still logs the pages, and "dialogue none" only when the
+# conversation is not up (never on a frame that logged a page).
+norom() {
+    in_order dlg-norom 'dialogue speech=0 page=1/4' 'dialogue speech=0 page=4/4' 'dialogue none' 'dialogue speech=1 page=1/3' || return 1
+    local f
+    for f in $(sed -n 's/^frame \([0-9]*\): dialogue speech=.*/\1/p' "$tmp/dlg-norom.log"); do
+        if grep -q "^frame $f: dialogue none" "$tmp/dlg-norom.log"; then echo "  dlg-norom: frame $f logged a page and none"; return 1; fi
+    done
+    if grep -q 'hd dialogue' "$tmp/dlg-norom.log"; then echo "  dlg-norom: an HD line without the game's text"; return 1; fi
+}
+check_pad dlg-norom norom
 for lang in 1 2 3 4 5; do
     name=measure-$lang
     if ! out=$("$bin" "$rom" --headless --frames 1 --state-load "$shots/s5.st" --save "$tmp/$name.sav" --language $lang --measure-string all 2> "$tmp/$name.log"); then

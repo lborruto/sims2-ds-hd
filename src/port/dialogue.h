@@ -26,6 +26,8 @@ constexpr int kDlgRows = 4;              // the text's rows before the panel gro
 constexpr int kDlgMaxRows = 9;           // at most (a longer page is clipped: never seen in the game's five languages)
 constexpr float kDlgTextSize = 30, kDlgTextMin = 28; // the text, pixels per em (TV-readable: 28 at least at 720p)
 constexpr float kDlgNameSize = 28, kDlgChipSize = 28;
+// The game's am / pm strings (for @am in a page).
+constexpr int kDlgAmId = 178, kDlgPmId = 179;
 // The portrait on the DS's touch screen: inside its frame's outline (x 170-243, rows 34-123 on
 // s5, sit-dialogue and sit-concierge) less the frame's bevel and its rounded corners' pixels
 // (x 174-240, rows 38-121); shown 2x in a well at the right.

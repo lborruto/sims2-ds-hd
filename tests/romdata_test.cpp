@@ -159,6 +159,9 @@ int main()
         CHECK(!d.LoadStrings(2) && d.StringCount() == 0 && d.StringsFile() == -1); // the French file is not in this table
         CHECK(!d.LoadStrings(6) && !d.LoadStrings(-1));
         CHECK(d.Open(rom.b) && d.StringCount() == 0);                                // opening again forgets the strings
+        CHECK(d.LoadStrings(1) && d.StringCount() == 4);
+        d.DropArchive();                                                             // the strings stay, the archive goes
+        CHECK(!d.IsOpen() && d.Resource(123).empty() && d.StringCount() == 4 && d.String(0) == "Hi!\n\xC2\xA9");
     }
     // The bit order: a tree by hand (pair 0: bit 0 'a', bit 1 pair 1; pair 1: bit 0 the end,
     // bit 1 'b'), one string whose bits 0, 1 1, 1 0 read "ab".

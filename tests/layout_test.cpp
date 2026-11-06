@@ -148,11 +148,12 @@ static HudState TestHud()
     return h;
 }
 
-static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int topH, int ow, int oh, bool withHud)
+// given: test that composition (the HD conversation's, built apart) instead of BuildConsole's.
+static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int topH, int ow, int oh, bool withHud, const Composition* given = nullptr)
 {
     const HudState hud = TestHud();
     const HudStrings strings = TestStrings();
-    const Composition c = withHud ? BuildConsole(s, menuOpen, -1, topW, topH, &hud, &strings) : BuildConsole(s, menuOpen, -1, topW, topH);
+    const Composition c = given ? *given : withHud ? BuildConsole(s, menuOpen, -1, topW, topH, &hud, &strings) : BuildConsole(s, menuOpen, -1, topW, topH);
     const CanvasFit fit = CanvasFit::For(c.cw, c.ch, ow, oh);
     int bottoms = 0;
     for (int i = 0; i < (int)c.pieces.size(); i++)
@@ -660,6 +661,9 @@ int main()
             CHECK(TouchFromComposition(comp, fit, P.x + 5.5f, P.y + 5.5f, tx, ty) && tx >= 219 && tx < 250 && ty >= 155 && ty < 187);
             CHECK(TouchFromComposition(comp, fit, P.x + P.w - 2.5f, P.y + P.h - 2.5f, tx, ty) && tx >= 219 && tx < 250 && ty >= 155 && ty < 187);
             CHECK(OverTopComposition(comp, fit, 640.5f, 100.5f));
+            // Every pixel of its touchable pieces (the invisible tap piece) round trips, at every size.
+            for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}, {800, 1000}})
+                TestConsoleRoundtrip({Screen::Dialogue}, false, topW, 192, o.first, o.second, true, &comp);
         }
         const Composition m1 = BuildConsole({Screen::Dialogue}, false, -1, 256, 192, &hud, nullptr, &g, &rom, face.data());
         CHECK(m1.ui.empty() && m1.pieces.size() == 5);

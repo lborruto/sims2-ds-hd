@@ -34,6 +34,9 @@ public:
     // an unknown byte shown as {xx}, a 2-byte escape (0xF0 and over) as {F0xx}; "" when id is
     // out of the table.
     std::string String(int id) const;
+    // Frees the archive's copy (Resource() then finds nothing) and keeps the strings loaded: what
+    // the running program needs (App::rom).
+    void DropArchive() { archive.clear(); archive.shrink_to_fit(); offsets.clear(); offsets.shrink_to_fit(); }
 
 private:
     std::vector<u8> archive;

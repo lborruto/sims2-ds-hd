@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <iterator>
 
 #include "console.h"
 #include "romdata.h"
@@ -14,7 +15,9 @@ namespace
 {
 // The game's speaker codes (research: 0x3F no speaker, 0x40 the player) and its am / pm.
 constexpr int kSpeakerNone = 0x3F, kSpeakerPlayer = 0x40;
-constexpr int kAmId = 178, kPmId = 179;
+// The game's own colours around the portrait on the touch screen: its frame's inner bevels (the
+// rest are the panel's: console.h, the kit's theme).
+constexpr u32 kBevelDark = 0x414979, kBevelLight = 0x51518A;
 // The game's arrow on the touch screen (inside its outline): a click on the panel taps it.
 constexpr Rect kArrowInside {223, 159, 23, 24};
 
@@ -42,15 +45,13 @@ std::string DropEscapes(const std::string& in)
 std::string Tidy(const std::string& in, const std::vector<bool>& dropped)
 {
     std::string s;
-    std::vector<bool> d;
     for (size_t i = 0; i < in.size(); i++)
     {
         const char c = in[i];
         if (c == ' ' && (s.empty() || s.back() == ' ' || s.back() == '\n')) continue;
-        if (c == '\n') while (!s.empty() && s.back() == ' ') { s.pop_back(); d.pop_back(); }
-        if (IsPunct(c) && !s.empty() && s.back() == ' ' && i > 0 && dropped[i - 1]) { s.pop_back(); d.pop_back(); }
+        if (c == '\n') while (!s.empty() && s.back() == ' ') s.pop_back();
+        if (IsPunct(c) && !s.empty() && s.back() == ' ' && i > 0 && dropped[i - 1]) s.pop_back();
         s += c;
-        d.push_back(dropped[i]);
     }
     while (!s.empty() && (s.back() == ' ' || s.back() == '\n')) s.pop_back();
     while (!s.empty() && s[0] == '\n') s.erase(0, 1);
@@ -130,7 +131,10 @@ DialogueLayout LayoutDialogue(const std::string& text, bool portrait)
     L.lineH = (int)std::lround(L.size * 1.3f); // the kit's line height (TextItem)
     for (const std::string& l : L.lines) L.fits = L.fits && ui::TextWidth(l, L.size) <= L.textW;
     const int textH = L.rows * L.lineH;
-    const int wellH = std::max(textH + 2 * kDlgTextPad - 4, portrait ? kDlgPortraitFrom.h * kDlgPortraitScale + 2 * kDlgPortraitPad : 0);
+    // At least the well of four rows at 30 px, so the box keeps its size from page to page (a page
+    // at 28 px or with fewer lines does not shrink it).
+    const int floorH = kDlgRows * (int)std::lround(kDlgTextSize * 1.3f) + 2 * kDlgTextPad - 4;
+    const int wellH = std::max({textH + 2 * kDlgTextPad - 4, floorH, portrait ? kDlgPortraitFrom.h * kDlgPortraitScale + 2 * kDlgPortraitPad : 0});
     const int h = kDlgTopPad + wellH + kDlgPad;
     L.panel = {kDlgPanelX, kConsoleH - kDlgBottomGap - h, kDlgPanelW, h};
     return L;
@@ -147,7 +151,8 @@ bool PortraitShown(const u32* bottom)
             const u32 p = bottom[y * SW + x] & 0xFFFFFF;
             const int r = p >> 16 & 0xFF, g = p >> 8 & 0xFF, b = p & 0xFF;
             total++;
-            if (p == 0x5961A2 || p == 0x828ACB || p == 0x51518A || p == 0x414979 || p == 0x383869 || p == 0x6171B2) continue;
+            const u32 theme[] = {kPanelArgb & 0xFFFFFF, kFrameArgb & 0xFFFFFF, kOutlineArgb & 0xFFFFFF, ui::GameTheme().frame & 0xFFFFFF, kBevelDark, kBevelLight};
+            if (std::find(std::begin(theme), std::end(theme), p) != std::end(theme)) continue;
             if (r < 24 && g < 24 && b < 24) continue;
             picture++;
         }
@@ -162,7 +167,7 @@ void BuildDialogue(Composition& c, const GameState& game, const RomData& rom, co
     c.pieces.push_back(ConsoleWorld(topW, HudCropRows(topH), true));
 
     // No page drawn yet (a speech starting, the frames between two): the panel alone.
-    const std::string text = d.valid ? DialogueText(rom.String(d.stringId), game.hud, rom.String(kAmId), rom.String(kPmId)) : "";
+    const std::string text = d.valid ? DialogueText(rom.String(d.stringId), game.hud, rom.String(kDlgAmId), rom.String(kDlgPmId)) : "";
     std::string name;
     if (!d.valid) {}
     else if (d.speaker == kSpeakerPlayer) name = game.hud.simName;
