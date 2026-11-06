@@ -1,0 +1,4 @@
+# From s7, CONSOLE: B closes the phone, then the right stick held up 20 frames (the DS's X: the
+# world's camera zooms in).
+20 2 pad b
+120 20 pad ry-

@@ -852,9 +852,9 @@ elif case == "cityhall-wide":
     # in the strip below, where the bar sits.
     big = Image.open(raw_path.replace(".png", "-top.png")).convert("RGB")
     expect("wide picture", big.size, (341, 192))
-    for cx, cy in ((0, 300), (1279, 100), (640, 400), (300, 655), (1000, 660)):
+    for cx, cy in ((0, 300), (1279, 100), (640, 400), (300, 655), (780, 660)):
         expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * 341 // 1280, cy * 176 // 661)))
-    for cx, cy in ((1000, 680), (1270, 715), (700, 700)):
+    for cx, cy in ((780, 680), (1270, 715), (700, 700)):
         expect(f"backdrop below the world at {cx},{cy}", C(cx, cy), (16, 18, 24))
     menu_hint_chip()
     status_bar(left=16)
@@ -1953,6 +1953,31 @@ check_pad pad-cas-looks cas_looks
 check_pad pad-cas-keep cas_keep
 check_pad pad-cas-cross cas_cross
 check_pad pad-cas-turn cas_turn
+# The world's camera on the right stick (navigator.h, WorldKeys; from s7, the phone closed): held
+# left it turns (the DS's L), held up it zooms in (X): the world's picture differs from the same
+# run without it; LB held (the shoulders' default L) changes nothing there any more.
+pad_world() {
+    local name=$1 input=$repo/scripts/console/$2.txt
+    "$bin" "$rom" --headless --frames 260 --state-load "$shots/s7.st" --save "$tmp/$name.sav" \
+        --layout console --print-game "${town[@]}" --input "$input" --compose --shot-at 259 --shot-dir "$tmp/$name" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_world pad-world-turn world-turn &
+pad_world pad-world-zoom world-zoom &
+pad_world pad-world-lb world-lb &
+pad_world pad-world-still world-still &
+wait
+# world_differs NAME 0|1: the world (above the strip) differs from world-still's (1) or not (0).
+world_differs() {
+    "$python" -I -c '
+import sys
+from PIL import Image, ImageChops
+a, b = (Image.open(p).convert("RGB").crop((0, 0, 1280, 640)) for p in sys.argv[1:3])
+sys.exit(0 if bool(ImageChops.difference(a, b).getbbox()) == (sys.argv[3] == "1") else 1)' "$tmp/$1/f000259.png" "$tmp/pad-world-still/f000259.png" "$2"
+}
+check_pad pad-world-turn world_differs pad-world-turn 1
+check_pad pad-world-zoom world_differs pad-world-zoom 1
+check_pad pad-world-lb world_differs pad-world-lb 0
 # The HD Interact tab's words in each language (src/port/interact.*: --measure-menu): every verb
 # in its row and in the A hint, every Sim's and object's name in the title and the strip, held in
 # their boxes (shrunk at most; a neighbour's name beside the plate may end in an ellipsis).

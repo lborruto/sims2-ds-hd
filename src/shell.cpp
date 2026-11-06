@@ -114,7 +114,7 @@ const std::vector<CardEntry>& Card()
         {{ui::Button::A}, -1, W::CtlTouch},
         {{ui::Button::B}, -1, W::CtlBack},
         {{ui::Button::X, ui::Button::Y}, -1, W::CtlZoom},
-        {{ui::Button::LB, ui::Button::RB}, -1, W::CtlCamera},
+        {{ui::Button::RStick}, -1, W::CtlCamera}, // (in the world: it turns, and zooms up / down)
         {{ui::Button::Back}, -1, W::Menu},
         {{ui::Button::Pause}, -1, W::ShellPauseMenu},
         {{ui::Button::RStick}, -1, W::Cursor},

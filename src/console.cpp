@@ -69,12 +69,12 @@ Overlay Text(int x, int y, const char* text, int scale)
 
 // The money's last change (port/statusbar.h's bar at `bar`): a small kit panel right of it, "+§12"
 // in a light green or "-§1" in a light red, on the bar's layer.
-void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom)
+void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom, int right = kConsoleW - 8)
 {
     const std::string text = (payout > 0 ? "+" : "-") + MenuWords(rom, kStrMgMoney, std::abs(payout));
     const float size = 26;
     const int w = (int)std::ceil(ui::TextWidth(text, size, ui::Weight::ExtraBold)) + 36;
-    if (bar.x + bar.w + 12 + w > kConsoleW - 8) return;
+    if (bar.x + bar.w + 12 + w > right) return;
     ui::UiItem p = ui::PanelItem({bar.x + bar.w + 12, bar.y, w, bar.h});
     p.layer = kStatusBarLayer;
     c.ui.push_back(p);
@@ -332,19 +332,26 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(World(topW, worldRows, bar));
         // (The HD town whenever RAM and the game's strings read: a frame whose tab does not read yet,
         // the panel coming back from a minigame, never flashes milestone 1's rail.)
+        int hintsLeft = kConsoleW - 8; // (the hints' panel's left: the payout stays clear of it)
         if (ConsoleView(s, game, rom).valid || (game && game->valid && rom && rom->StringCount() > 0 && bar))
         {
             // The HD menu has the tabs: no rail. A small kit panel level with the status bar says
             // how to open it: the TOUCH MENU's button as the device used last prints it (the pad's
-            // Back / View, Share, -; the keyboard's key, E by default: ui::ChipLook) and the word.
+            // Back / View, Share, -; the keyboard's key, E by default: ui::ChipLook) and the word;
+            // left of it the camera's, the right stick (navigator.h's world: it turns and zooms).
             const char* word = OwnWord(rom, OwnWordId::Menu);
+            const char* camera = OwnWord(rom, OwnWordId::CtlCamera);
             constexpr float kSize = 24;
-            constexpr int kPad = 14;
+            constexpr int kPad = 14, kBetween = 22;
             const Rect chip = ui::ChipRect(0, 0, ui::Button::Back, word, kSize);
-            const Rect box {kConsoleW - 16 - (chip.w + 2 * kPad), kStatusBarY, chip.w + 2 * kPad, kStatusBarH};
+            const Rect cam = ui::ChipRect(0, 0, ui::Button::RStick, camera, kSize);
+            const int w = cam.w + kBetween + chip.w + 2 * kPad;
+            const Rect box {kConsoleW - 16 - w, kStatusBarY, w, kStatusBarH};
+            hintsLeft = box.x - 12;
             const size_t first = c.ui.size();
             c.ui.push_back(ui::PanelItem(box));
-            c.ui.push_back(ui::ChipItem(box.x + kPad, box.y + (box.h - chip.h) / 2, ui::Button::Back, word, kSize));
+            c.ui.push_back(ui::ChipItem(box.x + kPad, box.y + (box.h - cam.h) / 2, ui::Button::RStick, camera, kSize));
+            c.ui.push_back(ui::ChipItem(box.x + w - kPad - chip.w, box.y + (box.h - chip.h) / 2, ui::Button::Back, word, kSize));
             for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
         }
         else
@@ -358,7 +365,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         {
             const Rect r = AddStatusBar(c, *hud, *strings);
             // The money's last change (an animation's payout, a prize) beside the bar, in the game's words.
-            if (payout != 0 && rom && rom->StringCount() > kStrMgMoney) AddPayout(c, r, payout, *rom);
+            if (payout != 0 && rom && rom->StringCount() > kStrMgMoney) AddPayout(c, r, payout, *rom, hintsLeft);
         }
     }
     else if (s.screen == Screen::Dialogue && game && game->valid && rom && rom->StringCount() > 0 && bottom)

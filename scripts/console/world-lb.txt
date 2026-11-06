@@ -1,0 +1,4 @@
+# From s7, CONSOLE: B closes the phone, then LB held 40 frames: the shoulders' default L no longer
+# turns the world's camera (the picture is world-still's).
+20 2 pad b
+120 40 pad lb

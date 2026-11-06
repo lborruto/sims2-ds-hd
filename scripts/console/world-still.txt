@@ -1,0 +1,3 @@
+# From s7, CONSOLE: B closes the phone, nothing else (world-turn's, world-zoom's and world-lb's
+# reference).
+20 2 pad b
