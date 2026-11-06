@@ -79,6 +79,10 @@ It is an early version: see [Good to know](#good-to-know).
 </p>
 
 <p align="center">
+  <img src="docs/screenshots/front-menu.webp" alt="CONSOLE: the main menu in HD: the game's title picture big at the left, its four buttons (Create-a-Sim, Load-a-Sim, Settings, DS Wireless) at the right with the button hints" width="700">
+</p>
+
+<p align="center">
   <img src="docs/screenshots/create-a-sim.webp" alt="CONSOLE in Create-a-Sim: the Sim big in a frame on the left, the HD panel on the right with the page tabs, the name in seven slots, the gender and skin buttons and the keyboard, the button hints" width="700">
 </p>
 
@@ -136,6 +140,14 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND
 BUTTONS): choose the action, press the key or button you want. Xbox, PlayStation and Switch
 controllers are known by their own button names.
+
+**Before the game** (the front end) the controller does it all: on the intro's last screen
+("Touch the Touch Screen to continue.") A or Start take the touch, on the title A begins, and on
+the main menu Up / Down and A pick Create-a-Sim, Load-a-Sim, Settings or DS Wireless (the buttons
+fade in first; a press during the fade does nothing). In Settings LB / RB change page (Music,
+SFX, Concept Art, Credits), Left / Right move a volume by a tenth, A opens an unlocked concept
+picture, and B goes back to the title. In Load-a-Sim Up / Down pick a slot and A loads it. The end
+credits the game shows after the story are still the game's own picture.
 
 **In town** the buttons are the DS's. **The menu** (phone, tabs, shop, the rest of the touch
 screen) opens on the PANEL button; the D-pad moves, A taps, LB / RB switch tabs, B closes. On the
@@ -248,7 +260,8 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
 - **An early version.** Town, conversations, Create-a-Sim, the shop, Build Rooms, the hotel's
   lobby, basement, Registry and music, the social games, the vacuum and the casino's card game are
   checked; not everything the game has is yet.
-- **A few screens are still the game's own picture.** The furniture editor of a hotel room, and
+- **A few screens are still the game's own picture.** The end credits (after the story),
+  the furniture editor of a hotel room, and
   any screen CONSOLE has no HD page for, are drawn big with the stick as a cursor (the right
   stick moves it, A touches), and a hint box says so.
 - **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
