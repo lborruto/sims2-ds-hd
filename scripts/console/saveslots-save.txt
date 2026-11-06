@@ -1,0 +1,5 @@
+# From B-st-opt-save (the town, Options > Save: the HD slot list, three empty slots), CONSOLE:
+# Down (slot 2), A (the game's tick for that slot: it saves there, "Saving", the slot used).
+# Run it with a scratch --save: it writes the game's save.
+20 2 pad down
+50 2 pad a

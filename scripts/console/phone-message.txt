@@ -1,0 +1,3 @@
+# From C-cas-msg1 (the complete save, a message open, the highlight on its sender), CONSOLE: A on
+# "Next Message" (the game's Down ten times past the text's lines, then its A: the next message).
+20 2 pad a

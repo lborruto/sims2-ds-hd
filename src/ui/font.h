@@ -12,6 +12,11 @@ namespace sims2wide::ui
 {
 enum class Weight { Bold, ExtraBold };
 
+// The code points (>= U+0020) the font was asked for and lacks, drawn or measured as '?', since the
+// last reset, ascending: what the checks (--measure-string, --measure-menu) fail on.
+std::vector<u32> MissingGlyphs();
+void ResetMissingGlyphs();
+
 // Ascent and descent (below the baseline, positive) and the line's height, for sizePx.
 struct LineMetrics { float ascent, descent, lineHeight; };
 LineMetrics Metrics(float sizePx, Weight w = Weight::Bold);

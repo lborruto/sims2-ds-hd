@@ -6,6 +6,7 @@
 #include <iterator>
 
 #include "console.h"
+#include "port/menuview.h"
 #include "romdata.h"
 #include "ui/kit.h"
 
@@ -22,22 +23,6 @@ constexpr u32 kBevelDark = 0x414979, kBevelLight = 0x51518A;
 constexpr Rect kArrowInside {223, 159, 23, 24};
 
 bool IsPunct(char c) { return c == '.' || c == ',' || c == '!' || c == '?' || c == ';' || c == ':'; }
-
-// RomData's escapes ({xx}, {F0xx}) dropped.
-std::string DropEscapes(const std::string& in)
-{
-    std::string s;
-    for (size_t i = 0; i < in.size(); i++)
-    {
-        if (in[i] == '{')
-        {
-            const size_t e = in.find('}', i);
-            if (e != std::string::npos && e - i <= 8) { i = e; continue; }
-        }
-        s += in[i];
-    }
-    return s;
-}
 
 // Spaces folded (a drop leaves two), none at a line's ends, none before punctuation that a drop
 // put there ("the @2." → "the."). A space before '!' / '?' that the string had (French) stays:
@@ -186,6 +171,7 @@ void BuildDialogue(Composition& c, const GameState& game, const RomData& rom, co
     tap.alpha = 0;
     c.pieces.push_back(tap);
 
+    const size_t uiFirst = c.ui.size();
     UiItem panel = PanelItem(P);
     c.ui.push_back(panel);
     const int wellY = P.y + kDlgTopPad, wellH = P.h - kDlgTopPad - kDlgPad;
@@ -196,11 +182,15 @@ void BuildDialogue(Composition& c, const GameState& game, const RomData& rom, co
     // The text: from the well's top, its rows centred in the well's height.
     const int textH = L.rows * L.lineH;
     const Rect textBox {well.x + kDlgTextPad, well.y + (well.h - textH) / 2, L.textW, textH};
+    // The page's words and the chip on layer 1: a page turning rasters them alone, the panel,
+    // well, plate and portrait's frame (layer 0) stay as they were while the box keeps its size.
+    const size_t textAt = c.ui.size();
     UiItem t = TextItem(textBox, text, L.size, Align::Left, Weight::Bold);
     c.ui.push_back(t);
     // The A chip in the well's bottom right corner.
     const Rect chip = ChipRect(0, 0, Button::A, "", kDlgChipSize);
     c.ui.push_back(ChipItem(well.x + well.w - chip.w - 12, well.y + well.h - chip.h - 10, Button::A, "", kDlgChipSize));
+    const size_t textEnd = c.ui.size();
     // The name plate: a tab over the panel's top edge, above the well's left.
     if (!name.empty())
     {
@@ -226,5 +216,7 @@ void BuildDialogue(Composition& c, const GameState& game, const RomData& rom, co
         const int iw = kDlgPortraitFrom.w * kDlgPortraitScale, ih = kDlgPortraitFrom.h * kDlgPortraitScale;
         if (picture) c.ui.push_back(ImageItem({frame.x + (frame.w - iw) / 2, frame.y + (frame.h - ih) / 2, iw, ih}, bottom, SW, SH, kDlgPortraitFrom));
     }
+    for (size_t i = textAt; i < textEnd; i++) c.ui[i].layer = 1;
+    SortUi(c.ui, uiFirst);
 }
 }

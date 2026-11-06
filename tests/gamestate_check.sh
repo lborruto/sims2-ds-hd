@@ -169,4 +169,72 @@ if [ -f "$shots/s6.st" ] && [ -f "$tmp/other.nds" ]; then
     if [ "$(count "$tmp/rec-other" st)" = 0 ] && grep -q '^clock: ' "$tmp/rec-other.log"; then echo "ok   rom gate: another game code records nothing"
     else echo "FAIL rom gate: recorded on another game code"; fail=1; fi
 else echo "FAIL rom gate: no $shots/s6.st or no copy"; fail=1; fi
+
+# The town's records read from RAM (--print-town): inventory, options, popup, save slots, from
+# the held-out states A-gift2-base (two items, key items not owned), A-pk-cnt3-slot1 (the complete
+# save's pockets), B-st-opt-music, B-ch-opt-quit / B-pause / s6 (popups; their texts must equal
+# the ROM's strings 65, 22 / 23 and 2448) and B-cas-opt-save (three save slots). Copies of these
+# states from research/ram/gen go in shots/ (git-ignored, listed in CLAUDE.md).
+town_run() { # NAME STATE: the last town lines in NAME.town
+    local name=$1 file=$shots/$2.st
+    if [ ! -f "$file" ]; then echo "no save state $2.st" > "$tmp/$name.town"; return; fi
+    "$bin" "$rom" --headless --frames 60 --state-load "$file" --save "$tmp/$name.sav" --print-town "${late[@]}" > "$tmp/$name.townlog" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.townlog" && touch "$tmp/$name.townok"
+    grep -E '^frame [0-9]+: (inventory|options|popup|saves|interact|pockets|goals|relations|phone|gift|note) ' "$tmp/$name.townlog" | sed 's/^frame [0-9]*: //' > "$tmp/$name.town"
+}
+town_want() { # NAME KIND PATTERN LABEL: the last line of that kind matches (grep -E)
+    if [ -f "$tmp/$1.townok" ] && grep "^$2 " "$tmp/$1.town" | tail -n 1 | grep -q -E "$3"; then echo "ok   $4"
+    else echo "FAIL $4: got '$(grep "^$2 " "$tmp/$1.town" 2>/dev/null | tail -n 1)'"; fail=1; fi
+}
+town_text() { # NAME TEXT_ID TITLE_ID LABEL: the popup's text (and title, -1 none) is the ROM's string
+    local want got
+    want="title=\"$([ "$3" = -1 ] || "$bin" "$rom" --dump-string "$3" 2>/dev/null)\" text=\"$("$bin" "$rom" --dump-string "$2" 2>/dev/null)\""
+    got=$(grep '^popup ' "$tmp/$1.town" | tail -n 1 | sed -E 's/^popup state=[0-9]+ kind=[0-9]+ pressed=-?[0-9]+,[01] //')
+    if [ -n "$got" ] && [ "$got" = "$want" ]; then echo "ok   $4"; else echo "FAIL $4: want '$want', got '$got'"; fail=1; fi
+}
+town_run t-gift A-gift2-base; town_run t-pk A-pk-cnt3-slot1; town_run t-music B-st-opt-music
+town_run t-quit B-ch-opt-quit; town_run t-pause B-pause; town_run t-goal s6; town_run t-save B-cas-opt-save
+town_want t-gift inventory '^inventory slots=171:634/993/321,106:569/928/1991 counted=0,0,0,0 keys=000$' "town: two pocket items with names, descriptions, icons"
+town_want t-pk inventory '^inventory slots=171:634/993/321 counted=27,0,2,0 keys=111$' "town: counted items 27 0 2 0, the three tools owned"
+town_want t-music options '^options music=1229 sfx=4096$' "town: music volume 30 %"
+town_want t-gift options '^options music=4096 sfx=4096$' "town: volumes at 100 %"
+town_want t-gift popup '^popup none$' "town: no popup"
+town_want t-quit popup 'kind=2 ' "town: the quit question is a yes / no popup"
+town_text t-quit 65 -1 "town: the quit popup's text is string 65, no title"
+town_want t-pause popup 'kind=0 ' "town: Game Paused has one button"
+town_text t-pause 23 22 "town: Game Paused's text and title are strings 23 and 22"
+town_text t-goal 2448 -1 "town: the goal popup's text is string 2448"
+town_want t-save saves '^saves current=2 0=[^ ]+/3226/3 1=[^ ]+/1055/19 2=[^ ]+/9150/20$' "town: three save slots, the third current"
+town_want t-gift saves '^saves current=-1 0=empty 1=empty 2=empty$' "town: no save slots used"
+# The menus' lists (--print-town: interact, pockets, goals, relations, phone, gift, note), from
+# held-out states (copies in shots/): the store's Buy, the casino's three rows, the concierge, the
+# strip, the pad's hold, Pockets selections, Goals (8 goals; the complete save's 100 % footer; a
+# hotel goal), Relationships (23 Sims; the scroll; one Sim), the phone's pages, Give Gift.
+for st in L-sit-store-none-250 L-sit-casino-none-250 L-sit-cityhall-none-250 D-hotel-down D-cas-right2 D-cas-hold D-cas-hold-down2 \
+          A-pk-slot1-key2 A-pk-town-cnt1 A-pk-cnt3-slot1 B-pg8-goals-l7 B-cas-goals B-hot-goals B-cas-rel-next5 B-st-rel \
+          C-cas-msg1 C-cas-msg1-dn4 C-cas-pb1 C-s7-msgs A-gift2-slot2; do town_run "m-$st" "$st"; done
+town_want m-L-sit-store-none-250 interact '^interact target=sim51:374:4359 prev=- next=- big=4359 pad=1 hl=0 actions=43:1888$' "menus: the store's target (Johnny Smith, Buy)"
+town_want m-L-sit-casino-none-250 interact 'target=obj29:492:6638 .* actions=98:1943,73:1918,93:1938$' "menus: the casino's cards, three actions"
+town_want m-L-sit-cityhall-none-250 interact '^interact target=- prev=- next=- ' "menus: no target"
+town_want m-D-hotel-down interact 'target=sim45:368:2168 .* actions=6:1851,71:1916,4:1849$' "menus: the concierge (Sim 45) and his actions"
+town_want m-D-cas-right2 interact 'target=obj15:478:5744 prev=obj29:492:6638 next=- .* actions=28:1873$' "menus: the strip's previous target"
+town_first() { # NAME KIND PATTERN LABEL: the FIRST line of that kind matches (the state's own frame 0)
+    if [ -f "$tmp/$1.townok" ] && grep "^$2 " "$tmp/$1.town" | head -n 1 | grep -q -E "$3"; then echo "ok   $4"
+    else echo "FAIL $4: got '$(grep "^$2 " "$tmp/$1.town" 2>/dev/null | head -n 1)'"; fail=1; fi
+}
+town_first m-D-cas-hold interact '^interact .* pad=0 hl=0 ' "menus: pad mode (A held), first row lit"
+town_first m-D-cas-hold-down2 interact 'hl=2 ' "menus: the third row lit"
+town_want m-A-pk-slot1-key2 pockets '^pockets slot=-1 key=1 counted=-1$' "menus: Pockets key item 1"
+town_want m-A-pk-town-cnt1 pockets '^pockets slot=-1 key=-1 counted=0$' "menus: Pockets counted item 0"
+town_want m-A-pk-cnt3-slot1 pockets '^pockets slot=0 key=-1 counted=-1$' "menus: Pockets slot 0"
+town_want m-B-pg8-goals-l7 goals '^goals sel=3 first=1 lines=14 portrait=4257 footer=-1/-1/-1 entries=m0:1627:0\+1,m1:1628:1\+3,m2:1629:4\+1,m3:1630:5\+3,m4:1631:8\+1,m5:1632:9\+2,m6:1633:11\+1,m7:1634:12\+2$' "menus: 8 goals, the fourth selected, scrolled"
+town_want m-B-cas-goals goals 'footer=1843/1842/100 entries=-$' "menus: the hotel footer at 100 %"
+town_want m-B-hot-goals goals '^goals sel=0 first=0 lines=3 portrait=2168 .* entries=m1:1628:0\+3$' "menus: the hotel goal and the concierge's portrait"
+town_want m-B-cas-rel-next5 relations '^relations first=2 sel=5 sims=1:324/390/184/195/26,2:' "menus: 23 Sims, the sixth selected, first 2"
+town_want m-B-st-rel relations '^relations first=0 sel=0 sims=22:345/411/184/195/4257$' "menus: one Sim (id 22, Jebediah)"
+town_want m-C-cas-msg1 phone '^phone page=3 row=0 scroll=0 shown=0 .* menu=2066,2068,2069,2070 inbox=0:2311:368:read,1:1182:368:new date=11/5 end=10 maid=-1 reply=-1 caller=-1 list=\?$' "menus: the phone's message page, two messages, one unread, Next Message on row 10"
+town_want m-C-cas-msg1-dn4 phone 'page=3 row=4 scroll=3 ' "menus: the phone's scrolled message"
+town_want m-C-cas-pb1 phone 'page=7 .* contacts=22/2 .* list=2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23$' "menus: the contact list, 22 rows, Sim 2, the list worked out agreeing"
+town_want m-C-s7-msgs phone 'page=2 .* inbox=- date=' "menus: no messages"
+town_want m-A-gift2-slot2 gift '^gift recipient=22 name=345 slot=1 refused=000000$' "menus: Give Gift to Jebediah, slot 2"
 exit $fail

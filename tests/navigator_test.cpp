@@ -6,7 +6,12 @@
 // RIGHT, the cards' draw, lift, play, discard and quit question, the vacuum's blow, hand and
 // steering; presses that would tap wait for a settled screen (90 frames at most), DS buttons do
 // not (a popup opening waits); the front end's screens, save slots and the quit question the
-// cursor, a black load the DS's buttons.
+// cursor, a black load the DS's buttons; the HD menu (port/menuview.h) on synthetic MenuViews:
+// the focus over the view's enabled items (greyed rows skipped, never performed), A runs the
+// focused item's steps (taps, DS keys over frames, drags, in order), Left / Right the view's
+// screen-wide actions, B its back action or the menu's close, the focus kept on its item's id when
+// the content changes (or clamped), a press held by the gate dropped when the view changed
+// (stale), the list's own scroll past its end with the focus following the rebuilt view.
 //   ninja -C build navigator_test && ./build/navigator_test
 #include <cstdio>
 #include <cstdlib>
@@ -47,11 +52,12 @@ struct Rig
     Navigator nav;
     TouchScript touch;
     u32 keys = 0;
+    const MenuView* view = nullptr; // the screen's HD menu, if any
     // One frame with these buttons held (the touch script is not advanced: see Touched).
     u32 Frame(ScreenState s, PadState p = {}, bool settled = true)
     {
         keys = 0;
-        nav.Update(s, p, touch, keys, settled);
+        nav.Update(s, p, touch, keys, settled, view);
         return keys;
     }
     // A press: a frame held, then a frame released.
@@ -702,9 +708,805 @@ static void popup_opening_holds_a()
     CHECK(!r.touch.Owns());
 }
 
+// A synthetic HD menu: a list of rows (group 1) in a column, each tapping (200 + i, 50 + i), the
+// third greyed, and a button at the top right (the phone's place) tapping (232, 22).
+static MenuView ListView(int rows = 4, int greyed = 2)
+{
+    MenuView v;
+    v.valid = true;
+    for (int i = 0; i < rows; i++)
+    {
+        ViewItem it;
+        it.rect = {460, 210 + 76 * i, 620, 62};
+        it.action = {TapStep(200 + i, 50 + i)};
+        it.enabled = i != greyed;
+        it.group = 1;
+        it.id = 0x100 + (u32)i;
+        v.items.push_back(it);
+    }
+    ViewItem phone;
+    phone.rect = {1000, 48, 74, 76};
+    phone.action = {TapStep(232, 22)};
+    phone.id = 1;
+    v.items.push_back(phone);
+    v.valid = true;
+    return v;
+}
+
+static void view_focus_skips_greyed_and_a_runs()
+{
+    Rig r;
+    const MenuView v = ListView();
+    r.view = &v;
+    r.Frame(kInteract);
+    CHECK(r.nav.Focus() == -1 && !r.nav.ViewFocus()); // menu closed: the DS's buttons
+    r.Press(kInteract, &PadState::menu);
+    CHECK(r.nav.ViewFocus());
+    CHECK(r.nav.Focus() == 0);
+    r.Press(kInteract, &PadState::down);
+    CHECK(r.nav.Focus() == 1);
+    r.Press(kInteract, &PadState::down); // row 2 is greyed: skipped
+    CHECK(r.nav.Focus() == 3);
+    r.Press(kInteract, &PadState::up);
+    CHECK(r.nav.Focus() == 1);
+    PadState a;
+    a.a = true;
+    CHECK(!(r.Frame(kInteract, a) & (1u << kA))); // not the DS's A
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == 201 && y == 51);
+    r.Drain();
+    r.Frame(kInteract);
+    // Up from the first row: the button above (the phone), then A taps it.
+    r.Press(kInteract, &PadState::up);
+    r.Press(kInteract, &PadState::up);
+    CHECK(r.nav.Focus() == 4);
+    r.Frame(kInteract, a);
+    CHECK(r.Touched(x, y));
+    CHECK(x == 232 && y == 22);
+    r.Drain();
+    // A pinned onto a greyed item (a check) never runs it.
+    MenuView g = ListView(3, 0);
+    g.items.pop_back();
+    g.items[1].enabled = g.items[2].enabled = false;
+    Rig q;
+    q.view = &g;
+    q.Frame(kInteract);
+    q.Press(kInteract, &PadState::menu);
+    CHECK(q.nav.Focus() == -1); // nothing enabled: no focus
+    q.Press(kInteract, &PadState::a);
+    CHECK(!q.touch.Owns());
+    // B closes the menu (no back action), no tap.
+    q.Press(kInteract, &PadState::b);
+    CHECK(!q.nav.MenuOpen() && !q.touch.Owns());
+}
+
+static void view_buttons_keys_and_sequences()
+{
+    // Left / Right: the view's screen-wide actions (Interact's targets), not focus moves.
+    MenuView v = ListView();
+    v.buttons[(int)MenuButton::Left] = {TapStep(55, 167)};
+    Rig r;
+    r.view = &v;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::left);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == 55 && y == 167);
+    r.Drain();
+    r.Frame(kInteract);
+    // Right has none: a focus move as usual.
+    const int f = r.nav.Focus();
+    r.Press(kInteract, &PadState::right);
+    CHECK(!r.touch.Owns());
+    CHECK(r.nav.Focus() == MenuNeighbour(v, f, 1, 0));
+    // An action of DS keys: held its frames, one step after the other, a tap after them.
+    MenuView k = ListView(1, -1);
+    k.items[0].action = {KeysStep(1u << kA, 3), KeysStep(1u << kDown, 1), TapStep(10, 20)};
+    Rig s;
+    s.view = &k;
+    s.Frame(kInteract);
+    s.Press(kInteract, &PadState::menu);
+    PadState a;
+    a.a = true;
+    CHECK(s.Frame(kInteract, a) == (1u << kA));
+    CHECK(s.nav.Running());
+    CHECK(s.Frame(kInteract) == (1u << kA));
+    CHECK(s.Frame(kInteract) == (1u << kA));
+    CHECK(s.Frame(kInteract) == (1u << kDown));
+    CHECK(!s.touch.Owns());
+    s.Frame(kInteract);
+    CHECK(s.Touched(x, y));
+    CHECK(x == 10 && y == 20);
+    CHECK(!s.nav.Running());
+    // A press while an action runs is dropped (not queued).
+    MenuView w = ListView(1, -1);
+    w.items[0].action = {WaitStep(5), TapStep(1, 2)};
+    Rig t;
+    t.view = &w;
+    t.Frame(kInteract);
+    t.Press(kInteract, &PadState::menu);
+    t.Press(kInteract, &PadState::a);
+    t.Press(kInteract, &PadState::a);
+    for (int i = 0; i < 6; i++) t.Frame(kInteract);
+    CHECK(t.Touched(x, y));
+    t.Drain();
+    for (int i = 0; i < 6; i++) t.Frame(kInteract);
+    CHECK(!t.touch.Owns());
+    // B runs the view's back action when it has one (and the menu stays).
+    MenuView b = ListView();
+    b.back = {TapStep(238, 18)};
+    Rig u;
+    u.view = &b;
+    u.Frame(kInteract);
+    u.Press(kInteract, &PadState::menu);
+    PadState pb;
+    pb.b = true;
+    u.Frame(kInteract, pb);
+    CHECK(u.Touched(x, y));
+    CHECK(x == 238 && y == 18);
+    CHECK(u.nav.MenuOpen());
+    // A drag: from its first point to its last.
+    MenuView d = ListView(1, -1);
+    d.items[0].action = {DragStep(72, 121, 160, 121)};
+    Rig e;
+    e.view = &d;
+    e.Frame(kInteract);
+    e.Press(kInteract, &PadState::menu);
+    e.Frame(kInteract, a);
+    int x0, y0, x1, y1;
+    CHECK(e.Path(x0, y0, x1, y1));
+    CHECK(x0 == 72 && y0 == 121 && x1 == 160 && y1 == 121);
+}
+
+static void view_content_changes()
+{
+    // The focused row goes (used up): the focus stays on its id when it moved, else clamps.
+    MenuView v = ListView(4, -1);
+    Rig r;
+    r.view = &v;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::down);
+    r.Press(kInteract, &PadState::down);
+    CHECK(r.nav.Focus() == 2);
+    MenuView w = v;
+    w.items.erase(w.items.begin()); // row 0 gone: row 2 is now index 1
+    for (int i = 0; i < 3; i++) w.items[i].rect.y -= 76;
+    r.view = &w;
+    r.Frame(kInteract);
+    CHECK(r.nav.Focus() == 1);
+    CHECK(w.items[r.nav.Focus()].id == 0x102);
+    MenuView z = w;
+    z.items.erase(z.items.begin() + 1); // the focused row itself gone: the one in its place
+    r.view = &z;
+    r.Frame(kInteract);
+    CHECK(r.nav.Focus() == 1);
+    CHECK(z.items[1].id == 0x103);
+    // Its row greyed: the focus leaves it.
+    MenuView gz = z;
+    gz.items[1].enabled = false;
+    r.view = &gz;
+    r.Frame(kInteract);
+    CHECK(r.nav.Focus() != 1 && MenuFocusable(gz, r.nav.Focus()));
+    // A press held by the gate is dropped when the content changed before it runs (stale)…
+    Rig s;
+    MenuView a1 = ListView(4, -1);
+    s.view = &a1;
+    s.Frame(kInteract);
+    s.Press(kInteract, &PadState::menu);
+    PadState a;
+    a.a = true;
+    s.Frame(kInteract, a, false);
+    s.Frame(kInteract, {}, false);
+    MenuView a2 = a1;
+    a2.items[0].action = {TapStep(99, 99)};
+    s.view = &a2;
+    s.Frame(kInteract, {}, true);
+    CHECK(!s.touch.Owns());
+    // …and replayed when it did not.
+    Rig t;
+    t.view = &a1;
+    t.Frame(kInteract);
+    t.Press(kInteract, &PadState::menu);
+    t.Frame(kInteract, a, false);
+    t.Frame(kInteract, {}, false);
+    CHECK(!t.touch.Owns());
+    t.Frame(kInteract, {}, true);
+    int x = -1, y = -1;
+    CHECK(t.Touched(x, y));
+    CHECK(x == 200 && y == 50);
+    // The view going invalid (a tab whose data stops reading): back to HotspotsFor.
+    MenuView none;
+    t.Drain();
+    t.view = &none;
+    t.Frame(kInteract);
+    CHECK(!t.nav.ViewFocus());
+    CHECK(t.nav.Focus() == 0); // HotspotsFor's first
+}
+
+static void view_scrolls_with_the_game()
+{
+    // A list of 3 shown rows of a longer one: Down past the last row performs the game's scroll;
+    // when the rebuilt view (the game scrolled) shows the next row, the focus moves onto it.
+    auto shown = [](int first) {
+        MenuView v;
+        v.valid = true;
+        for (int i = 0; i < 3; i++)
+        {
+            ViewItem it;
+            it.rect = {460, 210 + 76 * i, 620, 62};
+            it.action = {TapStep(200, 50 + 20 * i)};
+            it.group = 1;
+            it.id = 0x100 + (u32)(first + i);
+            v.items.push_back(it);
+        }
+        v.scrollGroup = 1;
+        v.scrollDown = {TapStep(240, 170)};
+        v.scrollUp = {TapStep(240, 40)};
+        return v;
+    };
+    MenuView v0 = shown(0), v1 = shown(1);
+    Rig r;
+    r.view = &v0;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::down);
+    r.Press(kInteract, &PadState::down);
+    CHECK(r.nav.Focus() == 2);
+    PadState d;
+    d.down = true;
+    r.Frame(kInteract, d);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == 240 && y == 170);
+    CHECK(r.nav.Focus() == 2);
+    r.Drain();
+    r.view = &v1; // the game scrolled by one: id 0x102 is now row 1
+    r.Frame(kInteract);
+    CHECK(r.nav.Focus() == 2);
+    CHECK(v1.items[2].id == 0x103);
+    // Not settled: the scroll is a tap like A's, held, then replayed on the first settled frame.
+    r.Frame(kInteract);
+    r.Frame(kInteract, d, false);
+    r.Frame(kInteract, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(kInteract, {}, true);
+    CHECK(r.Touched(x, y));
+    CHECK(x == 240 && y == 170);
+}
+
+// A selection the game owns (Relationships' Sim, the phone's row): the focus is held on it, and
+// Up / Down are the game's own scroll whatever the geometry; the rebuilt view moves the focus.
+static void view_selection_the_game_owns()
+{
+    auto sel = [](int selected) {
+        MenuView v;
+        v.valid = true;
+        for (int i = 0; i < 4; i++)
+        {
+            ViewItem it;
+            it.rect = {460, 210 + 76 * i, 620, 62};
+            it.action = {TapStep(100, 40 + 30 * i)};
+            it.id = 0x200 + (u32)i;
+            v.items.push_back(it);
+        }
+        v.selected = selected;
+        v.scrollUp = {TapStep(240, 40)};
+        v.scrollDown = {TapStep(240, 170)};
+        return v;
+    };
+    MenuView v1 = sel(1), v2 = sel(2);
+    Rig r;
+    r.view = &v1;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    CHECK(r.nav.Focus() == 1);
+    PadState d;
+    d.down = true;
+    r.Frame(kInteract, d);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == 240 && y == 170);
+    CHECK(r.nav.Focus() == 1); // the game has not moved yet
+    r.Drain();
+    r.Frame(kInteract);
+    r.view = &v2;
+    r.Frame(kInteract);
+    CHECK(r.nav.Focus() == 2);
+    // Up from the first row too (no geometry decides), A on the selected item.
+    MenuView v0 = sel(0);
+    r.view = &v0;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::up);
+    CHECK(r.Touched(x, y));
+    CHECK(x == 240 && y == 40);
+    r.Drain();
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::a);
+    CHECK(r.Touched(x, y));
+    CHECK(x == 100 && y == 40);
+    // Unsettled: held; the view changing meanwhile (the game moved by itself): dropped.
+    r.Drain();
+    r.Frame(kInteract);
+    r.Frame(kInteract, d, false);
+    r.Frame(kInteract, {}, false);
+    r.view = &v2;
+    r.Frame(kInteract, {}, true);
+    CHECK(!r.touch.Owns());
+}
+
+// An item's own Left / Right (Options' sliders): before the view's Left / Right and a focus move;
+// held while unsettled like a tap; the view's Left / Right held too.
+static void view_item_left_right()
+{
+    MenuView v = ListView();
+    v.items[1].right = {DragStep(232, 121, 200, 121)};
+    v.items[1].left = {DragStep(232, 121, 100, 121)};
+    v.buttons[(int)MenuButton::Right] = {TapStep(122, 167)};
+    Rig r;
+    r.view = &v;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::right); // row 0: the view's Right
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y));
+    CHECK(x == 122 && y == 167);
+    r.Drain();
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::down);
+    CHECK(r.nav.Focus() == 1);
+    PadState right;
+    right.right = true;
+    r.Frame(kInteract, right);
+    int x0, y0, x1, y1;
+    CHECK(r.Path(x0, y0, x1, y1));
+    CHECK(x0 == 232 && x1 == 200);
+    r.Frame(kInteract);
+    // Unsettled: held, then replayed.
+    PadState left;
+    left.left = true;
+    r.Frame(kInteract, left, false);
+    r.Frame(kInteract, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(kInteract, {}, true);
+    CHECK(r.Path(x0, y0, x1, y1));
+    CHECK(x0 == 232 && x1 == 100);
+    // The view's Left / Right held the same way (Interact's targets).
+    MenuView t = ListView();
+    t.buttons[(int)MenuButton::Left] = {TapStep(55, 167)};
+    Rig q;
+    q.view = &t;
+    q.Frame(kInteract);
+    q.Press(kInteract, &PadState::menu);
+    q.Frame(kInteract, left, false);
+    q.Frame(kInteract, {}, false);
+    CHECK(!q.touch.Owns());
+    q.Frame(kInteract, {}, true);
+    CHECK(q.Touched(x, y));
+    CHECK(x == 55 && y == 167);
+    // An explicit move wins over the geometry.
+    MenuView e = ListView(4, -1);
+    e.items[3].next[1] = 0; // Down from the last row: back to the first
+    Rig w;
+    w.view = &e;
+    w.Frame(kInteract);
+    w.Press(kInteract, &PadState::menu);
+    for (int i = 0; i < 3; i++) w.Press(kInteract, &PadState::down);
+    CHECK(w.nav.Focus() == 3);
+    w.Press(kInteract, &PadState::down);
+    CHECK(w.nav.Focus() == 0);
+}
+
+// An item's own X (Pockets' bin) before the view's, held while unsettled; Give Gift's view
+// (no menu to open): A runs the focused slot's taps, B its back (the game's X), LB / RB tap no tab.
+static void view_item_x_and_gift()
+{
+    MenuView v = ListView(4, -1);
+    v.items[1].buttonX = {TapStep(67, 167)};
+    v.buttons[(int)MenuButton::X] = {TapStep(10, 10)};
+    Rig r;
+    r.view = &v;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::x); // row 0: the view's X
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 10 && y == 10);
+    r.Drain();
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::down);
+    PadState px;
+    px.x = true;
+    r.Frame(kInteract, px, false); // unsettled: held
+    r.Frame(kInteract, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(kInteract, {}, true);
+    CHECK(r.Touched(x, y) && x == 67 && y == 167);
+
+    const ScreenState gift {Screen::Gift, Tab::None};
+    MenuView g;
+    g.valid = g.own = true; // (a screen of its own, as GiftMenuViewOf makes it)
+    for (int i = 0; i < 6; i++)
+    {
+        ViewItem it;
+        it.rect = {200 + (i % 2) * 116, 183 + (i / 2) * 116, 104, 104};
+        it.enabled = i < 2;
+        if (it.enabled) it.action = {TapStep(37 + 39 * (i % 2), 50), TapStep(127, 85)};
+        it.id = 0x300 + (u32)i;
+        g.items.push_back(it);
+    }
+    g.back = {TapStep(235, 19)};
+    g.initial = 1;
+    Rig q;
+    q.view = &g;
+    q.Frame(gift);
+    CHECK(q.nav.Focus() == 1);
+    q.Press(gift, &PadState::rb);
+    q.Press(gift, &PadState::lb);
+    CHECK(!q.touch.Owns());
+    q.Press(gift, &PadState::left);
+    CHECK(q.nav.Focus() == 0);
+    q.Press(gift, &PadState::down); // the slots below are empty: the focus stays
+    CHECK(q.nav.Focus() == 0);
+    q.Press(gift, &PadState::a);
+    CHECK(q.Touched(x, y) && x == 37 && y == 50);
+    q.Drain();
+    for (int i = 0; i < 3 && !q.touch.Owns(); i++) q.Frame(gift);
+    CHECK(q.Touched(x, y) && x == 127 && y == 85);
+    q.Drain();
+    q.Frame(gift);
+    q.Press(gift, &PadState::b);
+    for (int i = 0; i < 3 && !q.touch.Owns(); i++) q.Frame(gift);
+    CHECK(q.Touched(x, y) && x == 235 && y == 19);
+}
+
+// The HD Save slots (a valid view, no menu to open): a focus screen, not the stick cursor's; A
+// taps the focused slot's tick, B the game's X. Without a view: the cursor's, as before. Options'
+// slider: Left / Right drag the game's knob (its own actions), not a focus move.
+static void view_save_slots_and_slider()
+{
+    const ScreenState slots {Screen::SaveSlots, Tab::None};
+    MenuView v;
+    v.valid = v.own = true; // (as SaveSlotsViewOf makes it)
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {200, 124 + i * 156, 880, 142};
+        it.action = {TapStep(232, 67 + 46 * i)};
+        it.id = 0x610 + (u32)i;
+        v.items.push_back(it);
+    }
+    v.back = {TapStep(232, 22)};
+    v.initial = 2;
+    Rig r;
+    r.view = &v;
+    r.Frame(slots);
+    CHECK(r.nav.Focus() == 2 && !r.nav.CursorScreen());
+    r.Press(slots, &PadState::up);
+    CHECK(r.nav.Focus() == 1);
+    r.Press(slots, &PadState::a);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 232 && y == 113);
+    r.Drain();
+    r.Frame(slots);
+    r.Press(slots, &PadState::b);
+    CHECK(r.Touched(x, y) && x == 232 && y == 22);
+    Rig c; // no view: the stick cursor's screen, A stays the DS's without a cursor
+    c.Frame(slots);
+    CHECK(c.nav.CursorScreen());
+
+    const ScreenState opt {Screen::Panel, Tab::Options};
+    MenuView o;
+    o.valid = true;
+    ViewItem save;
+    save.rect = {200, 206, 432, 80};
+    save.action = {TapStep(57, 44)};
+    o.items.push_back(save);
+    ViewItem music;
+    music.rect = {200, 302, 880, 130};
+    music.left = {DragStep(232, 121, 216, 121)};
+    music.next[0] = 0;
+    o.items.push_back(music);
+    save.next[1] = 1;
+    o.items[0].next[1] = 1;
+    Rig q;
+    q.view = &o;
+    q.Frame(opt);
+    q.Press(opt, &PadState::menu);
+    q.Press(opt, &PadState::down);
+    CHECK(q.nav.Focus() == 1);
+    q.Press(opt, &PadState::left);
+    int x0, y0, x1, y1;
+    CHECK(q.Path(x0, y0, x1, y1) && x0 == 232 && y0 == 121 && x1 == 216 && y1 == 121);
+    q.Drain();
+    q.Frame(opt);
+    q.Press(opt, &PadState::right); // nothing to drag that way: no touch, the focus stays
+    CHECK(!q.touch.Owns() && q.nav.Focus() == 1);
+}
+
+// An asking X (ViewItem::xAsks, Pockets' bin): the first X arms (its xArm runs, nothing else),
+// the second performs; a focus move, the menu closing or the item going disarm it.
+static void view_item_x_asks()
+{
+    MenuView v = ListView(4, -1);
+    for (int i : {0, 1})
+    {
+        v.items[i].xAsks = true;
+        v.items[i].xArm = {TapStep(60 + i, 89)};
+        v.items[i].buttonX = {TapStep(60 + i, 89), TapStep(67, 167)};
+    }
+    Rig r;
+    r.view = &v;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    int x = -1, y = -1;
+    r.Press(kInteract, &PadState::x); // armed: only the slot tapped
+    CHECK(r.nav.Armed() == v.items[0].id);
+    CHECK(r.Touched(x, y) && x == 60 && y == 89);
+    r.Drain();
+    for (int i = 0; i < 4; i++) r.Frame(kInteract);
+    CHECK(!r.touch.Owns() && r.nav.Armed() == v.items[0].id);
+    r.Press(kInteract, &PadState::x); // the second: the slot, then the bin
+    CHECK(r.nav.Armed() == 0);
+    CHECK(r.Touched(x, y) && x == 60);
+    r.Drain();
+    for (int i = 0; i < 4 && !r.touch.Owns(); i++) r.Frame(kInteract);
+    CHECK(r.Touched(x, y) && x == 67 && y == 167);
+    r.Drain();
+    r.Frame(kInteract);
+    // A move between the two presses disarms: the next X arms again, nothing thrown.
+    r.Press(kInteract, &PadState::x);
+    CHECK(r.nav.Armed() == v.items[0].id);
+    r.Drain();
+    r.Press(kInteract, &PadState::down);
+    CHECK(r.nav.Armed() == 0);
+    r.Press(kInteract, &PadState::up);
+    r.Press(kInteract, &PadState::x);
+    CHECK(r.nav.Armed() == v.items[0].id);
+    CHECK(r.Touched(x, y) && x == 60 && y == 89);
+    r.Drain();
+    for (int i = 0; i < 4 && !r.touch.Owns(); i++) r.Frame(kInteract);
+    CHECK(!r.touch.Owns());
+    // The menu closing disarms.
+    r.Press(kInteract, &PadState::b);
+    CHECK(r.nav.Armed() == 0);
+    // The item going (another id at its place) disarms.
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::x);
+    CHECK(r.nav.Armed() == v.items[0].id);
+    r.Drain();
+    v.items[0].id = 0x999;
+    r.Frame(kInteract);
+    CHECK(r.nav.Armed() == 0);
+}
+
+// A tab change disarms the asking X: arm in Pockets, R to Goals, L back to Pockets, one X arms
+// again and taps no bin. MENU is B on a screen of its own (the phone, Give Gift, the Save slots,
+// a note), but not on a popup (its question is B's).
+static void view_tab_change_disarms_and_menu_is_b()
+{
+    const ScreenState pockets {Screen::Panel, Tab::Pockets};
+    MenuView v = ListView(4, -1);
+    v.items[0].xAsks = true;
+    v.items[0].xArm = {TapStep(60, 89)};
+    v.items[0].buttonX = {TapStep(60, 89), TapStep(67, 167)};
+    Rig r;
+    r.view = &v;
+    r.Frame(pockets);
+    r.Press(pockets, &PadState::menu);
+    r.Press(pockets, &PadState::x);
+    CHECK(r.nav.Armed() == v.items[0].id);
+    r.Drain();
+    for (int i = 0; i < 4; i++) r.Frame(pockets);
+    r.Press(pockets, &PadState::rb);
+    r.Drain();
+    r.Frame(kGoals);
+    CHECK(r.nav.Armed() == 0);
+    r.Frame(pockets);
+    CHECK(r.nav.Armed() == 0);
+    r.Frame(pockets);
+    r.Press(pockets, &PadState::x); // arms: the slot only, no bin
+    int x = -1, y = -1;
+    CHECK(r.nav.Armed() == v.items[0].id);
+    CHECK(r.Touched(x, y) && x == 60 && y == 89);
+    r.Drain();
+    for (int i = 0; i < 6 && !r.touch.Owns(); i++) r.Frame(pockets);
+    CHECK(!r.touch.Owns());
+
+    for (ScreenState s : {kPhone, kSaveSlots, ScreenState {Screen::Gift, Tab::None}, kUnknown})
+    {
+        MenuView o = ListView(3, -1);
+        o.own = true;
+        o.back = {TapStep(235, 19)};
+        Rig q;
+        q.view = &o;
+        q.Frame(s);
+        q.Press(s, &PadState::menu);
+        for (int i = 0; i < 3 && !q.touch.Owns(); i++) q.Frame(s);
+        CHECK(q.Touched(x, y) && x == 235 && y == 19);
+        // A popup: MENU does nothing.
+        MenuView p = o;
+        p.popup = true;
+        Rig z;
+        z.view = &p;
+        z.Frame(s);
+        z.Press(s, &PadState::menu);
+        for (int i = 0; i < 3; i++) z.Frame(s);
+        CHECK(!z.touch.Owns());
+    }
+}
+
+// A selection the game owns with no arrow above it (its first entry): Up goes to the phone and
+// the focus stays there; Down from the phone comes back to the selection. A view that does not
+// replay (the Save slots): a press held while unsettled is dropped once it settles.
+static void view_selection_phone_and_no_replay()
+{
+    const ScreenState goals {Screen::Panel, Tab::Goals};
+    MenuView v = ListView(3, -1);
+    for (ViewItem& it : v.items) it.action.clear();
+    v.selected = 0;
+    v.scrollGroup = 1;
+    v.scrollDown = {TapStep(62, 145)};
+    v.items[0].next[0] = 3; // (the frame's link: the top item Up to the phone)
+    v.items[3].next[1] = 0;
+    Rig r;
+    r.view = &v;
+    r.Frame(goals);
+    r.Press(goals, &PadState::menu);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(goals, &PadState::up);
+    CHECK(r.nav.Focus() == 3 && !r.touch.Owns());
+    r.Frame(goals);
+    CHECK(r.nav.Focus() == 3);
+    r.Press(goals, &PadState::down);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(goals, &PadState::down); // the game's arrow
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 62 && y == 145);
+
+    const ScreenState slots {Screen::SaveSlots, Tab::None};
+    MenuView s = ListView(3, -1);
+    s.own = true;
+    s.replay = false;
+    Rig q;
+    q.view = &s;
+    q.Frame(slots);
+    PadState pa;
+    pa.a = true;
+    q.Frame(slots, pa, false); // unsettled: held...
+    q.Frame(slots, {}, false);
+    q.Frame(slots, {}, true);  // ...and dropped
+    q.Frame(slots, {}, true);
+    CHECK(!q.touch.Owns());
+    s.replay = true;
+    q.Frame(slots, pa, false);
+    q.Frame(slots, {}, true);
+    CHECK(q.touch.Owns()); // (replayed where the view allows it)
+}
+
+// A popup over the open HD menu (port/popup.h): it wins the focus, the menu stays open beneath, A
+// taps its button and then waits (its closing), Start is passed on; when it goes and the panel
+// is back, the focus is on the row it was on. A popup over a screen of its own (the Save slots):
+// the same without a screen change. The phone's view: Up / Down its keys, B its X.
+static void view_popup_resume_and_phone()
+{
+    MenuView menu = ListView(4, -1);
+    MenuView pop;
+    pop.valid = pop.own = pop.popup = true;
+    ViewItem close;
+    close.rect = {490, 420, 300, 80};
+    close.action = {TapStep(132, 132)};
+    close.closes = true;
+    close.id = 0x700;
+    pop.items.push_back(close);
+    pop.back = close.action;
+    pop.backCloses = true;
+    pop.passKeys = 1u << kStart;
+    Rig r;
+    r.view = &menu;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::down);
+    r.Press(kInteract, &PadState::down);
+    CHECK(r.nav.MenuOpen() && r.nav.Focus() == 2);
+    r.view = &pop;
+    r.Frame(kPopup);
+    CHECK(r.nav.MenuOpen() && r.nav.Focus() == 0 && r.nav.ViewFocus());
+    PadState st;
+    st.start = true;
+    CHECK(r.Frame(kPopup, st) & (1u << kStart));
+    r.Frame(kPopup);
+    r.Press(kPopup, &PadState::a);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 132 && y == 132);
+    r.Drain();
+    r.Press(kPopup, &PadState::a); // (closing: the box slides away, a second tap would miss)
+    CHECK(!r.touch.Owns());
+    r.Press(kPopup, &PadState::b);
+    CHECK(!r.touch.Owns());
+    r.view = &menu;
+    r.Frame(kInteract);
+    CHECK(r.nav.MenuOpen() && r.nav.Focus() == 2);
+    // A popup over the closed panel: the menu stays closed after.
+    Rig c;
+    c.view = &menu;
+    c.Frame(kInteract);
+    c.view = &pop;
+    c.Frame(kPopup);
+    CHECK(!c.nav.MenuOpen() && c.nav.Focus() == 0);
+    c.view = &menu;
+    c.Frame(kInteract);
+    CHECK(!c.nav.MenuOpen());
+    // Over the Save slots (no screen change): back on the slot it was on.
+    MenuView slots = ListView(3, -1);
+    slots.own = true;
+    Rig s;
+    s.view = &slots;
+    s.Frame(kSaveSlots);
+    s.Press(kSaveSlots, &PadState::down);
+    CHECK(s.nav.Focus() == 1);
+    s.view = &pop;
+    s.Frame(kSaveSlots);
+    CHECK(s.nav.Focus() == 0);
+    s.Press(kSaveSlots, &PadState::b);
+    CHECK(s.Touched(x, y) && x == 132);
+    s.Drain();
+    s.view = &slots;
+    s.Frame(kSaveSlots);
+    CHECK(s.nav.Focus() == 1);
+    s.Press(kSaveSlots, &PadState::a); // (the popup went: no closing wait)
+    CHECK(s.touch.Owns());
+    // The phone: a selection the game owns, Up / Down its keys over frames, A keys then OK, B its X.
+    MenuView ph;
+    ph.valid = ph.own = true;
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {400, 150 + 48 * i, 480, 48};
+        it.group = 1;
+        it.id = 0x800 + (u32)i;
+        it.action = {KeysStep(1u << kA, 2)};
+        ph.items.push_back(it);
+    }
+    ph.scrollGroup = 1;
+    ph.selected = 0;
+    ph.scrollDown = {KeysStep(1u << kDown, 2), WaitStep(4)};
+    ph.back = {TapStep(237, 15)};
+    ph.backCloses = true;
+    Rig p;
+    p.view = &ph;
+    p.Frame(kPhone);
+    PadState d;
+    d.down = true;
+    CHECK(p.Frame(kPhone, d) & (1u << kDown));
+    CHECK(p.Frame(kPhone) & (1u << kDown));
+    CHECK(!(p.Frame(kPhone) & (1u << kDown)));
+    CHECK(p.nav.Focus() == 0);
+    for (int i = 0; i < 6; i++) p.Frame(kPhone); // (its wait)
+    p.Press(kPhone, &PadState::b);
+    CHECK(p.Touched(x, y) && x == 237 && y == 15);
+    // A popup coming while a multi-step action runs: it stops (no key under the popup).
+    MenuView k = ListView(1, -1);
+    k.items[0].action = {KeysStep(1u << kA, 4), KeysStep(1u << kDown, 4), TapStep(10, 20)};
+    Rig q;
+    q.view = &k;
+    q.Frame(kInteract);
+    q.Press(kInteract, &PadState::menu);
+    PadState a;
+    a.a = true;
+    CHECK(q.Frame(kInteract, a) == (1u << kA));
+    CHECK(q.nav.Running());
+    q.view = &pop;
+    CHECK(!(q.Frame(kPopup) & ((1u << kA) | (1u << kDown))));
+    CHECK(!q.nav.Running());
+}
+
 int main()
 {
     menu_opens_and_closes();
+    view_save_slots_and_slider();
+    view_selection_phone_and_no_replay();
     dpad_moves_focus();
     a_taps_focused();
     lb_rb_tap_tabs();
@@ -726,6 +1528,16 @@ int main()
     save_slots_and_quit_keep_the_cursor();
     front_end_screens_touch_with_a();
     popup_opening_holds_a();
+    view_focus_skips_greyed_and_a_runs();
+    view_buttons_keys_and_sequences();
+    view_content_changes();
+    view_scrolls_with_the_game();
+    view_selection_the_game_owns();
+    view_item_left_right();
+    view_item_x_and_gift();
+    view_item_x_asks();
+    view_tab_change_disarms_and_menu_is_b();
+    view_popup_resume_and_phone();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

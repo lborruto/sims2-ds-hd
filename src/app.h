@@ -10,6 +10,7 @@
 #include "common.h"
 #include "gamestate.h"
 #include "layout.h"
+#include "port/icons.h"
 #include "port/statusbar.h"
 #include "romdata.h"
 #include "scene.h"
@@ -30,6 +31,7 @@ struct App
     ScreenTracker screens;         // which screen the touch screen shows (screens.h), every frame
     bool consoleMenu = false;      // CONSOLE: the menu is up (the touch screen 3x over the dimmed world)
     int consoleFocus = -1;         // CONSOLE: the focused target, an index in HotspotsFor (-1: none)
+    u32 consoleArmed = 0;          // CONSOLE: the HD view item whose X is armed (Navigator::Armed), 0 none
     // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
     // pinned them for a check's picture.
     bool consolePinned = false;
@@ -50,10 +52,14 @@ struct App
     // the ROM's string table in the game's language (port/statusbar.h); not ok when the ROM's
     // data does not read: CONSOLE then keeps milestone 1's compositions (the game's own HUD).
     HudStrings hudStrings;
-    // The game's strings (and archive), opened once at start in the game's language (or
-    // --language's): the HD conversation's words. Null when the ROM's data does not read (or
-    // --no-romdata): CONSOLE's conversation is then milestone 1's.
+    // The game's strings and archive, opened once at start in the game's language (or
+    // --language's): the HD conversation's words, and the archive the icons are read from
+    // (kept open for the run). Null when the ROM's data does not read (or --no-romdata):
+    // CONSOLE's conversation is then milestone 1's, and there are no icons.
     std::unique_ptr<RomData> rom;
+    // The game's icons from that archive, decoded and scaled as the HD menus ask (port/icons.h);
+    // null with no `rom`.
+    std::unique_ptr<IconCache> icons;
     // The status bar's values for CONSOLE: the game's (RAM) on the European ROM, else none.
     const HudState* Hud() const { return portSupported ? &game.hud : nullptr; }
 

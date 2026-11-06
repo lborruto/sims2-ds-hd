@@ -1,5 +1,7 @@
 #include "input.h"
 
+#include "port/popup.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -319,9 +321,14 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
 {
     if (app.shown == Layout::Console)
     {
-        navigator.Update(app.ConsoleScreen(), p, touchScript, keys, app.Settled());
+        // The panel's HD menu (port/panelmenu.h), built from the game's state as CONSOLE draws it.
+        const ScreenState screen = app.ConsoleScreen();
+        const GameState* game = app.portSupported ? &app.game : nullptr;
+        const MenuView view = ConsoleView(screen, game, app.rom.get()); // (the same CONSOLE draws: port/popup.h)
+        navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
+        app.consoleArmed = navigator.Armed();
         // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding).
         app.micBlow = navigator.Blow();
         app.micForce = navigator.Blow();
@@ -332,6 +339,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         navigator.Leave(touchScript);
         steering = false;
         if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
+        app.consoleArmed = 0;
         app.micBlow = false;
         app.micForce = false;
     }

@@ -95,17 +95,123 @@ int CloseOf(const std::vector<Hotspot>& h)
 }
 }
 
+// The screen's mode: an HD screen of its own (a valid view: Give Gift, the Save slots, the phone,
+// a popup, a note) a focus screen whatever the screen state says.
+static Mode ModeWith(ScreenState s, bool menuOpen, const MenuView* view)
+{
+    if (view && view->valid && view->own) return Mode::Focus;
+    return ModeOf(s.screen, menuOpen);
+}
+
 // Mirrors the taps of Update's Mode::Focus and Mode::Popup cases: change one, change the other.
 bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
 {
-    const Mode mode = ModeOf(s.screen, menuOpen_);
+    const Mode mode = ModeWith(s, menuOpen_, view_);
     if (mode == Mode::Popup) return b == &PadState::a || b == &PadState::b;
     if (mode != Mode::Focus) return false;
+    if (UsesView(s))
+    {
+        const MenuView& v = *view_;
+        const int f = MenuFocusable(v, focus_) ? focus_ : MenuFirst(v);
+        if (b == &PadState::a) return f >= 0 && !v.items[f].action.empty();
+        if (b == &PadState::b) return !v.back.empty();
+        if (b == &PadState::menu) return v.own && !v.popup && !v.back.empty(); // (an own screen's MENU is B)
+        if (b == &PadState::x) return !XAction(v, f).empty();
+        if (b == &PadState::y) return !v.buttons[(int)MenuButton::Y].empty();
+        return s.screen == Screen::Panel && (b == &PadState::lb || b == &PadState::rb); // (the panel's tabs)
+    }
     const std::vector<Hotspot>& h = HotspotsFor(s);
     if (b == &PadState::a) return First(h) >= 0;
     if (s.screen == Screen::Panel) return b == &PadState::lb || b == &PadState::rb; // B / MENU close the menu, no tap
     if (s.screen == Screen::Phone) return b == &PadState::b || b == &PadState::menu;
     return b == &PadState::b && CloseOf(h) >= 0;
+}
+
+const MenuAction& Navigator::XAction(const MenuView& v, int f) const
+{
+    if (MenuFocusable(v, f) && !v.items[f].buttonX.empty())
+    {
+        const ViewItem& it = v.items[f];
+        return it.xAsks && armed_ != it.id ? it.xArm : it.buttonX;
+    }
+    return v.buttons[(int)MenuButton::X];
+}
+
+bool Navigator::Run(const MenuAction& a, const TouchScript& touch)
+{
+    if (a.empty() || !running_.empty() || touch.Owns() || closing_ > 0) return false;
+    running_ = a;
+    return true;
+}
+
+void Navigator::Step(TouchScript& touch, u32& dsKeys)
+{
+    // Steps in order: a tap or a drag waits for the stylus to be free (the one before it done,
+    // its released frame too), keys are held their frames, a wait counts frames.
+    while (!running_.empty())
+    {
+        MenuStep& st = running_.front();
+        if (touch.Owns()) return;
+        switch (st.kind)
+        {
+        case MenuStep::Tap:
+            if (st.frames > 0) touch.Tap(st.x, st.y, st.frames);
+            else touch.Tap(st.x, st.y);
+            running_.erase(running_.begin());
+            continue; // (the stylus is now owned: the next step waits)
+        case MenuStep::Drag:
+        {
+            // As the cards' drag (activities.cpp): 8 steps between the two points.
+            std::vector<Point> path;
+            for (int i = 0; i <= 8; i++) path.push_back({st.x + (st.x2 - st.x) * i / 8, st.y + (st.y2 - st.y) * i / 8});
+            touch.Drag(std::move(path));
+            running_.erase(running_.begin());
+            continue;
+        }
+        case MenuStep::Keys:
+            if (st.frames-- > 0) { dsKeys |= st.keys; if (st.frames > 0) return; }
+            running_.erase(running_.begin());
+            return; // (one step of keys a frame: the next starts on the next frame)
+        case MenuStep::Wait:
+            if (st.frames-- > 1) return;
+            running_.erase(running_.begin());
+            return;
+        }
+    }
+}
+
+const MenuAction* Navigator::DirAction(const MenuView& v, int dir, bool& scroll) const
+{
+    scroll = false;
+    const bool vertical = dir <= 1;
+    const MenuAction& gameScroll = dir == 0 ? v.scrollUp : v.scrollDown;
+    // A selection the game owns, the focus on it: Up / Down are its own buttons (its scroll); none
+    // that way (its first entry's Up): a focus move.
+    if (MenuFocusable(v, v.selected) && focus_ == v.selected && vertical) return gameScroll.empty() ? nullptr : &gameScroll;
+    if (!vertical)
+    {
+        if (MenuFocusable(v, focus_))
+        {
+            const MenuAction& own = dir == 2 ? v.items[focus_].left : v.items[focus_].right;
+            if (!own.empty()) return &own;
+        }
+        const MenuAction& side = v.buttons[(int)(dir == 2 ? MenuButton::Left : MenuButton::Right)];
+        return side.empty() ? nullptr : &side;
+    }
+    // Past the list's end: the game's own scroll (the focus follows once the rebuilt view shows more).
+    if (MenuFocusable(v, focus_) && MenuMove(v, focus_, dir) == focus_ && v.items[focus_].group == v.scrollGroup && !gameScroll.empty())
+    {
+        scroll = true;
+        return &gameScroll;
+    }
+    return nullptr;
+}
+
+bool Navigator::UsesView(ScreenState s) const
+{
+    // The panel's menu while open; a screen of its own (Give Gift, the Save slots, the phone, a
+    // popup, a note) whenever it is up.
+    return view_ && view_->valid && ((s.screen == Screen::Panel && menuOpen_) || view_->own);
 }
 
 void Navigator::Move(ScreenState s, int dx, int dy)
@@ -126,8 +232,9 @@ void Navigator::Move(ScreenState s, int dx, int dy)
     focus_ = index[Neighbour(list, from, dx, dy)];
 }
 
-void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys, bool settled)
+void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys, bool settled, const MenuView* view)
 {
+    view_ = view;
     if (fresh_)
     {
         prev_ = pad;
@@ -137,34 +244,83 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     }
     auto edge = [&](bool PadState::*b) { return pad.*b && !(prev_.*b); };
 
+    // A popup coming (over the panel, its menu open or not; over an HD screen): what was under it
+    // is remembered, to come back to when it goes.
+    const bool popupNow = view && view->valid && view->popup;
+    if (popupNow && !popupUp_)
+    {
+        resumeScreen_ = screen_;
+        resumeMenu_ = menuOpen_;
+        resumeValid_ = viewFocus_ && focus_ >= 0;
+        resumeId_ = focusId_;
+        resumeIndex_ = focus_;
+    }
+    if (popupNow != popupUp_)
+    {
+        // A popup coming or going: a multi-step action must not keep feeding keys under it, nor
+        // a held press or a pending move land on the other side.
+        running_.clear();
+        pendingDir_ = -1;
+        held_ = nullptr;
+    }
+    const bool back = !popupNow && popupUp_ && resumeValid_ && s == resumeScreen_;
     if (!(s == screen_))
     {
-        // The menu stays up only while the panel changes tab; the focus starts again.
-        if (s.screen != Screen::Panel || screen_.screen != Screen::Panel) menuOpen_ = false;
+        // The menu stays up only while the panel changes tab, or under a popup (and again when
+        // the screen it was over is back); the focus starts again (or comes back: the resume).
+        if (popupNow) {}
+        else if (popupUp_ && s == resumeScreen_) menuOpen_ = resumeMenu_;
+        else if (s.screen != Screen::Panel || screen_.screen != Screen::Panel) menuOpen_ = false;
         focus_ = -1;
         closing_ = 0;
         screen_ = s;
         activity_ = ActivityState();
         held_ = nullptr; // a held press was meant for the screen that went
+        running_.clear(); // (and an action running)
+        pendingDir_ = -1;
+        viewHash_ = 0;
+        armed_ = 0; // (an armed X belongs to the screen or tab it was pressed on)
     }
     else if (closing_ > 0) closing_--;
+    if (!popupNow && popupUp_) closing_ = 0; // (the popup went: its closing wait is over)
+    if (back) { restore_ = true; restoreFrames_ = 0; }
+    else if (popupNow) restore_ = false;
 
     // The gate: on a focus screen or a popup, a press that would tap waits while the game's
     // bottom slot is switching (the RAM leads the pixels) and is replayed on the first settled
     // frame; the latest one wins, and after kHoldFrames it is dropped. Focus moves and the DS's
     // own buttons never wait.
-    const Mode mode = ModeOf(s.screen, menuOpen_);
+    const Mode mode = ModeWith(s, menuOpen_, view_);
+    // The HD menu: rebuilt this frame; the focus follows its item's id when the content changed.
+    const bool useView = mode == Mode::Focus && UsesView(s);
+    const u64 viewHash = useView ? view_->Hash() : 0;
+    const bool viewChanged = useView && viewHash != viewHash_;
+    if (useView && viewChanged && viewHash_ != 0 && focus_ >= 0) focus_ = MenuKeep(*view_, focusId_, focus_);
+    if (!useView && viewFocus_) focus_ = -1; // (an index of the view means nothing to HotspotsFor)
+    // The resume: the item the focus was on before the popup, once its view is back.
+    if (restore_ && useView)
+    {
+        const int f = MenuKeep(*view_, resumeId_, resumeIndex_);
+        if (f >= 0) focus_ = f;
+        restore_ = false;
+    }
+    else if (restore_ && ++restoreFrames_ > kHoldFrames) restore_ = false;
     bool PadState::*replay = nullptr;
     if (held_ && ++heldFrames_ > kHoldFrames) held_ = nullptr;
     if (mode == Mode::Focus || mode == Mode::Popup)
     {
-        static bool PadState::*const kTapButtons[] = {&PadState::a, &PadState::b, &PadState::menu, &PadState::lb, &PadState::rb};
+        static bool PadState::*const kTapButtons[] = {&PadState::a, &PadState::b, &PadState::menu, &PadState::lb, &PadState::rb, &PadState::x, &PadState::y};
         if (!settled)
         {
             for (bool PadState::*b : kTapButtons)
-                if (edge(b) && WouldTap(s, b)) { held_ = b; heldFrames_ = 0; }
+                if (edge(b) && WouldTap(s, b)) { held_ = b; heldFrames_ = 0; heldHash_ = viewHash; }
         }
-        else if (held_) { replay = held_; held_ = nullptr; }
+        else if (held_)
+        {
+            // A press made on a view whose content has changed since is stale: dropped.
+            if (heldHash_ == viewHash && (!useView || view_->replay)) replay = held_;
+            held_ = nullptr;
+        }
     }
     else held_ = nullptr; // a screen that does not tap (or no longer): nothing to replay
     auto pressed = [&](bool PadState::*b)
@@ -175,7 +331,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     };
 
     const std::vector<Hotspot>& h = HotspotsFor(s);
-    cursorScreen_ = h.empty();
+    cursorScreen_ = h.empty() && !useView; // (the HD Save slots: no cursor)
     cursorPress_ = blow_ = false;
     handDx_ = handDy_ = 0;
     // A tap only when nothing else touches: a press while a tap or a drag runs is dropped.
@@ -196,6 +352,70 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         break;
     case Mode::Focus: // (the taps here are listed again in WouldTap, for the gate)
     {
+        if (useView)
+        {
+            // The HD menu (port/menuview.h): the focus over the view's enabled items; a selection
+            // the game owns holds it.
+            const MenuView& v = *view_;
+            // (held while the focus is in the list: the phone above it keeps the focus)
+            if (MenuFocusable(v, v.selected) && (!MenuFocusable(v, focus_) || v.items[focus_].group == v.scrollGroup)) focus_ = v.selected;
+            if (!MenuFocusable(v, focus_)) focus_ = MenuFirst(v);
+            // A move that waited for the list's own scroll: once the rebuilt view shows more.
+            if (pendingDir_ >= 0 && (viewChanged || ++pendingFrames_ > kHoldFrames))
+            {
+                if (viewChanged && focus_ >= 0 && !MenuFocusable(v, v.selected)) focus_ = MenuMove(v, focus_, pendingDir_);
+                pendingDir_ = -1;
+            }
+            // A direction: an action (the item's Left / Right, the view's, the game's scroll) is a
+            // tap like A's, held by the gate while not settled and replayed (or dropped when the
+            // view changed); otherwise a focus move, never held.
+            static bool PadState::*const kDirs[4] = {&PadState::up, &PadState::down, &PadState::left, &PadState::right};
+            int act = -1;
+            for (int d = 0; d < 4; d++)
+                if (replay == kDirs[d]) act = d;
+            if (move && act < 0)
+            {
+                bool scroll = false;
+                if (DirAction(v, dir, scroll))
+                {
+                    if (settled) act = dir;
+                    else { held_ = kDirs[dir]; heldFrames_ = 0; heldHash_ = viewHash; }
+                }
+                else if (focus_ >= 0) focus_ = MenuMove(v, focus_, dir);
+            }
+            if (act >= 0)
+            {
+                bool scroll = false;
+                if (const MenuAction* a = DirAction(v, act, scroll); a && Run(*a, touch) && scroll)
+                {
+                    pendingDir_ = act;
+                    pendingFrames_ = 0;
+                }
+            }
+            if (pressed(&PadState::a) && MenuFocusable(v, focus_) && Run(v.items[focus_].action, touch) && v.items[focus_].closes)
+                closing_ = kClosingFrames;
+            if (pressed(&PadState::x))
+            {
+                // An asking X (Pockets' bin): the first press arms the item (and runs its xArm),
+                // the second performs it.
+                const bool asks = MenuFocusable(v, focus_) && v.items[focus_].xAsks && !v.items[focus_].buttonX.empty();
+                const MenuAction& a = XAction(v, focus_);
+                if (asks && armed_ != v.items[focus_].id) { if (a.empty() || Run(a, touch)) armed_ = v.items[focus_].id; }
+                else if (Run(a, touch) && asks) armed_ = 0;
+            }
+            if (pressed(&PadState::y)) Run(v.buttons[(int)MenuButton::Y], touch);
+            const int t = s.tab == Tab::None ? -1 : (int)s.tab - (int)Tab::Interact;
+            if (s.screen == Screen::Panel && pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
+            else if (s.screen == Screen::Panel && pressed(&PadState::lb)) tap(kTabIcon[t < 0 ? 4 : (t + 4) % 5]);
+            const bool back = pressed(&PadState::b), menu = pressed(&PadState::menu);
+            // MENU does what B does on a screen of its own (not a popup: its question is B's)
+            const bool backKey = back || (menu && v.own && !v.popup);
+            if (backKey && !v.back.empty()) { if (Run(v.back, touch) && v.backCloses) closing_ = kClosingFrames; }
+            else if ((back || menu) && !v.own) menuOpen_ = false;
+            // DS buttons the view passes on (Game Paused's Start).
+            if (v.passKeys) dsKeys |= DsKeys(pad, true) & v.passKeys;
+            break;
+        }
         if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);
         if (move && focus_ >= 0)
         {
@@ -249,16 +469,32 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         break;
     }
 
+    // The view's action runs on (taps queued as the stylus frees, keys held).
+    Step(touch, dsKeys);
+
     // Where the focus shows: on the targets of a focus screen and on a popup's X.
-    switch (ModeOf(s.screen, menuOpen_))
+    const Mode after = ModeWith(s, menuOpen_, view_); // (B may have closed the menu)
+    viewFocus_ = after == Mode::Focus && UsesView(s);
+    switch (after)
     {
     case Mode::Focus: case Mode::Popup:
-        if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);
+        if (viewFocus_)
+        {
+            if (!MenuFocusable(*view_, focus_)) focus_ = MenuFirst(*view_);
+            focusId_ = focus_ >= 0 ? view_->items[focus_].id : 0;
+            viewHash_ = view_->Hash();
+        }
+        else if (focus_ < 0 || focus_ >= (int)h.size()) focus_ = First(h);
         break;
     case Mode::Activity: break; // (ActivityInput sets it: -1 in the vacuum)
     default: focus_ = -1; break;
     }
+    // An armed X lasts while its item keeps the focus on the same HD view (a move, a tab change,
+    // the item going, the menu closing: disarmed).
+    if (!viewFocus_ || focusId_ != armed_) armed_ = 0;
+    popupUp_ = popupNow;
     prev_ = pad;
+    view_ = nullptr; // (the caller's view lives for this call only)
 }
 
 void Navigator::Leave(TouchScript& touch)
@@ -270,6 +506,13 @@ void Navigator::Leave(TouchScript& touch)
     focus_ = -1;
     closing_ = 0;
     held_ = nullptr;
+    running_.clear();
+    pendingDir_ = -1;
+    view_ = nullptr;
+    viewFocus_ = false;
+    viewHash_ = 0;
+    armed_ = 0;
+    popupUp_ = resumeMenu_ = resumeValid_ = restore_ = false;
     screen_ = ScreenState();
     fresh_ = true;
 }

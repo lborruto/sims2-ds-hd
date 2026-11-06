@@ -41,6 +41,16 @@ void WriteImage(const std::string& path, const u32* px, int w, int h)
     stbi_write_png(path.c_str(), w, h, 3, rgb.data(), w * 3);
 }
 
+void WriteRgba(const std::string& path, const u32* px, int w, int h)
+{
+    std::vector<u8> rgba((size_t)w * h * 4);
+    for (size_t i = 0; i < (size_t)w * h; i++)
+    {
+        rgba[i * 4] = (px[i] >> 16) & 0xFF; rgba[i * 4 + 1] = (px[i] >> 8) & 0xFF; rgba[i * 4 + 2] = px[i] & 0xFF; rgba[i * 4 + 3] = px[i] >> 24;
+    }
+    stbi_write_png(path.c_str(), w, h, 4, rgba.data(), w * 4);
+}
+
 // A straight-alpha ARGB picture of w x h blended over the picture at (X0, Y0), clipped to it.
 static void Blend(std::vector<u8>& rgb, int cw, int ch, int X0, int Y0, const u32* px, int w, int h)
 {

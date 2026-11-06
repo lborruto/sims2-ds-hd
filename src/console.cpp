@@ -6,6 +6,12 @@
 #include "activities.h"
 #include "hotspots.h"
 #include "port/dialogue.h"
+#include "port/gift.h"
+#include "port/note.h"
+#include "port/options.h"
+#include "port/panelmenu.h"
+#include "port/phone.h"
+#include "port/popup.h"
 #include "romdata.h"
 
 namespace sims2wide
@@ -97,7 +103,7 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
 }
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
-                         const GameState* game, const RomData* rom, const u32* bottom)
+                         const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed)
 {
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
@@ -125,6 +131,40 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset, bx = (kConsoleW - bw) / 2;
         c.overlays.push_back({{bx, kFrontHintY, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
         c.overlays.push_back(Text(bx + inset, kFrontHintY + inset, kFrontHint, 3));
+    }
+    else if (MenuView v = ConsoleView(s, game, rom); v.valid && (v.own || (s.screen == Screen::Panel && menuOpen)))
+    {
+        // An HD screen (the panel's menu, port/panelmenu.h; Give Gift, port/gift.h; the Save
+        // slots, port/options.h; the phone, port/phone.h; a note, port/note.h) over the dimmed
+        // world, the status bar on its own layer above; a popup (port/popup.h) over all of it.
+        v.armed = armed;
+        Piece world = World(topW, worldRows, bar);
+        world.touch = false;
+        c.pieces.push_back(world);
+        c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
+        auto screen = [&](ScreenState at, const MenuView& view, int f) {
+            if (at.screen == Screen::Panel) BuildPanelMenu(c, at, view, f, *game, *rom, icons, bottom);
+            else if (at.screen == Screen::Gift) BuildGiftMenu(c, view, f, *game, *rom, icons, bottom);
+            else if (at.screen == Screen::SaveSlots) BuildSaveSlots(c, view, f, *game, *rom);
+            else if (at.screen == Screen::Phone) BuildPhone(c, view, f, *game, *rom, icons, bottom, strings);
+            else BuildNote(c, view, f, *game, *rom, icons);
+        };
+        if (v.popup)
+        {
+            // What the popup is over: its HD screen (the panel's menu while it was open) without a
+            // focus, or the dimmed world.
+            const ScreenState at = UnderScreen(s, *game);
+            if (const MenuView u = ScreenView(at, game, rom); u.valid && (u.own || (at.screen == Screen::Panel && menuOpen))) screen(at, u, -1);
+            if (bar) AddStatusBar(c, *hud, *strings);
+            BuildPopup(c, v, focus, *game, *rom);
+        }
+        else
+        {
+            screen(s, v, focus);
+            if (bar) AddStatusBar(c, *hud, *strings);
+        }
+        SortUi(c.ui); // (the bar's layer after the screen's, a popup's after it, the images last)
+        return c;     // (the focus is the view's: no ring from HotspotsFor)
     }
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {

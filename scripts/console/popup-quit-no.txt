@@ -1,0 +1,6 @@
+# From B-cas-opt (the complete save, Options), CONSOLE: MENU, Right (Quit), A (the game's
+# question over the open HD menu), B (No: the game's cross). The menu is back, on Quit.
+20 2 pad menu
+40 2 pad right
+60 2 pad a
+150 2 pad b

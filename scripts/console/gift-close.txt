@@ -1,0 +1,2 @@
+# From sit-gift (Give Item, empty pockets), CONSOLE: B taps the game's X: back to the panel.
+30 2 pad b

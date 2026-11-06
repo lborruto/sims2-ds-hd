@@ -15,6 +15,7 @@ void WriteRgb(const std::string& path, int w, int h, const u8* rgb);
 // than 256 x 192 with the looks on). scale: output pixels per canvas pixel (--compose-scale: the
 // pieces nearest, the overlays and the UI drawn at that size).
 void WriteCompose(const std::string& path, const Composition& c, const u32* top, int topW, int topH, const u32* bottom, int scale = 1);
-// One picture of w x h pixels (0xAARRGGBB).
+// One picture of w x h pixels (0xAARRGGBB), its alpha dropped (WriteImage) or kept (WriteRgba).
 void WriteImage(const std::string& path, const u32* px, int w, int h);
+void WriteRgba(const std::string& path, const u32* px, int w, int h);
 }

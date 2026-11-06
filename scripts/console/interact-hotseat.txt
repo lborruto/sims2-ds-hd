@@ -1,0 +1,5 @@
+# From sit-casino (the complete save), CONSOLE: MENU opens the HD menu (Interact: Keelhaulin'
+# Cards), Down moves the focus to the second row (Hotseat), A taps its arrow: Cards.
+20 2 pad menu
+60 2 pad down
+100 2 pad a

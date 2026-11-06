@@ -19,6 +19,19 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Added
 
+- The whole town in HD, played with a controller: the touch screen's menu opens big over the
+  town with its five tabs in the game's own look and words. Interact lists what the object or
+  person can do (D-pad and A, Left / Right for the next one nearby); Pockets shows the six
+  slots, the tools and counted items with their pictures and descriptions (A uses, X throws away
+  after asking once more); Give Gift hands an item over; Goals and Relationships show what the
+  game tracks; Options turns the volume by notches and saves into one of the three slots (the
+  game's own "Overwrite this save?" in HD). Popups (tips, goals, Game Paused, Quit?) and notes
+  are HD, the phone is too (messages, the phonebook, calls, ringtones) driven by the game's own
+  Up, OK and Down; a page the HD phone cannot read shows the game's own screen in it. Everything
+  is read from the game's memory and your ROM at run time; with another version of the game the
+  old pictures stay.
+- Checks and tools: `--print-town`, `--measure-menu`, `--dump-resource`, `--dump-sprite`; the
+  checks now fail on a character the font lacks.
 - The status bar in HD: in CONSOLE the clock, money and Sanity meter are redrawn sharp in the
   game's own style and language, read from the game's memory; the town keeps its sides in the
   widescreen world, with the bar in a strip below it.
@@ -28,7 +41,6 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - A shared HD interface kit (panels, text, button chips) with the Nunito font built in (SIL Open
   Font License, shipped with every download). Checks and tools: `--print-hud`, `--ui-demo`,
   `--compose-scale`, `--measure-string`, `--no-romdata`; `--language` also picks the HD words.
-
 - CONSOLE now asks the game what it is showing, read from its memory, instead of guessing from
   the pixels: every screen is known, the front end (title, menus, Create-a-Sim, save slots) and
   screens not yet named are framed, never the bare two-screen layout, a black load shows only
@@ -51,7 +63,6 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The casino's card game (Keelhaulin' Cards) shows the cards big, the table beside them.
 - The DS buttons' keys follow their position on any keyboard layout: on AZERTY, B is on W,
   Y on Q, L on A and R on Z, the same places as on QWERTY.
-
 - The hotel's vacuum: AUTO shows its bowl big, with the world beside it, clogged or not; the
   blow key (M) clears its clogged filter.
 

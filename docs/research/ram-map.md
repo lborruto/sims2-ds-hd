@@ -104,6 +104,40 @@ range-checked (else `valid` false); `--print-hud` logs changes. Offsets are in `
 
 Not mapped: motives and the mood meter; the progressive text reveal (the page is complete as soon as its counter shows).
 
+## The town's records (`TownState`, `RecordRow`, `SimRecord`)
+
+Read by `ReadGameState` into `GameState::town` (any screen; each part valid on its own, left out of
+`GameState ==`, logged by `--print-town`) and by `ReadSimRow` / `ReadItemRow` / `ReadSimRecord`. Offsets in `kEU.town`.
+`P` = `*(0x02139FA4)`, `G` = `*(0x0213E434)`.
+
+| Part | Address | Meaning |
+| --- | --- | --- |
+| Record table | `0x02122A00 + 0x12 * row` (static) | rows of 9 u16: Sim k = row 2 + k (k < 46), item id = row 0x3B + id; +0/+2/+4 sprite tiles / descriptor / palette resources, +8 name string id (Sims 323 + k, items 463 + id), +0xA portrait / second resource, +0xE price (items) |
+| Sim record | `G + 0x21DC + 0x2C * k` | u16 +0x18 Sim id, u32 +0x14 flags (bit 0 met, bit 1 secret info), u8 +0x1A mood (0..6), u8 +0x1B relationship level |
+| Pocket slots | `G + 0x215C` s32 count (0..6), `G + 0x28 + 2i` u16 item ids | name = the row's +8 (must equal 463 + id, else the inventory is invalid), description 822 + id, icon = the row's descriptor |
+| Counted items | `G + 0x24 + i` u8 (4) | names 1154 + i, descriptions 845 + i |
+| Key items | bits 1..3 of the u32 at `G` | Vacuum, Super Drencher, Metal Detector: names 1968 + k, descriptions 1972 + k |
+| Options | `G + 0x2F70` music, `G + 0x2F74` SFX | u32 20.12, 0..0x1000 |
+| Popup | `P + 0x8` state (1 opening, 2 shown, 3 closing), `P + 0x10` kind (0 one X, 2 cross + tick, 3 none) | text `P + 0x34` (0x400 bytes), title `P + 0x434` (0x100), both NUL-terminated game text bytes (`GameTextToUtf8` in `romdata.h` decodes them); `P + 0xD88` pressed button, `P + 0xD8C` stylus down |
+| Save slots | used `0x0213D848 + i` u8, current `0x0213D84C` s32 (-1 none) | headers `0x0213D7B8 + 0x30 * i`: +0x14 time word, +0x18 money s32, +0x1C name char[16], +0x2C place (string 0x43 + place) |
+
+Held-out states for the checks are listed in `CLAUDE.md`; the full field map is in the research notes (milestone 3, town).
+
+## The menus' lists (`TownState::interact` ... `::note`)
+
+Read on the screen that shows them (a tab object is read only while its tab is up: its fields are stale otherwise), each part
+`valid` on its own and `--print-town` logs each. Tab objects hang off `S` (heap, vtable checked); offsets in `kEU.menus`.
+
+| Part | Path | Meaning |
+| --- | --- | --- |
+| Interact | `T = *(S+0x34)` (vtable `0x021321C4`); `E = *(T+0x300)` target (0 none); `E+0` actor (`+0xA` record index, `+0xC` type 2 Sim / 0xB object, `+0x130` its interface), `E+4` kind (2: name 321 "???") | name from the record table (Sim k < 57: 323 + k; object: 463 + id); interface: `+8` action count (0..4), `+0x10 + i` codes (label 1845 + code, at most 106); greyed from the row's selector `*(T+0x6C+4i)+0x94` (codes 2, 0x3A..0x3C by the code); `T+0x308` next / `T+0x30C` previous target (stale when no target: not read); `T+0x314` mode (1 stylus, 0 pad mode, 2 after an action), `T+0x318` highlighted row; `u16 S+0xD0` big portrait (0x1A5A the plumbob) |
+| Pockets selection | `Pk = *(S+0x38)` (vtable `0x0213232C`) | `+0x74` slot (-1..count-1), `+0xE0` key item (-1..2), counted item = the ring `*(Pk+0x34)` (`+4` bit 0 shown, x `+0x50` 20.12: (x - 109) / 29) while both are -1 |
+| Goals | `TG = *(S+0x3C)` (vtable `0x02132480`) | `+0x50C` entries (at most 44), `+0x510` lines (132), entry n at `+0x18 + 16n` {id, first line, lines, u8 mission}; `+0x514` selected, `+0x518` first line; mission text 1627 + id; hotel request i: record `G+0x2BE8+0x4C*i` (`+0x48` text, `+0x30` Sim, `+0x32` place; code only); giver portrait from `0x0211FB6C + 0x114*stage + 8*done`; footer when game flag 17 (`G+0x4814`): score = the weights (`0x0211F9EC[4k+2]`) of the 33 set bits of `G+0x4410` (bit 32 is the next word's bit 0; 100 on the complete save), ids 1841 / 1843 and 1842 |
+| Relationships | `TR = *(S+0x40)` (vtable `0x02132580`) | `+0x1C` count (24), `+0x20` first, **`+0x24` selected** (the old `u16 S+0xD0` is the big portrait, not a Sim id: `GameState::selection` reads `TR+0x24`), `+0x28` the selected Sim's id (cross-checked), `+0x2C + 4i` pointers into the Sim records (met only); name 323 + id, description 389 + id, mood 184 + mood, level 192 + 7 * mood + level, portrait the Sim row's `+0xA` |
+| Phone | `S` (Phone vtable): page `+0x88` (0..10), row `+0x89`, scroll `+0x8A`; `+0x56` shown slot (page 3 only), `+0x86C` contacts / `+0x870` Sim under the highlight (page 7 only) | inbox `G+0x303C+0x24i` (10): `+0x1A` present, `+0x1B` read, `+0x14` text id, `+0x18` sender Sim, `+0` args, `+0x10` arg flags; page 0's four string ids at `0x0211E99C` (u32); ringtone `G+0x31C5` |
+| Give Gift | `S` (overlay 6): `+0x24` recipient actor (`+0xA` Sim index), `+0x4C` slot, `+0x34+4i` slot buttons (`+0x94` = cannot be given) | title 2422 with name 323 + Sim id |
+| Note | `S` (vtable `0x0214A040`, overlay 11): `u16 +0x2C` text id | `@1` the player's name for 0x4A8, 0x509, 0x657; code only, no state reaches it |
+
 ## Backup signal
 
 Sub-engine BG layer records at 0x02139618, 0x0213968C, 0x02139700 and 0x02139774 (stride 0x74)

@@ -32,20 +32,11 @@ bool StartsWith(const std::string& s, size_t at, const char* p)
     return s.size() >= at + n && s.compare(at, n, p) == 0;
 }
 
-// A string from the table without what is not text: RomData's {xx} / {F0xx} escapes dropped,
+// A string from the table without what is not text: RomData's escapes dropped (DropEscapes),
 // spaces (and no-break spaces) trimmed at both ends.
 std::string Clean(const std::string& in)
 {
-    std::string s;
-    for (size_t i = 0; i < in.size(); i++)
-    {
-        if (in[i] == '{')
-        {
-            const size_t e = in.find('}', i);
-            if (e != std::string::npos) { i = e; continue; }
-        }
-        s += in[i];
-    }
+    std::string s = DropEscapes(in);
     for (;;)
     {
         if (!s.empty() && (s.back() == ' ' || s.back() == '\n')) s.pop_back();
@@ -162,6 +153,7 @@ Rect AddStatusBar(Composition& c, const HudState& hud, const HudStrings& s, int 
     float fill = 0;
     if (!FormatHud(hud, s, clock, money, fill) || maxW < 2 * kPad + kMeterMin) return {x, y, 0, 0};
     using namespace ui;
+    const size_t first = c.ui.size();
     // Columns as wide as their widest value, so the bar keeps its size as the clock turns and
     // the money changes (up to six digits; more widens it).
     const float clockW = std::max(TextWidth(Clock(s, 10, 58), kValueSize, Weight::ExtraBold), TextWidth(Clock(s, 22, 58), kValueSize, Weight::ExtraBold));
@@ -229,6 +221,8 @@ Rect AddStatusBar(Composition& c, const HudState& hud, const HudStrings& s, int 
             if (fw >= 8) c.ui.push_back(Plain({track.x + 3, track.y + 2, fw - 6, 3}, (tc.light & 0xFFFFFF) | 0xD9000000, 1.5f));
         }
     }
+    // Its own still layer: a minute turning rasters the bar alone, never a menu's frame.
+    for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
     return bar;
 }
 

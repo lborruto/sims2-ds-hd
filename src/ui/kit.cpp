@@ -18,7 +18,8 @@ namespace
 {
 // Chip geometry, canvas pixels, from the label's text size.
 float ChipHeight(float size) { return std::round(size * 1.3f); }
-bool Round(Button b) { return b == Button::A || b == Button::B || b == Button::X || b == Button::Y || b == Button::DPad; }
+bool Round(Button b) { return b == Button::A || b == Button::B || b == Button::X || b == Button::Y || b == Button::DPad ||
+                        b == Button::DPadV || b == Button::DPadH; }
 const char* ButtonText(Button b)
 {
     switch (b)
@@ -30,7 +31,7 @@ const char* ButtonText(Button b)
     case Button::LB: return "LB";
     case Button::RB: return "RB";
     case Button::Start: return "START";
-    case Button::DPad: return "";
+    case Button::DPad: case Button::DPadV: case Button::DPadH: return "";
     }
     return "";
 }
@@ -199,12 +200,12 @@ void DrawChip(Layer& L, const UiItem& it, float s, float ox, float oy)
     FillRoundRect(L, x0 + line, y0 + line, x1 - line, y1 - line, r - line, 0xFF2E3063); // the dark face
     // A soft sheen on the face's upper half.
     FillRoundRect(L, x0 + line * 2, y0 + line * 1.5f, x1 - line * 2, (y0 + y1) / 2, r - line * 2, 0x1FFFFFFF);
-    if (it.button == Button::DPad)
+    if (it.button == Button::DPad || it.button == Button::DPadV || it.button == Button::DPadH)
     {
-        // A cross: two rounded bars.
+        // A cross: two rounded bars (one faint when only the other's directions do something).
         const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
-        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0xFFFFFFFF);
-        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0xFFFFFFFF);
+        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, it.button == Button::DPadV ? 0x59FFFFFF : 0xFFFFFFFF);
+        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, it.button == Button::DPadH ? 0x59FFFFFF : 0xFFFFFFFF);
     }
     else
     {
@@ -265,12 +266,20 @@ void DrawImage(Layer& L, const UiItem& it, float s, float ox, float oy)
             const int i = (int)u;
             const float fx = u - i;
             const u32 a = Texel(it, k, i, j), b = Texel(it, k, i + 1, j), c = Texel(it, k, i, j + 1), d = Texel(it, k, i + 1, j + 1);
+            // The picture's own alpha (an icon's transparent pixels) weighs each texel's colour
+            // (premultiplied), so an edge takes no colour from what is transparent beside it.
+            // All four opaque (a live crop of a DS screen), the weights are exactly 1: the
+            // pixel is what it was before alpha was looked at.
+            const bool opaque = ((a & b & c & d) >> 24) == 0xFF;
+            const float wa = (a >> 24) / 255.0f, wb = (b >> 24) / 255.0f, wc = (c >> 24) / 255.0f, wd = (d >> 24) / 255.0f;
+            const float cover = opaque ? 1.0f : (wa * (1 - fx) + wb * fx) * (1 - fy) + (wc * (1 - fx) + wd * fx) * fy;
+            if (cover <= 0) continue;
             auto mix = [&](int sh) {
-                const float top = ((a >> sh) & 0xFF) * (1 - fx) + ((b >> sh) & 0xFF) * fx;
-                const float bot = ((c >> sh) & 0xFF) * (1 - fx) + ((d >> sh) & 0xFF) * fx;
-                return (u32)std::lround(top * (1 - fy) + bot * fy);
+                const float top = ((a >> sh) & 0xFF) * wa * (1 - fx) + ((b >> sh) & 0xFF) * wb * fx;
+                const float bot = ((c >> sh) & 0xFF) * wc * (1 - fx) + ((d >> sh) & 0xFF) * wd * fx;
+                return (u32)std::lround(std::clamp((top * (1 - fy) + bot * fy) / cover, 0.0f, 255.0f));
             };
-            L.Over(x, y, 0xFF000000 | mix(16) << 16 | mix(8) << 8 | mix(0), alpha);
+            L.Over(x, y, 0xFF000000 | mix(16) << 16 | mix(8) << 8 | mix(0), alpha * cover);
         }
     }
 }
@@ -395,6 +404,7 @@ u64 Hash(const std::vector<UiItem>& items)
         Mix(h, FloatBits(it.labelAt));
         Mix(h, it.text.size());
         for (char c : it.text) Mix(h, (u8)c);
+        if (it.layer != 0) Mix(h, 0x4C41594552ull ^ (u64)(u32)it.layer); // (layer 0 hashes as before)
     }
     return h;
 }
@@ -431,16 +441,31 @@ std::vector<LayerAt> LayersAt(const std::vector<UiItem>& items, float scale, flo
     if (!(scale > 0)) return out;
     std::vector<UiItem> still, images;
     Layers(items, still, images);
-    auto add = [&](std::vector<UiItem> part, bool isStill) {
+    auto add = [&](std::vector<UiItem> part, bool isStill, int layer) {
         const Rect b = Bounds(part);
         if (b.w <= 0 || b.h <= 0) return;
         const int x0 = (int)std::floor(originX + b.x * scale), y0 = (int)std::floor(originY + b.y * scale);
         const int x1 = (int)std::ceil(originX + (b.x + b.w) * scale), y1 = (int)std::ceil(originY + (b.y + b.h) * scale);
         if (x1 <= x0 || y1 <= y0) return;
-        out.push_back({std::move(part), isStill, x0, y0, x1 - x0, y1 - y0, (x0 - originX) / scale, (y0 - originY) / scale});
+        // The layer's top left lands on its whole output pixel (x0, y0), as a piece's does (CanvasFit::ToOutput
+        // truncates): its edges are not anti-aliased across two pixels where a piece's are sharp.
+        out.push_back({std::move(part), isStill, layer, x0, y0, x1 - x0, y1 - y0, (float)b.x, (float)b.y});
     };
-    add(still, true);
-    for (const UiItem& im : images) add({im}, false);
+    // The still items by layer, ascending (one layer: exactly as before).
+    std::vector<int> layers;
+    for (const UiItem& it : still)
+        if (std::find(layers.begin(), layers.end(), it.layer) == layers.end()) layers.push_back(it.layer);
+    std::sort(layers.begin(), layers.end());
+    if (layers.size() <= 1) add(still, true, layers.empty() ? 0 : layers[0]);
+    else
+        for (int layer : layers)
+        {
+            std::vector<UiItem> part;
+            for (const UiItem& it : still)
+                if (it.layer == layer) part.push_back(it);
+            add(std::move(part), true, layer);
+        }
+    for (const UiItem& im : images) add({im}, false, 0);
     return out;
 }
 

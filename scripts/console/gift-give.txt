@@ -1,0 +1,5 @@
+# From A-gift2-base (Give Item with two items in the pockets, slot 1 selected), CONSOLE: the HD
+# screen's focus on slot 1; Right moves it to slot 2 (the Blue Oak Bed), A taps the slot then the
+# bow: the bed is given (the pockets keep the arcade) and the game goes back to the panel.
+30 2 pad right
+60 2 pad a

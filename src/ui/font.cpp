@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <set>
 #include <unordered_map>
 
 #define STB_TRUETYPE_IMPLEMENTATION
@@ -67,9 +68,16 @@ std::vector<Cp> Decode(const std::string& s)
     return out;
 }
 
+std::set<u32>& Missing()
+{
+    static std::set<u32> missing;
+    return missing;
+}
+
 int GlyphOf(const Face& f, u32 cp)
 {
     const int g = stbtt_FindGlyphIndex(&f.info, (int)cp);
+    if (!g && cp >= 0x20) Missing().insert(cp);   // (drawn as '?': the checks count them)
     return g ? g : f.fallback;
 }
 
@@ -112,6 +120,9 @@ const Glyph& Rendered(const Face& f, Weight w, float sizePx, int g, int sub)
     return cache.emplace(key, std::move(out)).first->second;
 }
 }
+
+std::vector<u32> MissingGlyphs() { return std::vector<u32>(Missing().begin(), Missing().end()); }
+void ResetMissingGlyphs() { Missing().clear(); }
 
 LineMetrics Metrics(float sizePx, Weight w)
 {

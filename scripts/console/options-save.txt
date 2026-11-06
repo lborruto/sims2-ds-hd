@@ -1,0 +1,5 @@
+# From B-cas-opt (the complete save, Options), CONSOLE: MENU, A on Save (the game's slot screen,
+# overlay 8, in HD), then B (the game's X: back to Options).
+20 2 pad menu
+50 2 pad a
+200 2 pad b

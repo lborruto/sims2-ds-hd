@@ -1,0 +1,8 @@
+# From A-pk-slot1-key2 (the complete save, Pockets, the Super Drencher selected, one item in the
+# pockets), CONSOLE: MENU, Left (the focus on slot 1, the Arcade-Pie Factory), X: the game selects
+# the slot (its bin turns green: the HD menu's question), nothing thrown yet; X again: the bin
+# throws it away (the pockets empty).
+20 2 pad menu
+50 2 pad left
+80 2 pad x
+140 2 pad x

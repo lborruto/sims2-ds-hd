@@ -1,0 +1,10 @@
+# From B-cas-rel (the complete save, Relationships, 23 Sims, the first selected), CONSOLE: MENU,
+# Down five times (the game's next arrow: its selection 0 -> 5, its four portraits scrolled),
+# then Up once: 4.
+20 2 pad menu
+50 2 pad down
+80 2 pad down
+110 2 pad down
+140 2 pad down
+170 2 pad down
+200 2 pad up

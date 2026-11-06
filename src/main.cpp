@@ -37,7 +37,16 @@
 #include "mic.h"
 #include "picker.h"
 #include "romdata.h"
+#include "ui/font.h"
 #include "port/dialogue.h"
+#include "port/interact.h"
+#include "port/goals.h"
+#include "port/note.h"
+#include "port/options.h"
+#include "port/phone.h"
+#include "port/popup.h"
+#include "port/pockets.h"
+#include "port/relations.h"
 #include "script.h"
 #include "shots.h"
 #include "recorder.h"
@@ -46,6 +55,14 @@
 
 using namespace sims2wide;
 using melonDS::NDS;
+
+// A whole number from 0 to max, the whole text (anything else is a usage error, not a 0).
+static bool WholeNumber(const std::string& v, long max, long& out)
+{
+    char* rest = nullptr;
+    out = strtol(v.c_str(), &rest, 10);
+    return !v.empty() && !*rest && out >= 0 && out <= max;
+}
 
 static void Usage()
 {
@@ -70,6 +87,7 @@ static void Usage()
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
+        "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
         "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
         "  --record-dir DIR              where unmapped screens are recorded (a state + a picture each; default: the\n"
@@ -81,8 +99,12 @@ static void Usage()
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --strings-count               print how many strings the game's text table has, and stop\n"
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
+        "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
+        "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
+        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes) can show fitted to its box, in --language's\n"
+        "                                words: how many shrink, how many need an ellipsis or a character the font lacks (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
-        "                                or all: every page of the game's conversations (needs --state-load), and stop\n"
+        "                                or all: every page of the game's conversations (needs --state-load; exit 2 on an overflow or a character the font lacks), and stop\n"
         "  --language N                  the text's language for those and the HD interface's words: 0 Japanese (the\n"
         "                                English file), 1 English, 2 French, 3 German, 4 Italian, 5 Spanish (default:\n"
         "                                the firmware's; the game itself keeps the firmware's)\n"
@@ -122,7 +144,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
     bool uiDemo = false;
@@ -130,7 +152,10 @@ int main(int argc, char** argv)
     bool wide = false, interp = false;
     int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
     bool stringsCount = false, noRomData = false;
+    int dumpResource = -1, dumpSprite = -1, dumpFrame = -1; // the archive's data (--dump-resource, --dump-sprite)
+    std::string dumpFile;
     std::string measure; // --measure-string ID|all
+    bool measureMenu = false;
     int dialogueString = -1; // (a check) the HD conversation shows this string instead of the page's
     for (int i = 1; i < argc; i++)
     {
@@ -158,6 +183,7 @@ int main(int argc, char** argv)
         else if (a == "--print-screen") printScreen = true;
         else if (a == "--print-game") printGame = true;
         else if (a == "--print-hud") printHud = true;
+        else if (a == "--print-town") printTown = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -168,31 +194,39 @@ int main(int argc, char** argv)
         else if (a == "--language" || a == "--dump-string")
         {
             // A whole number, 0 or more; anything else is a usage error, not a 0.
-            const std::string v = next();
-            char* rest = nullptr;
-            const long number = strtol(v.c_str(), &rest, 10);
-            if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            long number;
+            if (!WholeNumber(next(), 1000000, number)) { Usage(); return 1; }
             if (a == "--language" && number > 5) { Usage(); return 1; }
             (a == "--language" ? language : dumpString) = (int)number;
         }
         else if (a == "--strings-count") stringsCount = true;
         else if (a == "--no-romdata") noRomData = true;
+        // The archive's data to a file (tests/romdata_check.sh): whole numbers, else the usage.
+        else if (a == "--dump-resource" || a == "--dump-sprite")
+        {
+            auto number = [&](long max) {
+                long n;
+                if (!WholeNumber(next(), max, n)) { Usage(); exit(1); }
+                return (int)n;
+            };
+            if (a == "--dump-resource") dumpResource = number(1000000);
+            else { dumpSprite = number(1000000); dumpFrame = number(255); }
+            dumpFile = next();
+        }
         // For checks only (not in --help): the HD conversation shows string ID on every page (the
         // longest strings' pictures, tests/console_check.sh).
         else if (a == "--dialogue-string")
         {
-            const std::string v = next();
-            char* rest = nullptr;
-            const long number = strtol(v.c_str(), &rest, 10);
-            if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            long number;
+            if (!WholeNumber(next(), 1000000, number)) { Usage(); return 1; }
             dialogueString = (int)number;
         }
+        else if (a == "--measure-menu") measureMenu = true;
         else if (a == "--measure-string")
         {
             measure = next();
-            char* rest = nullptr;
-            const long number = strtol(measure.c_str(), &rest, 10);
-            if (measure != "all" && (measure.empty() || *rest || number < 0 || number > 1000000)) { Usage(); return 1; }
+            long number;
+            if (measure != "all" && !WholeNumber(measure, 1000000, number)) { Usage(); return 1; }
         }
         else if (a == "--layout")
         {
@@ -301,21 +335,95 @@ int main(int argc, char** argv)
         }
         return 0;
     }
+    // A resource of the game's archive, its compression undone, or a sprite's frame as a PNG
+    // (--dump-resource, --dump-sprite; tests/romdata_check.sh): write it, say what it is, stop.
+    if (dumpResource >= 0 || dumpSprite >= 0)
+    {
+        RomData data;
+        if (!data.Open(rom)) { fprintf(stderr, "no rom.bin archive in this ROM\n"); return 1; }
+        if (dumpResource >= 0)
+        {
+            if (dumpResource >= data.ResourceCount()) { fprintf(stderr, "no resource %d (the archive holds %d)\n", dumpResource, data.ResourceCount()); return 1; }
+            const std::vector<u8> raw = data.Resource(dumpResource);
+            std::vector<u8> out;
+            const bool packed = Decompress(raw.data(), raw.size(), out);
+            if (!packed) out = raw;
+            FILE* f = fopen(dumpFile.c_str(), "wb");
+            if (!f || (!out.empty() && fwrite(out.data(), 1, out.size(), f) != out.size())) { fprintf(stderr, "cannot write %s\n", dumpFile.c_str()); if (f) fclose(f); return 1; }
+            fclose(f);
+            if (packed && ((raw[0] >> 4) & 7) == 0) fprintf(stderr, "resource %d: stored (kind 0), its 4-byte header taken off: %zu bytes to %zu\n", dumpResource, raw.size(), out.size());
+            else if (packed) fprintf(stderr, "resource %d: kind %d, %zu bytes unpacked to %zu\n", dumpResource, (raw[0] >> 4) & 7, raw.size(), out.size());
+            else fprintf(stderr, "resource %d: %zu bytes, not compressed\n", dumpResource, raw.size());
+            return 0;
+        }
+        const int frames = data.SpriteFrames(dumpSprite);
+        if (frames == 0) { fprintf(stderr, "resource %d is not a sprite descriptor\n", dumpSprite); return 1; }
+        SpriteFrame f;
+        if (dumpFrame >= frames || !data.Sprite(dumpSprite - 1, dumpSprite, dumpSprite + 1, dumpFrame, f))
+        {
+            fprintf(stderr, "sprite %d: %d frames; frame %d does not read\n", dumpSprite, frames, dumpFrame);
+            return 1;
+        }
+        WriteRgba(dumpFile, f.argb.data(), f.w, f.h);
+        fprintf(stderr, "sprite %d: %d frames; frame %d: %d x %d, %d pieces\n", dumpSprite, frames, dumpFrame, f.w, f.h, f.pieces);
+        return 0;
+    }
     // The game's words for the HD status bar and conversations, once, in the game's language
     // (--language: another, a layout check only): a ROM whose data does not read keeps
-    // milestone 1's CONSOLE (the game's own HUD in the world, its own dialogue box).
+    // milestone 1's CONSOLE (the game's own HUD in the world, its own dialogue box). The
+    // archive stays open: the HD menus' icons are decoded from it as they are needed.
     if (!noRomData)
     {
         auto data = std::make_unique<RomData>();
         if (data->Open(rom) && data->LoadStrings(language >= 0 ? language : GameLanguage(nds)))
         {
             app.hudStrings = HudStringsFrom(data.get());
-            data->DropArchive(); // only the strings are kept
             app.rom = std::move(data);
+            app.icons = std::make_unique<IconCache>(app.rom.get());
         }
     }
     if (!app.hudStrings.ok) fprintf(stderr, "no status bar text in this ROM: CONSOLE shows the game's own\n");
     if (!app.rom) fprintf(stderr, "no conversation text in this ROM: CONSOLE shows the game's own box\n");
+    // (A check) the HD Interact tab's words in their boxes: print and stop.
+    if (measureMenu)
+    {
+        if (!app.rom) return 1;
+        ui::ResetMissingGlyphs();
+        const MenuMeasure m = MeasureInteract(*app.rom);
+        printf("interact: %d words, widest verb %d (%.0f px), %d shrunk, %d cut (row %d, hint %d, title %d, strip %d, strip sides %d)",
+               m.checked, m.widestId, m.widestW, m.shrunk, m.cut, m.cutIn[0], m.cutIn[1], m.cutIn[2], m.cutIn[3], m.cutIn[4]);
+        for (int id : m.cutIds) printf(" %d", id);
+        printf("\n");
+        // Pockets and Give Gift: every item's name and description, the buttons, the titles.
+        const BlockMeasure p = MeasurePockets(*app.rom);
+        printf("pockets: %d words, tallest description %d (%d lines), %d shrunk, %d cut, %d names cut", p.checked, p.tallestId, p.tallestLines, p.shrunk, p.cut, p.namesCut);
+        for (int id : p.cutIds) printf(" %d", id);
+        printf("\n");
+        // Goals, Relationships, Options and the Save slots: every goal, Sim, mood, relationship,
+        // button, volume, slot and place word in its box.
+        BlockMeasure g;
+        MeasureGoals(*app.rom, g);
+        MeasureRelations(*app.rom, g);
+        MeasureOptions(*app.rom, g);
+        printf("tabs: %d words, tallest text %d (%d lines), %d shrunk, %d cut", g.checked, g.tallestId, g.tallestLines, g.shrunk, g.cut);
+        for (int id : g.cutIds) printf(" %d", id);
+        printf("\n");
+        // Popups, the phone and notes: every popup text the game opens, the phone's rows, answers
+        // and messages, the notes the code names.
+        BlockMeasure q;
+        MeasurePopups(*app.rom, q);
+        MeasurePhone(*app.rom, q);
+        MeasureNotes(*app.rom, q);
+        printf("popups: %d words, tallest text %d (%d lines), %d shrunk, %d cut", q.checked, q.tallestId, q.tallestLines, q.shrunk, q.cut);
+        for (int id : q.cutIds) printf(" %d", id);
+        printf("\n");
+        // A neighbour's name beside the plate may end in an ellipsis (the Italian table has a
+        // sentence at an object's name, 463); every other box must hold its words.
+        // Every character of those words must be in the font (else a '?' is drawn).
+        const std::vector<u32> lacking = ui::MissingGlyphs();
+        for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || !lacking.empty() ? 2 : 0;
+    }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.
     if (!measure.empty())
@@ -328,6 +436,7 @@ int main(int argc, char** argv)
             if (ids.empty()) { fprintf(stderr, "no speech table in RAM (a state of the European ROM is needed)\n"); return 1; }
         }
         else ids.push_back(atoi(measure.c_str()));
+        ui::ResetMissingGlyphs();
         HudState hud;
         hud.valid = true; hud.hour = 22; hud.minute = 58; hud.simName = "WWWWWWWW"; // the widest name and clock
         int worst = -1, bad = 0, raw = 0;
@@ -360,7 +469,10 @@ int main(int argc, char** argv)
         }
         // (The longest is measured with the portrait's column, the narrower box; both are checked.)
         if (ids.size() > 1) printf("%zu pages, longest string %d (%zu lines), %d overflow%s, %d raw\n", ids.size(), worst, worstLines, bad, bad == 1 ? "" : "s", raw);
-        return bad || raw ? 2 : 0;
+        // A character the font lacks would be drawn as '?'.
+        const std::vector<u32> lacking = ui::MissingGlyphs();
+        for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
+        return bad || raw || !lacking.empty() ? 2 : 0;
     }
 
     std::vector<InputEvent> script;
@@ -492,6 +604,11 @@ int main(int argc, char** argv)
                 app.game.valid = true; app.game.between = false; app.game.settled = true;
                 app.game.screen = GScreen::Unknown; app.game.overlay = 90; app.game.vtable = 0x02000000 + (u32)((frame - unknownAfter) / 200);
             }
+            {   // the phone's contact list the game is still building (or never agrees with): counted
+                PhoneState& ph = app.game.town.phone;
+                if (ph.valid && ph.page == 7 && !ph.contactsKnown && ph.contacts == 0)
+                    ph.contactsWait = before.town.phone.valid ? before.town.phone.contactsWait + 1 : 1;
+            }
             if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
             if (app.portSupported && printHud)
             {
@@ -518,6 +635,122 @@ int main(int argc, char** argv)
                     else fprintf(stderr, "frame %ld: dialogue none\n", frame);
                 }
             }
+            if (app.portSupported && printTown)
+            {
+                const TownState& t = app.game.town;
+                const TownState& b = before.town;
+                if (!(t.inventory == b.inventory) || frame == 0)
+                {
+                    if (!t.inventory.valid) fprintf(stderr, "frame %ld: inventory none\n", frame);
+                    else
+                    {
+                        std::string s;
+                        for (const ItemRec& i : t.inventory.slots) s += (s.empty() ? "" : ",") + std::to_string(i.id) + ":" + std::to_string(i.nameId) + "/" + std::to_string(i.descId) + "/" + std::to_string(i.iconRes);
+                        fprintf(stderr, "frame %ld: inventory slots=%s counted=%d,%d,%d,%d keys=%d%d%d\n", frame, s.empty() ? "-" : s.c_str(),
+                                t.inventory.counted[0].count, t.inventory.counted[1].count, t.inventory.counted[2].count, t.inventory.counted[3].count,
+                                t.inventory.keys[0].count, t.inventory.keys[1].count, t.inventory.keys[2].count);
+                    }
+                }
+                if (!(t.options == b.options) || frame == 0)
+                {
+                    if (t.options.valid) fprintf(stderr, "frame %ld: options music=%d sfx=%d\n", frame, t.options.music, t.options.sfx);
+                    else fprintf(stderr, "frame %ld: options none\n", frame);
+                }
+                if (!(t.popup == b.popup) || frame == 0)
+                {
+                    if (t.popup.valid)
+                        fprintf(stderr, "frame %ld: popup state=%d kind=%d pressed=%d,%d title=\"%s\" text=\"%s\"\n", frame, t.popup.state, t.popup.kind, t.popup.pressed, t.popup.pressing ? 1 : 0,
+                                GameTextToUtf8(t.popup.title).c_str(), GameTextToUtf8(t.popup.text).c_str());
+                    else fprintf(stderr, "frame %ld: popup none\n", frame);
+                }
+                if (!(t.saves == b.saves) || frame == 0)
+                {
+                    if (!t.saves.valid) fprintf(stderr, "frame %ld: saves none\n", frame);
+                    else
+                    {
+                        std::string s;
+                        for (int i = 0; i < kSaveSlotCount; i++)
+                            s += std::string(" ") + std::to_string(i) + "=" + (t.saves.used[i] ? t.saves.slot[i].simName + "/" + std::to_string(t.saves.slot[i].money) + "/" + std::to_string(t.saves.slot[i].place) : "empty");
+                        fprintf(stderr, "frame %ld: saves current=%d%s\n", frame, t.saves.current, s.c_str());
+                    }
+                }
+            }
+            if (app.portSupported && printTown)
+            {   // the menus' lists (gamestate.h), one line per part when it changes
+                const TownState& t = app.game.town;
+                const TownState& b = before.town;
+                auto tgt = [](const TargetRef& r) { return r.kind == TargetRef::None ? std::string("-") : std::string(r.kind == TargetRef::Sim ? "sim" : "obj") + std::to_string(r.index) + ":" + std::to_string(r.nameId) + ":" + std::to_string(r.portraitRes); };
+                if (!(t.interact == b.interact) || frame == 0)
+                {
+                    const InteractState& v = t.interact;
+                    if (!v.valid) fprintf(stderr, "frame %ld: interact none\n", frame);
+                    else
+                    {
+                        std::string a;
+                        for (const InteractAction& x : v.actions) a += (a.empty() ? "" : ",") + std::to_string(x.code) + ":" + std::to_string(x.labelId) + (x.greyed ? ":grey" : "") + (x.amount >= 0 ? ":$" + std::to_string(x.amount) : "");
+                        fprintf(stderr, "frame %ld: interact target=%s prev=%s next=%s big=%d pad=%d hl=%d actions=%s\n", frame, tgt(v.target).c_str(), tgt(v.prev).c_str(), tgt(v.next).c_str(),
+                                v.bigPortraitRes, v.padMode, v.highlighted, a.empty() ? "-" : a.c_str());
+                    }
+                }
+                if (!(t.pockets == b.pockets) || frame == 0)
+                {
+                    if (t.pockets.valid) fprintf(stderr, "frame %ld: pockets slot=%d key=%d counted=%d\n", frame, t.pockets.slot, t.pockets.key, t.pockets.counted);
+                    else fprintf(stderr, "frame %ld: pockets none\n", frame);
+                }
+                if (!(t.goals == b.goals) || frame == 0)
+                {
+                    const GoalsState& v = t.goals;
+                    if (!v.valid) fprintf(stderr, "frame %ld: goals none\n", frame);
+                    else
+                    {
+                        std::string e;
+                        for (const GoalEntry& x : v.entries)
+                            e += (e.empty() ? "" : ",") + std::string(x.mission ? "m" : "h") + std::to_string(x.id) + ":" + std::to_string(x.textId) + ":" + std::to_string(x.firstLine) + "+" + std::to_string(x.nLines) +
+                                 (x.mission ? "" : ":" + std::to_string(x.nameId) + ":" + std::to_string(x.placeId));
+                        fprintf(stderr, "frame %ld: goals sel=%d first=%d lines=%d portrait=%d footer=%d/%d/%d entries=%s\n", frame, v.selected, v.first, v.lines, v.portraitRes,
+                                v.footer ? v.footerId : -1, v.footer ? v.scoreId : -1, v.footer ? v.score : -1, e.empty() ? "-" : e.c_str());
+                    }
+                }
+                if (!(t.relations == b.relations) || frame == 0)
+                {
+                    const RelState& v = t.relations;
+                    if (!v.valid) fprintf(stderr, "frame %ld: relations none\n", frame);
+                    else
+                    {
+                        std::string e;
+                        for (const RelEntry& x : v.sims)
+                            e += (e.empty() ? "" : ",") + std::to_string(x.id) + ":" + std::to_string(x.nameId) + "/" + std::to_string(x.descId) + "/" + std::to_string(x.moodId) + "/" + std::to_string(x.levelId) + "/" + std::to_string(x.portraitRes) + (x.secret ? "/secret" : "");
+                        fprintf(stderr, "frame %ld: relations first=%d sel=%d sims=%s\n", frame, v.first, v.selected, e.empty() ? "-" : e.c_str());
+                    }
+                }
+                if (!(t.phone == b.phone) || frame == 0)
+                {
+                    const PhoneState& v = t.phone;
+                    if (!v.valid) fprintf(stderr, "frame %ld: phone none\n", frame);
+                    else
+                    {
+                        std::string e;
+                        for (const InboxMsg& x : v.inbox)
+                            e += (e.empty() ? "" : ",") + std::to_string(x.slot) + ":" + std::to_string(x.textId) + ":" + std::to_string(x.senderNameId) + (x.read ? ":read" : ":new");
+                        std::string l;
+                        for (int k : v.contactList) l += (l.empty() ? "" : ",") + std::to_string(k);
+                        fprintf(stderr, "frame %ld: phone page=%d row=%d scroll=%d shown=%d ring=%d contacts=%d/%d menu=%d,%d,%d,%d inbox=%s date=%d/%d end=%d maid=%d reply=%d caller=%d list=%s\n", frame, v.page, v.row, v.scroll, v.shownSlot, v.ringtone,
+                                v.contacts, v.contactSim, v.menuIds[0], v.menuIds[1], v.menuIds[2], v.menuIds[3], e.empty() ? "-" : e.c_str(), v.month, v.day,
+                                v.textEnd, v.maidCost, v.reply, v.caller, v.contactsKnown ? (l.empty() ? "-" : l.c_str()) : "?");
+                    }
+                }
+                if (!(t.gift == b.gift) || frame == 0)
+                {
+                    const GiftState& v = t.gift;
+                    if (!v.valid) fprintf(stderr, "frame %ld: gift none\n", frame);
+                    else fprintf(stderr, "frame %ld: gift recipient=%d name=%d slot=%d refused=%d%d%d%d%d%d\n", frame, v.recipient, v.recipientNameId, v.slot, v.refused[0], v.refused[1], v.refused[2], v.refused[3], v.refused[4], v.refused[5]);
+                }
+                if (!(t.note == b.note) || frame == 0)
+                {
+                    if (t.note.valid) fprintf(stderr, "frame %ld: note text=%d playername=%d\n", frame, t.note.textId, t.note.playerName ? 1 : 0);
+                    else fprintf(stderr, "frame %ld: note none\n", frame);
+                }
+            }
             if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
         }
         if (recorder) recorder->Frame(app, frame, nds);
@@ -538,9 +771,11 @@ int main(int argc, char** argv)
             ScreenState before = app.screens.Current();
             ScreenState now = app.screens.Update(top, bottom);
             // The navigator ran before this frame's screen was known: a new screen (CONSOLE's, the
-            // game's when it reads) starts without the old menu and focus.
+            // game's when it reads) starts without the old menu and focus (a popup coming over the
+            // panel keeps its menu beneath: port/popup.h).
             const ScreenState consoleNow = app.ConsoleScreen();
-            if (!(consoleNow == consoleBefore) && !app.consolePinned && consoleNow.screen != Screen::Panel)
+            if (!(consoleNow == consoleBefore) && !app.consolePinned && consoleNow.screen != Screen::Panel &&
+                !(app.portSupported && PopupOver(consoleNow, app.game)))
             {
                 app.consoleMenu = false;
                 app.consoleFocus = -1;

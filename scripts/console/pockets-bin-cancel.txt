@@ -1,0 +1,7 @@
+# From A-pk-cnt3-slot1, CONSOLE: MENU, X (the bin asks), Right, Left (the focus away and back:
+# the question dropped), X: it asks again, nothing thrown.
+20 2 pad menu
+60 2 pad x
+90 2 pad right
+110 2 pad left
+140 2 pad x
