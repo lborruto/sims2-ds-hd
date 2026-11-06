@@ -37,6 +37,7 @@
 #include "mic.h"
 #include "picker.h"
 #include "romdata.h"
+#include "port/dialogue.h"
 #include "script.h"
 #include "shots.h"
 #include "recorder.h"
@@ -80,8 +81,12 @@ static void Usage()
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --strings-count               print how many strings the game's text table has, and stop\n"
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
-        "  --language N                  the text's language for those: 0 Japanese (the English file), 1 English,\n"
-        "                                2 French, 3 German, 4 Italian, 5 Spanish (default: the firmware's)\n"
+        "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
+        "                                or all: every page of the game's conversations (needs --state-load), and stop\n"
+        "  --language N                  the text's language for those and the HD interface's words: 0 Japanese (the\n"
+        "                                English file), 1 English, 2 French, 3 German, 4 Italian, 5 Spanish (default:\n"
+        "                                the firmware's; the game itself keeps the firmware's)\n"
+        "  --no-romdata                  (checks) do not read the game's text: milestone 1's CONSOLE\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
         "      Esc menu (settings, save states, quit), Space fast forward, Tab swaps the big screen\n"
@@ -124,7 +129,9 @@ int main(int argc, char** argv)
     int res3d = 0;
     bool wide = false, interp = false;
     int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
-    bool stringsCount = false;
+    bool stringsCount = false, noRomData = false;
+    std::string measure; // --measure-string ID|all
+    int dialogueString = -1; // (a check) the HD conversation shows this string instead of the page's
     for (int i = 1; i < argc; i++)
     {
         std::string a = argv[i];
@@ -168,6 +175,17 @@ int main(int argc, char** argv)
             (a == "--language" ? language : dumpString) = (int)number;
         }
         else if (a == "--strings-count") stringsCount = true;
+        else if (a == "--no-romdata") noRomData = true;
+        // For checks only (not in --help): the HD conversation shows string ID on every page (the
+        // longest strings' pictures, tests/console_check.sh).
+        else if (a == "--dialogue-string") dialogueString = atoi(next().c_str());
+        else if (a == "--measure-string")
+        {
+            measure = next();
+            char* rest = nullptr;
+            const long number = strtol(measure.c_str(), &rest, 10);
+            if (measure != "all" && (measure.empty() || *rest || number < 0 || number > 1000000)) { Usage(); return 1; }
+        }
         else if (a == "--layout")
         {
             std::string l = next();
@@ -275,14 +293,59 @@ int main(int argc, char** argv)
         }
         return 0;
     }
-    // The game's words for the HD status bar, once: a ROM whose data does not read keeps
-    // milestone 1's CONSOLE (the game's own HUD in the world).
+    // The game's words for the HD status bar and conversations, once, in the game's language
+    // (--language: another, a layout check only): a ROM whose data does not read keeps
+    // milestone 1's CONSOLE (the game's own HUD in the world, its own dialogue box).
+    if (!noRomData)
     {
-        RomData data;
-        if (data.Open(rom) && data.LoadStrings(GameLanguage(nds))) app.hudStrings = HudStringsFrom(&data);
-        if (!app.hudStrings.ok) fprintf(stderr, "no status bar text in this ROM: CONSOLE shows the game's own\n");
+        auto data = std::make_unique<RomData>();
+        if (data->Open(rom) && data->LoadStrings(language >= 0 ? language : GameLanguage(nds)))
+        {
+            app.hudStrings = HudStringsFrom(data.get());
+            app.rom = std::move(data);
+        }
     }
+    if (!app.hudStrings.ok) fprintf(stderr, "no status bar text in this ROM: CONSOLE shows the game's own\n");
+    if (!app.rom) fprintf(stderr, "no conversation text in this ROM: CONSOLE shows the game's own box\n");
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
+    // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.
+    if (!measure.empty())
+    {
+        if (!app.rom) return 1;
+        std::vector<int> ids;
+        if (measure == "all")
+        {
+            if (app.portSupported) ids = SpeechStringIds({nds.MainRAM, nds.MainRAMMask});
+            if (ids.empty()) { fprintf(stderr, "no speech table in RAM (a state of the European ROM is needed)\n"); return 1; }
+        }
+        else ids.push_back(atoi(measure.c_str()));
+        HudState hud;
+        hud.valid = true; hud.hour = 22; hud.minute = 58; hud.simName = "WWWWWWWW"; // the widest name and clock
+        int worst = -1, bad = 0;
+        size_t worstLines = 0, worstLen = 0;
+        for (int id : ids)
+        {
+            if (id < 0 || id >= app.rom->StringCount()) { fprintf(stderr, "no string %d\n", id); return 1; }
+            const std::string text = DialogueText(app.rom->String(id), hud);
+            for (bool portrait : {true, false})
+            {
+                const DialogueLayout L = LayoutDialogue(text, portrait);
+                const bool inside = L.fits && L.panel.y >= 0 && L.panel.y + L.panel.h <= kConsoleH;
+                if (!inside) bad++;
+                if (ids.size() == 1)
+                    printf("string %d portrait %d: %zu lines of %d, size %g, text box %d wide, panel %d,%d %dx%d, %s\n", id, portrait ? 1 : 0, L.lines.size(),
+                           L.rows, L.size, L.textW, L.panel.x, L.panel.y, L.panel.w, L.panel.h, inside ? "fits" : "overflows");
+                if (portrait && (L.lines.size() > worstLines || (L.lines.size() == worstLines && text.size() > worstLen)))
+                {
+                    worst = id;
+                    worstLines = L.lines.size();
+                    worstLen = text.size();
+                }
+            }
+        }
+        if (ids.size() > 1) printf("%zu pages, longest string %d (%zu lines), %d overflow%s\n", ids.size(), worst, worstLines, bad, bad == 1 ? "" : "s");
+        return bad ? 2 : 0;
+    }
 
     std::vector<InputEvent> script;
     if (!inputPath.empty()) script = LoadScript(inputPath);
@@ -413,6 +476,7 @@ int main(int argc, char** argv)
                 app.game.valid = true; app.game.between = false; app.game.settled = true;
                 app.game.screen = GScreen::Unknown; app.game.overlay = 90; app.game.vtable = 0x02000000 + (u32)((frame - unknownAfter) / 200);
             }
+            if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
             if (app.portSupported && printHud)
             {
                 const HudState& h = app.game.hud;
@@ -425,6 +489,12 @@ int main(int argc, char** argv)
                 if (d.valid != before.dialogue.valid || (d.valid && !(d == before.dialogue)))
                 {
                     if (d.valid) fprintf(stderr, "frame %ld: dialogue speech=%d page=%d/%d id=%d speaker=%d name=%d last=%d\n", frame, d.speech, d.page, d.pages, d.stringId, d.speaker, d.speakerNameId, d.last ? 1 : 0);
+                    // What the HD box shows from this frame on (CONSOLE builds it from the same reading).
+                    if (d.valid && app.rom && d.stringId < app.rom->StringCount())
+                    {
+                        const DialogueLayout L = LayoutDialogue(DialogueText(app.rom->String(d.stringId), app.game.hud), true);
+                        fprintf(stderr, "frame %ld: hd dialogue id=%d lines=%zu size=%g\n", frame, d.stringId, L.lines.size(), L.size);
+                    }
                     else fprintf(stderr, "frame %ld: dialogue none\n", frame);
                 }
             }

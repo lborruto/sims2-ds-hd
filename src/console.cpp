@@ -5,6 +5,8 @@
 
 #include "activities.h"
 #include "hotspots.h"
+#include "port/dialogue.h"
+#include "romdata.h"
 
 namespace sims2wide
 {
@@ -67,6 +69,8 @@ void AddRing(Composition& c, ScreenState s, int focus)
     }
 }}
 
+Piece ConsoleWorld(int topW, int rows, bool keepSides) { return World(topW, rows, keepSides); }
+
 void AddHints(Composition& c, const std::vector<Hint>& hints)
 {
     if (hints.empty()) return;
@@ -92,7 +96,8 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
     c.overlays[box].to.h = std::min(y - kHintGap + kHintPad - kHintBox.y, kHintBox.h);
 }
 
-Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings)
+Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
+                         const GameState* game, const RomData* rom, const u32* bottom)
 {
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
@@ -141,6 +146,12 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(Bottom(kRailPhoneFrom, kRailPhoneTo));
         c.pieces.push_back(Bottom(kRailTabsFrom, kRailTabsTo));
         if (bar) AddStatusBar(c, *hud, *strings);
+    }
+    else if (s.screen == Screen::Dialogue && game && game->valid && rom && rom->StringCount() > 0 && bottom)
+    {
+        // The HD conversation (port/dialogue.h): the game's words, its speaker and portrait (the
+        // panel alone while no page is drawn yet: the frames between two speeches).
+        BuildDialogue(c, *game, *rom, bottom, topW, topH);
     }
     else if (s.screen == Screen::Dialogue)
     {

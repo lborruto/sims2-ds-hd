@@ -14,7 +14,9 @@
 #include "console.h"
 #include "hotspots.h"
 #include "layout.h"
+#include "port/dialogue.h"
 #include "port/statusbar.h"
+#include "romdata.h"
 #include "ui/kit.h"
 
 using namespace sims2wide;
@@ -596,6 +598,72 @@ int main()
     CHECK(Place(Layout::Side, true, 16.0f / 9.0f).top.w == 341);
     CHECK(Place(Layout::Stacked, true, 16.0f / 9.0f).cw == 341);
     CHECK(Place(Layout::Side, true, kDSAspect).cw == SW * 2);
+
+    // The HD conversation's text (port/dialogue.h): placeholders and escapes never shown raw.
+    {
+        HudState hud;
+        hud.valid = true; hud.hour = 15; hud.minute = 7; hud.simName = "Jun";
+        CHECK(DialogueText("There's a reason, @1. Go!", hud) == "There's a reason, Jun. Go!");
+        CHECK(DialogueText("the @2 was repossessed", hud) == "the was repossessed");
+        CHECK(DialogueText("Looks like a @2! Amazing.", hud) == "Looks like a! Amazing.");
+        CHECK(DialogueText("by @3.", hud) == "by.");
+        CHECK(DialogueText("at @hh:@mm @am today", hud, "am", "pm") == "at 3:07 pm today");
+        CHECK(DialogueText("day:@DD @ss @ll end", hud) == "day: end");
+        CHECK(DialogueText("{F012}Hello{0b} there{F0}", hud) == "Hello there");
+        CHECK(DialogueText("lone @ sign @", hud) == "lone sign");
+        CHECK(DialogueText("  @2 starts\n@1\n\n", hud) == "starts\nJun");
+        CHECK(DialogueText("Bonjour !", hud) == "Bonjour !"); // the string's own space before '!' stays
+        HudState none; // no clock, no name: dropped
+        CHECK(DialogueText("@1, it is @hh:@mm.", none) == ", it is:.");
+        // Wrapped to the box: a word longer than a line breaks; a long page grows the panel up,
+        // never past the canvas; every line within the text box.
+        const DialogueLayout a = LayoutDialogue("Short.", true);
+        CHECK(a.fits && a.lines.size() == 1 && a.size == kDlgTextSize && a.rows == kDlgRows);
+        CHECK(a.panel.x == kDlgPanelX && a.panel.y + a.panel.h == kConsoleH - kDlgBottomGap && a.panel.y > 0);
+        const DialogueLayout b = LayoutDialogue(std::string(150, 'W'), true);
+        CHECK(b.fits && b.lines.size() > 4 && b.panel.y >= 0 && b.panel.h > a.panel.h);
+        std::string longText;
+        for (int i = 0; i < 60; i++) longText += "word ";
+        const DialogueLayout c = LayoutDialogue(longText, false);
+        CHECK(c.fits && c.size >= kDlgTextMin && c.textW > a.textW);
+        for (const std::string& l : c.lines) CHECK(ui::TextWidth(l, c.size) <= c.textW);
+        const DialogueLayout huge = LayoutDialogue(std::string(4000, 'W'), true); // clipped, never past the panel
+        CHECK(!huge.fits && huge.rows == kDlgMaxRows && huge.panel.y >= 0);
+        CHECK(!PortraitShown(nullptr));
+        std::vector<u32> flat(SW * SH, 0xFF5961A2), black(SW * SH, 0xFF000000), face(SW * SH, 0xFFC08060);
+        CHECK(!PortraitShown(flat.data()) && !PortraitShown(black.data()) && PortraitShown(face.data()));
+
+        // BuildDialogue (a RomData without strings: no text, the player's name on the plate):
+        // the world whole, every UI item inside the canvas, a click on the panel taps the game's
+        // arrow; BuildConsole keeps milestone 1's box without the game's strings.
+        RomData rom;
+        GameState g;
+        g.valid = true;
+        g.hud = hud;
+        g.dialogue.valid = true; g.dialogue.page = 1; g.dialogue.pages = 2; g.dialogue.stringId = 5; g.dialogue.speaker = 0x40;
+        for (int topW : {256, 341})
+        {
+            Composition comp {kConsoleW, kConsoleH, {}, {}};
+            BuildDialogue(comp, g, rom, face.data(), topW, 192);
+            CHECK(comp.pieces.size() == 2 && comp.pieces[0].src == Src::Top && comp.pieces[0].from.x == 0 && comp.pieces[0].from.w == topW);
+            CHECK(comp.pieces[0].from.h == HudCropRows(192));
+            bool plate = false;
+            for (const ui::UiItem& it : comp.ui)
+            {
+                CHECK(it.to.x >= 0 && it.to.y >= 0 && it.to.x + it.to.w <= kConsoleW && it.to.y + it.to.h <= kConsoleH);
+                plate |= it.kind == ui::UiItem::Text && it.text == "Jun";
+            }
+            CHECK(plate);
+            const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+            const Rect P = comp.pieces[1].to;
+            int tx, ty;
+            CHECK(TouchFromComposition(comp, fit, P.x + 5.5f, P.y + 5.5f, tx, ty) && tx >= 219 && tx < 250 && ty >= 155 && ty < 187);
+            CHECK(TouchFromComposition(comp, fit, P.x + P.w - 2.5f, P.y + P.h - 2.5f, tx, ty) && tx >= 219 && tx < 250 && ty >= 155 && ty < 187);
+            CHECK(OverTopComposition(comp, fit, 640.5f, 100.5f));
+        }
+        const Composition m1 = BuildConsole({Screen::Dialogue}, false, -1, 256, 192, &hud, nullptr, &g, &rom, face.data());
+        CHECK(m1.ui.empty() && m1.pieces.size() == 5);
+    }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("layout_test: ok\n");

@@ -4,7 +4,7 @@
 // right; the menu, the phone, popups and Give Item are the whole touch screen 3x over the dimmed
 // world (framed for SaveSlots, ItemHand and Unknown); a black load is the bare backdrop; without a
 // HUD (the front end) the top screen at the left and the touch screen 2.5x at the right, each in its frame; a conversation is the world with the
-// game's dialogue box rebuilt wide at the bottom; an activity is the touch screen 3x at the left
+// game's dialogue redrawn in HD at the bottom (port/dialogue.h; without the game's text, its own box rebuilt wide); an activity is the touch screen 3x at the left
 // with the world small at the top right. DS pieces are drawn as the game draws them, 2x or 3x;
 // frames and the focus ring are overlays in the game's colours.
 #pragma once
@@ -16,6 +16,7 @@
 
 namespace sims2wide
 {
+class RomData;
 constexpr int kConsoleW = 1280, kConsoleH = 720;
 
 // The game's colours (frame, panel, outline, highlight).
@@ -89,6 +90,16 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // picture's last 16 of 192 rows) cropped off that world: town, the menu over the dimmed world,
 // and under the small world of the activities that keep the HUD (Social, Vacuum, Catalogue,
 // Build; not Cards). Without them: milestone 1's compositions, the game's HUD left in the world.
+// game, rom, bottom (the RAM's state, read, the game's strings, the DS's touch screen; all
+// given): a conversation is the HD one (port/dialogue.h; its panel alone while the game has no
+// page drawn, dialogue not valid); without them, milestone 1's (the game's own box rebuilt wide
+// from pieces).
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
-                         const HudStrings* strings = nullptr);
+                         const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
+                         const u32* bottom = nullptr);
+
+// The world (the top picture's first `rows` rows, topW wide) as CONSOLE draws it: 720 high,
+// centred when narrower than the canvas; keepSides: never cut at its sides (fitted to the
+// canvas's width, top-aligned, when wider), else cropped to 16:9.
+Piece ConsoleWorld(int topW, int rows, bool keepSides);
 }

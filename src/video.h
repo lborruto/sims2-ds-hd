@@ -49,7 +49,8 @@ struct Video
     {
         int tw, th;
         app.TopImage(tw, th);
-        Composition c = app.shown == Layout::Console ? BuildConsole(app.ConsoleScreen(), app.consoleMenu, app.consoleFocus, tw, th, app.Hud(), &app.hudStrings)
+        Composition c = app.shown == Layout::Console ? BuildConsole(app.ConsoleScreen(), app.consoleMenu, app.consoleFocus, tw, th, app.Hud(), &app.hudStrings,
+                                                                    app.portSupported ? &app.game : nullptr, app.rom.get(), app.Bottom())
                                                      : Compose(app.shown, app.mainIsTop, app.topAspect, tw, th);
         if (app.uiDemo) c.ui = ui::DemoItems(app.Bottom());
         return c;

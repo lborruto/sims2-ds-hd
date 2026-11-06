@@ -2,6 +2,7 @@
 // shows and the selections on it, without looking at pixels. The RAM map is in docs/research/ram-map.md.
 #pragma once
 #include <string>
+#include <vector>
 
 #include "common.h"
 #include "screens.h"
@@ -68,6 +69,10 @@ struct GameState
 struct RamView { const u8* ram; u32 mask; };
 
 GameState ReadGameState(RamView ram);           // EU table
+// Every page's string id in the game's speech table (static data, any state of the European
+// ROM), in table order, repeats kept; empty when the table does not read. For checks: the
+// conversations' texts in each language measured against the HD box (--measure-string all).
+std::vector<int> SpeechStringIds(RamView ram);
 const char* GScreenName(GScreen);
 std::string GameStateName(const GameState&);   // "Panel/Goals", "Popup", "Unknown(ov=8,vt=0x0214B1C4)"
 // CONSOLE's screen from the game's: Panel with its tab, the rest by name; not valid, a Panel

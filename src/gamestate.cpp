@@ -146,6 +146,21 @@ DialogueState ReadDialogue(const Reader& m, u32 S)
 }
 }
 
+std::vector<int> SpeechStringIds(RamView ram)
+{
+    const Reader m {ram};
+    std::vector<int> ids;
+    for (u32 speech = 0; speech < kEU.speechCount; speech++)
+    {
+        u32 entry = kEU.speechTable + 8 * speech, pages, count, sid;
+        if (!m.R32(entry, pages) || !m.R8(entry + 4, count)) return {};
+        if (pages == 0 || count == 0 || count > kEU.dlgMaxPages) continue; // a game-built one-off (entry 67)
+        for (u32 p = 0; p < count; p++)
+            if (m.R16(pages + 4 * p, sid)) ids.push_back((int)sid);
+    }
+    return ids;
+}
+
 GameState ReadGameState(RamView ram)
 {
     GameState g;

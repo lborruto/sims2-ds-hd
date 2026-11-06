@@ -6,7 +6,10 @@
 #   sit-cityhall (the panel, in town): the world, the rail of the touch screen's tab column and
 #   phone icon; the same with --console-menu: the menu, 3x over the dimmed world; s7 (the phone): the touch screen 3x over the dimmed world; the same with
 #   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item): 3x over the
-#   dimmed world; s5 (a conversation): the dialogue rebuilt wide;
+#   dimmed world; s5 with --no-romdata (no game text: milestone 1's conversation): the dialogue
+#   rebuilt wide from the game's pieces; s5-hd (the HD conversation, src/port/dialogue.*): the
+#   world whole, the panel, the name plate's and the text's white pixels, the portrait as the
+#   touch screen's own pixels 2x; s5-hd-wide (--wide): the world not cut at its sides;
 #   act-social, act-vacuum, act-cards: the touch screen 3x at the left, the world small at the
 #   top right, the hints' box; s2, s3, s4 (the main menu, Create-a-Sim, Keep this Sim?: no HUD):
 #   the front end's view, the top screen framed at the left at its shape and the touch screen
@@ -74,7 +77,9 @@ run cityhall-wide sit-cityhall "${town[@]}" --wide &
 run s7-menu s7 "${town[@]}" --console-focus 0 &
 run cityhall-menu sit-cityhall "${town[@]}" --console-menu &
 run gift sit-gift "${town[@]}" &
-run s5 s5 "${town[@]}" &
+run s5 s5 "${town[@]}" --no-romdata &
+run s5-hd s5 "${town[@]}" --print-hud &
+run s5-hd-wide s5 "${town[@]}" --wide &
 run social act-social "${town[@]}" &
 wait
 run vacuum act-vacuum "${hotel[@]}" &
@@ -91,7 +96,7 @@ run casino-2x sit-casino "${late[@]}" --print-hud --compose-scale 2 &
 wait
 
 fails=0
-for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots load casino casino-2x; do
+for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -309,6 +314,40 @@ elif case == "s5":
     w = world_full(176)
     for cx, cy in ((400, 100), (1000, 300)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
+elif case in ("s5-hd", "s5-hd-wide"):
+    # The HD conversation (port/dialogue.h): the panel 1060 wide from x 110 (its frame band
+    # #6171B2), the text well, white text in it, the name plate's white text above it, the
+    # portrait: the touch screen's x 174-240, rows 38-121, 2x from (1006, 504) (a page of
+    # four rows: the panel 254 high from y 452), nothing of the game's own box.
+    BAND, TWELL = hexrgb("6171B2"), hexrgb("6A72B8")
+    expect("panel band", C(112, 600), BAND)
+    expect("text well", C(560, 676), TWELL)
+    white = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1) for x in range(x0, x1) if min(C(x, y)) > 235)
+    if white(150, 500, 960, 680) < 1000:
+        errors.append("no text in the panel")
+    if white(140, 430, 400, 476) < 300:
+        errors.append("no name on the plate")
+    grid = [(x, y) for y in range(0, 84, 3) for x in range(0, 67, 3)]
+    bad = sum(1 for x, y in grid if C(1006 + 2 * x, 504 + 2 * y) != bottom(174 + x, 38 + y))
+    if bad:
+        errors.append(f"portrait: {bad} pixels not the touch screen's")
+    if sum(1 for x, y in grid if max(C(1006 + 2 * x, 504 + 2 * y)) > 40) < len(grid) // 2:
+        errors.append("portrait black")
+    if case == "s5-hd":
+        w = world_full(176)
+        for cx, cy in ((400, 100), (1000, 300), (130, 420)):
+            expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
+        if not re.search(r"frame \d+: hd dialogue id=\d+ lines=\d+", open(log_path).read()):
+            errors.append("no hd dialogue line in the log")
+    else:
+        # --wide: the world's whole width on the canvas (1280 wide, top-aligned, its status bar's
+        # rows dropped), as the HD status bar's town: never cut at its sides.
+        big = Image.open(raw_path.replace(".png", "-top.png")).convert("RGB")
+        tw, th = big.size
+        rows = th * 176 // 192
+        h = round(1280 * rows / tw)
+        for cx, cy in ((2, 100), (1277, 100), (640, 300), (40, 440)):
+            expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * tw // 1280, cy * rows // h)))
 elif case in ("social", "vacuum"):
     expect("canvas", comp.size, (1280, 720))
     activity(176)
@@ -484,5 +523,90 @@ cancelled() {
 }
 check_pad act-cancel cancelled
 check_pad act-blow pixels act-blow blow
+# The HD conversation's pages (src/port/dialogue.*): from s5 tapping the arrow through the first
+# speech (scripts/dlg-taps.txt), the HD text follows the game's page counter the same frame:
+# --print-hud logs the page and the HD box's string on the same frame, and the box's text
+# changes between the frame before and that frame; on every page the text, the name and a
+# portrait that is not black. From s5, A pressed twice (scripts/console/dialogue-a.txt) turns
+# exactly two pages. Then each language's conversations (every page of the game's speech table,
+# --measure-string all; a layout check: the game itself stays in its firmware's language) fit
+# the box, the longest one too (--measure-string ID), and its picture (--dialogue-string) keeps
+# every white text pixel of the panel inside the text well.
+dlg() {
+    local name=$1; shift
+    "$bin" "$rom" --headless --state-load "$shots/s5.st" --save "$tmp/$name.sav" --layout console --clock "2026-01-01 12:00" \
+        --print-hud "$@" > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+dlg dlg-pages --frames 160 --input "$repo/scripts/dlg-taps.txt" --compose --shot-at 28,29,88,89,149,150 --shot-dir "$tmp/dlg-pages" &
+dlg dlg-a --frames 160 --input "$repo/scripts/console/dialogue-a.txt" &
+wait
+pages() {
+    local f
+    for f in 29 89 150; do
+        grep -q -E "^frame $f: dialogue .*page=" "$tmp/dlg-pages.log" && grep -q -E "^frame $f: hd dialogue " "$tmp/dlg-pages.log" ||
+            { echo "  dlg-pages: no page change and HD text both at frame $f"; return 1; }
+    done
+    "$python" -I - "$tmp/dlg-pages" <<'EOF'
+import sys
+from PIL import Image
+
+d = sys.argv[1]
+shot = lambda f: Image.open(f"{d}/f{f:06d}.png").convert("RGB")
+errors = []
+white = lambda im, x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if min(im.getpixel((x, y))) > 235)
+for f in (28, 29, 88, 89, 149, 150):
+    im = shot(f)
+    if white(im, 150, 500, 960, 680) < 250:
+        errors.append(f"frame {f}: no text")
+    if white(im, 140, 430, 400, 476) < 75:
+        errors.append(f"frame {f}: no name")
+    if sum(1 for y in range(504, 672, 6) for x in range(1006, 1140, 6) if max(im.getpixel((x, y))) > 40) < 300:
+        errors.append(f"frame {f}: no portrait")
+for a, b in ((28, 29), (88, 89), (149, 150)):
+    A, B = shot(a), shot(b)
+    if sum(1 for y in range(500, 680, 2) for x in range(150, 960, 2) if A.getpixel((x, y)) != B.getpixel((x, y))) < 200:
+        errors.append(f"the text did not change from frame {a} to {b}")
+for e in errors:
+    print(f"  dlg-pages: {e}")
+sys.exit(1 if errors else 0)
+EOF
+}
+check_pad dlg-pages pages
+two_pages() {
+    in_order dlg-a 'dialogue speech=0 page=1/4' 'dialogue speech=0 page=2/4' 'dialogue speech=0 page=3/4' || return 1
+    if grep -q 'page=4/4' "$tmp/dlg-a.log"; then echo "  dlg-a: A turned more than two pages"; return 1; fi
+}
+check_pad dlg-a two_pages
+for lang in 1 2 3 4 5; do
+    name=measure-$lang
+    if ! out=$("$bin" "$rom" --headless --frames 1 --state-load "$shots/s5.st" --save "$tmp/$name.sav" --language $lang --measure-string all 2> "$tmp/$name.log"); then
+        echo "FAIL $name: $out $(tail -n 1 "$tmp/$name.log")"; fails=$((fails + 1)); continue
+    fi
+    id=$(echo "$out" | sed -n 's/.*longest string \([0-9]*\).*/\1/p')
+    one=$("$bin" "$rom" --headless --frames 1 --state-load "$shots/s5.st" --save "$tmp/$name.sav" --language $lang --measure-string "$id" 2>/dev/null)
+    if [ "$(echo "$one" | grep -c ' fits$')" != 2 ]; then echo "FAIL $name: string $id: $one"; fails=$((fails + 1)); continue; fi
+    dlg "$name" --frames 40 --language $lang --dialogue-string "$id" --compose --shot-at 30 --shot-dir "$tmp/$name"
+    if [ ! -f "$tmp/$name.ok" ]; then echo "FAIL $name: the picture's run did not end well"; fails=$((fails + 1)); continue; fi
+    # Every white text pixel of the panel's rows inside the text well (x 132-974) or on the
+    # name plate (above the well's top edge); the portrait's column left out.
+    if "$python" -I - "$tmp/$name/f000030.png" <<'EOF'
+import sys
+from PIL import Image
+
+im = Image.open(sys.argv[1]).convert("RGB")
+# The well's top edge: the first row of the well's colour at x 600, from y 380 down.
+top = next((y for y in range(380, 700) if im.getpixel((600, y)) == (0x6A, 0x72, 0xB8)), None)
+if top is None:
+    print("  no text well")
+    sys.exit(1)
+out = [(x, y) for y in range(top, 706) for x in range(110, 1170)
+       if not (132 <= x < 975) and not (996 <= x < 1150) and min(im.getpixel((x, y))) > 245]
+if out:
+    print(f"  text outside the well at {out[:3]}")
+    sys.exit(1)
+EOF
+    then echo "ok   $name: $(echo "$out" | head -n 1)"
+    else echo "FAIL $name"; fails=$((fails + 1)); fi
+done
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"
