@@ -1,6 +1,8 @@
 #include "port/phone.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cstdlib>
 
 #include "hotspots.h"
 #include "port/goals.h"
@@ -145,6 +147,7 @@ PhonePage PhonePageOf(const GameState& game, const RomData& rom)
         for (int i = 0; i < 7; i++)
         {
             add(i, i < 4 ? MenuText(Fill(rom.String(kStrPhRingtone), 1, std::to_string(i))) : words(kStrPhEmpty));
+            pg.rows.back().marked = i == ph.ringtone;
         }
         add(7, words(kStrPhExit));
         break;
@@ -152,8 +155,8 @@ PhonePage PhonePageOf(const GameState& game, const RomData& rom)
         for (int i = 0; i < 4; i++) add(i, kStrPhPhonebook[i] == kStrPhMaid ? Shown(Fill(rom.String(kStrPhMaid), 1, ph.maidCost >= 0 ? GroupThousands(ph.maidCost) : "")) : words(kStrPhPhonebook[i]));
         break;
     case 7:
-        // (The game builds its list over a frame or two: a count of 0 that disagrees is that.)
-        if (!ph.contactsKnown && ph.contacts == 0) break;
+        // (The game builds its list over a frame or two: a count of 0 that disagrees is that, for a few frames; after them its own LCD.)
+        if (!ph.contactsKnown && ph.contacts == 0 && ph.contactsWait <= kPhContactsGrace) break;
         if (!ph.contactsKnown) { pg.crop = true; break; }
         if (ph.contactList.empty()) pg.body = words(kStrPhNoContacts);
         for (int i = 0; i < (int)ph.contactList.size(); i++) add(i, simName(ph.contactList[i]));
@@ -287,7 +290,9 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
         std::string clock, money;
         float fill;
         if (!strings || !FormatHud(game.hud, *strings, clock, money, fill)) clock.clear();
+        const size_t at = c.ui.size();
         text({kPhHeader.x + 80, kPhHeader.y, kPhHeader.w - 80, kPhHeader.h}, MenuText(date) + "    " + clock, 28, 22, Align::Right, kInk);
+        c.ui[at].layer = kPhClockLayer;   // (its own layer: the minute does not raster the LCD again)
         UiItem rule = PanelItem({kPhHeader.x, kPhHeader.y + kPhHeader.h + 4, kPhHeader.w, 2});
         rule.plain = true;
         rule.fill = kLcdRim;
@@ -340,7 +345,7 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
                 c.ui.push_back(bar);
             }
             const u32 ink = on ? kBarInk : kInk;
-            if (r.unread)
+            if (r.unread || r.marked)
             {
                 UiItem dot = PanelItem({rr.x + 24, rr.y + rr.h / 2 - 7, 14, 14});
                 dot.plain = true;

@@ -731,6 +731,7 @@ int main()
         in.prev = {TargetRef::Sim, 3, 326, 1, false};
         in.next = {TargetRef::Object, 15, 478, 5744, false};
         for (int i = 0; i < 4; i++) in.actions.push_back({i, 1845 + i, i == 2});
+        CHECK(WithoutAmount("Pay (\x24@1)") == "Pay" && WithoutAmount("Buy (@1) now") == "Buy now" && WithoutAmount("Open") == "Open" && WithoutAmount("Pay @1") == "Pay @1");
         const ScreenState it {Screen::Panel, Tab::Interact};
         const MenuView v = PanelMenuViewOf(it, g);
         CHECK(v.valid && v.items.size() == 5);
@@ -1137,8 +1138,14 @@ int main()
                     if (u.valid) BuildPanelMenu(comp, under, u, 0, h, rom, nullptr, face.data());
                     std::vector<u32> crop(SW * SH, 0xFF808080);
                     comp.ui.push_back(ui::ImageItem({kPopBox.x + 10, kPopBox.y + 10, 60, 60}, crop.data(), SW, SH, {0, 0, 20, 20})); // (a picture under the box)
+                    ui::UiItem barItem = ui::PanelItem({16, 8, 200, 40}); // (the status bar's panel: never under the veil)
+                    barItem.layer = kStatusBarLayer;
+                    comp.ui.push_back(barItem);
                     BuildPopup(comp, v, 0, h, rom);
                     SortUi(comp.ui);
+                    int bars = 0;
+                    for (const ui::UiItem& it : comp.ui) bars += it.kind != ui::UiItem::Image && it.layer == kPopLayer + 1 && it.to.x == 16 && it.to.w == 200;
+                    CHECK(bars == 1);
                     int layer = 0;
                     for (const ui::UiItem& it : comp.ui)
                     {
@@ -1239,6 +1246,8 @@ int main()
             CHECK(PhonePageOf(odd, rom).crop);
             odd.town.phone.contacts = 0; // (the list being built: nothing yet)
             CHECK(!PhonePageOf(odd, rom).crop && PhoneViewOf(ps, odd, &rom).items.empty());
+            odd.town.phone.contactsWait = kPhContactsGrace + 1; // (never agreeing: after a few frames, its LCD)
+            CHECK(PhonePageOf(odd, rom).crop && PhoneViewOf(ps, odd, &rom).items.size() == 1);
             CHECK(!PhoneViewOf({Screen::Panel, Tab::Interact}, phone(0, 0, 0, 0), &rom).valid);
             CHECK(!PhoneView(ps, nullptr, &rom).valid && !PhoneView(ps, &odd, &rom).valid); // (no strings)
             // A note: A and B press the DS's A (the game closes it so); its X onto the game's.

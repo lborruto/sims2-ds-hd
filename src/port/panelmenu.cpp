@@ -45,6 +45,7 @@ std::string MenuWordsWith(const RomData& rom, int id, const std::string& at1)
 
 std::string MenuText(std::string in, int amount)
 {
+    in = DropEscapes(in);   // (RomData's {xx} / {F0xx})
     if (amount >= 0)
     {
         // The amount in @1, the simoleon glyph for '$' (as the HD status bar draws the money).
@@ -61,11 +62,6 @@ std::string MenuText(std::string in, int amount)
     for (size_t i = 0; i < in.size(); i++)
     {
         const char c = in[i];
-        if (c == '{')
-        {   // RomData's escapes ({xx}, {F0xx}) dropped.
-            const size_t e = in.find('}', i);
-            if (e != std::string::npos && e - i <= 8) { i = e; continue; }
-        }
         if (c == '@')
         {   // A placeholder: '@' and its digits or up to two letters; a '$' (the simoleon) before it goes too.
             size_t j = i + 1;

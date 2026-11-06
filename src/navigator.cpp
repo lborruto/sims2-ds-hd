@@ -254,6 +254,14 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         resumeId_ = focusId_;
         resumeIndex_ = focus_;
     }
+    if (popupNow != popupUp_)
+    {
+        // A popup coming or going: a multi-step action must not keep feeding keys under it, nor
+        // a held press or a pending move land on the other side.
+        running_.clear();
+        pendingDir_ = -1;
+        held_ = nullptr;
+    }
     const bool back = !popupNow && popupUp_ && resumeValid_ && s == resumeScreen_;
     if (!(s == screen_))
     {

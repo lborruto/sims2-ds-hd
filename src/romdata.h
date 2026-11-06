@@ -42,7 +42,7 @@ struct SpriteFrame
 // bytes, u16 frame offsets from byte 12; each frame u16 pieces (1 to 64), u8 w, u8 h, u16 the
 // byte offset of its compressed tiles in the tiles resource, s16 x, s16 y, then its pieces:
 // u16 position (x 9 bits signed, y 7 bits signed), u16 attribute (bits 2-3 the size, 4-5 the
-// shape, 6 and up the tile in units of 128 bytes), the DS's OBJ sizes), a tiles resource (one
+// shape, 6 and up the first tile, a count of 32-byte units into the unpacked tiles), the DS's OBJ sizes), a tiles resource (one
 // compressed 4bpp tile stream per frame, Decompress) and a 16-colour palette resource. The
 // frame's picture is w x h at (x, y): each piece's tiles are read in order (rows of 8 x 8,
 // 32 bytes each, two pixels a byte, the low nibble first) and drawn at (piece x - x, piece y
@@ -89,6 +89,11 @@ private:
     std::vector<std::string> strings; // UTF-8
     int stringsFile = -1;
 };
+
+// A string from RomData::String without its escapes: the {xx} and {F0xx} it shows for a byte
+// it has no meaning for (a brace group of up to 8 characters) dropped. The one dropper the HD
+// text (status bar, menus, conversations) shares.
+std::string DropEscapes(const std::string& in);
 
 // The game's raw text bytes (a RAM buffer, e.g. a popup's) as UTF-8, as RomData::String decodes them.
 std::string GameTextToUtf8(const std::string& raw);

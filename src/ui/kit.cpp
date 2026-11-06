@@ -447,7 +447,9 @@ std::vector<LayerAt> LayersAt(const std::vector<UiItem>& items, float scale, flo
         const int x0 = (int)std::floor(originX + b.x * scale), y0 = (int)std::floor(originY + b.y * scale);
         const int x1 = (int)std::ceil(originX + (b.x + b.w) * scale), y1 = (int)std::ceil(originY + (b.y + b.h) * scale);
         if (x1 <= x0 || y1 <= y0) return;
-        out.push_back({std::move(part), isStill, layer, x0, y0, x1 - x0, y1 - y0, (x0 - originX) / scale, (y0 - originY) / scale});
+        // The layer's top left lands on its whole output pixel (x0, y0), as a piece's does (CanvasFit::ToOutput
+        // truncates): its edges are not anti-aliased across two pixels where a piece's are sharp.
+        out.push_back({std::move(part), isStill, layer, x0, y0, x1 - x0, y1 - y0, (float)b.x, (float)b.y});
     };
     // The still items by layer, ascending (one layer: exactly as before).
     std::vector<int> layers;

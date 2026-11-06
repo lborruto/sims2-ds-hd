@@ -37,6 +37,7 @@
 #include "mic.h"
 #include "picker.h"
 #include "romdata.h"
+#include "ui/font.h"
 #include "port/dialogue.h"
 #include "port/interact.h"
 #include "port/goals.h"
@@ -54,6 +55,14 @@
 
 using namespace sims2wide;
 using melonDS::NDS;
+
+// A whole number from 0 to max, the whole text (anything else is a usage error, not a 0).
+static bool WholeNumber(const std::string& v, long max, long& out)
+{
+    char* rest = nullptr;
+    out = strtol(v.c_str(), &rest, 10);
+    return !v.empty() && !*rest && out >= 0 && out <= max;
+}
 
 static void Usage()
 {
@@ -93,9 +102,9 @@ static void Usage()
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
         "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes) can show fitted to its box, in --language's\n"
-        "                                words: how many shrink, how many need an ellipsis (exit 2), and stop\n"
+        "                                words: how many shrink, how many need an ellipsis or a character the font lacks (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
-        "                                or all: every page of the game's conversations (needs --state-load), and stop\n"
+        "                                or all: every page of the game's conversations (needs --state-load; exit 2 on an overflow or a character the font lacks), and stop\n"
         "  --language N                  the text's language for those and the HD interface's words: 0 Japanese (the\n"
         "                                English file), 1 English, 2 French, 3 German, 4 Italian, 5 Spanish (default:\n"
         "                                the firmware's; the game itself keeps the firmware's)\n"
@@ -185,10 +194,8 @@ int main(int argc, char** argv)
         else if (a == "--language" || a == "--dump-string")
         {
             // A whole number, 0 or more; anything else is a usage error, not a 0.
-            const std::string v = next();
-            char* rest = nullptr;
-            const long number = strtol(v.c_str(), &rest, 10);
-            if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            long number;
+            if (!WholeNumber(next(), 1000000, number)) { Usage(); return 1; }
             if (a == "--language" && number > 5) { Usage(); return 1; }
             (a == "--language" ? language : dumpString) = (int)number;
         }
@@ -198,10 +205,8 @@ int main(int argc, char** argv)
         else if (a == "--dump-resource" || a == "--dump-sprite")
         {
             auto number = [&](long max) {
-                const std::string v = next();
-                char* rest = nullptr;
-                const long n = strtol(v.c_str(), &rest, 10);
-                if (v.empty() || *rest || n < 0 || n > max) { Usage(); exit(1); }
+                long n;
+                if (!WholeNumber(next(), max, n)) { Usage(); exit(1); }
                 return (int)n;
             };
             if (a == "--dump-resource") dumpResource = number(1000000);
@@ -212,19 +217,16 @@ int main(int argc, char** argv)
         // longest strings' pictures, tests/console_check.sh).
         else if (a == "--dialogue-string")
         {
-            const std::string v = next();
-            char* rest = nullptr;
-            const long number = strtol(v.c_str(), &rest, 10);
-            if (v.empty() || *rest || number < 0 || number > 1000000) { Usage(); return 1; }
+            long number;
+            if (!WholeNumber(next(), 1000000, number)) { Usage(); return 1; }
             dialogueString = (int)number;
         }
         else if (a == "--measure-menu") measureMenu = true;
         else if (a == "--measure-string")
         {
             measure = next();
-            char* rest = nullptr;
-            const long number = strtol(measure.c_str(), &rest, 10);
-            if (measure != "all" && (measure.empty() || *rest || number < 0 || number > 1000000)) { Usage(); return 1; }
+            long number;
+            if (measure != "all" && !WholeNumber(measure, 1000000, number)) { Usage(); return 1; }
         }
         else if (a == "--layout")
         {
@@ -349,7 +351,8 @@ int main(int argc, char** argv)
             FILE* f = fopen(dumpFile.c_str(), "wb");
             if (!f || (!out.empty() && fwrite(out.data(), 1, out.size(), f) != out.size())) { fprintf(stderr, "cannot write %s\n", dumpFile.c_str()); if (f) fclose(f); return 1; }
             fclose(f);
-            if (packed) fprintf(stderr, "resource %d: kind %d, %zu bytes unpacked to %zu\n", dumpResource, (raw[0] >> 4) & 7, raw.size(), out.size());
+            if (packed && ((raw[0] >> 4) & 7) == 0) fprintf(stderr, "resource %d: stored (kind 0), its 4-byte header taken off: %zu bytes to %zu\n", dumpResource, raw.size(), out.size());
+            else if (packed) fprintf(stderr, "resource %d: kind %d, %zu bytes unpacked to %zu\n", dumpResource, (raw[0] >> 4) & 7, raw.size(), out.size());
             else fprintf(stderr, "resource %d: %zu bytes, not compressed\n", dumpResource, raw.size());
             return 0;
         }
@@ -385,6 +388,7 @@ int main(int argc, char** argv)
     if (measureMenu)
     {
         if (!app.rom) return 1;
+        ui::ResetMissingGlyphs();
         const MenuMeasure m = MeasureInteract(*app.rom);
         printf("interact: %d words, widest verb %d (%.0f px), %d shrunk, %d cut (row %d, hint %d, title %d, strip %d, strip sides %d)",
                m.checked, m.widestId, m.widestW, m.shrunk, m.cut, m.cutIn[0], m.cutIn[1], m.cutIn[2], m.cutIn[3], m.cutIn[4]);
@@ -415,7 +419,10 @@ int main(int argc, char** argv)
         printf("\n");
         // A neighbour's name beside the plate may end in an ellipsis (the Italian table has a
         // sentence at an object's name, 463); every other box must hold its words.
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 ? 2 : 0;
+        // Every character of those words must be in the font (else a '?' is drawn).
+        const std::vector<u32> lacking = ui::MissingGlyphs();
+        for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.
@@ -429,6 +436,7 @@ int main(int argc, char** argv)
             if (ids.empty()) { fprintf(stderr, "no speech table in RAM (a state of the European ROM is needed)\n"); return 1; }
         }
         else ids.push_back(atoi(measure.c_str()));
+        ui::ResetMissingGlyphs();
         HudState hud;
         hud.valid = true; hud.hour = 22; hud.minute = 58; hud.simName = "WWWWWWWW"; // the widest name and clock
         int worst = -1, bad = 0, raw = 0;
@@ -461,7 +469,10 @@ int main(int argc, char** argv)
         }
         // (The longest is measured with the portrait's column, the narrower box; both are checked.)
         if (ids.size() > 1) printf("%zu pages, longest string %d (%zu lines), %d overflow%s, %d raw\n", ids.size(), worst, worstLines, bad, bad == 1 ? "" : "s", raw);
-        return bad || raw ? 2 : 0;
+        // A character the font lacks would be drawn as '?'.
+        const std::vector<u32> lacking = ui::MissingGlyphs();
+        for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
+        return bad || raw || !lacking.empty() ? 2 : 0;
     }
 
     std::vector<InputEvent> script;
@@ -592,6 +603,11 @@ int main(int argc, char** argv)
             {   // the check's fake: a new unmapped pair every 200 frames
                 app.game.valid = true; app.game.between = false; app.game.settled = true;
                 app.game.screen = GScreen::Unknown; app.game.overlay = 90; app.game.vtable = 0x02000000 + (u32)((frame - unknownAfter) / 200);
+            }
+            {   // the phone's contact list the game is still building (or never agrees with): counted
+                PhoneState& ph = app.game.town.phone;
+                if (ph.valid && ph.page == 7 && !ph.contactsKnown && ph.contacts == 0)
+                    ph.contactsWait = before.town.phone.valid ? before.town.phone.contactsWait + 1 : 1;
             }
             if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
             if (app.portSupported && printHud)

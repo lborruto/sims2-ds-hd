@@ -1430,6 +1430,20 @@ static void view_popup_resume_and_phone()
     for (int i = 0; i < 6; i++) p.Frame(kPhone); // (its wait)
     p.Press(kPhone, &PadState::b);
     CHECK(p.Touched(x, y) && x == 237 && y == 15);
+    // A popup coming while a multi-step action runs: it stops (no key under the popup).
+    MenuView k = ListView(1, -1);
+    k.items[0].action = {KeysStep(1u << kA, 4), KeysStep(1u << kDown, 4), TapStep(10, 20)};
+    Rig q;
+    q.view = &k;
+    q.Frame(kInteract);
+    q.Press(kInteract, &PadState::menu);
+    PadState a;
+    a.a = true;
+    CHECK(q.Frame(kInteract, a) == (1u << kA));
+    CHECK(q.nav.Running());
+    q.view = &pop;
+    CHECK(!(q.Frame(kPopup) & ((1u << kA) | (1u << kDown))));
+    CHECK(!q.nav.Running());
 }
 
 int main()

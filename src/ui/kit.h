@@ -101,6 +101,8 @@ void Rasterise(const std::vector<UiItem>& items, float scale, u32* argb, int w, 
 // What the window and --compose both draw: each still layer (by `layer`, ascending) over its
 // bounds, then each image over its own, as whole output pixels (x, y, w, h) for a canvas whose origin is output pixel
 // (originX, originY); Rasterise(items, scale, …, w, h, ox, oy) draws one. Empty ones are left out.
+// A layer's pixel origin (x, y) is rounded down like a piece's (CanvasFit::ToOutput): its bounds' top left
+// is drawn on it exactly (ox, oy are the bounds' canvas position), never between two pixels.
 struct LayerAt
 {
     std::vector<UiItem> items;

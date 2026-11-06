@@ -50,7 +50,7 @@ MenuView NoteViewOf(ScreenState s, const GameState& game, const RomData* rom)
     return v;
 }
 
-void BuildNote(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons)
+void BuildNote(Composition& c, const MenuView&, int focus, const GameState& game, const RomData& rom, IconCache* icons)
 {
     const size_t first = c.ui.size();
     UiItem paper = PanelItem(kNotePanel);
@@ -96,7 +96,6 @@ void BuildNote(Composition& c, const MenuView& v, int focus, const GameState& ga
 
     AddMousePiece(c, {kNoteCloseX - 14, kNoteCloseY - 14, 28, 28}, kNoteX);
     AddSpriteIcon(c, icons, kSprNoteX, 0, 2, kNoteX);
-    (void)v;
     SortUi(c.ui, first);
 }
 

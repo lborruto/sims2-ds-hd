@@ -8,6 +8,7 @@
 #include "port/panelmenu.h"
 #include "port/phone.h"
 #include "port/pockets.h"
+#include "port/statusbar.h"
 #include "romdata.h"
 #include "ui/kit.h"
 
@@ -75,7 +76,6 @@ MenuView PopupViewOf(ScreenState s, const GameState& game, const RomData* rom)
         it.id = kPopCloseId;
         it.action = {TapStep(x0, y0)};
         it.closes = true;
-        if (rom) it.word = MenuWords(*rom, kStrPopClose);
         v.items.push_back(it);
         v.back = it.action;
         v.backCloses = true;
@@ -89,7 +89,6 @@ MenuView PopupViewOf(ScreenState s, const GameState& game, const RomData* rom)
         yes.id = kPopYesId;
         yes.action = {TapStep(x1, y1)};
         yes.closes = true;
-        if (rom) yes.word = MenuWords(*rom, kStrPopYes);
         v.items.push_back(yes);
         v.back = {TapStep(x0, y0)};
         v.backCloses = true;
@@ -126,7 +125,7 @@ ScreenState UnderScreen(ScreenState s, const GameState& game)
     return s;
 }
 
-void BuildPopup(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom)
+void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& game, const RomData& rom)
 {
     const Theme& th = GameTheme();
     const PopupState& p = game.town.popup;
@@ -134,8 +133,11 @@ void BuildPopup(Composition& c, const MenuView& v, int focus, const GameState& g
     // over it); the others are dimmed with the rest.
     for (Piece& q : c.pieces) q.touch = false;
     std::vector<UiItem> kept;
-    for (const UiItem& u : c.ui)
+    for (const UiItem& u0 : c.ui)
     {
+        UiItem u = u0;
+        // The status bar stays clear: above the veil, never dimmed.
+        if (u.layer == kStatusBarLayer) { u.layer = kPopLayer + 1; kept.push_back(u); continue; }
         if (u.kind != UiItem::Image) { kept.push_back(u); continue; }
         if (Overlaps(u.to, {kPopBox.x - 8, kPopTitle.y - 8, kPopBox.w + 16, kPopBox.y + kPopBox.h - kPopTitle.y + 24})) continue;
         UiItem d = u;
@@ -216,7 +218,6 @@ void BuildPopup(Composition& c, const MenuView& v, int focus, const GameState& g
         button(kPopNo, 0, false, {{Button::B, MenuWords(rom, kStrPopNo)}});
         button(kPopYes, 1, focus == 0, {{Button::A, MenuWords(rom, kStrPopYes)}});
     }
-    (void)v;
 }
 
 void MeasurePopups(const RomData& rom, BlockMeasure& m)

@@ -115,7 +115,7 @@ struct SaveSlot
 struct SaveSlots
 {
     bool valid = false;
-    bool used[kSaveSlotCount] = {};
+    bool used[kSaveSlotCount] = {};   // the UI keys off this (slot[i] is read only when used)
     int current = -1;                 // the game's current slot, -1 none
     SaveSlot slot[kSaveSlotCount];
     bool operator==(const SaveSlots&) const = default;
@@ -238,6 +238,7 @@ struct PhoneState
     // game's own count (S+0x86C) or highlighted Sim (S+0x870).
     std::vector<int> contactList;
     bool contactsKnown = false;       // contactList is the game's (it agreed)
+    int contactsWait = 0;             // frames page 7 has shown 0 contacts the records do not agree with (the front end counts: the game builds its list over a few)
     InboxMsg incoming;                // page 1: the call's record (S+0x2C, the inbox entry's layout)
     bool customTones = false;         // page 4: a recorded ringtone slot (its name is not decoded)
     bool operator==(const PhoneState&) const = default;
@@ -310,7 +311,10 @@ struct GameState
 struct RamView { const u8* ram; u32 mask; };
 
 GameState ReadGameState(RamView ram);           // EU table
-// The shared record table's rows: Sim k (0..45) and item id (0..0x1FF); valid false out of range.
+// The shared record table's rows: Sim k (0..45) and item id (0..0x1FF). `valid` means the row
+// was readable (in range, in RAM), not that it is a real record: a slot the game left zeroed
+// reads valid with empty fields. Callers check the name id (a string id in the table) before
+// they use a row.
 RecordRow ReadSimRow(RamView ram, int k);
 RecordRow ReadItemRow(RamView ram, int id);
 // The record table's string ids (the same in every language): Sim k's name kSimNameBase + k (k

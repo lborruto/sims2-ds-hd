@@ -1,9 +1,11 @@
 // Checks RomData (romdata.*) on a synthetic ROM written by hand: a header, a name table, a
 // file table, an archive and a tiny string table of made-up text, a few hundred bytes, no
 // game data and no melonDS NDS. The valid ROM decodes; every truncation, oversize,
-// out-of-range or cyclic table is refused without a crash (run once under
-// -fsanitize=address,undefined too). Then the status bar's words (HudStringsFrom) from such a
-// table of made-up text.
+// out-of-range or cyclic table is refused without a crash (run once under UBSan and a hardened
+// libc++: -fsanitize=undefined -D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE; not
+// ASan). Then the compressions (LZ10, the game's own, the delta), the sprites' descriptors and
+// frames, the icon cache (its scaled copies, capped sizes) and the status bar's words
+// (HudStringsFrom) from such a table of made-up text.
 //   ninja -C build romdata_test && ./build/romdata_test
 #include <algorithm>
 #include <cstdio>
@@ -556,6 +558,7 @@ static void sprites()
         const SpriteFrame* odd = cache.Scaled(s, 1, 30, 18); // not a whole factor: the size asked, nothing outside, the corners' alpha kept
         CHECK(odd && odd->w == 30 && odd->h == 18 && odd->argb.size() == 540 && odd->argb[0] == Sprite::Colour(5) && (odd->argb[17 * 30 + 29] >> 24) == 0xFF);
         CHECK(!cache.Scaled(s, 0, 0, 8) && !cache.Scaled(s, 0, 8, -1) && !cache.Scaled(s, 0, 0) && !cache.Scaled(s, 3, 2) && !cache.Scaled(SpriteRef::Of(9), 0, 2));
+        CHECK(!cache.Scaled(s, 0, kMaxScaled + 1, 8) && !cache.Scaled(s, 0, 8, kMaxScaled + 1)); // (capped: never allocated)
         IconCache none(nullptr);
         CHECK(none.Frames(s) == 0 && !none.Frame(s, 0) && !none.Scaled(s, 0, 2));
         rom.DropArchive();

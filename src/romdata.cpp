@@ -264,6 +264,21 @@ bool RomData::LoadStrings(int language)
     return true;
 }
 
+std::string DropEscapes(const std::string& in)
+{
+    std::string s;
+    for (size_t i = 0; i < in.size(); i++)
+    {
+        if (in[i] == '{')
+        {
+            const size_t e = in.find('}', i);
+            if (e != std::string::npos && e - i <= 8) { i = e; continue; }
+        }
+        s += in[i];
+    }
+    return s;
+}
+
 std::string GameTextToUtf8(const std::string& raw) { return ToUtf8(raw); }
 
 std::string RomData::String(int id) const

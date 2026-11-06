@@ -32,20 +32,11 @@ bool StartsWith(const std::string& s, size_t at, const char* p)
     return s.size() >= at + n && s.compare(at, n, p) == 0;
 }
 
-// A string from the table without what is not text: RomData's {xx} / {F0xx} escapes dropped,
+// A string from the table without what is not text: RomData's escapes dropped (DropEscapes),
 // spaces (and no-break spaces) trimmed at both ends.
 std::string Clean(const std::string& in)
 {
-    std::string s;
-    for (size_t i = 0; i < in.size(); i++)
-    {
-        if (in[i] == '{')
-        {
-            const size_t e = in.find('}', i);
-            if (e != std::string::npos) { i = e; continue; }
-        }
-        s += in[i];
-    }
+    std::string s = DropEscapes(in);
     for (;;)
     {
         if (!s.empty() && (s.back() == ' ' || s.back() == '\n')) s.pop_back();

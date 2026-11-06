@@ -25,7 +25,7 @@ const SpriteFrame* IconCache::Frame(SpriteRef s, int frame)
 
 const SpriteFrame* IconCache::Scaled(SpriteRef s, int frame, int w, int h)
 {
-    if (w <= 0 || h <= 0) return nullptr;
+    if (w <= 0 || h <= 0 || w > kMaxScaled || h > kMaxScaled) return nullptr;
     const auto key = std::make_tuple(s, frame, w, h);
     auto it = scaled.find(key);
     if (it == scaled.end())

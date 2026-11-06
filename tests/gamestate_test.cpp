@@ -690,6 +690,8 @@ static void phone_gift_note()
     r.W8(kGb + 0x21DC + 0x2C * 2 + 0x4, 0x21);
     CHECK(ReadGameState(r.View()).town.phone.callAway);
     r.W16(kS + 0x864, 46); CHECK(!ReadGameState(r.View()).town.phone.valid);   // not a Sim
+    r.W16(kS + 0x864, 2); r.W8(kGb + 0x21DC + 0x2C * 2 + 0x4, 0x25); CHECK(!ReadGameState(r.View()).town.phone.valid);   // a place the strings have none of
+    r.W8(kGb + 0x21DC + 0x2C * 2 + 0x4, 0x1F); CHECK(ReadGameState(r.View()).town.phone.valid);
     r.W8(kS + 0x88, 7); r.W8(kS + 0x86C, 22);
     r.W8(kS + 0x86C, 65); CHECK(!ReadGameState(r.View()).town.phone.valid);
 
@@ -719,12 +721,16 @@ static void phone_gift_note()
 static void menus_random()
 {
     std::mt19937 rng(11);
-    const u32 tabs[] = {0, 1, 2, 3};
-    for (int round = 0; round < 400; round++)
+    // The tabs' screen and the Phone, Gift and Note screens (overlays 6 and 11) with their pages.
+    struct Kind { u32 vt; int overlay; };
+    const Kind kinds[] = {{0x0213203C, -1}, {0x0213203C, -1}, {0x0213203C, -1}, {0x0213203C, -1}, {0x02131F08, -1}, {0x0214ABA4, 6}, {0x0214A040, 11}};
+    for (int round = 0; round < 700; round++)
     {
-        Ram r = menus_ram(0x0213203C, -1, tabs[round % 4]);
+        const Kind k = kinds[round % 7];
+        Ram r = menus_ram(k.vt, k.overlay, (u32)(round % 4));
         r.W32(kS + 0x34, kT); r.W32(kT, 0x021321C4); r.W32(kS + 0x38, 0x0219E400); r.W32(0x0219E400, 0x0213232C);
         r.W32(kS + 0x3C, kTG); r.W32(kTG, 0x02132480); r.W32(kS + 0x40, kTR); r.W32(kTR, 0x02132580);
+        if (k.vt == 0x02131F08) r.W8(kS + 0x88, (u32)(round / 7 % 12));
         for (int i = 0; i < 400; i++)
         {
             const u32 areas[] = {kT, kTG, kTR, 0x0219E400, kE, kActor, kIface, kGb + 0x2BE8, kGb + 0x21DC, kGb + 0x303C, kS};
@@ -732,6 +738,7 @@ static void menus_random()
         }
         const GameState g = ReadGameState(r.View());   // must not crash or run out of bounds; counts stay capped
         CHECK(g.town.goals.entries.size() <= 44 && g.town.relations.sims.size() <= 24 && g.town.interact.actions.size() <= 4 && g.town.phone.inbox.size() <= 10);
+        CHECK(g.town.phone.contactList.size() <= 64);
     }
 }
 

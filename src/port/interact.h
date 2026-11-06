@@ -49,6 +49,8 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
                    const u32* bottom);
 // The row label as shown (amount: the game's @1 for it, -1 none).
 std::string InteractLabel(const RomData& rom, int labelId, int amount = -1);
+// A label's raw text without the bracket holding its @1 ("Pay (@1)" -> "Pay"): what an amount of 0 shows.
+std::string WithoutAmount(std::string raw);
 
 // (A check, --measure-menu) every word the tab can show, in rom's language, fitted to its HD
 // box: the verbs 1845-1951 in a row and in the A hint, the titles "Interact: <name>" and the

@@ -22,6 +22,9 @@ struct SpriteRef
     bool operator<(const SpriteRef& o) const { return std::tie(tiles, desc, pal) < std::tie(o.tiles, o.desc, o.pal); }
 };
 
+// The largest w or h IconCache::Scaled makes (a bad size is refused, not allocated).
+constexpr int kMaxScaled = 4096;
+
 class IconCache
 {
 public:
@@ -36,7 +39,7 @@ public:
     const SpriteFrame* Frame(SpriteRef s, int frame);
     // The same frame scaled to w x h through the kit's scaler (ImageItem's: nearest by the
     // whole factor, then bilinear; `scale` times its own size: nearest alone, every pixel a
-    // scale x scale block); null as above, or for an empty size.
+    // scale x scale block); null as above, or for an empty size or one past kMaxScaled (4096) either way.
     const SpriteFrame* Scaled(SpriteRef s, int frame, int w, int h);
     const SpriteFrame* Scaled(SpriteRef s, int frame, int scale);
 

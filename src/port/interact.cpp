@@ -58,9 +58,24 @@ constexpr int kLabelInset = 28;
 int LabelW() { return kInteractRowW - kLabelInset - kArrowIcon - 28; }
 }
 
+std::string WithoutAmount(std::string raw)
+{
+    const size_t at = raw.find("@1");
+    if (at == std::string::npos) return raw;
+    const size_t open = raw.rfind('(', at), close = raw.find(')', at);
+    if (open == std::string::npos || close == std::string::npos) return raw;
+    size_t from = open;
+    while (from > 0 && raw[from - 1] == ' ') from--;
+    raw.erase(from, close + 1 - from);
+    return raw;
+}
+
 std::string InteractLabel(const RomData& rom, int labelId, int amount)
 {
-    return labelId >= 0 ? MenuWords(rom, labelId, amount) : std::string();
+    if (labelId < 0) return {};
+    // An amount of 0 (a zeroed table entry) is not shown: "Pay" and not "Pay (§0)".
+    if (amount == 0) return MenuText(WithoutAmount(rom.String(labelId)));
+    return MenuWords(rom, labelId, amount);
 }
 
 void AddInteractView(MenuView& v, const InteractState& in, const RomData* rom)

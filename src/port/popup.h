@@ -37,7 +37,7 @@ constexpr int kPopBtnY = kPopBox.y + kPopBox.h - 104, kPopBtnH = 80;
 constexpr Rect kPopClose {kPopBox.x + (kPopBox.w - 320) / 2, kPopBtnY, 320, kPopBtnH};
 constexpr Rect kPopNo {kPopBox.x + 48, kPopBtnY, 260, kPopBtnH};
 constexpr Rect kPopYes {kPopBox.x + kPopBox.w - 308, kPopBtnY, 260, kPopBtnH};
-constexpr int kPopLayer = 3;   // above the screen beneath (0, 1) and the status bar (2)
+constexpr int kPopLayer = 4;   // above the screen beneath (0, 1), the status bar (2) and the phone's clock (3); the bar is lifted above it (kPopLayer + 1: never dimmed)
 constexpr u32 kPopCloseId = 0x700, kPopYesId = 0x701;
 
 // The game's button `index` of popup p (0: the X or the cross, 1: the tick), its centre on the
@@ -56,7 +56,7 @@ MenuView PopupViewOf(ScreenState s, const GameState& game, const RomData* rom = 
 
 // The HD view CONSOLE draws and the navigator drives on screen s: the popup's when one is up,
 // else the screen's own (the panel's tab, Give Gift, the Save slots, the phone, a note); valid
-// false: milestone 1's composition. ConsoleViewOf: without the strings' check (tests).
+// false: milestone 1's composition.
 MenuView ConsoleView(ScreenState s, const GameState* game, const RomData* rom);
 // The screen's own view, a popup or not (what a popup is drawn over).
 MenuView ScreenView(ScreenState s, const GameState* game, const RomData* rom);

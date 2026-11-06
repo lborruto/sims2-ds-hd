@@ -78,6 +78,16 @@ struct EUTable
         u32 noteVt, noteOverlay, noteText, noteNameIds[3];
         u32 stringMax;                                       // string ids stay below the table's count (3127 in the EU ROM)
     } menus;
+    // Milestone 3's popups' boxes and the phone's pages (research m3-town §3.4, §4.1).
+    struct
+    {
+        u32 popBoxY, popBoxW, popBoxTiles;                       // from P
+        u32 phMonth, phDay;                                      // from G
+        u32 phEnd8, phEnd1, phEnd6, phNext3, phEnd9, phMaidCost; // absolute statics
+        u32 phMaidText, phCaller, phPrank, phPrankText, phIncoming;   // from S
+        u32 guests, guestStride, guestSim, guestN, simState, simPlace, guestState, awayPlace, noSim;
+        u32 tones, toneStride, toneNamed, toneN;                 // from G
+    } x;
 };
 constexpr EUTable kEU = {
     0x02000000, 0x02139FA4,
@@ -141,26 +151,15 @@ constexpr EUTable kEU = {
         0x0214A040, 11, 0x2C, {0x4A8, 0x509, 0x657},
         3127,
     },
+    {
+        0x544, 0x550, 0x554,
+        0x47F4, 0x47F8,
+        0x0213E41C, 0x0213E420, 0x0213E424, 0x0213E428, 0x0213E42C, 0x0213E430,
+        0x862, 0x864, 0x866, 0x868, 0x2C,
+        0x2BC0, 8, 4, 5, 0x10, 0x4, 5, 0x21, 0x3F,
+        0x46DC, 0x40, 0xF, 3,
+    },
 };
-// Milestone 3's popups' boxes and the phone's pages (research m3-town §3.4, §4.1).
-struct EUExtra
-{
-    u32 popBoxY, popBoxW, popBoxTiles;                       // from P
-    u32 phMonth, phDay;                                      // from G
-    u32 phEnd8, phEnd1, phEnd6, phNext3, phEnd9, phMaidCost; // absolute statics
-    u32 phMaidText, phCaller, phPrank, phPrankText, phIncoming;   // from S
-    u32 guests, guestStride, guestSim, guestN, simState, simPlace, guestState, awayPlace, noSim;
-    u32 tones, toneStride, toneNamed, toneN;                 // from G
-};
-constexpr EUExtra kEUX = {
-    0x544, 0x550, 0x554,
-    0x47F4, 0x47F8,
-    0x0213E41C, 0x0213E420, 0x0213E424, 0x0213E428, 0x0213E42C, 0x0213E430,
-    0x862, 0x864, 0x866, 0x868, 0x2C,
-    0x2BC0, 8, 4, 5, 0x10, 0x4, 5, 0x21, 0x3F,
-    0x46DC, 0x40, 0xF, 3,
-};
-
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
 
 struct Reader
@@ -347,7 +346,7 @@ PopupState ReadPopup(const Reader& m, u32 P)
     if (!m.R32(P + t.popPressed, pressed) || !m.R8(P + t.popPressing, pressing) || pressing > 1) return p;
     if (!ReadCString(m, P + t.popText, t.popTextMax, p.text) || !ReadCString(m, P + t.popTitle, t.popTitleMax, p.title)) return PopupState{};
     u32 by, bw, bt;
-    if (!m.R32(P + kEUX.popBoxY, by) || !m.R32(P + kEUX.popBoxW, bw) || !m.R32(P + kEUX.popBoxTiles, bt)) return PopupState{};
+    if (!m.R32(P + kEU.x.popBoxY, by) || !m.R32(P + kEU.x.popBoxW, bw) || !m.R32(P + kEU.x.popBoxTiles, bt)) return PopupState{};
     // (Out of range: kept at 0, no button place: PopupButton says so.)
     if (by < 192 && bw >= 32 && bw <= 256 && bt >= 1 && bt <= 24) { p.boxY = (int)by; p.boxW = (int)bw; p.boxTiles = (int)bt; }
     p.valid = true;
@@ -652,10 +651,10 @@ PhoneState ReadPhone(const Reader& m, u32 S)
         v.inbox.push_back(b);
     }
     u32 month, day;
-    if (!m.R32(G + kEUX.phMonth, month) || !m.R32(G + kEUX.phDay, day) || month < 1 || month > 12 || day < 1 || day > 31) return PhoneState{};
+    if (!m.R32(G + kEU.x.phMonth, month) || !m.R32(G + kEU.x.phDay, day) || month < 1 || month > 12 || day < 1 || day > 31) return PhoneState{};
     v.month = (int)month; v.day = (int)day;
     // The page's own fields (each read on its page only: off it they are stale).
-    const u32 endOf[11] = {0, kEUX.phEnd1, 0, kEUX.phNext3, 0, 0, kEUX.phEnd6, 0, kEUX.phEnd8, kEUX.phEnd9, 0};
+    const u32 endOf[11] = {0, kEU.x.phEnd1, 0, kEU.x.phNext3, 0, 0, kEU.x.phEnd6, 0, kEU.x.phEnd8, kEU.x.phEnd9, 0};
     if (endOf[page])
     {
         u32 end;
@@ -665,13 +664,13 @@ PhoneState ReadPhone(const Reader& m, u32 S)
     if (page == 5)
     {
         u32 cost;
-        if (!m.R32(kEUX.phMaidCost, cost) || cost > 99999999) return PhoneState{};
+        if (!m.R32(kEU.x.phMaidCost, cost) || cost > 99999999) return PhoneState{};
         v.maidCost = (int)cost;
     }
     if (page == 6 || page == 8)
     {
         u32 r;
-        if (page == 6 ? !m.R16(S + kEUX.phMaidText, r) : !m.R32(S + kEUX.phPrankText, r)) return PhoneState{};
+        if (page == 6 ? !m.R16(S + kEU.x.phMaidText, r) : !m.R32(S + kEU.x.phPrankText, r)) return PhoneState{};
         if (r >= q.stringMax) return PhoneState{};
         v.reply = (int)r;
     }
@@ -679,53 +678,54 @@ PhoneState ReadPhone(const Reader& m, u32 S)
     if (page == 8 || page == 9)
     {
         u32 k;
-        if (!m.R16(S + kEUX.phCaller, k) || k >= t.maxSims) return PhoneState{};
+        if (!m.R16(S + kEU.x.phCaller, k) || k >= t.maxSims) return PhoneState{};
         v.caller = (int)k;
         if (page == 9)
         {
             u32 state, place, mood;
-            if (!simAt(k, kEUX.simState, state) || !simAt(k, kEUX.simPlace, place) || !simAt(k, t.simMood, mood) || mood > 4) return PhoneState{};
-            v.callAway = state == 0 || place == kEUX.awayPlace;
+            if (!simAt(k, kEU.x.simState, state) || !simAt(k, kEU.x.simPlace, place) || !simAt(k, t.simMood, mood) || mood > 4) return PhoneState{};
+            if (place >= 0x20 && place != kEU.x.awayPlace) return PhoneState{};   // (a place the string table has none of: the crop)
+            v.callAway = state == 0 || place == kEU.x.awayPlace;
             v.callMood = (int)mood; v.callPlace = (int)place;
         }
     }
     if (page == 1)
     {
-        if (!entry(S + kEUX.phIncoming, v.incoming)) return PhoneState{};
+        if (!entry(S + kEU.x.phIncoming, v.incoming)) return PhoneState{};
         v.caller = v.incoming.sender;
     }
     if (page == 7)
     {
         u32 prank;
-        if (!m.R8(S + kEUX.phPrank, prank) || prank > 1) return PhoneState{};
+        if (!m.R8(S + kEU.x.phPrank, prank) || prank > 1) return PhoneState{};
         v.prank = prank == 1;
         // The game's list (0x0205B…): the hotel's guests whose record says checked in (state 5),
         // then the Sims 0..23 met (flags bit 0) and not away (state 7, 8, 9). The game also asks
         // one more function (0x02077E08) not decoded: the list is kept only when it agrees with
         // the game's count and its highlighted Sim.
         std::vector<int> list;
-        for (u32 j = 0; j < kEUX.guestN; j++)
+        for (u32 j = 0; j < kEU.x.guestN; j++)
         {
             u32 sim, state;
-            if (!m.R8(G + kEUX.guests + kEUX.guestStride * j + kEUX.guestSim, sim)) return PhoneState{};
-            if (sim == kEUX.noSim || sim >= t.maxSims) continue;
-            if (simAt(sim, kEUX.simState, state) && state == kEUX.guestState) list.push_back((int)sim);
+            if (!m.R8(G + kEU.x.guests + kEU.x.guestStride * j + kEU.x.guestSim, sim)) return PhoneState{};
+            if (sim == kEU.x.noSim || sim >= t.maxSims) continue;
+            if (simAt(sim, kEU.x.simState, state) && state == kEU.x.guestState) list.push_back((int)sim);
         }
         for (u32 k = 0; k < 24; k++)
         {
             u32 flags, state;
-            if (!m.R8(G + kEU.simRecords + kEU.simRecordSize * k + t.simFlags, flags) || !simAt(k, kEUX.simState, state)) return PhoneState{};
+            if (!m.R8(G + kEU.simRecords + kEU.simRecordSize * k + t.simFlags, flags) || !simAt(k, kEU.x.simState, state)) return PhoneState{};
             if ((flags & 1) && (state < 7 || state > 9)) list.push_back((int)k);
         }
         const bool agrees = (int)list.size() == (int)contacts &&
-                            (row < (int)list.size() ? list[row] == (int)csim : row == (int)list.size() && csim == kEUX.noSim);
+                            (row < (int)list.size() ? list[row] == (int)csim : row == (int)list.size() && csim == kEU.x.noSim);
         if (agrees) { v.contactList = list; v.contactsKnown = true; }
     }
     if (page == 4)
-        for (u32 j = 0; j < kEUX.toneN; j++)
+        for (u32 j = 0; j < kEU.x.toneN; j++)
         {
             u32 named;
-            if (!m.R8(G + kEUX.tones + kEUX.toneStride * j + kEUX.toneNamed, named)) return PhoneState{};
+            if (!m.R8(G + kEU.x.tones + kEU.x.toneStride * j + kEU.x.toneNamed, named)) return PhoneState{};
             if (named) v.customTones = true;
         }
     for (int i = 0; i < 4; i++)
