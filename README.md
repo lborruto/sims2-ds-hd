@@ -33,7 +33,8 @@
   Detector, painting at the Art Gallery) keep their own playfield, big, in an HD frame: the game's name,
   its numbers (the cards' score board, the vacuum's earnings, the organs' health, the detector's charge
   and signal, your brush and color) and the buttons' hints, which follow what the game asks (the cards'
-  quit question, a clogged filter, an organ to carry). The pointing games have a pointer on the sticks.
+  quit question, a clogged filter, an organ to carry); the hints are our own words, translated into the
+  game's five languages. The pointing games have a pointer on the sticks.
   No mouse needed, though it works.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with

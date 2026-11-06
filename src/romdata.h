@@ -67,6 +67,9 @@ public:
     // for another language or a file that does not read as a string table.
     bool LoadStrings(int language);
     int StringCount() const { return (int)strings.size(); }
+    // The language the strings were loaded in, as the game's files have it: 1 English (also for
+    // 0 Japanese, which reads the English file), 2 French, 3 German, 4 Italian, 5 Spanish; -1 none.
+    int Language() const { return language; }
     int StringsFile() const { return stringsFile; } // the resource the strings came from (-1: none)
     // String id as UTF-8, its newlines kept: the game's 1-byte charset mapped (romdata.cpp),
     // an unknown byte shown as {xx}, a 2-byte escape (0xF0 and over) as {F0xx}; "" when id is
@@ -88,6 +91,7 @@ private:
     std::vector<u32> offsets;         // the table, and the archive's size after it: resource i is [offsets[i], offsets[i + 1])
     std::vector<std::string> strings; // UTF-8
     int stringsFile = -1;
+    int language = -1;
 };
 
 // A string from RomData::String without its escapes: the {xx} and {F0xx} it shows for a byte

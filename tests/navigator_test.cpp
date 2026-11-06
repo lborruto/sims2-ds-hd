@@ -462,6 +462,31 @@ static void cards_quit_question()
 
 // What RAM says on the cards (ActivityRam): a question the mouse opened is answered by A / B; the
 // end-of-turn message goes on with A (a touch in its box), the other buttons waiting.
+// The question answered by B while RAM shows it: RAM shows it one more frame, then not; the table
+// is the controller's again (X draws, A lifts card 1).
+static void cards_ram_answered()
+{
+    Rig r;
+    r.Frame(kCards);
+    int x = -1, y = -1;
+    ActivityRam ram;
+    ram.cards = true;
+    ram.quitAsk = true;
+    r.nav.SetActivityRam(ram);
+    r.Press(kCards, &PadState::b);
+    CHECK(r.Touched(x, y) && x == kCardsQuitNo.x && y == kCardsQuitNo.y);
+    r.Drain();
+    r.Frame(kCards);
+    ram.quitAsk = false;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kCards);
+    r.Press(kCards, &PadState::x);
+    CHECK(r.Touched(x, y) && x == HotspotsFor(kCards)[Index(kCards, "deck")].x);
+    r.Drain();
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y) && x == HotspotsFor(kCards)[Index(kCards, "card 1")].x && y == HotspotsFor(kCards)[Index(kCards, "card 1")].y);
+}
+
 static void cards_ram()
 {
     Rig r;
@@ -489,6 +514,14 @@ static void cards_ram()
     r.nav.SetActivityRam(ram);
     r.Press(kCards, &PadState::b);
     CHECK(r.Touched(x, y) && x == kCardsQuitNo.x && y == kCardsQuitNo.y);
+    r.Drain();
+    // RAM still shows it one more frame after the answer, then not: the table again (X draws).
+    r.Frame(kCards);
+    ram.quitAsk = false;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kCards);
+    r.Press(kCards, &PadState::x);
+    CHECK(r.Touched(x, y) && x == HotspotsFor(kCards)[Index(kCards, "deck")].x);
     r.Drain();
     // Nothing known (another ROM): milestone 1's way, A on the focused card.
     r.nav.SetActivityRam({});
@@ -2065,6 +2098,7 @@ int main()
     cards_draw_lift_play_discard();
     cards_quit_question();
     cards_ram();
+    cards_ram_answered();
     vacuum_blows_drives_and_grabs();
     pointer_moves();
     autopsy_scheme();

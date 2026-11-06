@@ -7,7 +7,14 @@
 // controller's hints as the kit's chips, for the minigame's scheme (activities.h). What the game
 // says changes the hints: the cards' quit question (A its "Yes", B its "No"), the end-of-turn
 // message (A goes on), the vacuum's clog (the blow's hint lit red).
+// The hints and the side panels' labels the game has no word for are the port's own, translated
+// into the game's five languages (port/ownwords.*, by RomData::Language).
 // Without the game's strings or RAM: milestone 1's activity layout (console.cpp, the 5 x 7 hints).
+// With them but a minigame's own part of RAM not reading (its `valid` false): the frame stays
+// (playfield, top screen, title, prompts as with nothing known) and the side panel is left out.
+// The cards' help ("?" on the table, tapped by A on it or the mouse) sets only RAM's `box`: the
+// deck's thumbnail is hidden under it and the prompts stay the table's (its pages are the game's
+// own, in the playfield; not redrawn).
 // Today: Keelhaulin' Cards, the vacuum and the social reaction games (their schemes from
 // milestone 1: activities.*), and the pointing games (milestone 6): Alien Autopsy, the Metal
 // Detector and the Art Gallery's painting, their pointer drawn over the playfield (a ring, gold

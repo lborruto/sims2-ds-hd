@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "port/menuview.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "port/popup.h"
@@ -43,56 +44,49 @@ Token Sep(const char* s) { return {false, Button::A, s}; }
 
 std::string Words(const RomData& rom, int id) { return MenuWords(rom, id); }
 
-// The port's own words, where the game's table has none: one table per game, so that each can
-// move into the five-language table whole. (English today, whatever --language says.)
-struct PointWords
-{
-    const char* point = "Point";
-    const char* slow = "Slow";
-};
+// The port's own words, where the game's table has none (port/ownwords.*: in the game's
+// language), gathered per game.
+const char* Own(const RomData& rom, OwnWordId id, int k = 0) { return OwnWord(&rom, (OwnWordId)((int)id + k)); }
 struct AutopsyWords
 {
-    const char* tools[3] = {"Laser", "Hand", "Tweezers"};
-    const char* use[3] = {"Hold: cut", "Hold: lift an organ", "Hold: pick a parasite"};
-    const char* carry[2] = {"To the tray", "To the flask"};
-    const char* tear = "Hold and pull: tear it open";
-    const char* quit = "Quit";
-    const char* quitAgain = "Again: quit, the earnings lost";
-    const char* specimen = "Specimen @1 of 2";
-    const char* earnings = "Earnings";
-    const char* organ = "Organ @1";
-    const char* freed = "Freed";
-    const char* removed = "Removed";
-    const char* destroyed = "Destroyed";
-    const char* parasites = "Parasites";
-    const char* eating = "@1 eating";
+    const char *tools[3], *use[3], *carry[2], *tear, *quit, *quitAgain, *specimen, *organ, *freed, *removed, *destroyed, *parasites, *eating;
+    explicit AutopsyWords(const RomData& r)
+    {
+        for (int i = 0; i < 3; i++) { tools[i] = Own(r, OwnWordId::AutopsyLaser, i); use[i] = Own(r, OwnWordId::AutopsyCut, i); }
+        for (int i = 0; i < 2; i++) carry[i] = Own(r, OwnWordId::AutopsyToTray, i);
+        tear = Own(r, OwnWordId::AutopsyTear);
+        quit = Own(r, OwnWordId::AutopsyQuit);
+        quitAgain = Own(r, OwnWordId::AutopsyQuitAgain);
+        specimen = Own(r, OwnWordId::AutopsySpecimen);
+        organ = Own(r, OwnWordId::AutopsyOrgan);
+        freed = Own(r, OwnWordId::AutopsyFreed);
+        removed = Own(r, OwnWordId::AutopsyRemoved);
+        destroyed = Own(r, OwnWordId::AutopsyDestroyed);
+        parasites = Own(r, OwnWordId::AutopsyParasites);
+        eating = Own(r, OwnWordId::AutopsyEating);
+    }
 };
 struct DetectorWords
 {
-    const char* walk = "Walk";
-    const char* dig = "Dig";
-    const char* depth = "Depth";
-    const char* powerOff = "Power off";
-    const char* charge = "Charge";
-    const char* signal = "Signal";
-    const char* none = "None";
+    const char *walk, *dig, *depth, *powerOff, *charge, *signal, *none;
+    explicit DetectorWords(const RomData& r)
+        : walk(Own(r, OwnWordId::DetectorWalk)), dig(Own(r, OwnWordId::DetectorDig)), depth(Own(r, OwnWordId::DetectorDepth)),
+          powerOff(Own(r, OwnWordId::DetectorPowerOff)), charge(Own(r, OwnWordId::DetectorCharge)), signal(Own(r, OwnWordId::DetectorSignal)),
+          none(Own(r, OwnWordId::DetectorNone))
+    {
+    }
 };
 struct ArtWords
 {
-    const char* paint = "Hold: paint";
-    const char* tool = "Tool";
-    const char* colour = "Next color";
-    const char* undo = "Undo";
-    const char* done = "Done";
-    const char* tools[6] = {"Pencil", "Eraser", "Line", "Bucket", "Rectangle", "Filled rectangle"};   // the game's tool 0..5
-    const char* sizes[3] = {"small", "medium", "large"};
-    const char* colourOf = "Color @1 of 15";
-    const char* page = "Palette @1 of 16";
+    const char *paint, *tool, *colour, *undo, *done, *tools[6], *sizes[3], *colourOf, *page;   // tools: the game's tool 0..5
+    explicit ArtWords(const RomData& r)
+        : paint(Own(r, OwnWordId::ArtPaint)), tool(Own(r, OwnWordId::ArtTool)), colour(Own(r, OwnWordId::ArtNextColour)), undo(Own(r, OwnWordId::ArtUndo)),
+          done(Own(r, OwnWordId::ArtDone)), colourOf(Own(r, OwnWordId::ArtColourOf)), page(Own(r, OwnWordId::ArtPage))
+    {
+        for (int i = 0; i < 6; i++) tools[i] = Own(r, OwnWordId::ArtPencil, i);
+        for (int i = 0; i < 3; i++) sizes[i] = Own(r, OwnWordId::ArtSmall, i);
+    }
 };
-constexpr PointWords kPointWords;
-constexpr AutopsyWords kAutopsyWords;
-constexpr DetectorWords kDetectorWords;
-constexpr ArtWords kArtWords;
 
 // A port word with its @1 filled.
 std::string With(const char* w, int n)
@@ -103,8 +97,8 @@ std::string With(const char* w, int n)
 }
 
 // The pointer's hints, shared by the pointing games: a stick (either) points, LT slows it.
-HdHint PointHint() { return {{C(Button::LStick), Sep("/"), C(Button::RStick)}, kPointWords.point}; }
-HdHint SlowHint() { return {{C(Button::LT)}, kPointWords.slow}; }
+HdHint PointHint(const RomData& rom) { return {{C(Button::LStick), Sep("/"), C(Button::RStick)}, Own(rom, OwnWordId::Point)}; }
+HdHint SlowHint(const RomData& rom) { return {{C(Button::LT)}, Own(rom, OwnWordId::Slow)}; }
 
 // The prompt bar's hints: the scheme of activities.cpp, and what the game says now. quitArmed:
 // the autopsy's first B / Start (a second quits).
@@ -115,10 +109,10 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     case Screen::Autopsy:
     {
         const AutopsyState& a = game.minigame.autopsy;
-        const AutopsyWords& w = kAutopsyWords;
+        const AutopsyWords w(rom);
         if (quitArmed) return {{{C(Button::B)}, w.quitAgain, true}};
         const int tool = a.valid ? std::clamp(a.tool, 0, 2) : 0;
-        std::vector<HdHint> h {PointHint(), SlowHint()};
+        std::vector<HdHint> h {PointHint(rom), SlowHint(rom)};
         if (a.valid && (a.phase == 5 || a.phase == 6)) h.push_back({{C(Button::A)}, w.tear});
         else if (a.valid && (a.sub == 3 || a.sub == 6)) h.push_back({{C(Button::LB)}, w.carry[a.sub == 3 ? 0 : 1], true});
         else
@@ -135,7 +129,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     }
     case Screen::Detector:
     {
-        const DetectorWords& w = kDetectorWords;
+        const DetectorWords w(rom);
         return {{{C(Button::LStick), Sep("/"), C(Button::DPad)}, w.walk},
                 {{C(Button::A)}, w.dig, game.minigame.detector.valid && game.minigame.detector.inRange},
                 {{C(Button::LB), C(Button::RB), Sep("/"), C(Button::RStick)}, w.depth},
@@ -143,28 +137,28 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     }
     case Screen::Art:
     {
-        const ArtWords& w = kArtWords;
+        const ArtWords w(rom);
         const PopupState& p = game.town.popup;
         if (p.valid && p.state == 2 && p.kind == 2) return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
-        return {PointHint(), SlowHint(), {{C(Button::A)}, w.paint}, {{C(Button::LB), C(Button::RB)}, w.tool},
+        return {PointHint(rom), SlowHint(rom), {{C(Button::A)}, w.paint}, {{C(Button::LB), C(Button::RB)}, w.tool},
                 {{C(Button::X)}, w.colour}, {{C(Button::Y)}, w.undo}, {{C(Button::B)}, w.done}};
     }
     case Screen::Cards:
     {
         const CardsState& k = game.minigame.cards;
         if (k.valid && k.quitAsk) return {{{C(Button::A)}, Words(rom, kStrMgYes)}, {{C(Button::B)}, Words(rom, kStrMgNo)}};
-        if (k.valid && k.message) return {{{C(Button::A)}, "Continue"}};
-        return {{{C(Button::DPad)}, "Choose a card"}, {{C(Button::A)}, "Pick up, again to play"}, {{C(Button::X)}, "Draw a card"},
-                {{C(Button::Y)}, "Discard"}, {{C(Button::B)}, Words(rom, kStrMgQuit)}};
+        if (k.valid && k.message) return {{{C(Button::A)}, Own(rom, OwnWordId::CardsContinue)}};
+        return {{{C(Button::DPad)}, Own(rom, OwnWordId::CardsChoose)}, {{C(Button::A)}, Own(rom, OwnWordId::CardsPickUp)}, {{C(Button::X)}, Own(rom, OwnWordId::CardsDraw)},
+                {{C(Button::Y)}, Own(rom, OwnWordId::CardsDiscard)}, {{C(Button::B)}, Words(rom, kStrMgQuit)}};
     }
     case Screen::Vacuum:
     {
         const bool clog = game.minigame.vacuum.valid && game.minigame.vacuum.clogged;
-        return {{{C(Button::LStick)}, "Drive"}, {{C(Button::RStick), Sep("/"), C(Button::X), Sep("+"), C(Button::DPad)}, "Move the hand"},
-                {{C(Button::A)}, "Grab, drag to the box"}, {{C(Button::Y)}, clog ? "Blow: unclog!" : "Blow: unclog", clog}};
+        return {{{C(Button::LStick)}, Own(rom, OwnWordId::VacuumDrive)}, {{C(Button::RStick), Sep("/"), C(Button::X), Sep("+"), C(Button::DPad)}, Own(rom, OwnWordId::VacuumHand)},
+                {{C(Button::A)}, Own(rom, OwnWordId::VacuumGrab)}, {{C(Button::Y)}, Own(rom, clog ? OwnWordId::VacuumBlowNow : OwnWordId::VacuumBlow), clog}};
     }
     case Screen::Social:
-        return {{{C(Button::DPadL), C(Button::DPadU), C(Button::DPadR)}, "Answer"}, {{C(Button::A)}, "The focused answer"}};
+        return {{{C(Button::DPadL), C(Button::DPadU), C(Button::DPadR)}, Own(rom, OwnWordId::SocialAnswer)}, {{C(Button::A)}, Own(rom, OwnWordId::SocialAgain)}};
     default: return {};
     }
 }
@@ -179,17 +173,6 @@ std::string Title(Screen s, const RomData& rom)
     return "";
 }
 
-void Line(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour, int layer = 1)
-{
-    const FittedText f = FitLine(s, size, minSize, r.w, w);
-    UiItem t = TextItem(r, f.text, f.size, a, w);
-    t.wrap = false;
-    t.middle = true;
-    t.colour = colour;
-    t.layer = layer;
-    c.ui.push_back(t);
-}
-
 // The board's columns in the cards' well: the name, its cards, its score (from the right).
 constexpr int kColW = 78;
 
@@ -202,8 +185,8 @@ int CardsValues(Composition& c, int y, const CardsState& k, const RomData& rom, 
     c.ui.push_back(well);
     const int ix = x + 12, iw = w - 24, cx = ix + iw - 2 * kColW, sx = ix + iw - kColW;
     int yy = y + 10;
-    Line(c, {cx, yy, kColW - 8, head}, Words(rom, kStrMgCardsCount), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
-    Line(c, {sx, yy, kColW - 8, head}, Words(rom, kStrMgScore), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
+    PanelText(c, {cx, yy, kColW - 8, head}, Words(rom, kStrMgCardsCount), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
+    PanelText(c, {sx, yy, kColW - 8, head}, Words(rom, kStrMgScore), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
     yy += head;
     const std::string names[2] = {k.name.empty() ? Words(rom, kStrMgPlayer) : k.name, Words(rom, kStrMgOpponent)};
     const int cards[2] = {k.hand, k.opponent}, scores[2] = {k.score, k.opponentScore};
@@ -215,20 +198,20 @@ int CardsValues(Composition& c, int y, const CardsState& k, const RomData& rom, 
         bar.radius = 8;
         bar.layer = 0;
         c.ui.push_back(bar);
-        Line(c, {ix + 6, yy, cx - ix - 12, row}, names[i], kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
-        Line(c, {cx, yy, kColW - 8, row}, std::to_string(cards[i]), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, 0xFFFFFFFF);
-        Line(c, {sx, yy, kColW - 8, row}, std::to_string(scores[i]), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, kValueColour);
+        PanelText(c, {ix + 6, yy, cx - ix - 12, row}, names[i], kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+        PanelText(c, {cx, yy, kColW - 8, row}, std::to_string(cards[i]), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, 0xFFFFFFFF);
+        PanelText(c, {sx, yy, kColW - 8, row}, std::to_string(scores[i]), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, kValueColour);
     }
     yy += 6;
     // The deck: the game's own card back, a thumbnail, and how many are left.
     const int tw = 24, th = 35;
     // (Not while a box of the game's lies over it: the help, the question, the message.)
     if (bottom && !k.box) c.ui.push_back(ImageItem({ix + 4, yy + (last - th) / 2, tw, th}, bottom, SW, SH, kMgDeckFrom));
-    Line(c, {ix + 4 + tw + 10, yy, 70, last}, std::to_string(k.deck), kMgValueSize, kMgValueSize, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+    PanelText(c, {ix + 4 + tw + 10, yy, 70, last}, std::to_string(k.deck), kMgValueSize, kMgValueSize, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
     // The treasure chest's points.
     const int tx = ix + 4 + tw + 10 + 70;
-    Line(c, {tx, yy, sx - tx - 4, last}, Words(rom, kStrMgTreasure), kMgHeadSize + 2, 13, Align::Right, Weight::Bold, kHeadColour);
-    Line(c, {sx, yy, kColW - 8, last}, std::to_string(k.treasure), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, kValueColour);
+    PanelText(c, {tx, yy, sx - tx - 4, last}, Words(rom, kStrMgTreasure), kMgHeadSize + 2, 13, Align::Right, Weight::Bold, kHeadColour);
+    PanelText(c, {sx, yy, kColW - 8, last}, std::to_string(k.treasure), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, kValueColour);
     return h;
 }
 
@@ -250,9 +233,9 @@ int EarningsValues(Composition& c, int y, int index, int amount, const RomData& 
     const bool beside = FitLine(label, kMgValueSize - 2, kMgValueMin, w - 28 - vw - 10).fits;
     const int h = beside ? 48 : 80;
     c.ui.push_back(WellItem({x, y, w, h}));
-    if (beside) Line(c, {x + 14, y, w - 28 - vw - 10, h}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    else Line(c, {x + 14, y + 6, w - 28, 34}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    Line(c, {x + w - 14 - vw, beside ? y : y + 40, vw, beside ? h : 34}, vf.text, vf.size, vf.size, Align::Right, Weight::ExtraBold, kValueColour);
+    if (beside) PanelText(c, {x + 14, y, w - 28 - vw - 10, h}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    else PanelText(c, {x + 14, y + 6, w - 28, 34}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelText(c, {x + w - 14 - vw, beside ? y : y + 40, vw, beside ? h : 34}, vf.text, vf.size, vf.size, Align::Right, Weight::ExtraBold, kValueColour);
     return h;
 }
 
@@ -278,14 +261,15 @@ u32 Health(float f) { return f > 2 / 3.0f ? kMeterGreen : f > 1 / 3.0f ? kMeterY
 
 constexpr int kMgRow = 30;        // a values' row
 constexpr int kMgLabelW = 118;    // the label's column before a meter
+constexpr int kArtLabelW = 124;   // the painting's "Tool" label
 
 // One row: the label at the left, a meter (frac >= 0) after it, the value at the right.
 void MeterRow(Composition& c, int x, int y, int w, const std::string& label, float frac, u32 colour, const std::string& value, u32 valueColour)
 {
     const int vw = 96;
-    Line(c, {x, y, kMgLabelW - 8, kMgRow}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelText(c, {x, y, kMgLabelW - 8, kMgRow}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
     if (frac >= 0) Meter(c, {x + kMgLabelW, y + 7, w - kMgLabelW - vw - 8, kMgRow - 14}, frac, colour);
-    Line(c, {x + w - vw, y, vw, kMgRow}, value, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, valueColour);
+    PanelText(c, {x + w - vw, y, vw, kMgRow}, value, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, valueColour);
 }
 
 // A percentage as shown.
@@ -295,13 +279,13 @@ std::string Percent(long long n, long long of) { return std::to_string(of > 0 ? 
 // health (or removed / destroyed; freed: the hand can lift it) and the parasites.
 int AutopsyValues(Composition& c, int y, const AutopsyState& a, const RomData& rom)
 {
-    const AutopsyWords& w = kAutopsyWords;
+    const AutopsyWords w(rom);
     const int organs = a.specimen == 0 ? 3 : 2, h = 10 + (2 + organs) * kMgRow + 10;
     const int x = kMgInnerX, wd = kMgInnerW, ix = x + 12, iw = wd - 24;
     c.ui.push_back(WellItem({x, y, wd, h}));
     int yy = y + 10;
-    Line(c, {ix, yy, iw - 110, kMgRow}, With(w.specimen, a.specimen + 1), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
-    Line(c, {ix + iw - 110, yy, 110, kMgRow}, MenuWords(rom, kStrMgMoney, a.earnings), kMgValueSize, kMgValueMin, Align::Right, Weight::ExtraBold, kValueColour);
+    PanelText(c, {ix, yy, iw - 110, kMgRow}, With(w.specimen, a.specimen + 1), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+    PanelText(c, {ix + iw - 110, yy, 110, kMgRow}, MenuWords(rom, kStrMgMoney, a.earnings), kMgValueSize, kMgValueMin, Align::Right, Weight::ExtraBold, kValueColour);
     yy += kMgRow;
     for (int i = 0; i < organs; i++, yy += kMgRow)
     {
@@ -314,8 +298,8 @@ int AutopsyValues(Composition& c, int y, const AutopsyState& a, const RomData& r
     int eating = 0;
     for (const AutopsyParasite& p : a.parasites) eating += p.eating;
     const std::string pv = std::to_string(a.parasites.size()) + (eating ? " (" + With(w.eating, eating) + ")" : "");
-    Line(c, {ix, yy, kMgLabelW + 20, kMgRow}, w.parasites, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    Line(c, {ix + kMgLabelW + 20, yy, iw - kMgLabelW - 20, kMgRow}, pv, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
+    PanelText(c, {ix, yy, kMgLabelW + 20, kMgRow}, w.parasites, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelText(c, {ix + kMgLabelW + 20, yy, iw - kMgLabelW - 20, kMgRow}, pv, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
          eating ? kBadColour : 0xFFFFFFFF);
     return h;
 }
@@ -338,7 +322,7 @@ int EarningsValues(Composition& c, int y, int index, int amount, const RomData& 
 // the depth matches, the scope's calm), the depth (the slider), what the card found, the earnings.
 int DetectorValues(Composition& c, int y, const DetectorState& d, const RomData& rom)
 {
-    const DetectorWords& w = kDetectorWords;
+    const DetectorWords w(rom);
     const int x = kMgInnerX, wd = kMgInnerW, ix = x + 12, iw = wd - 24, h = 10 + 4 * kMgRow + 10;
     c.ui.push_back(WellItem({x, y, wd, h}));
     int yy = y + 10;
@@ -354,8 +338,8 @@ int DetectorValues(Composition& c, int y, const DetectorState& d, const RomData&
     yy += kMgRow;
     // The game's card: "Found:" and the find (while it is up).
     const std::string found = d.card ? FindName(rom, d.findType) : "";
-    Line(c, {ix, yy, kMgLabelW - 8, kMgRow}, Words(rom, kStrMgFound), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    Line(c, {ix + kMgLabelW, yy, iw - kMgLabelW, kMgRow}, found.empty() ? "\xE2\x80\x94" : found, kMgValueSize - 2, kMgValueMin, Align::Right,
+    PanelText(c, {ix, yy, kMgLabelW - 8, kMgRow}, Words(rom, kStrMgFound), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelText(c, {ix + kMgLabelW, yy, iw - kMgLabelW, kMgRow}, found.empty() ? "\xE2\x80\x94" : found, kMgValueSize - 2, kMgValueMin, Align::Right,
          Weight::ExtraBold, found.empty() ? kHeadColour : kValueColour);
     return h + 8 + EarningsValues(c, y + h + 8, 3, d.earnings, rom);
 }
@@ -364,14 +348,14 @@ int DetectorValues(Composition& c, int y, const DetectorState& d, const RomData&
 // colours) and the palette page.
 int ArtValues(Composition& c, int y, const ArtState& a, const RomData& rom)
 {
-    const ArtWords& w = kArtWords;
+    const ArtWords w(rom);
     const int x = kMgInnerX, wd = kMgInnerW, ix = x + 12, iw = wd - 24, h = 10 + 3 * kMgRow + 10;
     c.ui.push_back(WellItem({x, y, wd, h}));
     int yy = y + 10;
     std::string tool = w.tools[std::clamp(a.tool, 0, 5)];
     if (a.tool == 0 || a.tool == 1) tool += std::string(" (") + w.sizes[std::clamp(a.brush, 0, 2)] + ")";
-    Line(c, {ix, yy, 80, kMgRow}, w.tool, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    Line(c, {ix + 80, yy, iw - 80, kMgRow}, tool, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, kValueColour);
+    PanelText(c, {ix, yy, kArtLabelW, kMgRow}, w.tool, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelText(c, {ix + kArtLabelW, yy, iw - kArtLabelW, kMgRow}, tool, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, kValueColour);
     yy += kMgRow;
     // The colour: the page's colour swatch + 1 (resource 6028: 16 pages of 16).
     std::vector<u8> res = rom.Resource(kResArtColours), raw;
@@ -391,10 +375,10 @@ int ArtValues(Composition& c, int y, const ArtState& a, const RomData& rom)
         c.ui.push_back(sw);
         sx = ix + 52;
     }
-    Line(c, {sx, yy, ix + iw - sx, kMgRow}, With(w.colourOf, std::clamp(a.swatch, 0, 14) + 1), kMgValueSize - 2, kMgValueMin, Align::Left,
+    PanelText(c, {sx, yy, ix + iw - sx, kMgRow}, With(w.colourOf, std::clamp(a.swatch, 0, 14) + 1), kMgValueSize - 2, kMgValueMin, Align::Left,
          Weight::ExtraBold, 0xFFFFFFFF);
     yy += kMgRow;
-    Line(c, {ix, yy, iw, kMgRow}, With(w.page, std::clamp(a.page, 0, 15) + 1), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold,
+    PanelText(c, {ix, yy, iw, kMgRow}, With(w.page, std::clamp(a.page, 0, 15) + 1), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold,
          0xFFFFFFFF);
     return h;
 }
@@ -424,10 +408,10 @@ void AddPointer(Composition& c, const PointerView& p)
 
 // The social answers (the side panel): "match the gesture", then the D-pad's direction and the
 // game's own label for each (a live crop 2x).
-int SocialAnswers(Composition& c, int y, const u32* bottom)
+int SocialAnswers(Composition& c, int y, const u32* bottom, const RomData& rom)
 {
     const int x = kMgInnerX, w = kMgInnerW;
-    Line(c, {x + 4, y, w - 8, 34}, "Match the gesture", kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+    PanelText(c, {x + 4, y, w - 8, 34}, Own(rom, OwnWordId::SocialMatch), kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
     int yy = y + 38;
     const Button dir[3] = {Button::DPadL, Button::DPadU, Button::DPadR};
     for (int i = 0; i < 3; i++, yy += kMgAnswerRow)
@@ -491,14 +475,14 @@ void AddPrompts(Composition& c, const std::vector<HdHint>& hints)
             else
             {
                 const int sw = (int)std::ceil(TextWidth(t.sep, size, Weight::ExtraBold));
-                Line(c, {x, y, sw + 2, h}, t.sep, size, size, Align::Left, Weight::ExtraBold, kHeadColour);
+                PanelText(c, {x, y, sw + 2, h}, t.sep, size, size, Align::Left, Weight::ExtraBold, kHeadColour);
                 x += sw + 6;
             }
         }
         if (!hint.text.empty())
         {
             const int tw = (int)std::ceil(TextWidth(hint.text, size, Weight::ExtraBold));
-            Line(c, {x + 4, y, tw + 2, h}, hint.text, size, size, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+            PanelText(c, {x + 4, y, tw + 2, h}, hint.text, size, size, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
             x += 4 + tw;
         }
         x += kMgPromptGap;
@@ -548,7 +532,7 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
         const FittedText t = FitLine(title, kMgTitleSize, kMgTitleMin, kMgTitleMaxW - 48, Weight::ExtraBold);
         const int w = std::min(kMgTitleMaxW, (int)std::ceil(TextWidth(t.text, t.size, Weight::ExtraBold)) + 48);
         c.ui.push_back(PanelItem({kMgTitleX, kMgTitleY, w, kMgTitleH}));
-        Line(c, {kMgTitleX + 24, kMgTitleY, w - 48, kMgTitleH}, t.text, t.size, t.size, Align::Left, Weight::ExtraBold, 0xFFFFFFFF, 0);
+        PanelText(c, {kMgTitleX + 24, kMgTitleY, w - 48, kMgTitleH}, t.text, t.size, t.size, Align::Left, Weight::ExtraBold, 0xFFFFFFFF, 0);
     }
 
     int y = topTo.y + topTo.h + 6;
@@ -565,7 +549,7 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
     int content = 0;
     if (s.screen == Screen::Cards && game.minigame.cards.valid) content = CardsValues(c, y + kMgPad, game.minigame.cards, rom, bottom);
     else if (s.screen == Screen::Vacuum && game.minigame.vacuum.valid) content = VacuumValues(c, y + kMgPad, game.minigame.vacuum, rom);
-    else if (s.screen == Screen::Social) content = SocialAnswers(c, y + kMgPad, bottom);
+    else if (s.screen == Screen::Social) content = SocialAnswers(c, y + kMgPad, bottom, rom);
     else if (s.screen == Screen::Autopsy && game.minigame.autopsy.valid) content = AutopsyValues(c, y + kMgPad, game.minigame.autopsy, rom);
     else if (s.screen == Screen::Detector && game.minigame.detector.valid) content = DetectorValues(c, y + kMgPad, game.minigame.detector, rom);
     else if (s.screen == Screen::Art && game.minigame.art.valid) content = ArtValues(c, y + kMgPad, game.minigame.art, rom);
@@ -575,6 +559,71 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
     AddPrompts(c, Hints(s.screen, game, rom, pointer && pointer->quitArmed));
     if (pointer && pointer->shown && IsPointing(s.screen)) AddPointer(c, *pointer);
     SortUi(c.ui);
+}
+
+// Every prompt bar each minigame can show (each state its hints follow), in rom's language, as
+// AddPrompts lays it out: shrunk when it does not hold at kMgHintSize, cut when it does not hold
+// at kMgHintMin either; and the port's own words of the side panels in their boxes.
+static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
+{
+    const Measurer me {m};
+    constexpr int kOwn = 9000;   // a port word's id in the tallies: kOwn + its OwnWordId
+    auto id = [](OwnWordId w) { return kOwn + (int)w; };
+    const int avail = kMgPrompt.w - 2 * kMgPromptPad;
+    auto total = [](const std::vector<HdHint>& hs, float size) {
+        int t = (int)(hs.size() - 1) * kMgPromptGap;
+        for (const HdHint& h : hs) t += HintWidth(h, size);
+        return t;
+    };
+    std::vector<std::pair<Screen, GameState>> states;
+    auto add = [&](Screen sc, auto&& set) {
+        GameState g;
+        g.valid = true;
+        set(g);
+        states.push_back({sc, g});
+    };
+    add(Screen::Cards, [](GameState&) {});
+    add(Screen::Cards, [](GameState& g) { g.minigame.cards.valid = g.minigame.cards.quitAsk = true; });
+    add(Screen::Cards, [](GameState& g) { g.minigame.cards.valid = g.minigame.cards.message = true; });
+    add(Screen::Vacuum, [](GameState&) {});
+    add(Screen::Vacuum, [](GameState& g) { g.minigame.vacuum.valid = g.minigame.vacuum.clogged = true; });
+    add(Screen::Social, [](GameState&) {});
+    for (int tool = 0; tool < 3; tool++)
+        add(Screen::Autopsy, [tool](GameState& g) {
+            g.minigame.autopsy.valid = g.minigame.autopsy.handAlert = g.minigame.autopsy.tweezersAlert = true;
+            g.minigame.autopsy.tool = tool;
+        });
+    add(Screen::Autopsy, [](GameState& g) { g.minigame.autopsy.valid = true; g.minigame.autopsy.phase = 5; });
+    add(Screen::Autopsy, [](GameState& g) { g.minigame.autopsy.valid = true; g.minigame.autopsy.sub = 3; });
+    add(Screen::Autopsy, [](GameState& g) { g.minigame.autopsy.valid = true; g.minigame.autopsy.sub = 6; });
+    add(Screen::Detector, [](GameState& g) { g.minigame.detector.valid = g.minigame.detector.inRange = true; });
+    add(Screen::Art, [](GameState& g) { g.minigame.art.valid = true; });
+    add(Screen::Art, [](GameState& g) { g.town.popup.valid = true; g.town.popup.state = 2; g.town.popup.kind = 2; });
+    std::vector<std::vector<HdHint>> bars;
+    for (const auto& [sc, g] : states) bars.push_back(Hints(sc, g, rom));
+    bars.push_back(Hints(Screen::Autopsy, states.back().second, rom, true));   // the autopsy's quit asked
+    for (const std::vector<HdHint>& hs : bars) me.Note(kOwn, total(hs, kMgHintSize) > avail, total(hs, kMgHintMin) <= avail);
+    // The side panels' own words (their boxes as the Build functions give them).
+    const float vs = kMgValueSize - 2;
+    const int iw = kMgInnerW - 24;
+    for (int i = 1; i <= 2; i++) me.Line(id(OwnWordId::AutopsySpecimen), With(Own(rom, OwnWordId::AutopsySpecimen), i), vs, kMgValueMin, iw - 110);
+    me.Line(id(OwnWordId::AutopsyOrgan), With(Own(rom, OwnWordId::AutopsyOrgan), 3), vs, kMgValueMin, kMgLabelW - 8, Weight::Bold);
+    for (OwnWordId w : {OwnWordId::AutopsyFreed, OwnWordId::AutopsyRemoved, OwnWordId::AutopsyDestroyed, OwnWordId::DetectorNone})
+        me.Line(id(w), Own(rom, w), vs, kMgValueMin, 96);
+    me.Line(id(OwnWordId::AutopsyParasites), Own(rom, OwnWordId::AutopsyParasites), vs, kMgValueMin, kMgLabelW + 20, Weight::Bold);
+    me.Line(id(OwnWordId::AutopsyEating), "8 (" + With(Own(rom, OwnWordId::AutopsyEating), 8) + ")", vs, kMgValueMin, iw - kMgLabelW - 20);
+    for (OwnWordId w : {OwnWordId::DetectorCharge, OwnWordId::DetectorSignal, OwnWordId::DetectorDepth})
+        me.Line(id(w), Own(rom, w), vs, kMgValueMin, kMgLabelW - 8, Weight::Bold);
+    me.Line(id(OwnWordId::ArtTool), Own(rom, OwnWordId::ArtTool), vs, kMgValueMin, kArtLabelW, Weight::Bold);
+    for (int t = 0; t < 6; t++)
+    {
+        std::string tool = Own(rom, OwnWordId::ArtPencil, t);
+        if (t < 2) tool += std::string(" (") + Own(rom, OwnWordId::ArtMedium) + ")";
+        me.Line(id(OwnWordId::ArtPencil) + t, tool, vs, kMgValueMin, iw - kArtLabelW);
+    }
+    me.Line(id(OwnWordId::ArtColourOf), With(Own(rom, OwnWordId::ArtColourOf), 15), vs, kMgValueMin, iw - 52);
+    me.Line(id(OwnWordId::ArtPage), With(Own(rom, OwnWordId::ArtPage), 16), vs, kMgValueMin, iw);
+    me.Line(id(OwnWordId::SocialMatch), Own(rom, OwnWordId::SocialMatch), kMgValueSize, kMgValueMin, kMgInnerW - 8);
 }
 
 void MeasureMinigames(const RomData& rom, BlockMeasure& m)
@@ -598,23 +647,6 @@ void MeasureMinigames(const RomData& rom, BlockMeasure& m)
             me.Line(kStrMgDetector, label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28, Weight::Bold);
         else m.checked++;
     }
-    {
-        GameState g;
-        g.minigame.autopsy.valid = g.minigame.detector.valid = g.minigame.art.valid = true;
-        g.minigame.autopsy.handAlert = g.minigame.autopsy.tweezersAlert = true;
-        GameState ask = g;
-        ask.town.popup.valid = true;
-        ask.town.popup.state = 2;
-        ask.town.popup.kind = 2;
-        const int avail = kMgPrompt.w - 2 * kMgPromptPad;
-        for (const std::vector<HdHint>& hs : {Hints(Screen::Autopsy, g, rom), Hints(Screen::Autopsy, g, rom, true), Hints(Screen::Detector, g, rom),
-                                              Hints(Screen::Art, g, rom), Hints(Screen::Art, ask, rom)})
-        {
-            int t = (int)(hs.size() - 1) * kMgPromptGap;
-            for (const HdHint& h : hs) t += HintWidth(h, kMgHintMin);
-            me.Note(kStrMgYes, false, t <= avail);
-        }
-    }
     for (int id : {kStrMgCardsCount, kStrMgScore}) me.Line(id, Words(rom, id), kMgHeadSize, 13, kColW - 8, Weight::Bold);
     // The names' column (the player's own name is at most 7 letters: the game's keyboard).
     const int nameW = kMgInnerW - 24 - 2 * kColW - 12;
@@ -634,16 +666,6 @@ void MeasureMinigames(const RomData& rom, BlockMeasure& m)
     if (!FitLine(label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28 - std::min(vw, kMgInnerW / 2) - 10).fits)
         me.Line(kStrMgVacuumEarnings, label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28, Weight::Bold);
     else m.checked++;
-    // The hints in the game's words.
-    // The cards' prompts with the game's "Quit", and its question's "Yes" / "No", in the bar at full size.
-    const int avail = kMgPrompt.w - 2 * kMgPromptPad;
-    GameState ask;
-    ask.minigame.cards.valid = ask.minigame.cards.quitAsk = true;
-    for (const std::vector<HdHint>& hs : {Hints(Screen::Cards, GameState {}, rom), Hints(Screen::Cards, ask, rom)})
-    {
-        int t = (int)(hs.size() - 1) * kMgPromptGap;
-        for (const HdHint& h : hs) t += HintWidth(h, kMgHintSize);
-        me.Note(kStrMgQuit, false, t <= avail);
-    }
+    MeasureOwnWords(rom, m);
 }
 }

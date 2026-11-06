@@ -66,8 +66,13 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
         touch.Tap(q.x, q.y);
         st.confirm = true;
     };
-    // The question opened by the mouse: RAM knows (it still reads Cards).
-    if (st.ram.cards && st.ram.quitAsk) st.confirm = true;
+    // The question as RAM shows it (opened by the mouse too: it still reads Cards). Once RAM has
+    // shown it, RAM also says when it has gone (answered by the mouse, or by A / B a frame ago).
+    if (st.ram.cards)
+    {
+        if (st.ram.quitAsk) st.confirm = st.askSeen = true;
+        else if (st.askSeen) st.confirm = st.askSeen = false;
+    }
     if (!st.confirm && st.ram.cards && st.ram.message)
     {
         // The end of a turn: a touch anywhere goes on (the other buttons wait).

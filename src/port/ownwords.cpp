@@ -1,0 +1,96 @@
+#include "port/ownwords.h"
+
+#include <iterator>
+
+#include "romdata.h"
+
+namespace sims2wide
+{
+namespace
+{
+// English, French, German, Italian, Spanish: the port's own words (not the game's), kept short:
+// most sit beside a button's chip.
+constexpr const char* kWords[][5] = {
+    // Point, Slow
+    {"Point", "Viser", "Zeigen", "Punta", "Apuntar"},
+    {"Slow", "Lent", "Langsam", "Lento", "Lento"},
+    // Autopsy: the tools
+    {"Laser", "Laser", "Laser", "Laser", "Láser"},
+    {"Hand", "Main", "Hand", "Mano", "Mano"},
+    {"Tweezers", "Pince", "Pinzette", "Pinzette", "Pinzas"},
+    // What A does with each
+    {"Hold: cut", "Maintenir : couper", "Halten: schneiden", "Tieni: taglia", "Mantén: cortar"},
+    {"Hold: lift an organ", "Maintenir : prendre un organe", "Halten: Organ heben", "Tieni: prendi un organo", "Mantén: coger un órgano"},
+    {"Hold: pick a parasite", "Maintenir : prendre un parasite", "Halten: Parasit greifen", "Tieni: prendi un parassita", "Mantén: coger un parásito"},
+    // The carry, the tear
+    {"To the tray", "Vers le plateau", "Zur Schale", "Al vassoio", "A la bandeja"},
+    {"To the flask", "Vers le bocal", "Zum Glas", "Al barattolo", "Al frasco"},
+    {"Hold and pull: tear it open", "Maintenir et tirer : déchirer", "Halten und ziehen: aufreißen", "Tieni e tira: strappa", "Mantén y tira: rasgar"},
+    // Quit, asked once
+    {"Quit", "Quitter", "Beenden", "Esci", "Salir"},
+    {"Again: quit, the earnings lost", "Encore : quitter, gains perdus", "Nochmal: beenden, Geld verloren", "Ancora: esci, guadagni persi", "Otra vez: salir sin ganancias"},
+    // The autopsy's values
+    {"Specimen @1 of 2", "Spécimen @1 sur 2", "Exemplar @1 von 2", "Esemplare @1 di 2", "Espécimen @1 de 2"},
+    {"Organ @1", "Organe @1", "Organ @1", "Organo @1", "Órgano @1"},
+    {"Freed", "Libéré", "Gelöst", "Libero", "Suelto"},
+    {"Removed", "Retiré", "Entfernt", "Rimosso", "Extraído"},
+    {"Destroyed", "Détruit", "Zerstört", "Distrutto", "Destruido"},
+    {"Parasites", "Parasites", "Parasiten", "Parassiti", "Parásitos"},
+    {"@1 eating", "@1 mangent", "@1 fressen", "@1 mangiano", "@1 comiendo"},
+    // The detector
+    {"Walk", "Marcher", "Gehen", "Cammina", "Andar"},
+    {"Dig", "Creuser", "Graben", "Scava", "Cavar"},
+    {"Depth", "Profondeur", "Tiefe", "Profondità", "Profundidad"},
+    {"Power off", "Éteindre", "Ausschalten", "Spegni", "Apagar"},
+    {"Charge", "Charge", "Ladung", "Carica", "Carga"},
+    {"Signal", "Signal", "Signal", "Segnale", "Señal"},
+    {"None", "Aucun", "Keins", "Nessuno", "Ninguna"},
+    // The painting: the hints
+    {"Hold: paint", "Maintenir : peindre", "Halten: malen", "Tieni: dipingi", "Mantén: pintar"},
+    {"Tool", "Outil", "Werkzeug", "Strumento", "Herramienta"},
+    {"Next color", "Couleur suivante", "Nächste Farbe", "Colore seguente", "Color siguiente"},
+    {"Undo", "Annuler", "Rückgängig", "Annulla", "Deshacer"},
+    {"Done", "Terminé", "Fertig", "Fatto", "Hecho"},
+    // The tools 0..5
+    {"Pencil", "Crayon", "Stift", "Matita", "Lápiz"},
+    {"Eraser", "Gomme", "Radierer", "Gomma", "Goma"},
+    {"Line", "Ligne", "Linie", "Linea", "Línea"},
+    {"Bucket", "Pot de peinture", "Farbeimer", "Secchiello", "Bote"},
+    {"Rectangle", "Rectangle", "Rechteck", "Rettangolo", "Rectángulo"},
+    {"Filled rectangle", "Rectangle plein", "Volles Rechteck", "Rettangolo pieno", "Rectángulo relleno"},
+    // The brush sizes
+    {"small", "petit", "klein", "piccolo", "pequeño"},
+    {"medium", "moyen", "mittel", "medio", "mediano"},
+    {"large", "grand", "groß", "grande", "grande"},
+    // The colour and page
+    {"Color @1 of 15", "Couleur @1 sur 15", "Farbe @1 von 15", "Colore @1 di 15", "Color @1 de 15"},
+    {"Palette @1 of 16", "Palette @1 sur 16", "Palette @1 von 16", "Tavolozza @1 di 16", "Paleta @1 de 16"},
+    // The cards
+    {"Continue", "Continuer", "Weiter", "Continua", "Continuar"},
+    {"Choose a card", "Choisir une carte", "Karte wählen", "Scegli una carta", "Elegir carta"},
+    {"Pick up, again to play", "Prendre, encore : jouer", "Nehmen, nochmal: spielen", "Prendi, ancora: gioca", "Coger, otra vez: jugar"},
+    {"Draw a card", "Piocher", "Karte ziehen", "Pesca", "Robar carta"},
+    {"Discard", "Défausser", "Abwerfen", "Scarta", "Descartar"},
+    // The vacuum
+    {"Drive", "Conduire", "Fahren", "Guida", "Conducir"},
+    {"Move the hand", "Bouger la main", "Hand bewegen", "Muovi la mano", "Mover la mano"},
+    {"Grab, drag to the box", "Saisir, glisser dans la boîte", "Greifen, in die Box ziehen", "Prendi, trascina nella scatola", "Coger, llevar a la caja"},
+    {"Blow: unclog", "Souffler : déboucher", "Pusten: frei machen", "Soffia: sblocca", "Soplar: desatascar"},
+    {"Blow: unclog!", "Souffler : déboucher !", "Pusten: frei machen!", "Soffia: sblocca!", "Soplar: ¡desatascar!"},
+    // The social games
+    {"Answer", "Répondre", "Antworten", "Rispondi", "Responder"},
+    {"The chosen answer again", "La même réponse", "Dieselbe Antwort", "La stessa risposta", "La misma respuesta"},
+    {"Match the gesture", "Imite le geste", "Geste nachmachen", "Imita il gesto", "Imita el gesto"},
+};
+static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
+}
+
+const char* OwnWordIn(int language, OwnWordId id)
+{
+    const int i = (int)id;
+    if (i < 0 || i >= (int)OwnWordId::Count) return "";
+    return kWords[i][language >= 1 && language <= 5 ? language - 1 : 0];
+}
+
+const char* OwnWord(const RomData* rom, OwnWordId id) { return OwnWordIn(rom ? rom->Language() : 1, id); }
+}
