@@ -406,7 +406,8 @@ static void minigame_frame()
                 const bool litNow = (sc == Screen::Vacuum && variant == 2) || (sc == Screen::Autopsy && variant > 0) || (sc == Screen::Detector && variant == 2) ||
                                     (sc == Screen::Drencher && variant == 1) || (sc == Screen::Crime && variant == 2) ||
                                     (sc == Screen::Scratch && variant == 3) || (sc == Screen::Mixer && variant == 1) || (sc == Screen::MixerSave && variant == 1);
-                CHECK(lit == (sc == Screen::Crime && variant == 1 ? 3 : litNow ? 1 : 0));
+                // (The save page with a slot asked over: its row lit too, beside A's hint.)
+                CHECK(lit == (sc == Screen::Crime && variant == 1 ? 3 : sc == Screen::MixerSave && variant == 1 ? 2 : litNow ? 1 : 0));
                 CHECK(pointer == (OwnScheme(sc) ? 2 : 0));   // (shown: the navigator shows it on the pointing games and the crime game's aim)
                 // MooGoo's focus: one ring over the playfield, around the monkey (an overlay).
                 CHECK(c.overlays.size() == overlays0 + ((sc == Screen::MooGoo && variant == 1) || (sc == Screen::Mixer && variant == 2) ? 1 : 0));
