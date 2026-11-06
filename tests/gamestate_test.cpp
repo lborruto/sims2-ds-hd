@@ -228,6 +228,18 @@ static void to_screen_state()
     CHECK(PixelsAgree(g, {Screen::Unknown}) && !PixelsAgree(g, {Screen::Panel, Tab::Options}));
     g.screen = GScreen::Phone;
     CHECK(PixelsAgree(g, {Screen::Phone}) && !PixelsAgree(g, {Screen::Unknown}));
+    // The boot's splashes (no GScreen): Unknown in RAM, None in the pixels; an Unknown that is not
+    // the boot's still disagrees (Settings, Load-a-Sim and Wireless read FrontEnd: ReadGameState).
+    g.screen = GScreen::Unknown;
+    CHECK(!PixelsAgree(g, {Screen::None}));
+    for (FrontKind k : {FrontKind::Boot, FrontKind::Video})
+    {
+        g.front.kind = k;
+        CHECK(PixelsAgree(g, {Screen::None}) && !PixelsAgree(g, {Screen::Panel, Tab::Interact}));
+    }
+    g.front.kind = FrontKind::Settings;
+    CHECK(!PixelsAgree(g, {Screen::None}));
+    g.front.kind = FrontKind::None;
     // Options > Quit: a popup over the Options tab, Unknown for CONSOLE (its buttons are not the
     // popup's X); a popup over any other tab stays Popup.
     g.screen = GScreen::Popup;
@@ -996,6 +1008,7 @@ static void front_settings()
     r.W32(kS + 0x28, kFH); r.W8(kS + 0x24, 1);
     r.W32(kGb + 0x2F70, 0x510); r.W32(kGb + 0x2F74, 0x1000);
     GameState g = ReadGameState(r.View());
+    CHECK(g.screen == GScreen::FrontEnd && ToScreenState(g) == (ScreenState{Screen::FrontEnd}));
     CHECK(g.front.settings.valid && g.front.kind == FrontKind::Settings && g.front.settings.page == 0 && g.front.settings.music == 0x510 && g.front.settings.sfx == 0x1000 && !g.front.settings.art);
     CHECK(!g.front.settings.conceptKnown && !g.front.settings.creditsKnown);
     r.W8(kS + 0x24, 0); CHECK(ReadGameState(r.View()).front.settings.art);
@@ -1020,6 +1033,7 @@ static void front_load()
     for (u32 i = 0; i < 3; i++) r.W8(0x0213D848 + i, 0);
     r.W32(0x0213D84C, 0xFFFFFFFF); r.W32(kS + 0x70, 0xFFFFFFFF);
     GameState g = ReadGameState(r.View());
+    CHECK(g.screen == GScreen::FrontEnd);
     CHECK(g.front.load.valid && g.front.kind == FrontKind::Load && !g.front.load.wireless && g.front.load.green == -1 && g.front.load.tapped == -1 && !g.front.load.rows[0].used);
     r.W8(0x0213D848 + 1, 1); r.W32(0x0213D84C, 1);
     const u32 h = 0x0213D7B8 + 0x30;

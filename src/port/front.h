@@ -7,7 +7,8 @@
 // them: live pictures, both. Only the last splash (mode 0) waits for a touch, and that touch also
 // ends the video and opens the title: there A or Start tap the splash (an A and a START chip
 // under it); the earlier splashes take no touch (measured: a tap during them changes nothing), so
-// they have no item. A popup splash (mode 4) has no view (milestone 1's picture).
+// they have no item: the DS's own Start and A are passed on there (MenuView::passKeys), as before
+// the view. A popup splash (mode 4) has no view (milestone 1's picture).
 //
 // The title (CTitleSceenMenu phase 0, "Touch the Touch Screen to begin"): the game's own top
 // screen (its backdrop and logo) as large as the canvas holds it, an A chip with the game's blue
@@ -72,6 +73,12 @@ MenuView FrontView(ScreenState s, const GameState* game, const RomData* rom);
 MenuView FrontViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);
 // The screen drawn into c (empty: the whole canvas is this screen's), the focus on item `focus`.
 void BuildFront(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons, int topW, int topH);
+// Shared with port/frontmenus.h: `w` x `h` fitted in box at its shape, centred; the top picture's
+// 2D part (the DS's 4:3: the widescreen looks' black sides left out); a piece with its 6-pixel
+// frame just outside it.
+Rect FrontFit(Rect box, int w, int h);
+Rect FrontTopFrom(int topW, int topH);
+void FrontFramed(Composition& c, Piece p);
 // (A check, --measure-menu) the four labels in their buttons.
 void MeasureFront(const RomData& rom, BlockMeasure& m);
 }

@@ -26,7 +26,7 @@ FrontScreen ScreenOf(ScreenState s, const GameState& game)
     if (!game.valid) return FrontScreen::None;
     const FrontState& f = game.front;
     // The title and the main menu: the front end's GScreen (the title object in the top slot).
-    if (s.screen == Screen::FrontEnd && f.title.valid) return f.title.phase == 0 ? FrontScreen::Title : FrontScreen::Menu;
+    if (s.screen == Screen::FrontEnd && f.title.valid && (f.kind == FrontKind::Title || f.kind == FrontKind::MainMenu)) return f.title.phase == 0 ? FrontScreen::Title : FrontScreen::Menu;
     // The boot: the splash object (the video's or not), no HUD (its fades between splashes black:
     // Loading); not its popup mode (4).
     if ((s.screen == Screen::None || s.screen == Screen::Loading) && f.boot.valid && f.boot.mode != 4 && (f.kind == FrontKind::Boot || f.kind == FrontKind::Video)) return FrontScreen::Boot;
@@ -61,6 +61,10 @@ Rect TopFrom(int topW, int topH)
 std::string Label(const RomData& rom, int i) { return MenuWords(rom, kStrFrMenu[i]); }
 }
 
+Rect FrontFit(Rect box, int w, int h) { return Fit(box, w, h); }
+Rect FrontTopFrom(int topW, int topH) { return TopFrom(topW, topH); }
+void FrontFramed(Composition& c, Piece p) { FramedPiece(c, p); }
+
 MenuView FrontView(ScreenState s, const GameState* game, const RomData* rom)
 {
     if (!game || !rom || rom->StringCount() <= kStrFrMenu[2]) return {};
@@ -85,6 +89,9 @@ MenuView FrontViewOf(ScreenState s, const GameState& game, const RomData* rom)
             v.items.push_back(it);
             v.buttons[(int)MenuButton::Start] = it.action;
         }
+        // The splashes that take no touch: the DS's Start and A passed on (as before this view:
+        // harmless where the game ignores them, any skip of its own kept).
+        else v.passKeys = (1u << kStart) | (1u << kA);
         v.page = 1;
         break;
     case FrontScreen::Title:

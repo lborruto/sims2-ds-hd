@@ -10,6 +10,7 @@
 #include "port/catalogue.h"
 #include "port/gift.h"
 #include "port/front.h"
+#include "port/frontmenus.h"
 #include "port/note.h"
 #include "port/options.h"
 #include "port/panelmenu.h"
@@ -61,7 +62,9 @@ bool PopupOver(ScreenState s, const GameState& game)
     if (!game.valid || !p.valid || p.state < 1 || p.state > 3) return false;
     if (game.screen == GScreen::Popup) return s.screen == Screen::Popup || s.screen == Screen::Unknown; // (Options > Quit: Unknown)
     return s.screen == Screen::Gift || s.screen == Screen::SaveSlots || s.screen == Screen::Phone || s.screen == Screen::Catalogue || s.screen == Screen::Build ||
-           (s.screen == Screen::Unknown && (NoteUp(game) || game.checkIn.valid || game.roomInfo.valid || game.music.valid || game.stat.valid));
+           (s.screen == Screen::Unknown && (NoteUp(game) || game.checkIn.valid || game.roomInfo.valid || game.music.valid || game.stat.valid)) ||
+           // The front end's Load-a-Sim ("Loading", kind 3; port/frontmenus.h).
+           ((s.screen == Screen::None || s.screen == Screen::FrontEnd) && game.front.load.valid);
 }
 
 MenuView PopupView(ScreenState s, const GameState* game, const RomData* rom)
@@ -134,8 +137,12 @@ MenuView ScreenView(ScreenState s, const GameState* game, const RomData* rom)
         if (game && game->music.valid) return MusicView(s, game, rom);
         if (game && game->stat.valid) return StatPanelView(s, game, rom);
         return NoteView(s, game, rom);
-    // The front end's boot, title and main menu (port/front.h).
-    case Screen::FrontEnd: case Screen::None: case Screen::Loading: return FrontView(s, game, rom);
+    // The front end's boot, title and main menu (port/front.h), Settings and Load-a-Sim (port/frontmenus.h).
+    case Screen::FrontEnd: case Screen::None: case Screen::Loading:
+        if (MenuView v = FrontView(s, game, rom); v.valid) return v;
+        if (game && game->front.settings.valid) return SettingsView(s, game, rom);
+        if (game && game->front.load.valid) return LoadView(s, game, rom);
+        return {};
     default: return {};
     }
 }

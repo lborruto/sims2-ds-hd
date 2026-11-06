@@ -39,6 +39,7 @@
 #include "romdata.h"
 #include "ui/font.h"
 #include "port/front.h"
+#include "port/frontmenus.h"
 #include "port/build.h"
 #include "port/checkin.h"
 #include "port/roominfo.h"
@@ -470,10 +471,16 @@ int main(int argc, char** argv)
         printf("front: %d words, %d shrunk, %d cut", fe.checked, fe.shrunk, fe.cut);
         for (int id : fe.cutIds) printf(" %d", id);
         printf("\n");
+        // Settings and Load-a-Sim: the titles, the pages, every credits line, the slots' words.
+        BlockMeasure fm;
+        MeasureFrontMenus(*app.rom, fm);
+        printf("frontmenus: %d words, %d shrunk, %d cut", fm.checked, fm.shrunk, fm.cut);
+        for (int id : fm.cutIds) printf(" %d", id);
+        printf("\n");
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || fe.cut > 0 ||
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || fe.cut > 0 || fm.cut > 0 ||
                        !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }

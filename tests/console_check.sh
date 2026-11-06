@@ -50,8 +50,8 @@
 # frames clears the clog (the bowl's row 1 back to #30A2D3) within 30 frames.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
 #   bash tests/console_check.sh
-# Override with SIMS2WIDE, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh) and
-# PYTHON (a Python with Pillow).
+# Override with SIMS2WIDE, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh),
+# PYTHON (a Python with Pillow) and MAX_SIMS (the emulators run at once, 4).
 set -u
 repo=$(cd "$(dirname "$0")/.." && pwd)
 bin=${SIMS2WIDE:-$repo/build/sims2wide}
@@ -65,6 +65,22 @@ python=${PYTHON:-python3}
 "$python" -c "import PIL" 2>/dev/null || { echo "no Pillow for $python (set PYTHON)"; exit 2; }
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+# At most MAX_SIMS (default 4) emulators at once, whatever the cases started in the background:
+# "$bin" is this function, which takes one of the slots (a directory each) for the run.
+max_sims=${MAX_SIMS:-4}
+real_bin=$bin
+sims2wide_slot() {
+    local i slot=
+    while [ -z "$slot" ]; do
+        for i in $(seq 1 "$max_sims"); do mkdir "$tmp/slot$i" 2>/dev/null && { slot=$tmp/slot$i; break; }; done
+        [ -n "$slot" ] || sleep 0.2
+    done
+    "$real_bin" "$@"
+    local rc=$?
+    rmdir "$slot"
+    return $rc
+}
+bin=sims2wide_slot
 
 # run NAME STATE [options...]: frame 119 as the console's picture (NAME/c/f000119.png) and as
 # the two screens (NAME/r/f000119.png); NAME.ok only if both runs went to their end.
@@ -74,11 +90,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*) cp "$complete_save" "$save" || return ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*) cp "$complete_save" "$save" ;; esac
+    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -176,10 +192,23 @@ run menu-2x s2 "${town[@]}" --console-focus 1 --compose-scale 2 &
 run menu-wide s2 "${town[@]}" --console-focus 0 --wide &
 run menu-de s2 "${town[@]}" --console-focus 3 --language 3 &
 wait
+run settings F-mm-opt-150 "${town[@]}" --console-focus 0 &
+run settings-2x F-mm-opt-150 "${town[@]}" --console-focus 0 --compose-scale 2 &
+run settings-wide F-mm-opt-150 "${town[@]}" --console-focus 0 --wide &
+run settings-concept F-copt-concept-80 "${town[@]}" --console-focus 3 &
+run settings-credits F-opt-credits-400 "${town[@]}" &
+run settings-fr F-copt-concept-80 "${town[@]}" --console-focus 3 --language 2 &
+run loadgame F-cload-150 "${town[@]}" --console-focus 0 &
+run loadgame-2x F-cload-150 "${town[@]}" --console-focus 1 --compose-scale 2 &
+run loadgame-wide F-cload-150 "${town[@]}" --console-focus 0 --wide &
+run loadgame-empty F-mm-load-150 "${town[@]}" &
+run loadgame-loading F-cload-t1-60 "${town[@]}" &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3 s4 slots load casino casino-2x \
     title title-wide boot boot-wide menu-2x menu-wide menu-de \
+    settings settings-2x settings-wide settings-concept settings-credits settings-fr loadgame loadgame-2x loadgame-wide loadgame-empty loadgame-loading \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
@@ -386,6 +415,78 @@ def front_boot(raw=True):
     expect("backdrop", C(5, 5), BACKDROP)
     chips = [C(x, y) for y in range(534, 590) for x in range(838, 1222)]
     if sum(1 for p in chips if p != BACKDROP) < 300: errors.append("no A / START chips")
+
+def front_settings(page, focus):
+    """HD Settings (src/port/frontmenus.*): the top screen 3x framed at the left, the panel at the
+    right, the game's four tabs = the touch screen's pixels 2x in the tab bar, the page: Music's
+    slider (its percent's white text, the knob at the right end: 100 %), Concept Art's twelve
+    cells = the touch screen's pixels 2x with the focus ring on `focus`, Credits' lines (white and
+    the game's green) in their well."""
+    expect("canvas", comp.size, (1280, 720))
+    for x in range(0, 256, 11):
+        for y in range(0, 192, 11):
+            expect(f"top 3x DS {x},{y}", C(24 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
+            if len(errors) > 4:
+                return
+    expect("panel", C(1240, 600), FRAME)
+    expect("backdrop", C(5, 5), BACKDROP)
+    for i in range(4):
+        cx = 908 + 64 * i
+        for dy in range(0, 26, 5):
+            for dx in range(0, 28, 5):
+                expect(f"tab {i} DS {7 + dx},{41 + 40 * i + dy}", C(cx + 4 + 2 * dx, 138 + 6 + 2 * dy), bottom(7 + dx, 41 + 40 * i + dy))
+        if len(errors) > 4:
+            return
+    if page == 0:
+        well = [C(x, y) for y in range(338, 402) for x in range(950, 1130)]
+        if sum(1 for p in well if p == (255, 255, 255)) < 100: errors.append("no percent text")
+        r, g, b = C(1192, 444)
+        if not (r > 120 and b > 180): errors.append(f"knob not at 100 %: {(r, g, b)}")
+        r, g, b = C(1036, 318)
+        if not (g > r + 80 and g > b + 60): errors.append(f"slider not focused: {(r, g, b)}")
+    elif page == 2:
+        for i in range(12):
+            gx, gy = 842 + (i % 4) * 100 + 4, 292 + (i // 4) * 88 + 4
+            fx, fy = 56 + (i % 4) * 48, 72 + (i // 4) * 40
+            for dy in range(0, 32, 7):
+                for dx in range(0, 40, 7):
+                    expect(f"cell {i} DS {fx + dx},{fy + dy}", C(gx + 2 * dx, gy + 2 * dy), bottom(fx + dx, fy + dy))
+            r, g, b = C(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
+            ringed = g > r + 80 and g > b + 60
+            if ringed != (i == focus): errors.append(f"cell {i}: ring {ringed}")
+            if len(errors) > 4:
+                return
+    elif page == 3:
+        well = [C(x, y) for y in range(286, 582) for x in range(850, 1222)]
+        if sum(1 for p in well if p == (255, 255, 255)) < 200: errors.append("no white credits lines")
+        if sum(1 for p in well if p == (0x79, 0xFB, 0x00)) < 100: errors.append("no green credits headings")
+    hints = [C(x, y) for y in range(612, 644) for x in range(1100, 1232)]
+    if sum(1 for p in hints if p != FRAME) < 40: errors.append("no hints")
+
+def front_load(focus, used, loading=False):
+    """HD Load-a-Sim: the dimmed top screen behind the in-game Save slots' panel; each used row
+    two lines of white text (name, money) and the place and time, the current slot's number green,
+    the focus ring on `focus`; "No Data" rows a lavender line; the "Loading" popup over it all."""
+    expect("canvas", comp.size, (1280, 720))
+    for i in range(3):
+        y0 = 124 + 156 * i
+        if loading:
+            continue
+        name = sum(1 for y in range(y0 + 26, y0 + 66) for x in range(348, 700) if C(x, y) == (255, 255, 255))
+        line2 = sum(1 for y in range(y0 + 78, y0 + 114) for x in range(348, 1050) if C(x, y)[2] > 200 and C(x, y)[0] > 180)
+        if used[i]:
+            if name < 60: errors.append(f"row {i}: no name ({name})")
+            if line2 < 60: errors.append(f"row {i}: no place / time ({line2})")
+        r, g, b = C(640, y0 - 3)
+        ringed = g > r + 80 and g > b + 60
+        if ringed != (i == focus): errors.append(f"row {i}: ring {ringed}")
+    if not loading:
+        num = [C(x, y) for y in range(124 + 30, 124 + 110) for x in range(240, 300)]
+        if used[0] and sum(1 for r, g, b in num if g > r + 60 and g > b + 60) < 50: errors.append("slot 1's number not green")
+        expect("panel", C(190, 360), FRAME)
+    else:
+        box = [C(x, y) for y in range(230, 480) for x in range(340, 940)]
+        if sum(1 for p in box if p == (255, 255, 255)) < 300: errors.append("no Loading popup text")
 
 def big_over_dim(rows=176):
     piece("touch screen 3x", 0, 0, 256, 192, 256, 72, 3, step=9)
@@ -826,6 +927,20 @@ elif case == "s2":
     front_menu(0)
 elif case in ("menu-2x", "menu-wide", "menu-de"):
     front_menu({"menu-2x": 1, "menu-wide": 0, "menu-de": 3}[case], raw_top=case == "menu-2x")
+elif case in ("settings", "settings-2x", "settings-wide"):
+    front_settings(0, 0)
+elif case in ("settings-concept", "settings-fr"):
+    front_settings(2, 3)
+elif case == "settings-credits":
+    front_settings(3, -1)
+elif case in ("loadgame", "loadgame-wide"):
+    front_load(0, (1, 1, 1))
+elif case == "loadgame-2x":
+    front_load(1, (1, 1, 1))
+elif case == "loadgame-empty":
+    front_load(-1, (0, 0, 0))
+elif case == "loadgame-loading":
+    front_load(-1, (1, 1, 1), loading=True)
 elif case in ("title", "title-wide"):
     front_title(raw_top=case == "title")
 elif case in ("boot", "boot-wide"):
@@ -1415,8 +1530,8 @@ done
 # nothing chosen (no press lands mid-fade); from s2, A on Load-a-Sim, Settings and DS Wireless →
 # each screen, and B (the game's own) → the title at phase 0, never the menu; from F-boot-900, A
 # or Start (the splash's touch) → the title.
-# (Settings, Load-a-Sim and Wireless are not GScreens yet: --print-game's pixel tracker disagrees
-# there, so those runs go without it.)
+# (Settings, Load-a-Sim and Wireless have no GScreen: Unknown in RAM, None in the pixels, which
+# PixelsAgree takes as one: --print-game logs no "pixels disagree" there.)
 pad_front() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4; shift 4
     "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
@@ -1425,9 +1540,9 @@ pad_front() {
 }
 pad_front pad-front-title F-title0 front-title 300 --print-game &
 pad_front pad-front-fade F-title0 front-fade 200 --print-game &
-pad_front pad-front-load s2 front-load 330 &
-pad_front pad-front-settings s2 front-settings 330 &
-pad_front pad-front-wireless s2 front-wireless 330 &
+pad_front pad-front-load s2 front-load 330 --print-game &
+pad_front pad-front-settings s2 front-settings 330 --print-game &
+pad_front pad-front-wireless s2 front-wireless 330 --print-game &
 pad_front pad-front-boot-a F-boot-900 front-boot-a 150 --print-game &
 pad_front pad-front-boot-start F-boot-900 front-boot-start 150 --print-game &
 wait
@@ -1445,6 +1560,50 @@ check_pad pad-front-settings front_back pad-front-settings Settings
 check_pad pad-front-wireless front_back pad-front-wireless Wireless
 check_pad pad-front-boot-a front_boot pad-front-boot-a
 check_pad pad-front-boot-start front_boot pad-front-boot-start
+# Settings and Load-a-Sim (src/port/frontmenus.*, --print-front, copies of the complete save):
+# from F-mm-opt-150, Left, Left, Right → the game's music 90, 80, 90 % read back from RAM, RB →
+# the SFX page, Left → SFX 90 %, B → the title at phase 0; from F-copt-concept-80, A → the unlocked
+# picture on the top screen (art=1), Left, A on a locked one → nothing, RB → Credits, RB → Music
+# (the ring), LB, LB → Concept Art, B → the title; from F-cload-150, Down, Up, A → slot 1 loaded:
+# the game's "Loading" popup (HD), then the town (Panel/Interact, the arrival's Dialogue); a fresh
+# boot (no state): Start and A during the splashes that take no touch (modes 3, 2, 1) are the
+# DS's own and change nothing, A on "Touch the Touch Screen to continue." → the title.
+pad_fm() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4; shift 4
+    cp "$complete_save" "$tmp/$name.sav" || return
+    local load=(--state-load "$shots/$state.st")
+    [ "$state" = - ] && load=()
+    "$bin" "$rom" --headless --frames "$frames" ${load[@]+"${load[@]}"} --save "$tmp/$name.sav" \
+        --layout console --print-game --print-front --print-town "${late[@]}" --input "$input" "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_fm pad-settings-volume F-mm-opt-150 settings-volume 330 &
+pad_fm pad-settings-pages F-copt-concept-80 settings-pages 400 &
+pad_fm pad-load-slot F-cload-150 load-slot 360 &
+pad_fm pad-boot-keys - boot-keys 1000 &
+wait
+settings_volume() {
+    # (the settings line last logged by each frame: 90 % = 3686 ± 32, 80 % = 3277 ± 32)
+    awk -v F=55 '$1=="frame" && ($2+0)<=F && /settings page/{l=$0} END{print l}' "$tmp/pad-settings-volume.log" | grep -q 'page=0 music=3[67][0-9][0-9] sfx=4096' || { echo "  music not 90 % after Left"; return 1; }
+    awk -v F=105 '$1=="frame" && ($2+0)<=F && /settings page/{l=$0} END{print l}' "$tmp/pad-settings-volume.log" | grep -q 'page=0 music=3[23][0-9][0-9] sfx=4096' || { echo "  music not 80 % after Left"; return 1; }
+    awk -v F=155 '$1=="frame" && ($2+0)<=F && /settings page/{l=$0} END{print l}' "$tmp/pad-settings-volume.log" | grep -q 'page=0 music=3[67][0-9][0-9] sfx=4096' || { echo "  music not 90 % after Right"; return 1; }
+    awk -v F=255 '$1=="frame" && ($2+0)<=F && /settings page/{l=$0} END{print l}' "$tmp/pad-settings-volume.log" | grep -q 'page=1 music=3[67][0-9][0-9] sfx=3[67][0-9][0-9]' || { echo "  SFX not 90 % on its page"; return 1; }
+    in_order pad-settings-volume 'settings page=1' 'front Title' 'title phase=0'
+}
+settings_pages() {
+    in_order pad-settings-pages 'settings page=2 .*art=0 concept=8' 'settings page=2 .*art=1 concept=8' 'settings page=3' 'settings page=0' 'settings page=3' 'settings page=2' 'front Title' 'title phase=0'
+}
+load_slot() {
+    in_order pad-load-slot 'front Load' 'popup state=[1-3] kind=3 .*title="Loading"' 'front None' 'game Panel/Interact' 'game Dialogue'
+}
+boot_keys() {
+    in_order pad-boot-keys 'boot mode=3' 'boot mode=2' 'boot mode=1' 'boot mode=0' 'front Title' 'title phase=0' || return 1
+    ! grep -q -E 'front (Settings|Load|Wireless|CreateASim)|game CreateASim' "$tmp/pad-boot-keys.log" || { echo "  pad-boot-keys: a key went past the title"; return 1; }
+}
+check_pad pad-settings-volume settings_volume
+check_pad pad-settings-pages settings_pages
+check_pad pad-load-slot load_slot
+check_pad pad-boot-keys boot_keys
 # The HD Interact tab's words in each language (src/port/interact.*: --measure-menu): every verb
 # in its row and in the A hint, every Sim's and object's name in the title and the strip, held in
 # their boxes (shrunk at most; a neighbour's name beside the plate may end in an ellipsis).

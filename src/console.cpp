@@ -13,6 +13,7 @@
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/front.h"
+#include "port/frontmenus.h"
 #include "port/gift.h"
 #include "port/note.h"
 #include "port/options.h"
@@ -129,11 +130,24 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
     const bool bar = hud && strings && strings->ok;
     const int worldRows = bar ? HudCropRows(topH) : topH;
-    // The front end's boot, title and main menu in HD (port/front.h): the whole canvas theirs.
+    // The front end's boot, title and main menu (port/front.h), Settings and Load-a-Sim
+    // (port/frontmenus.h) in HD: the whole canvas theirs; Load's "Loading" popup (port/popup.h) over it.
     if (s.screen == Screen::FrontEnd || s.screen == Screen::None || s.screen == Screen::Loading)
-        if (const MenuView v = FrontView(s, game, rom); v.valid)
+        if (const MenuView v = ConsoleView(s, game, rom); v.valid)
         {
-            BuildFront(c, v, focus, *game, *rom, icons, topW, topH);
+            const bool front = FrontView(s, game, rom).valid;
+            auto screen = [&](const MenuView& view, int f) {
+                if (!front && game->front.settings.valid) BuildSettings(c, view, f, *game, *rom, bottom, topW, topH);
+                else if (!front && game->front.load.valid) BuildLoad(c, view, f, *game, *rom, topW, topH);
+                else BuildFront(c, view, f, *game, *rom, icons, topW, topH);
+            };
+            if (v.popup)
+            {
+                if (const MenuView u = ScreenView(s, game, rom); u.valid) screen(u, -1);
+                BuildPopup(c, v, focus, *game, *rom);
+                SortUi(c.ui);
+            }
+            else screen(v, focus);
             return c;
         }
     // A black load (both screens black, RAM between screens): the bare backdrop.

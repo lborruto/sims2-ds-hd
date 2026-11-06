@@ -24,6 +24,7 @@
 #include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/front.h"
+#include "port/frontmenus.h"
 #include "port/gift.h"
 #include "port/goals.h"
 #include "port/note.h"
@@ -2167,6 +2168,235 @@ int main()
         GameState bad = front(3, -1);
         bad.valid = false;
         CHECK(!FrontViewOf(fe, bad).valid);
+    }
+
+    // Settings and Load-a-Sim (port/frontmenus.h) on made-up states: the sliders' Left / Right a
+    // drag from the game's knob to the next tenth at every volume (none past an end; a volume
+    // landed half a pixel off still moves a whole tenth), the concept grid (A only on the unlocked
+    // pictures, a tap inside the game's cell; the first focus the first unlocked one), Credits (no
+    // item); LB / RB the neighbouring tabs in a ring, B the X; Load's rows (enabled only when used
+    // and no popup is up, A the tick, the first focus the game's current slot when used), the slot
+    // time as the game's formats print it; ids distinct and the module's; every enabled item
+    // reachable; inside the canvas, layers ascending; the mouse round trips onto the game's targets;
+    // no view on another screen, without the RAM's part or the strings.
+    {
+        RomData rom;
+        const ScreenState none {Screen::None, Tab::None}, fe {Screen::FrontEnd, Tab::None};
+        std::vector<u32> bottom(SW * SH, 0xFF5961A2);
+        auto layers = [&](const Composition& comp) {
+            int layer = 0;
+            for (const ui::UiItem& u : comp.ui)
+            {
+                CHECK(u.to.x >= 0 && u.to.y >= 0 && u.to.x + u.to.w <= kConsoleW && u.to.y + u.to.h <= kConsoleH);
+                if (u.kind == ui::UiItem::Image) continue;
+                CHECK(u.layer >= layer);
+                layer = u.layer;
+            }
+        };
+        auto settings = [](int page, int music, int sfx, u16 bits) {
+            GameState g;
+            g.valid = true;
+            g.front.kind = FrontKind::Settings;
+            SettingsState& st = g.front.settings;
+            st.valid = true;
+            st.page = page;
+            st.music = music;
+            st.sfx = sfx;
+            st.conceptKnown = page == 2;
+            st.conceptBits = bits;
+            st.creditsKnown = page == 3;
+            st.creditsPos = 0xBF000;
+            st.creditsLine = 11;
+            return g;
+        };
+        // The knob's drag: from the knob, the volume after it (32 a pixel) within a pixel of the tenth.
+        for (int vol = 0; vol <= 4096; vol += 16)
+            for (int dir : {-1, 1})
+            {
+                const int x = SettingsNotchX(vol, dir), k = (int)std::lround(vol * 10.0 / 4096);
+                const bool near = std::fabs(vol * 10.0 / 4096 - k) < 0.15;
+                const int want = dir < 0 ? (near ? k - 1 : (int)std::floor(vol * 10.0 / 4096)) : (near ? k + 1 : (int)std::ceil(vol * 10.0 / 4096));
+                CHECK((x < 0) == (want < 0 || want > 10));
+                if (x < 0) continue;
+                const int after = std::clamp(vol + 32 * (x - SettingsKnobX(vol)), 0, 4096);
+                CHECK(std::abs(after - 4096 * want / 10) <= 32);
+                CHECK(x >= kSeTrackX0 - 4 && x <= kSeTrackX0 + kSeTrackW + 4);
+            }
+        CHECK(SettingsKnobX(4096) == 212 && SettingsKnobX(0) == 84);
+        std::set<u32> ids;
+        for (int page = 0; page < 4; page++)
+            for (u16 bits : {(u16)0, (u16)0x8, (u16)0xFFF})
+                for (int vol : {0, 1296, 3696, 4096})
+                {
+                    const GameState g = settings(page, vol, 4096 - vol, bits);
+                    const MenuView v = SettingsViewOf(none, g);
+                    CHECK(v.valid && v.own && !v.replay && v.backCloses && AllReachable(v));
+                    CHECK(SettingsViewOf(fe, g).valid && !SettingsViewOf({Screen::Panel, Tab::Interact}, g).valid);
+                    CHECK(!SettingsView(none, &g, &rom).valid); // no strings: milestone 1's
+                    CHECK(v.back.size() == 1 && v.back[0].x == kSeCloseX && v.back[0].y == kSeCloseY);
+                    const MenuAction& lb = v.buttons[(int)MenuButton::LB];
+                    const MenuAction& rb = v.buttons[(int)MenuButton::RB];
+                    CHECK(lb.size() == 1 && lb[0].y == kSeTabY0 + kSeTabDy * ((page + 3) % 4) && rb.size() == 1 && rb[0].y == kSeTabY0 + kSeTabDy * ((page + 1) % 4));
+                    for (const ViewItem& it : v.items) { ids.insert(it.id); CHECK((it.id >> 24) == (kModFrontMenus >> 24)); }
+                    if (page <= 1)
+                    {
+                        const int vv = page == 0 ? vol : 4096 - vol;
+                        CHECK(v.items.size() == 1 && v.items[0].left.empty() == (vv == 0) && v.items[0].right.empty() == (vv == 4096));
+                        for (const MenuAction* a : {&v.items[0].left, &v.items[0].right})
+                            if (!a->empty()) CHECK(a->size() == 1 && (*a)[0].kind == MenuStep::Drag && (*a)[0].x == SettingsKnobX(vv) && (*a)[0].y == (page == 0 ? kSeMusicY : kSeSfxY));
+                    }
+                    else if (page == 2)
+                    {
+                        CHECK((int)v.items.size() == kSeCells);
+                        int firstOn = -1;
+                        for (int i = 0; i < kSeCells; i++)
+                        {
+                            const ViewItem& it = v.items[i];
+                            const bool on = bits & (1u << i);
+                            if (on && firstOn < 0) firstOn = i;
+                            CHECK(it.enabled && it.action.empty() == !on);
+                            if (on)
+                            {
+                                const int x = it.action[0].x, y = it.action[0].y, cx = kSeCellX0 + (i & 3) * kSeCellDx, cy = kSeCellY0 + (i >> 2) * kSeCellDy;
+                                CHECK(x > cx + 4 && x < cx + kSeCellW - 4 && y > cy + 4 && y < cy + kSeCellH - 4);
+                            }
+                        }
+                        CHECK(MenuFirst(v) == std::max(firstOn, 0));
+                    }
+                    else CHECK(v.items.empty());
+                    for (int topW : {256, 341})
+                        for (int focus : {-1, 0, 3})
+                        {
+                            Composition comp {kConsoleW, kConsoleH, {}, {}};
+                            BuildSettings(comp, v, focus, g, rom, bottom.data(), topW, 192);
+                            layers(comp);
+                            if (focus != 0 || topW != 256 || vol != 1296) continue;
+                            for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                TestConsoleRoundtrip(none, false, 256, 192, o.first, o.second, false, &comp);
+                            // Every tab's HD cell lands in the game's tab box, every cell in its picture.
+                            const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                            for (int i = 0; i < kSeTabs; i++)
+                            {
+                                const Rect r = SettingsTabRect(i);
+                                int tx, ty;
+                                CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                                CHECK(std::abs(tx - kSeTabX) <= 12 && std::abs(ty - (kSeTabY0 + kSeTabDy * i)) <= 12);
+                            }
+                            if (page == 2)
+                                for (int i = 0; i < kSeCells; i++)
+                                {
+                                    const Rect r = SettingsCellRect(i);
+                                    int tx, ty;
+                                    CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - (kSeCellX0 + (i & 3) * kSeCellDx + kSeCellW / 2)) <= 1 && std::abs(ty - (kSeCellY0 + (i >> 2) * kSeCellDy + kSeCellH / 2)) <= 1);
+                                }
+                        }
+                }
+        CHECK(ids.size() == 2 + kSeCells);
+        {
+            GameState g = settings(2, 4096, 4096, 1);
+            g.front.settings.conceptKnown = false;
+            CHECK(!SettingsViewOf(none, g).valid);
+            g = settings(3, 4096, 4096, 0);
+            g.front.settings.creditsKnown = false;
+            CHECK(!SettingsViewOf(none, g).valid);
+            g.front.settings.valid = false;
+            CHECK(!SettingsViewOf(none, g).valid);
+        }
+
+        // The slot time in the game's formats (EN, FR, DE), midnight and noon in 12 hours.
+        LoadRow t;
+        t.timeKnown = true;
+        t.month = 11; t.day = 21; t.hour12 = 12; t.minute = 52; t.pm = false;
+        CHECK(SlotTimeText("%n/%j %g:%i%a", t, "am", "pm") == "11/21 12:52am");
+        CHECK(SlotTimeText("%j/%n %H:%i", t, "am", "pm") == "21/11 00:52");
+        t.hour12 = 1; t.minute = 3; t.pm = true; t.month = 2; t.day = 5;
+        CHECK(SlotTimeText("%n/%j %g:%i%a", t, "am", "pm") == "2/5 1:03pm");
+        CHECK(SlotTimeText("%j.%n %H:%i", t, "am", "pm") == "5.2 13:03");
+        CHECK(SlotTimeText("%d/%m %G%A%q%%", t, "am", "pm") == "05/02 13PM%");
+        t.timeKnown = false;
+        CHECK(SlotTimeText("%n/%j", t, "am", "pm").empty());
+
+        auto load = [](u8 used, int green, bool popup, bool wireless) {
+            GameState g;
+            g.valid = true;
+            LoadScreen& l = g.front.load;
+            l.valid = true;
+            l.wireless = wireless;
+            l.green = green;
+            g.front.kind = wireless ? FrontKind::Wireless : FrontKind::Load;
+            for (int i = 0; i < kLoadRows; i++)
+            {
+                LoadRow& r = l.rows[i];
+                r.used = used & (1u << i);
+                if (!r.used) continue;
+                r.name = i == 1 ? "WWWWWWW" : "Chris";
+                r.money = i == 2 ? 99999999 : 3226;
+                r.place = 3; r.placeNameId = 70;
+                r.timeKnown = true; r.month = 12; r.day = 28; r.hour12 = 12; r.minute = 58; r.pm = true;
+            }
+            if (popup)
+            {
+                g.town.popup.valid = true;
+                g.town.popup.state = 3;
+                g.town.popup.kind = 3;
+            }
+            return g;
+        };
+        std::set<u32> lids;
+        for (int used = 0; used < 8; used++)
+            for (int green : {-1, 0, 2})
+                for (bool popup : {false, true})
+                    for (bool wireless : {false, true})
+                    {
+                        const GameState g = load((u8)used, green, popup, wireless);
+                        const MenuView v = LoadViewOf(none, g);
+                        CHECK(v.valid && v.own && !v.replay && AllReachable(v) && (int)v.items.size() == kLoadRows);
+                        CHECK(!LoadViewOf({Screen::Panel, Tab::Interact}, g).valid && !LoadView(none, &g, &rom).valid);
+                        CHECK(v.back.empty() == popup);
+                        if (!popup) CHECK(v.back.size() == 1 && v.back[0].x == kLdCloseX && v.back[0].y == kLdCloseY && v.backCloses);
+                        for (int i = 0; i < kLoadRows; i++)
+                        {
+                            const ViewItem& it = v.items[i];
+                            lids.insert(it.id);
+                            CHECK((it.id >> 24) == (kModFrontMenus >> 24));
+                            CHECK(it.enabled == ((used & (1 << i)) && !popup));
+                            CHECK(it.action.empty() != it.enabled);
+                            if (it.enabled) CHECK(it.action.size() == 1 && it.action[0].x == kLdTickX && it.action[0].y == kLdTickY[i]);
+                        }
+                        const int first = MenuFirst(v);
+                        if (!popup && used)
+                        {
+                            const int want = green >= 0 && (used & (1 << green)) ? green : __builtin_ctz(used);
+                            CHECK(first == want);
+                        }
+                        else CHECK(first < 0);
+                        for (int topW : {256, 341})
+                        {
+                            Composition comp {kConsoleW, kConsoleH, {}, {}};
+                            BuildLoad(comp, v, first, g, rom, topW, 192);
+                            layers(comp);
+                            for (const Piece& q : comp.pieces)
+                                if (q.src == Src::Top) CHECK(!q.touch);
+                            if (topW != 256 || popup || !used) continue;
+                            for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                TestConsoleRoundtrip(none, false, 256, 192, o.first, o.second, false, &comp);
+                            const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                            for (int i = 0; i < kLoadRows; i++)
+                            {
+                                const Rect r = LoadRowRect(i);
+                                int tx, ty;
+                                const bool hit = TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty);
+                                CHECK(hit == (bool)(used & (1 << i)));
+                                if (hit) CHECK(std::abs(tx - kLdTickX) <= 12 && std::abs(ty - kLdTickY[i]) <= 12);
+                            }
+                        }
+                    }
+        CHECK(lids.size() == (size_t)kLoadRows);
+        for (u32 id : lids) CHECK(!ids.count(id));
+        GameState bad = load(7, 0, false, false);
+        bad.front.load.valid = false;
+        CHECK(!LoadViewOf(none, bad).valid);
     }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }

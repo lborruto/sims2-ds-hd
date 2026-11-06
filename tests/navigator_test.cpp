@@ -1807,8 +1807,103 @@ static void view_front_start()
     }
 }
 
+// The boot's splashes that take no touch (port/front.h): a view with no item passes the DS's own
+// Start and A on (passKeys) while they are held; Settings and Load-a-Sim (port/frontmenus.h) on the
+// front end's None screen: LB / RB the view's page taps, a slider's Left / Right its drag, B its
+// back tap then the closing wait, an unsettled A dropped (never replayed).
+static void view_front_menus()
+{
+    const ScreenState none {Screen::None, Tab::None};
+    {
+        MenuView v;
+        v.valid = v.own = true;
+        v.replay = false;
+        v.passKeys = (1u << kStart) | (1u << kA);
+        Rig r;
+        r.view = &v;
+        r.Frame(none);
+        PadState st;
+        st.start = true;
+        CHECK((r.Frame(none, st) & (1u << kStart)) != 0);
+        PadState a;
+        a.a = true;
+        CHECK((r.Frame(none, a) & (1u << kA)) != 0 && !r.touch.Owns());
+        PadState b;
+        b.b = true;
+        CHECK((r.Frame(none, b) & (1u << kB)) == 0);
+    }
+    MenuView v;
+    v.valid = v.own = true;
+    v.replay = false;
+    ViewItem slider;
+    slider.rect = {840, 320, 392, 180};
+    slider.id = 0x11000100;
+    slider.left = {DragStep(212, 96, 199, 96)};
+    for (int& n : slider.next) n = kNoMove;
+    v.items.push_back(slider);
+    v.buttons[(int)MenuButton::LB] = {TapStep(21, 174)};
+    v.buttons[(int)MenuButton::RB] = {TapStep(21, 94)};
+    v.back = {TapStep(19, 17)};
+    v.backCloses = true;
+    int x0, y0, x1, y1;
+    {
+        Rig r;
+        r.view = &v;
+        r.Frame(none);
+        r.Press(none, &PadState::left);
+        CHECK(r.Path(x0, y0, x1, y1) && x0 == 212 && x1 == 199 && y0 == 96 && y1 == 96);
+        r.Press(none, &PadState::right); // (nothing that way: the focus stays)
+        CHECK(!r.touch.Owns() && r.nav.Focus() == 0);
+        r.Press(none, &PadState::rb);
+        CHECK(r.Touched(x0, y0) && x0 == 21 && y0 == 94);
+        r.Drain();
+        r.Frame(none);
+        r.Press(none, &PadState::lb);
+        CHECK(r.Touched(x0, y0) && x0 == 21 && y0 == 174);
+        r.Drain();
+        r.Frame(none);
+        r.Press(none, &PadState::b);
+        CHECK(r.Touched(x0, y0) && x0 == 19 && y0 == 17);
+    }
+    // Load-a-Sim: A taps the slot's tick; held while unsettled, dropped.
+    MenuView ld;
+    ld.valid = ld.own = true;
+    ld.replay = false;
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {200, 124 + 156 * i, 880, 142};
+        it.id = 0x11000300u + (u32)i;
+        it.enabled = i != 1;
+        if (it.enabled) it.action = {TapStep(231, 66 + 46 * i)};
+        ld.items.push_back(it);
+    }
+    {
+        Rig r;
+        r.view = &ld;
+        r.Frame(none);
+        r.Press(none, &PadState::down); // (past the empty slot)
+        CHECK(r.nav.Focus() == 2);
+        r.Press(none, &PadState::a);
+        CHECK(r.Touched(x0, y0) && x0 == 231 && y0 == 158);
+    }
+    {
+        Rig r;
+        r.view = &ld;
+        r.Frame(none);
+        PadState a;
+        a.a = true;
+        r.Frame(none, a, false);
+        r.Frame(none, {}, false);
+        r.Frame(none, {}, true);
+        r.Frame(none, {}, true);
+        CHECK(!r.touch.Owns());
+    }
+}
+
 int main()
 {
+    view_front_menus();
     view_modules_on_one_screen();
     view_catalogue_spends_once();
     menu_opens_and_closes();

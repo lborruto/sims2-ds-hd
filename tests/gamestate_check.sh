@@ -19,6 +19,22 @@ complete_save=${COMPLETE_SAVE:-$repo/saves/complete-play.sav}
 [ -f "$rom" ] || { echo "no ROM (set ROM)"; exit 2; }
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
+# At most MAX_SIMS (default 4) emulators at once: "$bin" is this function, which takes one of
+# the slots (a directory each) for the run.
+max_sims=${MAX_SIMS:-4}
+real_bin=$bin
+sims2wide_slot() {
+    local i slot=
+    while [ -z "$slot" ]; do
+        for i in $(seq 1 "$max_sims"); do mkdir "$tmp/slot$i" 2>/dev/null && { slot=$tmp/slot$i; break; }; done
+        [ -n "$slot" ] || sleep 0.2
+    done
+    "$real_bin" "$@"
+    local rc=$?
+    rmdir "$slot"
+    return $rc
+}
+bin=sims2wide_slot
 
 # run NAME STATE FRAMES [options...]: the whole log in NAME.log, the game states printed (one
 # "frame N: game X" per line) in NAME.out, and NAME.ok only if the run went to its end (exit

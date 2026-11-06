@@ -1462,6 +1462,9 @@ GameState ReadGameState(RamView ram)
     for (const auto& e : kEU.plain) if (e.vt == vt) { g.screen = e.screen; break; }
     if (g.screen == GScreen::Unknown)
         for (const auto& e : kEU.overlays) if (e.vt == vt && e.ov == g.overlay) { g.screen = e.screen; break; }
+    // Settings, Load-a-Sim and DS Wireless (the front end's bottom objects, port/frontmenus.h): the
+    // front end's GScreen, as the title and the main menu (CONSOLE's screen from RAM there).
+    if (g.screen == GScreen::Unknown && (g.front.settings.valid || g.front.load.valid)) g.screen = GScreen::FrontEnd;
 
     switch (g.screen)
     {
@@ -1592,6 +1595,8 @@ bool PixelsAgree(const GameState& g, ScreenState pixels)
     {
     case Screen::FrontEnd: case Screen::CreateASim: return pixels.screen == Screen::None;
     case Screen::SaveSlots: case Screen::ItemHand: return pixels.screen == Screen::Unknown;
+    // The boot's splashes (no GScreen of their own): Unknown in RAM, no HUD in the pixels.
+    case Screen::Unknown: return pixels.screen == Screen::None && (g.front.kind == FrontKind::Boot || g.front.kind == FrontKind::Video);
     default: return false;
     }
 }
