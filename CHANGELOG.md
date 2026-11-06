@@ -7,6 +7,12 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+### Added
+
+- The Steam Controller and the Steam Deck work out of the box: through Steam's default Gamepad
+  layout (added as a non-Steam game), and without Steam too (the Steam Controller's own driver is
+  turned on when Steam did not start the game, its back grip standing for the right pad's click).
+
 ### Changed
 
 - CONSOLE is now the default layout (the other layouts stay in SETTINGS > DISPLAY > LAYOUT).

@@ -449,6 +449,74 @@ static void steam()
     SDL_SetHint("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD", "0");
 }
 
+// The Steam Controller and the Deck, natively (SDL's HIDAPI drivers) and through Steam Input.
+static void steam_pads()
+{
+    // The ids: SDL's Steam Controllers, not the Deck, not Steam's virtual pad, not a Sony pad.
+    for (Uint16 p : {0x1101, 0x1102, 0x1105, 0x1106, 0x1142, 0x1201, 0x1202}) CHECK(Pads::SteamController(0x28DE, p));
+    CHECK(!Pads::SteamController(0x28DE, 0x1205)); // the Deck
+    CHECK(!Pads::SteamController(0x28DE, 0x11FF)); // Steam's virtual pad
+    CHECK(!Pads::SteamController(kSony, 0x1102));
+    // The driver off in SDL, on here unless Steam launched the game (the player's own hint stays).
+    SDL_setenv("SteamGameId", "", 1);
+    CHECK(!Pads::LaunchedBySteam());
+    SDL_setenv("SteamGameId", "12345", 1);
+    CHECK(Pads::LaunchedBySteam());
+    SDL_setenv("SteamGameId", "", 1);
+    CHECK(!Pads::LaunchedBySteam());
+    SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_STEAM, "0");
+    Pads::Hints();
+    CHECK(SDL_GetHintBoolean(SDL_HINT_JOYSTICK_HIDAPI_STEAM, SDL_FALSE)); // (not launched by Steam)
+    SDL_SetHint(SDL_HINT_JOYSTICK_HIDAPI_STEAM, "0");
+    // Each type's look: Xbox-style glyphs for the Steam Controller, the Deck and Steam's pad.
+    CHECK(Pads::StyleOf(SDL_CONTROLLER_TYPE_UNKNOWN) == XBOX);
+    Pads pads;
+    for (Uint16 product : {0x1102, 0x1205})
+    {
+        const SDL_JoystickID id = Attach(0x28DE, product, product == 0x1205 ? "Steam Deck" : "Steam Controller", 0, 0, 17);
+        Pump(pads);
+        CHECK(pads.Count() == 1 && pads.Active() == id);
+        CHECK(pads.Style() == XBOX);
+        // The full set of a Steam Input default gamepad: faces, bumpers, Start / Back, both clicks, the D-pad.
+        const int bs[] = {SDL_CONTROLLER_BUTTON_A, SDL_CONTROLLER_BUTTON_B, SDL_CONTROLLER_BUTTON_X, SDL_CONTROLLER_BUTTON_Y,
+                          SDL_CONTROLLER_BUTTON_BACK, SDL_CONTROLLER_BUTTON_START, SDL_CONTROLLER_BUTTON_LEFTSTICK,
+                          SDL_CONTROLLER_BUTTON_RIGHTSTICK, SDL_CONTROLLER_BUTTON_LEFTSHOULDER, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
+                          SDL_CONTROLLER_BUTTON_DPAD_UP, SDL_CONTROLLER_BUTTON_DPAD_DOWN, SDL_CONTROLLER_BUTTON_DPAD_LEFT,
+                          SDL_CONTROLLER_BUTTON_DPAD_RIGHT};
+        const int ins[] = {IN_A, IN_B, IN_X, IN_Y, IN_BACK, IN_START, IN_LS, IN_RS, IN_LB, IN_RB, IN_UP, IN_DOWN, IN_LEFT, IN_RIGHT};
+        for (size_t i = 0; i < 14; i++)
+        {
+            if (ins[i] == IN_RS && product == 0x1102) continue; // (the click is the grip's, below)
+            Button(id, bs[i], true);
+            Pump(pads);
+            CHECK(pads.Read(opt).btn[ins[i]]);
+            Button(id, bs[i], false);
+            Pump(pads);
+            CHECK(!pads.Read(opt).btn[ins[i]]);
+        }
+        if (product == 0x1102)
+        {
+            // The right pad's click never reaches SDL natively: the back grip stands for R3.
+            Button(id, SDL_CONTROLLER_BUTTON_PADDLE1, true);
+            Pump(pads);
+            CHECK(pads.Read(opt).btn[IN_RS]);
+            Button(id, SDL_CONTROLLER_BUTTON_PADDLE1, false);
+            Pump(pads);
+            CHECK(!pads.Read(opt).btn[IN_RS]);
+        }
+        Trigger(id, SDL_CONTROLLER_AXIS_TRIGGERLEFT, 1.0f);
+        Trigger(id, SDL_CONTROLLER_AXIS_TRIGGERRIGHT, 1.0f);
+        Pump(pads);
+        CHECK(pads.Read(opt).btn[IN_LT] && pads.Read(opt).btn[IN_RT]);
+        Detach(id);
+        Pump(pads);
+        CHECK(pads.Count() == 0);
+    }
+    // Every default action has an input a Steam Input gamepad gives: none on the Guide.
+    Bindings b;
+    for (int a = 0; a < COUNT; a++) CHECK(b.Pad(a) != IN_GUIDE);
+}
+
 // A mapping line for a virtual pad's GUID, named `name`, A on its button `a`.
 static std::string Line(const std::string& guid, const char* name, int a)
 {
@@ -549,6 +617,7 @@ int main()
     missing_buttons();
     types_and_looks();
     steam();
+    steam_pads();
     SDL_Quit();
     if (failures) { fprintf(stderr, "pads_test: %d failed\n", failures); return 1; }
     printf("pads_test: all passed\n");

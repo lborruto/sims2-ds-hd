@@ -77,6 +77,12 @@ public:
     static int StyleOf(SDL_GameControllerType t);
     // Steam's virtual pad, as SDL tells it (SDL_IsJoystickSteamVirtualGamepad).
     static bool SteamVirtual(Uint16 vendor, Uint16 product, Uint16 version);
+    // A Valve Steam Controller (not the Deck, not Steam's virtual pad) by its USB ids: through
+    // SDL's HIDAPI driver its right pad's click never reaches SDL (R3), its back grip does.
+    static bool SteamController(Uint16 vendor, Uint16 product);
+    // Whether the game was started by Steam (its environment: SteamGameId, SteamAppId): then
+    // Steam Input owns the Steam Controller and gives the game its virtual pad.
+    static bool LaunchedBySteam();
 
 private:
     struct Pad
@@ -84,6 +90,7 @@ private:
         SDL_GameController* c;
         SDL_JoystickID id;
         bool steam;
+        bool rsFromGrip; // a Steam Controller on SDL's HIDAPI driver: R3 is its back grip
         int style;
         SDL_GameControllerType type;
     };
