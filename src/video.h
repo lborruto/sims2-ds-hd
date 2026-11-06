@@ -35,6 +35,12 @@ struct Video
     UiCache uiCache, shellCache; // the game's UI; the shell's, kept apart
     SDL_Texture* cropTex = nullptr;
     void DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, UiCache& cache, const u32* bottom);
+    // The renderer lost its textures' contents (SDL_RENDER_TARGETS_RESET / SDL_RENDER_DEVICE_RESET:
+    // a GPU switch, a display change on Windows): the UI's layers, the crops' texture and the
+    // overlays are forgotten, so the next picture makes and uploads them whole. main.cpp passes
+    // every event.
+    void Event(const SDL_Event& ev);
+    void ForgetTextures();
     // The composition last shown (Present): what the mouse reads (TouchAt, OverTop) until the
     // next one, rather than composing it again per event.
     Composition lastShown;

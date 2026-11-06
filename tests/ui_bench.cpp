@@ -264,7 +264,8 @@ int main(int argc, char** argv)
                 for (const Rect& r : e.dirty)
                     for (int y = r.y; y < r.y + r.h; y++)
                     {
-                        memcpy(&texture[(size_t)(e.y + y) % oh * ow], &e.px[(size_t)y * e.w + r.x], (size_t)r.w * 4);
+                        // (into the output-sized buffer, a layer wider than it cut: the copy's cost)
+                        memcpy(&texture[(size_t)(e.y + y) % oh * ow], &e.px[(size_t)y * e.w + r.x], (size_t)std::min(r.w, ow) * 4);
                         pixels += r.w;
                     }
         const auto t3 = Clock::now();

@@ -317,6 +317,26 @@ void Video::DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, U
     }
 }
 
+void Video::Event(const SDL_Event& ev)
+{
+    if (ev.type == SDL_RENDER_TARGETS_RESET || ev.type == SDL_RENDER_DEVICE_RESET) ForgetTextures();
+}
+
+void Video::ForgetTextures()
+{
+    for (UiCache* c : {&uiCache, &shellCache})
+    {
+        for (auto& [id, t] : c->tex)
+            if (t.tex) SDL_DestroyTexture(t.tex);
+        c->tex.clear();
+        c->layers.entries.clear(); // (every layer drawn and uploaded whole again)
+    }
+    if (cropTex) SDL_DestroyTexture(cropTex);
+    cropTex = nullptr;
+    for (OverlayTex& e : overlayTex) SDL_DestroyTexture(e.tex);
+    overlayTex.clear();
+}
+
 const Composition& Video::ShownComposition(const App& app, Composition& scratch) const
 {
     if (haveLastShown) return lastShown;

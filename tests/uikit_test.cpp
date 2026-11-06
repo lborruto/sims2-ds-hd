@@ -514,6 +514,27 @@ static void raster_ways()
     long long area = 0;
     for (const Rect& r : cache.entries[0].dirty) area += (long long)r.w * r.h;
     CHECK(cache.entries[0].changed && area > 0 && area * 4 < (long long)cache.entries[0].w * cache.entries[0].h);
+    // A chip whose `to` is cut shorter than the chip (the shell's Keys page caps a long key's at
+    // 170): the chip still draws whole, and the cache draws it again whole when it changes.
+    for (float s : {1.0f, 2.0f, 3.0f})
+    {
+        std::vector<UiItem> keys = {PanelItem({20, 20, 600, 200})};
+        UiItem key = ChipItemAs(60, 60, Face::Keyboard, "KEYPAD MEMSUBTRACT", "", 24, Weight::ExtraBold);
+        CHECK(key.to.w > 170);
+        key.to.w = 170;
+        keys.push_back(key);
+        UiItem after = TextItem({400, 60, 200, 40}, "Right", 24);
+        keys.push_back(after);
+        LayerCache c;
+        c.Update(keys, s, 0, 0);
+        keys[1] = ChipItemAs(60, 60, Face::Keyboard, "THOUSANDSSEPARATOR", "", 24, Weight::ExtraBold);
+        keys[1].to.w = 170;
+        c.Update(keys, s, 0, 0);
+        const std::vector<LayerAt> l = LayersAt(keys, s, 0, 0);
+        std::vector<u32> whole((size_t)l[0].w * l[0].h);
+        Rasterise(l[0].items, s, whole.data(), l[0].w, l[0].h, l[0].ox, l[0].oy);
+        CHECK(c.entries.size() == 1 && c.entries[0].px == whole);
+    }
     // A live crop at a whole factor is the GPU's (WholeFactorCrop); at another scale, or with a
     // transparent pixel, the kit's.
     const std::vector<UiItem> crop = {ImageItem({10, 10, 60, 40}, pic.data(), 256, 192, {5, 5, 30, 20})};

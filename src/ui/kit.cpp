@@ -1005,7 +1005,8 @@ std::atomic<int> gRasterThreads {0};
 // An item's pixels on a raster (layer pixels, before the raster's own clip): what it may draw,
 // with room to spare: a panel's shadow (4 canvas pixels around, 3 + 4 below), a chip's (1.5 + 1.5)
 // and the chip itself, which a column's labelAt moves right of `to` (by half of it at most) and
-// which keeps its own height whatever `to`'s; a text inside its box; a picture inside `to`.
+// which keeps its own width and height whatever `to`'s (a `to` cut shorter than the chip: the
+// shell's Keys page); a text inside its box; a picture inside `to`.
 // A still item with no size: everything.
 Rect Footprint(const UiItem& it, float s, float ox, float oy, int w, int h)
 {
@@ -1014,9 +1015,10 @@ Rect Footprint(const UiItem& it, float s, float ox, float oy, int w, int h)
     if (it.kind == UiItem::Panel) l = r = t = b = 12;
     else if (it.kind == UiItem::Chip)
     {
-        const float ch = ChipHeight(it.size);
+        // (ChipWidth asks the font: the footprint is made on the calling thread, as Prepare is.)
+        const float ch = ChipHeight(it.size), cw = ChipWidth(Resolve(it), it.size);
         l = 8;
-        r = 8 + std::max(it.labelAt, 0.0f);
+        r = 8 + std::max(it.labelAt, 0.0f) + std::max(cw - it.to.w, 0.0f);
         t = b = 8 + ch;
     }
     const int x0 = std::max((int)std::floor((it.to.x - l - ox) * s) - 2, 0), x1 = std::min((int)std::ceil((it.to.x + it.to.w + r - ox) * s) + 2, w);

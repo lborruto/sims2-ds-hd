@@ -398,7 +398,11 @@ int main(int argc, char** argv)
             {
                 SDL_Event ev;
                 input.PushScript(script, iter, video);
-                while (SDL_PollEvent(&ev)) input.HandleEvent(ev, app, video, true);
+                while (SDL_PollEvent(&ev))
+                {
+                    video.Event(ev);
+                    input.HandleEvent(ev, app, video, true);
+                }
                 input.Poll(app, true);
                 if (input.wantQuit) return false;
                 in = shellInput(input.nav);
@@ -949,7 +953,11 @@ relaunch:
         {
             SDL_Event ev;
             input.PushScript(script, iter, video);
-            while (SDL_PollEvent(&ev)) input.HandleEvent(ev, app, video, host.Open());
+            while (SDL_PollEvent(&ev))
+            {
+                video.Event(ev);
+                input.HandleEvent(ev, app, video, host.Open());
+            }
             // A controller connected (at start too): how to pause, now that Guide is Steam's.
             for (const Pads::Connected& pc : input.pads.TakeConnected())
             {
