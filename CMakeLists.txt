@@ -72,7 +72,7 @@ target_include_directories(uikit PUBLIC melonDS/src src PRIVATE src/thirdparty)
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
     src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/controls.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
-    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
+    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
@@ -115,8 +115,9 @@ endif()
 
 # Checks of the layouts' touch mapping (not built by default): ninja -C build layout_test && ./build/layout_test
 add_executable(layout_test EXCLUDE_FROM_ALL tests/layout_test.cpp src/layout.cpp src/activities.cpp src/compose.cpp src/console.cpp src/hotspots.cpp src/screens.cpp
-    src/touchscript.cpp src/ui.cpp)
+    src/touchscript.cpp src/ui.cpp src/port/statusbar.cpp src/romdata.cpp)
 target_include_directories(layout_test PRIVATE melonDS/src src)
+target_link_libraries(layout_test PRIVATE uikit)
 
 # Checks of the synthesised touches (not built by default): ninja -C build touchscript_test && ./build/touchscript_test
 add_executable(touchscript_test EXCLUDE_FROM_ALL tests/touchscript_test.cpp src/touchscript.cpp)

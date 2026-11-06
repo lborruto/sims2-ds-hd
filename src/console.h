@@ -10,6 +10,8 @@
 #pragma once
 #include "activities.h"
 #include "compose.h"
+#include "gamestate.h"
+#include "port/statusbar.h"
 #include "screens.h"
 
 namespace sims2wide
@@ -50,6 +52,9 @@ constexpr Rect kDialogueTextBox {124, 516, 776, 188};
 constexpr Rect kActivityBottomTo {36, 68, SW * 3, SH * 3};
 constexpr int kActivityTopX = 858, kActivityTopY = 68, kActivityTopW = 384;
 constexpr Rect kHintBox {850, 400, 400, 252};
+// The HD status bar under the small world (its frame's 6 pixels and a gap), as wide as that
+// frame: 4:3, rows 344-391, above the hints' box (400) with the bar's shadow.
+constexpr int kActivityBarGap = 12;
 // Inside it: the padding, the gap between rows, the buttons' chips' height and the column the
 // texts start at (after the widest chip, a 7-letter word at 2x); a text line at 3x is 18 pixels
 // a character, so 14 fit beside a chip and 20 in a note (activities.cpp wraps them by hand).
@@ -75,5 +80,11 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // Screen::Loading (a black load): the bare backdrop, no piece.
 // Screen::None, FrontEnd, CreateASim: the front end's view (kFront*); SaveSlots, ItemHand, Unknown:
 // the menu composition with a frame (the stick cursor's screens); never SIDE's bare pair of screens.
-Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH);
+// hud, strings (both given and strings->ok: the game's RAM and text read): the HD status bar
+// (port/statusbar.h) wherever the world shows the game's HUD, the game's own bar (the top
+// picture's last 16 of 192 rows) cropped off that world: town, the menu over the dimmed world,
+// and under the small world of the activities that keep the HUD (Social, Vacuum, Catalogue,
+// Build; not Cards). Without them: milestone 1's compositions, the game's HUD left in the world.
+Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
+                         const HudStrings* strings = nullptr);
 }

@@ -88,9 +88,12 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
     c.overlays[box].to.h = std::min(y - kHintGap + kHintPad - kHintBox.y, kHintBox.h);
 }
 
-Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH)
+Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings)
 {
     Composition c {kConsoleW, kConsoleH, {}, {}};
+    // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
+    const bool bar = hud && strings && strings->ok;
+    const int worldRows = bar ? std::max(1, topH * 176 / 192) : topH;
     // A black load (both screens black, RAM between screens): the bare backdrop.
     if (s.screen == Screen::Loading) return c;
     const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::ItemHand || s.screen == Screen::Unknown;
@@ -118,19 +121,22 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     {
         // The world dimmed behind the touch screen: not playable, the mouse does nothing there.
         // The stick cursor's screens (no table: SaveSlots, ItemHand, Unknown) get a frame.
-        Piece world = World(topW, topH);
+        Piece world = World(topW, worldRows);
         world.touch = false;
         c.pieces.push_back(world);
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
         if (cursorScreen) c.overlays.push_back(FrameAround(kMenuTo, 1));
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
+        // Not dimmed: the game keeps its status bar up while the touch screen is used.
+        if (bar) AddStatusBar(c, *hud, *strings);
     }
     else if (s.screen == Screen::Panel)
     {
-        c.pieces.push_back(World(topW, topH));
+        c.pieces.push_back(World(topW, worldRows));
         c.overlays.push_back(Frame(kRailFrame, 1));
         c.pieces.push_back(Bottom(kRailPhoneFrom, kRailPhoneTo));
         c.pieces.push_back(Bottom(kRailTabsFrom, kRailTabsTo));
+        if (bar) AddStatusBar(c, *hud, *strings);
     }
     else if (s.screen == Screen::Dialogue)
     {
@@ -145,15 +151,19 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
     }
     else
     {
-        // Social, Vacuum, Cards, Catalogue, Build; the hints' box for the activities.
-        const int h = (int)std::lround((double)kActivityTopW * topH / topW);
+        // Social, Vacuum, Cards, Catalogue, Build; the hints' box for the activities. All but the
+        // cards keep the HUD: their small world without it, the HD bar under it.
+        const bool hudHere = bar && s.screen != Screen::Cards;
+        const int rows = hudHere ? worldRows : topH;
+        const int h = (int)std::lround((double)kActivityTopW * rows / topW);
         const Rect topTo {kActivityTopX, kActivityTopY, kActivityTopW, h};
         c.overlays.push_back({kCanvas, kPanelArgb, 0, 0, 0, 0});
         c.overlays.push_back(FrameAround(kActivityBottomTo, 0));
         c.overlays.push_back(FrameAround(topTo, 0));
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kActivityBottomTo));
-        c.pieces.push_back({Src::Top, {0, 0, topW, topH}, topTo});
+        c.pieces.push_back({Src::Top, {0, 0, topW, rows}, topTo});
         AddHints(c, ActivityHints(s.screen));
+        if (hudHere) AddStatusBar(c, *hud, *strings, topTo.x - 6, topTo.y + topTo.h + kActivityBarGap, topTo.w + 12);
     }
     AddRing(c, s, focus);
     return c;

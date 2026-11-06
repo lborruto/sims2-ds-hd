@@ -55,11 +55,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
+    case $state in act-cards|sit-casino) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    [ "$state" = act-cards ] && cp "$complete_save" "$save"
+    case $state in act-cards|sit-casino) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -68,7 +68,7 @@ run() {
 town=(--clock "2026-01-01 12:00")
 hotel=(--clock "2026-01-01 14:00")
 late=(--clock "2026-11-05 12:05")
-run s7 s7 "${town[@]}" &
+run s7 s7 --clock "2026-01-01 15:37" &
 run cityhall sit-cityhall "${town[@]}" &
 run s7-menu s7 "${town[@]}" --console-focus 0 &
 run cityhall-menu sit-cityhall "${town[@]}" --console-menu &
@@ -85,20 +85,31 @@ run s4 s4 "${town[@]}" &
 run slots sit-store "${town[@]}" --input "$repo/scripts/hotspots/options-save.txt" &
 run load act-cards "${late[@]}" --input "$repo/scripts/console/cards-quit.txt" &
 wait
+run casino sit-casino "${late[@]}" --print-hud &
+run casino-2x sit-casino "${late[@]}" --print-hud --compose-scale 2 &
+wait
 
 fails=0
-for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots load; do
+for name in s7 cityhall cityhall-menu s7-menu gift s5 social vacuum cards s2 s3 s4 slots load casino casino-2x; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
         continue
     fi
-    if "$python" -I - "$tmp/$name/c/f000119.png" "$tmp/$name/r/f000119.png" "$name" <<'EOF'
+    if "$python" -I - "$tmp/$name/c/f000119.png" "$tmp/$name/r/f000119.png" "$name" "$tmp/$name.log" <<'EOF'
+import re
 import sys
 from PIL import Image
 
-comp_path, raw_path, case = sys.argv[1:4]
+comp_path, raw_path, case, log_path = sys.argv[1:5]
 comp = Image.open(comp_path).convert("RGB")
+if case.endswith("-2x"):
+    # --compose-scale 2: the canvas at twice its size (pieces nearest): read it at canvas points.
+    expect_size = (2560, 1440)
+    if comp.size != expect_size:
+        print(f"  {case}: size {comp.size}")
+        sys.exit(1)
+    comp = comp.resize((1280, 720), Image.NEAREST)
 raw = Image.open(raw_path).convert("RGB")
 top = lambda x, y: raw.getpixel((x, y))
 bottom = lambda x, y: raw.getpixel((x, 192 + y))
@@ -132,9 +143,54 @@ def rail():
     expect("rail frame", C(1175, 360), FRAME)
     piece("rail tabs", 0, 6, 35, 184, 1177, 208, 2, step=2)
     piece("rail phone", 222, 4, 30, 30, 1182, 144, 2)
-    w = world_full()
-    for cx, cy in ((400, 100), (700, 650), (1000, 300)):
+    # The world without the game's status bar (its last 16 rows): 176 rows 720 high.
+    w = world_full(176)
+    for cx, cy in ((400, 100), (700, 650), (1000, 300), (900, 715)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
+
+WELL = hexrgb("6A72B8")
+BODY = [hexrgb(h) for h in ("EB0000", "38BA38", "DBA230", "B2B2E3")]
+
+def hud_values():
+    """The last status bar --print-hud logged: (money, hh, mm, cur, max, tier)."""
+    found = None
+    for line in open(log_path, encoding="utf-8", errors="replace"):
+        m = re.search(r"hud money=(\d+) time=(\d+):(\d+) sanity=(\d+)/(\d+) tier=(\d+)", line)
+        if m:
+            found = tuple(int(v) for v in m.groups())
+    return found
+
+def status_bar(values=None):
+    """The HD status bar at the bottom left (rows 660-708): white text with its dark shadow; with
+    values (from --print-hud), the meter: its body in the tier's colour, filled cur / max of the
+    track (the well's inside less 2 pixels a side) within 2 pixels."""
+    region = [C(x, y) for y in range(662, 706) for x in range(110, 760)]
+    if (255, 255, 255) not in region or OUTLINE not in region:
+        errors.append("no status bar text")
+    expect("status bar band", C(150, 662), hexrgb("6171B2"))
+    if values is None:
+        return
+    money, hh, mm, cur, mx, tier = values
+    body = BODY[tier]
+    rows = {}
+    for y in range(660, 709):
+        xs = [x for x in range(100, 1170) if C(x, y) == body]
+        if xs:
+            rows[y] = xs
+    if not rows:
+        errors.append(f"no meter body in tier {tier}'s colour")
+        return
+    y = sorted(rows)[len(rows) // 2 + 1] if len(rows) > 2 else sorted(rows)[0]
+    xs = rows[y]
+    wells = [x for x in range(100, 1170) if C(x, y) == WELL]
+    if not wells:
+        errors.append("no meter well")
+        return
+    track_w = (max(max(wells), max(xs)) - min(wells) + 1) - 4
+    filled = (max(xs) - min(xs) + 1) + 2
+    want = round(track_w * cur / mx)
+    if abs(filled - want) > 2:
+        errors.append(f"meter filled {filled} of {track_w} (want {want}: {cur}/{mx})")
 
 def front():
     """No HUD: the top screen fitted in 24,72 568 x 480 (4:3: 568 x 426 at 24,99), the touch
@@ -159,19 +215,27 @@ def front():
 def big_over_dim():
     piece("touch screen 3x", 0, 0, 256, 192, 256, 72, 3, step=9)
     expect("touch screen 3x top-left", C(256, 72), bottom(0, 0))
-    w = world_full()
-    for cx, cy in ((200, 100), (1100, 650)):
+    # The world without the game's status bar (176 rows): row 174 at the canvas's foot.
+    w = world_full(176)
+    for cx, cy in ((200, 100), (1100, 650), (900, 715), (1050, 700)):
         r, g, b = w(cx, cy)
         expect(f"dimmed world at {cx},{cy}", C(cx, cy), tuple(v * (255 - 0x8C) // 255 for v in (r, g, b)))
 
-def activity():
+def activity(rows=192):
     expect("background", C(10, 10), PANEL)
     expect("touch screen frame", C(32, 300), OUTLINE)
     expect("touch screen 3x top-left", C(36, 68), bottom(0, 0))
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
     expect("world frame", C(855, 200), OUTLINE)
-    for x, y in ((0, 0), (100, 50), (383, 287), (200, 280)):
-        expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, y * 192 // 288))
+    # The small world, 384 wide; without the game's status bar (176 rows: 264 high) where the
+    # HD bar sits under it.
+    h = round(384 * rows / 256)
+    for x, y in ((0, 0), (100, 50), (383, h - 1), (200, h - 8)):
+        expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, y * rows // h))
+    if rows < 192:
+        region = [C(x, y) for y in range(68 + h + 14, 68 + h + 58) for x in range(852, 1248)]
+        if (255, 255, 255) not in region or OUTLINE not in region:
+            errors.append("no status bar text under the small world")
     # The hints' box (kHintBox, 850,400): its outline, its fill, the first button's chip and,
     # in the first row's text (x 972 on), white letters with the outline's shadow.
     expect("hints outline", C(851, 500), OUTLINE)
@@ -184,8 +248,22 @@ def activity():
 if case == "cityhall":
     expect("canvas", comp.size, (1280, 720))
     rail()
-elif case in ("s7", "cityhall-menu"):
+    status_bar()
+elif case == "s7":
     big_over_dim()
+    status_bar()
+elif case == "cityhall-menu":
+    big_over_dim()
+    status_bar()
+elif case in ("casino", "casino-2x"):
+    # The complete save (yellow tier): the casino's panel, the meter filled cur / max in yellow.
+    values = hud_values()
+    if values is None:
+        errors.append("no hud line from --print-hud")
+    else:
+        expect("tier", values[5], 2)
+        status_bar(values)
+        rail()
 elif case == "s7-menu":
     big_over_dim()
     # The ring around the phone's first button (up: x 12-79, y 140-189), 4 pixels outside it.
@@ -206,7 +284,11 @@ elif case == "s5":
     w = world_full(176)
     for cx, cy in ((400, 100), (1000, 300)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
-elif case in ("social", "vacuum", "cards"):
+elif case in ("social", "vacuum"):
+    expect("canvas", comp.size, (1280, 720))
+    activity(176)
+elif case == "cards":
+    # The card game has no HUD: its world whole, no status bar.
     expect("canvas", comp.size, (1280, 720))
     activity()
 elif case in ("s2", "s3", "s4"):
@@ -301,7 +383,7 @@ act() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 at=$5 clock=$6 file save=$tmp/$1.sav
     file=$shots/$state.st
     [ -f "$file" ] || file=$more_shots/$state.st
-    if [ "$state" = act-cards ]; then cp "$complete_save" "$save" || return; fi
+    case $state in act-cards|sit-casino) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames "$frames" --state-load "$file" --save "$save" --layout console \
         --print-screen --print-game --clock "$clock" --input "$input" --shot-at "$at" --shot-dir "$tmp/$name" \
         > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"

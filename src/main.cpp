@@ -275,6 +275,13 @@ int main(int argc, char** argv)
         }
         return 0;
     }
+    // The game's words for the HD status bar, once: a ROM whose data does not read keeps
+    // milestone 1's CONSOLE (the game's own HUD in the world).
+    {
+        RomData data;
+        if (data.Open(rom) && data.LoadStrings(GameLanguage(nds))) app.hudStrings = HudStringsFrom(&data);
+        if (!app.hudStrings.ok) fprintf(stderr, "no status bar text in this ROM: CONSOLE shows the game's own\n");
+    }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
 
     std::vector<InputEvent> script;

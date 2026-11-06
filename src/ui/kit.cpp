@@ -159,6 +159,7 @@ void DrawPanel(Layer& L, const UiItem& it, float s, float ox, float oy)
     const Theme& t = GameTheme();
     const float x0 = (it.to.x - ox) * s, y0 = (it.to.y - oy) * s, x1 = x0 + it.to.w * s, y1 = y0 + it.to.h * s;
     const float r = it.radius * s, line = std::max(1.0f, std::round(s));
+    if (it.plain) { FillRoundRect(L, x0, y0, x1, y1, r, it.fill); return; }
     if (it.raised) FillRoundRect(L, x0, y0 + 3 * s, x1, y1 + 3 * s, r, 0x66000000, 4 * s);
     // The dark outline, the frame's band, then the fill.
     FillRoundRect(L, x0, y0, x1, y1, r, t.shadow);
@@ -389,7 +390,7 @@ u64 Hash(const std::vector<UiItem>& items)
         Mix(h, ((u64)it.fill << 32) | it.borderArgb);
         Mix(h, (FloatBits(it.radius) << 32) | FloatBits(it.border));
         Mix(h, (FloatBits(it.size) << 32) | ((u64)it.raised << 16) | ((u64)it.weight << 8) | (u64)it.align);
-        Mix(h, ((u64)it.middle << 48) | ((u64)it.wrap << 40) | ((u64)it.button << 32));
+        Mix(h, ((u64)it.plain << 56) | ((u64)it.middle << 48) | ((u64)it.wrap << 40) | ((u64)it.button << 32));
         Mix(h, ((u64)it.colour << 32) | it.shadowArgb);
         Mix(h, FloatBits(it.labelAt));
         Mix(h, it.text.size());

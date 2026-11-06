@@ -36,6 +36,7 @@ struct UiItem
     u32 fill = 0, borderArgb = 0;
     float radius = 0, border = 0;
     bool raised = true;
+    bool plain = false;  // just the rounded box in `fill`: no outline, band, bevel or shadow (a meter's fill)
 
     // Text (and a chip's label): UTF-8, size in canvas pixels per em, wrapped to to.w when
     // `wrap`, aligned in `to`; a shadow one canvas pixel down and right, softened when scaled.

@@ -17,7 +17,8 @@
 ## What it does
 
 - **Like a console game (CONSOLE, the default).** In town the 3D world fills the window, widescreen
-  and sharper, with a small rail of the touch screen's tabs and phone beside it. One button
+  and sharper, with a small rail of the touch screen's tabs and phone beside it and the clock,
+  money and Sanity meter in a sharp HD status bar (in the game's language). One button
   (Back, or E) opens the touch screen's menu big over the town; conversations, popups and the
   games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a

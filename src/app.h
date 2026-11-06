@@ -10,6 +10,7 @@
 #include "common.h"
 #include "gamestate.h"
 #include "layout.h"
+#include "port/statusbar.h"
 #include "scene.h"
 #include "screens.h"
 #include "settings.h"
@@ -44,6 +45,12 @@ struct App
     // (ASJP) has its addresses; any other: GameState is never read (not valid, not between).
     std::string romCode;
     bool portSupported = false;
+    // The game's own words for the HD status bar (clock, money, Sanity), read once at start from
+    // the ROM's string table in the game's language (port/statusbar.h); not ok when the ROM's
+    // data does not read: CONSOLE then keeps milestone 1's compositions (the game's own HUD).
+    HudStrings hudStrings;
+    // The status bar's values for CONSOLE: the game's (RAM) on the European ROM, else none.
+    const HudState* Hud() const { return portSupported ? &game.hud : nullptr; }
 
     bool fast = false;             // fast forward held
     bool quit = false;
