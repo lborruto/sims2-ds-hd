@@ -1,0 +1,10 @@
+# Change game, from s7: Start + Back, Down x4 and A on Change game (the place kept, the launch
+# panel again), then A on Continue: the same game where it was.
+10 2 pad start
+10 2 pad menu
+20 2 pad down
+26 2 pad down
+32 2 pad down
+38 2 pad down
+50 2 pad a
+80 2 pad a

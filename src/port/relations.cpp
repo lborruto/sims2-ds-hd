@@ -18,20 +18,23 @@ constexpr u32 kRowFill = 0xFF6A72B8, kRowSelFill = 0xFF9AA2E3;
 constexpr u32 kLabel = 0xFFD6DAF6;      // a well's small label: a pale lavender
 constexpr u32 kPlateRim = 0xFFB2B2E3;
 constexpr int kRowPortrait = 68;        // a row's portrait well (the crop 2x inside)
-constexpr float kRowName = 24, kRowNameMin = 18;
+constexpr float kRowName = 24, kRowNameLine = 22, kRowNameMin = 18;
 
 Rect RowRect(int i) { return {kRelRowX, 206 + i * (kRelRowH + kRelRowGap), kRelRowW, kRelRowH}; }
 Rect RowPortrait(Rect r) { return {r.x + 8, r.y + (r.h - kRowPortrait) / 2, kRowPortrait, kRowPortrait}; }
 Rect RowNameBox(Rect r) { return {r.x + 8 + kRowPortrait + 12, r.y + 4, r.w - kRowPortrait - 36, r.h - 8}; }
 
-// A name in a row: one line from 24 px to 18, else two lines at 18 (the row holds two).
+// A name in a row, readable first: one line at 24 px (to 22), else two lines at 22 (the row holds
+// two), then 20; only a name that does not hold in two lines shrinks on one line, to 18.
 struct RowName { std::string text; float size; bool wrap, fits; };
 RowName FitRowName(const std::string& name, int width)
 {
-    const FittedText one = FitLine(name, kRowName, kRowNameMin, width, Weight::ExtraBold);
+    const FittedText one = FitLine(name, kRowName, kRowNameLine, width, Weight::ExtraBold);
     if (one.fits) return {one.text, one.size, false, true};
-    if (Wrap(name, kRowNameMin, (float)width, Weight::ExtraBold).size() <= 2) return {name, kRowNameMin, true, true};
-    return {one.text, one.size, false, false};
+    for (float size : {kRowNameLine, 20.0f})
+        if (Wrap(name, size, (float)width, Weight::ExtraBold).size() <= 2) return {name, size, true, true};
+    const FittedText small = FitLine(name, kRowNameLine, kRowNameMin, width, Weight::ExtraBold);
+    return {small.text, small.size, false, small.fits};
 }
 
 // A small well: its label above, the value below.

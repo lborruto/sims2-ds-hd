@@ -85,6 +85,13 @@ struct ViewItem
     // A's action starts an animation on the world (the slot machine's reels, an arcade cabinet, the
     // skydive): the panel's menu closes with it, so the world shows big.
     bool closesMenu = false;
+    // Its Left / Right step a value the game reads back (a volume slider): every press counts.
+    // Presses made while a step runs or before the game took it are queued in order (one step a
+    // press, 16 at most; a press past an end does nothing when its turn comes), and each queued
+    // step runs once the item's Left / Right have been rebuilt from the game's new value (the drag
+    // starts where the knob now is). B, MENU, LB, RB, the item going or the screen changing drop
+    // what is still queued (Navigator::queue_).
+    bool queues = false;
 };
 
 // Screen-wide buttons (not the focused item's). LB / RB: a screen's own pages (the stat panel's);
@@ -101,6 +108,10 @@ struct MenuView
     MenuAction buttons[(int)MenuButton::Count];
     // B: empty closes the panel's menu (no tap), as before.
     MenuAction back;
+    // MENU on a screen of its own: empty does what B does; else this (the phone: its X from any
+    // page, while B goes back one level), closing the screen when `menuCloses`.
+    MenuAction menu;
+    bool menuCloses = false;
     // The list's own scroll (see above); `scrollGroup` the group it belongs to.
     MenuAction scrollUp, scrollDown;
     int scrollGroup = 0;
@@ -112,6 +123,13 @@ struct MenuView
     // on (by id: the room the question was about), else `initial`.
     int page = 0;
     bool question = false;
+    // B's safe landing (an index; -1 none): B first moves the focus to this item (Keep this Sim?'s
+    // cross), and only B pressed again there runs `back`: one B never discards.
+    int backFocus = -1;
+    // A picture the screen shows big (Settings' concept art: the game keeps it on its top screen
+    // until Settings closes): the first B closes the big picture (the navigator's PictureClosed,
+    // drawing only) instead of running `back`; an A that runs opens it again.
+    bool picture = false;
     // A selection the game owns (Relationships' Sim, the phone's row): when >= 0 and enabled, the
     // focus is held on that item while it is in the list (scrollGroup), and every Up / Down there
     // performs scrollUp / scrollDown (the game's own buttons move its selection; the rebuilt view

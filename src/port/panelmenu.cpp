@@ -8,6 +8,7 @@
 #include "port/goals.h"
 #include "port/icons.h"
 #include "port/interact.h"
+#include "port/ownwords.h"
 #include "port/options.h"
 #include "port/pockets.h"
 #include "port/relations.h"
@@ -282,7 +283,10 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     }
     if (MenuFocusable(v, focus) && !v.items[focus].buttonX.empty())
     {
-        const FittedText x = FitLine(v.items[focus].xWord, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+        // An asking X armed (Pockets' bin): the hint says what the second X does.
+        const bool armed = v.items[focus].xAsks && v.armed != 0 && v.armed == v.items[focus].id;
+        const std::string word = armed ? OwnWord(&rom, OwnWordId::TrashAgain) : v.items[focus].xWord;
+        const FittedText x = FitLine(word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
         right = AddHint(c, right, Button::X, x.text);
     }
     // The D-pad's Up / Down (its vertical arms lit: the game has no word for its arrows) while they
@@ -297,7 +301,7 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
             if (const SpriteFrame* f = icons->Scaled(ref, i, kPmTabIcon / 24))
             {
                 const Rect to {kPmTabsX + i * kPmTabCell + (kPmTabCell - f->w) / 2, cellY + (kPmTabCell - f->h) / 2, f->w, f->h};
-                c.ui.push_back(ImageItem(to, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h}));
+                c.ui.push_back(icons->Image(ref, i, *f, to));
             }
         }
     // The phone: the game's own button, live from the touch screen, 2x.

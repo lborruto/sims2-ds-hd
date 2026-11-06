@@ -54,6 +54,8 @@ constexpr int kSeCloseX = 19, kSeCloseY = 17;
 constexpr int kSeTabX = 21, kSeTabY0 = 54, kSeTabDy = 40, kSeTabs = 4;     // tab i at (x, y0 + dy i), box ± 12
 constexpr Rect kSeTabFrom {6, 40, 30, 28};                                  // tab i's picture: + dy i (its plate when selected)
 constexpr int kSeTrackX0 = 84, kSeTrackW = 128, kSeMusicY = 96, kSeSfxY = 114;
+// The concept art big (MenuView::picture) and its hint's band.
+constexpr Rect kSeArtBig {64, 16, 1152, 640}, kSeArtHints {64, 662, 1152, 48};
 constexpr int kSeCells = 12, kSeCellX0 = 56, kSeCellY0 = 72, kSeCellDx = 48, kSeCellDy = 40, kSeCellW = 40, kSeCellH = 32;
 constexpr int kSprX = 7683;                                                 // the game's blue X (as the note's, the catalogue's)
 constexpr int kLdTickX = 231, kLdTickY[3] = {66, 112, 158}, kLdCloseX = 231, kLdCloseY = 22;
@@ -109,7 +111,9 @@ MenuView LoadView(ScreenState s, const GameState* game, const RomData* rom);
 MenuView LoadViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);
 // The screen drawn into c (empty: the whole canvas is this screen's), the focus on item `focus`.
 // The game's X drawn (icons null: not drawn) and mapped onto its own for the mouse.
-void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom, IconCache* icons, int topW, int topH);
+// big: the concept art the game shows, big over the whole canvas (MenuView::picture, not closed by B).
+void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom, IconCache* icons, int topW, int topH,
+                   bool big = false);
 void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons, int topW, int topH);
 // (A check, --measure-menu) Settings' and Load's words in their boxes: the titles, the pages'
 // names, every credits line, "No Data", the places, the widest name, money and time.

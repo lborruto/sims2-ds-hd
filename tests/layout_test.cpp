@@ -30,8 +30,10 @@
 #include "port/goals.h"
 #include "port/note.h"
 #include "port/options.h"
+#include "port/ownwords.h"
 #include "port/phone.h"
 #include "port/popup.h"
+#include "port/prompt.h"
 #include "port/relations.h"
 #include "port/interact.h"
 #include "port/minigame.h"
@@ -193,8 +195,8 @@ static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int top
                 const float px = fit.ox + cx * fit.scale, py = fit.oy + cy * fit.scale;
                 int tx = -1, ty = -1, idx = -1, dx = -1, dy = -1;
                 const bool hit = TouchFromComposition(c, fit, px, py, tx, ty, &idx);
-                TouchClampedComposition(c, i, fit, px, py, dx, dy);
-                if (!hit || tx != x || ty != y || idx != i || dx != x || dy != y || OverTopComposition(c, fit, px, py))
+                const bool dragged = TouchClampedComposition(c, i, fit, px, py, dx, dy);
+                if (!hit || !dragged || tx != x || ty != y || idx != i || dx != x || dy != y || OverTopComposition(c, fit, px, py))
                 {
                     fprintf(stderr, "console %s menu %d top %dx%d out %dx%d: piece %d pixel %d,%d -> %s %d,%d (piece %d), drag %d,%d\n",
                             ScreenStateName(s).c_str(), menuOpen, topW, topH, ow, oh, i, x, y, hit ? "hit" : "miss", tx, ty, idx, dx, dy);
@@ -204,9 +206,9 @@ static void TestConsoleRoundtrip(ScreenState s, bool menuOpen, int topW, int top
             }
         // A drag that began on the piece and left it is held to the piece's own rectangle.
         int tx, ty;
-        TouchClampedComposition(c, i, fit, -1000, -1000, tx, ty);
+        CHECK(TouchClampedComposition(c, i, fit, -1000, -1000, tx, ty));
         CHECK(tx == q.from.x && ty == q.from.y);
-        TouchClampedComposition(c, i, fit, 1e6f, 1e6f, tx, ty);
+        CHECK(TouchClampedComposition(c, i, fit, 1e6f, 1e6f, tx, ty));
         CHECK(tx == q.from.x + q.from.w - 1 && ty == q.from.y + q.from.h - 1);
     }
     // A black load (Loading) shows nothing at all: no piece to touch.
@@ -369,11 +371,27 @@ static void minigame_frame()
                 const size_t overlays0 = 3;   // (the backdrop and the two pictures' frames)
                 Composition c {kConsoleW, kConsoleH, {}, {}};
                 BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom, nullptr, &pv, sc == Screen::MixerSave ? (variant == 1 ? 30 : 27) : -1);
-                CHECK(c.pieces.size() == 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
+                // The playfield and the top screen; an HD box over the playfield (port/popup.h's
+                // BuildGameBox: a minigame's question, message or help) adds its buttons' mouse
+                // pieces, inside the box's area.
+                CHECK(c.pieces.size() >= 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
                       c.pieces[0].to.w == kActivityBottomTo.w && c.pieces[0].to.h == kActivityBottomTo.h);
-                const Rect topTo = c.pieces[1].to;
+                const Piece* topPiece = nullptr;
+                std::vector<Piece> pictures {c.pieces[0]};
+                for (size_t i = 1; i < c.pieces.size(); i++)
+                {
+                    if (c.pieces[i].src == Src::Top) { CHECK(!topPiece); topPiece = &c.pieces[i]; pictures.push_back(c.pieces[i]); continue; }
+                    const Rect q = c.pieces[i].to;
+                    CHECK(q.x >= kMgBoxArea.x && q.y >= kMgBoxArea.y && q.x + q.w <= kMgBoxArea.x + kMgBoxArea.w && q.y + q.h <= kMgBoxArea.y + kMgBoxArea.h);
+                }
+                CHECK(topPiece != nullptr);
+                if (!topPiece) continue;
+                const Rect topTo = topPiece->to;
                 CHECK(topTo.x == kActivityTopX && topTo.y == kActivityTopY && topTo.w == kActivityTopW);
-                CHECK(c.pieces[1].from.h == (sc == Screen::Cards ? top.second : HudCropRows(top.second)));
+                // (the social game's top screen without the game's own bar rows: kMgSocialBarRows)
+                const int skip = sc == Screen::Social ? top.second * kMgSocialBarRows / SH : 0;
+                CHECK(topPiece->from.y == skip && topPiece->from.h == (sc == Screen::Cards ? top.second : HudCropRows(top.second)) - skip);
+                bool box = false;
                 int layer = -1, prompt = 0, lit = 0, chips = 0, pointer = 0;
                 bool images = false;
                 for (const ui::UiItem& it : c.ui)
@@ -390,8 +408,10 @@ static void minigame_frame()
                         layer = it.layer;
                         continue;
                     }
+                    // An HD box (and the status bar lifted above its veil): over the playfield by design.
+                    if (it.layer >= kPopLayer) { box = true; continue; }
                     // Off both pictures (their frames' 6 pixels too).
-                    for (const Piece& q : c.pieces)
+                    for (const Piece& q : pictures)
                         CHECK(r.x + r.w <= q.to.x - 6 || r.x >= q.to.x + q.to.w + 6 || r.y + r.h <= q.to.y - 6 || r.y >= q.to.y + q.to.h + 6);
                     if (it.kind == ui::UiItem::Image) { images = true; CHECK(r.x >= kMgSideX && r.x + r.w <= kMgSideX + kMgSideW && r.y + r.h <= kMgSideBottom); continue; }
                     CHECK(!images && it.layer >= layer);   // still layers ascending, the images last
@@ -402,30 +422,38 @@ static void minigame_frame()
                     if (it.kind == ui::UiItem::Chip && r.y >= kMgPrompt.y) chips++;
                 }
                 CHECK(prompt > 0);
+                // The playfield and the top screen alone, unless an HD box adds its buttons' pieces.
+                CHECK(c.pieces.size() == 2 || box);
                 // The clog lights the blow's hint; the cards' question has two chips (Yes, No), the message one.
                 const bool litNow = (sc == Screen::Vacuum && variant == 2) || (sc == Screen::Autopsy && variant > 0) || (sc == Screen::Detector && variant == 2) ||
                                     (sc == Screen::Drencher && variant == 1) || (sc == Screen::Crime && variant == 2) ||
                                     (sc == Screen::Scratch && variant == 3) || (sc == Screen::Mixer && variant == 1) || (sc == Screen::MixerSave && variant == 1);
                 // (The save page with a slot asked over: its row lit too, beside A's hint.)
                 CHECK(lit == (sc == Screen::Crime && variant == 1 ? 3 : sc == Screen::MixerSave && variant == 1 ? 2 : litNow ? 1 : 0));
-                CHECK(pointer == (OwnScheme(sc) ? 2 : 0));   // (shown: the navigator shows it on the pointing games and the crime game's aim)
+                // (shown: the navigator shows it on the pointing games and the crime game's aim; never
+                // under an HD box, whose answers are the buttons')
+                CHECK(pointer == (OwnScheme(sc) && !box ? 2 : 0));
                 // MooGoo's focus: one ring over the playfield, around the monkey (an overlay).
                 CHECK(c.overlays.size() == overlays0 + ((sc == Screen::MooGoo && variant == 1) || (sc == Screen::Mixer && variant == 2) ? 1 : 0));
-                // The lottery's popup: A alone (the game's Close); the mixer's save question: A, B, X;
-                // the wireless lobby: B alone.
+                // The lottery's popup: A alone (the game's Close); the mixer's save question (an HD
+                // box since task 3 of the polish, its focus on No): the D-pad, A, B, X; the wireless
+                // lobby: B alone.
                 if (sc == Screen::Scratch && variant == 2) CHECK(chips == 1);
-                if (sc == Screen::Mixer && variant == 3) CHECK(chips == 3);
+                if (sc == Screen::Mixer && variant == 3) CHECK(box && chips == 4);
                 if (sc == Screen::Trading) CHECK(chips == 1);
                 if (sc == Screen::MooGoo && variant == 1)
                 {
                     const Rect o = c.overlays.back().to;
                     CHECK(o.x >= kActivityBottomTo.x + (56 + 32 * 5) * 3 - 8 && o.x + o.w <= kActivityBottomTo.x + (80 + 32 * 5) * 3 + 8 && o.y >= kActivityBottomTo.y + 32 * 3 - 8);
                 }
-                // MooGoo's question: two chips (Yes, No).
-                if (sc == Screen::MooGoo && variant == 2) CHECK(chips == 2);
-                // The painting's question: two chips (Yes, No).
-                if (sc == Screen::Art && variant == 2) CHECK(chips == 2);
-                if (sc == Screen::Cards) CHECK(chips == (variant == 2 ? 2 : variant == 3 ? 1 : 5));
+                // The questions (MooGoo's, the painting's, the cards'; No focused first): the D-pad, A
+                // the focused answer, B No.
+                if (sc == Screen::MooGoo && variant == 2) CHECK(box && chips == 3);
+                if (sc == Screen::Art && variant == 2) CHECK(chips == 3);
+                // The cards: nothing known (the table's prompts), the draw step (X, B), the question,
+                // the end of a turn (A).
+                if (sc == Screen::Cards) CHECK(chips == (variant == 0 ? 4 : variant == 1 ? 2 : variant == 2 ? 3 : 1));
+                if (sc == Screen::Cards && variant >= 2) CHECK(box);
                 for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
                     TestConsoleRoundtrip({sc, Tab::None}, false, top.first, top.second, o.first, o.second, true, &c);
             }
@@ -436,8 +464,253 @@ static void minigame_frame()
     CHECK(!MinigameFramed({Screen::Cards, Tab::None}, &g, &rom));
 }
 
+// Task 5: Create-a-Sim's name typed on the keyboard (CasTypeAction; the key matching needs the
+// game's strings: console_check's pad-cas-type) and fast boot's rule (BootPassesBy).
+static void platform()
+{
+    RomData rom; // no strings: no key matches
+    CasState c;
+    c.valid = true;
+    c.page = 0;
+    c.nameKnown = true;
+    c.name = "Sim";
+    c.nameLength = 3;
+    c.keyboard = 0;
+    CasType t = CasTypeAction(c, rom, "\b");
+    CHECK(t.done && t.taps.size() == 1 && t.taps[0].x == kCasBackX && t.taps[0].y == kCasBackY);
+    t = CasTypeAction(c, rom, "a");   // (no key: dropped, nothing tapped)
+    CHECK(t.done && t.taps.empty());
+    CasState e = c;
+    e.name.clear();
+    e.nameLength = 0;
+    CHECK(CasTypeAction(e, rom, "\b").taps.empty());   // nothing to erase
+    CasState full = c;
+    full.nameLength = kCasName;
+    CHECK(CasTypeAction(full, rom, "a").taps.empty() && CasTypeAction(full, rom, "a").done);
+    for (int page = 1; page <= 4; page++)
+    {
+        CasState o = c;
+        o.page = page;
+        CHECK(CasTypeAction(o, rom, "\b").taps.empty());   // only on the Name page
+    }
+    CasState sw = c;
+    sw.nameKnown = false;
+    CHECK(CasTypeAction(sw, rom, "\b").taps.empty());
+    // The other case through the game's charset pairs (not ASCII only): É / é, Ä / ä, Ñ / ñ; a
+    // capital the game has no small letter for, and the signs, stay as they are.
+    CHECK(GameLower("ABCxyz19") == "abcxyz19");
+    CHECK(GameLower("\xC3\x89") == "\xC3\xA9" && GameLower("\xC3\x84") == "\xC3\xA4" && GameLower("\xC3\x91") == "\xC3\xB1");
+    CHECK(GameLower("\xC3\xA9") == "\xC3\xA9" && GameLower("\xC3\x9F") == "\xC3\x9F");   // é, ß
+    CHECK(GameLower("\xC3\x9B") == "\xC3\x9B");   // Û: the game has û but not Û (no pair)
+    CHECK(GameLower("\xC3\x97") == "\xC3\x97" && GameLower("\xC2\xA7") == "\xC2\xA7"); // ×, §
+    // Fast boot: nothing up yet, the video, the legal / EA / Maxis splashes, the zoom and the blank
+    // go by; the last splash, a popup splash, the title or any other screen stop it.
+    GameState g;
+    CHECK(BootPassesBy(g));
+    g.front.kind = FrontKind::Video;
+    CHECK(BootPassesBy(g));
+    g.front.boot.valid = true;
+    for (int mode = 0; mode <= 6; mode++)
+    {
+        g.front.boot.mode = mode;
+        CHECK(BootPassesBy(g) == (mode != 0 && mode != 4));
+    }
+    g.front.boot.valid = false;
+    for (FrontKind k : {FrontKind::Title, FrontKind::MainMenu, FrontKind::Settings, FrontKind::Load, FrontKind::CreateASim, FrontKind::KeepSim})
+    {
+        g.front.kind = k;
+        CHECK(!BootPassesBy(g));
+    }
+}
+
+// The UI's size (ui::UiScale, console.cpp's groups) at 60, 100 and 150 %, in five languages, on
+// made-up states drawn by BuildConsole with a made-up string table: the town's strip (the status
+// at its left, the hints at its right, a payout; the pad's look and the keyboard's, whose camera
+// hint is its own L / R keys), the panel's HD menu, a popup over it, a lone popup over the world,
+// the conversation, the stick cursor's screen. Every item (as drawn: ui::Placed) inside the canvas;
+// the strip's inside the strip below its band, the status clear of the hints; the menus above the
+// strip, never larger than at 100 %; a lone popup above the strip, as large as the UI's size; the
+// stick cursor's hints, pause panel and status bar clear of its touch screen's frame; the mouse's
+// pieces round trip at every window size; at 100 % the items as they always were (no zoom). The whole-canvas screens (the front end, Create-a-Sim) keep their layout.
+static void ui_scale()
+{
+    std::vector<u32> face(SW * SH);
+    for (size_t i = 0; i < face.size(); i++) face[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    const HudStrings strings = TestStrings();
+    HudState hud = TestHud();
+    hud.money = 99999999; // (the widest the bar shows)
+    for (int lang = 1; lang <= 5; lang++)
+    {
+        RomData rom;
+        std::vector<std::string> words(3127);
+        for (size_t i = 0; i < words.size(); i++) words[i] = "Word " + std::to_string(i) + (i % 7 == 0 ? " longer than the others" : "");
+        rom.SetStringsForTest(words, lang);
+        for (bool keys : {false, true})
+        {
+            ui::ChipLook look;
+            if (keys)
+            {
+                look.face = ui::Face::Keyboard;
+                look.glyph[(int)ui::Button::LB] = "Q";
+                look.glyph[(int)ui::Button::RB] = "W";
+                look.glyph[(int)ui::Button::Back] = "E";
+                look.glyph[(int)ui::Button::A] = "Return";
+                look.glyph[(int)ui::Button::B] = "Backspace";
+                look.glyph[(int)ui::Button::Pause] = "Escape";
+            }
+            ui::SetChipLook(look);
+            for (float z : {0.6f, 1.0f, 1.5f})
+            {
+                ui::SetUiScale(z);
+                auto inCanvas = [&](const Composition& c, const char* what) {
+                    for (const ui::UiItem& it : c.ui)
+                    {
+                        const Rect r = ui::Placed(it);
+                        if (r.x < 0 || r.y < 0 || r.x + r.w > kConsoleW || r.y + r.h > kConsoleH)
+                        {
+                            fprintf(stderr, "ui %d%% lang %d keys %d: %s item at %d,%d %dx%d off the canvas\n", (int)(z * 100), lang, keys, what, r.x, r.y, r.w, r.h);
+                            failures++;
+                            return;
+                        }
+                        if (z == 1) CHECK(it.zoom == 1 && it.dx == 0 && it.dy == 0);
+                    }
+                };
+                // The town: the strip, the status (and a payout) left, the hints right.
+                GameState g;
+                g.valid = true;
+                g.screen = GScreen::Panel;
+                g.hud = hud;
+                for (int payout : {0, -1234567})
+                {
+                    const Composition town = BuildConsole({Screen::Panel, Tab::Interact}, false, -1, 341, 192, &hud, &strings, &g, &rom, face.data(),
+                                                          nullptr, 0, nullptr, payout);
+                    inCanvas(town, "town");
+                    int statusRight = 0, hintsLeft = kConsoleW, chips = 0, keycaps = 0;
+                    for (const ui::UiItem& it : town.ui)
+                    {
+                        if (it.to.x <= 0 && it.to.x + it.to.w >= kConsoleW) continue; // (the strip itself)
+                        const Rect r = ui::Placed(it);
+                        CHECK(r.y >= kStripY + 1 + kStripBand && r.y + r.h <= kConsoleH);
+                        if (it.kind == ui::UiItem::Chip)
+                        {
+                            hintsLeft = std::min(hintsLeft, r.x);
+                            chips++;
+                            keycaps += it.face == ui::Face::Keyboard;
+                        }
+                        else statusRight = std::max(statusRight, r.x + r.w);
+                    }
+                    CHECK(chips == (keys ? 3 : 2) && keycaps == (keys ? 3 : 0));
+                    if (statusRight + 12 > hintsLeft)
+                    {
+                        fprintf(stderr, "ui %d%% lang %d keys %d payout %d: the status (to %d) meets the hints (from %d)\n", (int)(z * 100), lang, keys,
+                                payout, statusRight, hintsLeft);
+                        failures++;
+                    }
+                }
+                // The panel's HD menu (Interact) and a popup over it; the cursor's screen.
+                GameState m = g;
+                InteractState& in = m.town.interact;
+                in.valid = true;
+                in.target = {TargetRef::Object, 29, 492, 6638, false};
+                in.prev = {TargetRef::Sim, 3, 326, 1, false};
+                in.next = {TargetRef::Object, 15, 478, 5744, false};
+                for (int i = 0; i < 4; i++) in.actions.push_back({i, 1845 + i, i == 2});
+                GameState p = m;
+                p.screen = GScreen::Popup;
+                p.tab = 0; // (over the Interact tab's menu)
+                p.town.popup = {true, 2, 2, std::string(300, 'w'), "stale", -1, false, 56, 160, 6};
+                p.town.options = {true, 4096, 2048};
+                const ScreenState pan {Screen::Panel, Tab::Interact}, pop {Screen::Popup, Tab::None};
+                const Composition menu = BuildConsole(pan, true, 1, 341, 192, &hud, &strings, &m, &rom, face.data());
+                const Composition popup = BuildConsole(pop, true, 0, 341, 192, &hud, &strings, &p, &rom, face.data());
+                const Composition cursor = BuildConsole({Screen::Unknown, Tab::None}, false, -1, SW, SH, &hud, &strings);
+                for (const auto* c : {&menu, &popup})
+                {
+                    inCanvas(*c, c == &menu ? "menu" : "popup");
+                    bool zoomed = false;
+                    for (const ui::UiItem& it : c->ui)
+                    {
+                        if (it.to.x <= 0 && it.to.x + it.to.w >= kConsoleW) continue;
+                        const Rect r = ui::Placed(it);
+                        if (it.layer != kStatusBarLayer && it.layer != kPopLayer + 1) CHECK(r.y + r.h <= kStripY);
+                        CHECK(it.zoom <= 1.0f + 1e-6f || it.layer == kStatusBarLayer || it.layer == kPopLayer + 1);
+                        if (it.layer != kStatusBarLayer && it.layer != kPopLayer + 1) zoomed |= it.zoom != 1; // (the menu's, not the strip's)
+                    }
+                    CHECK(zoomed == (z < 1));
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(c == &menu ? pan : pop, true, 341, 192, o.first, o.second, true, c);
+                }
+                inCanvas(cursor, "cursor");
+                {
+                    // The touch screen's frame (FrameAround kMenuTo: 6 pixels) and every item clear
+                    // of it: the hints and the status bar below, the pause panel at its right.
+                    const Rect frame {kMenuTo.x - 6, kMenuTo.y - 6, kMenuTo.w + 12, kMenuTo.h + 12};
+                    bool framed = false;
+                    for (const Overlay& o : cursor.overlays) framed |= o.to.x == frame.x && o.to.y == frame.y && o.to.w == frame.w && o.to.h == frame.h;
+                    CHECK(framed);
+                    int panels = 0;
+                    for (const ui::UiItem& it : cursor.ui)
+                    {
+                        if (it.to.x <= 0 && it.to.x + it.to.w >= kConsoleW) continue;
+                        const Rect r = ui::Placed(it);
+                        panels += it.kind == ui::UiItem::Panel;
+                        if (r.x < frame.x + frame.w && r.x + r.w > frame.x && r.y < frame.y + frame.h && r.y + r.h > frame.y)
+                        {
+                            fprintf(stderr, "ui %d%% lang %d keys %d: cursor item at %d,%d %dx%d over the frame\n", (int)(z * 100), lang, keys, r.x, r.y, r.w, r.h);
+                            failures++;
+                        }
+                    }
+                    CHECK(panels >= 3); // (the hints', the pause's, the status bar's)
+                }
+                // A lone popup (over the dimmed world, no menu beneath): its own group, as large as
+                // the UI's size (as far as the canvas above the strip holds it).
+                {
+                    GameState q = g;
+                    q.screen = GScreen::Popup;
+                    q.tab = -1; // (no tab: nothing beneath)
+                    q.town.popup = {true, 2, 2, "A goal reached.", "stale", -1, false, 56, 160, 6};
+                    const Composition lone = BuildConsole(pop, false, 0, 341, 192, &hud, &strings, &q, &rom, face.data());
+                    inCanvas(lone, "lone popup");
+                    float most = 0, least = 9;
+                    for (const ui::UiItem& it : lone.ui)
+                    {
+                        if (it.to.x <= 0 && it.to.x + it.to.w >= kConsoleW) continue;
+                        if (it.layer == kStatusBarLayer || it.layer == kPopLayer + 1) continue; // (the strip's)
+                        const Rect r = ui::Placed(it);
+                        CHECK(r.y + r.h <= kStripY);
+                        most = std::max(most, it.zoom);
+                        least = std::min(least, it.zoom);
+                    }
+                    CHECK(least <= most);
+                    if (z < 1) CHECK(std::abs(most - z) < 1e-4f && std::abs(least - z) < 1e-4f);
+                    else if (z == 1) CHECK(most == 1 && least == 1);
+                    else CHECK(least > 1.1f && most <= z + 1e-4f);
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(pop, false, 341, 192, o.first, o.second, true, &lone);
+                }
+                // The conversation: about the canvas's bottom centre, 60 % of its width at 60 %.
+                GameState d = g;
+                d.screen = GScreen::Dialogue;
+                d.dialogue.valid = true; d.dialogue.page = 1; d.dialogue.pages = 2; d.dialogue.stringId = 7; d.dialogue.speaker = 0x40;
+                const Composition dlg = BuildConsole({Screen::Dialogue, Tab::None}, false, -1, 341, 192, &hud, &strings, &d, &rom, face.data());
+                inCanvas(dlg, "dialogue");
+                int x0 = kConsoleW, x1 = 0;
+                for (const ui::UiItem& it : dlg.ui) { x0 = std::min(x0, ui::Placed(it).x); x1 = std::max(x1, ui::Placed(it).x + ui::Placed(it).w); }
+                const float want = z < 1 ? 1060 * z : z == 1 ? 1060 : 1060 * (636.0f / 530);
+                CHECK(std::abs((x1 - x0) - want) < 40 && std::abs((x0 + x1) / 2.0f - 640) < 4);
+                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                    TestConsoleRoundtrip({Screen::Dialogue, Tab::None}, false, 341, 192, o.first, o.second, true, &dlg);
+            }
+        }
+    }
+    ui::SetChipLook({});
+    ui::SetUiScale(1);
+}
+
 int main()
 {
+    ui_scale();
+    platform();
     minigame_frame();
     // CONSOLE's compositions.
     for (ScreenState s : AllStates())
@@ -492,12 +765,40 @@ int main()
                     CHECK(std::abs(w.to.w * w.from.h - w.to.h * w.from.w) <= w.from.h + w.from.w);
                     CHECK(w.to.y == 0 && w.to.x >= 0 && w.to.x + w.to.w <= kConsoleW && w.to.h <= kConsoleH);
                     CHECK(top.first * 3 == top.second * 4 ? w.to.h == kConsoleH : (w.to.w == kConsoleW && w.to.h == 661));
-                    // The bar's items (its layer); the stick cursor's screens also have the pause
-                    // chip's panel (layer 0) beside their hint, right of the touch screen's frame.
+                    // The bar's items (its layer); the stick cursor's screens also have the hint's
+                    // chips panel at the bottom right (right of the bar) and the pause chip's panel
+                    // above it, right of the touch screen's frame (layer 0).
                     size_t first = 0;
                     while (first < c.ui.size() && c.ui[first].layer != kStatusBarLayer) first++;
                     CHECK(first < c.ui.size());
                     if (first >= c.ui.size()) continue;
+                    // The town (no menu open): the strip, the canvas's whole width from kStripY to its
+                    // foot (its fill, then its outline and band along its top), inside the canvas; the
+                    // world down to it (widescreen: no black between); the status's items in the
+                    // strip below its band, at the left, no panel of their own; the hints (none here:
+                    // no HD view without RAM) at the right clear of it.
+                    if (st.screen == Screen::Panel && !menuOpen)
+                    {
+                        CHECK(c.ui.size() >= first + 3);
+                        if (c.ui.size() < first + 3) continue;
+                        const Rect sp = c.ui[first].to;
+                        CHECK(c.ui[first].plain && sp.x == 0 && sp.w == kConsoleW && sp.y == kStripY && sp.y + sp.h == kConsoleH);
+                        CHECK(c.ui[first + 1].to.y == kStripY && c.ui[first + 1].to.w == kConsoleW && c.ui[first + 2].to.y == kStripY + 1 && c.ui[first + 2].to.w == kConsoleW);
+                        CHECK(top.first * 3 == top.second * 4 || w.to.y + w.to.h == kStripY);
+                        int chips = 0, statusRight = 0, chipsLeft = kConsoleW;
+                        for (size_t i = first + 3; i < c.ui.size(); i++)
+                        {
+                            const Rect r = c.ui[i].to;
+                            CHECK(c.ui[i].layer == kStatusBarLayer);
+                            CHECK(r.x >= 16 && r.x + r.w <= kConsoleW - 16 && r.y >= kStripY + 1 + kStripBand && r.y + r.h <= kConsoleH - 2);
+                            if (c.ui[i].kind == ui::UiItem::Chip) { chips++; chipsLeft = std::min(chipsLeft, r.x); }
+                            else statusRight = std::max(statusRight, r.x + r.w);
+                            CHECK(c.ui[i].kind != ui::UiItem::Panel || c.ui[i].plain || r.h < kStatusBarH); // (no panel of its own: the strip is)
+                        }
+                        CHECK(chips == 0 || chips == 2);
+                        CHECK(statusRight > 200 && statusRight < chipsLeft);
+                        continue;
+                    }
                     const Rect b = c.ui[first].to;
                     CHECK(b.y == kStatusBarY && b.h == kStatusBarH && b.x >= std::max(w.to.x, 0) && b.x + b.w <= std::min(w.to.x + w.to.w, kConsoleW));
                     CHECK(b.y > kMenuTo.y + kMenuTo.h + 6);
@@ -509,7 +810,10 @@ int main()
                         else
                         {
                             CHECK(st.screen == Screen::SaveSlots && c.ui[i].layer == 0);
-                            CHECK(r.x > kMenuTo.x + kMenuTo.w && r.x + r.w <= kConsoleW && r.y + r.h < b.y); // never over the bar or the frame
+                            CHECK(r.x + r.w <= kConsoleW && r.y + r.h <= kConsoleH);
+                            // never over the bar or the frame
+                            CHECK(r.x > b.x + b.w || (r.x > kMenuTo.x + kMenuTo.w && r.y + r.h < b.y));
+                            CHECK(r.y >= kMenuTo.y + kMenuTo.h + 6 || r.x > kMenuTo.x + kMenuTo.w);
                         }
                     }
                 }
@@ -620,9 +924,11 @@ int main()
             // The top screen at its own shape (within a pixel), never stretched.
             const Rect t = c.pieces[0].to;
             CHECK(std::abs(t.w * top.second - t.h * top.first) <= top.first);
+            // (the kit's chips: the right stick, A, the pause menu's; no 5 x 7 text)
             bool hint = false;
-            for (const Overlay& o : c.overlays) hint |= o.text != nullptr && o.to.y > 600;
+            for (const ui::UiItem& it : c.ui) hint |= it.kind == ui::UiItem::Chip && it.to.y > 600;
             CHECK(hint);
+            for (const Overlay& o : c.overlays) CHECK(o.text == nullptr);
             float cx, cy, sc2;
             CHECK(CanvasFromTouch(c, 10, 20, cx, cy, sc2) && sc2 == 2.5f && cx == c.pieces[1].to.x + 25 && cy == c.pieces[1].to.y + 50);
             // Both pieces framed (6 pixels outside each, drawn before the top piece); the top
@@ -654,10 +960,32 @@ int main()
     {
         const Composition m = BuildConsole({sc, Tab::None}, false, -1, SW, SH);
         CHECK(m.pieces.size() == 2 && !m.pieces[0].touch && m.pieces[1].src == Src::Bottom && m.pieces[1].to.x == kMenuTo.x && m.pieces[1].to.y == kMenuTo.y && m.pieces[1].to.w == SW * 3);
-        // (and the cursor's hint box under it, at the right clear of the HD status bar: how to leave)
-        CHECK(m.overlays.size() == 4 && m.overlays[0].argb == kDimArgb && m.overlays[1].argb == kFrameArgb && m.overlays[1].to.x == kMenuTo.x - 6);
-        const Rect hb = m.overlays[2].to;
+        // (and the cursor's hint panel under it, at the right clear of the HD status bar: how to
+        // leave; the kit's chips, the 5 x 7 font gone)
+        CHECK(m.overlays.size() == 2 && m.overlays[0].argb == kDimArgb && m.overlays[1].argb == kFrameArgb && m.overlays[1].to.x == kMenuTo.x - 6);
+        CHECK(m.ui.size() >= 4 && m.ui[0].kind == ui::UiItem::Panel);
+        const Rect hb = m.ui[0].to;
         CHECK(hb.x >= 720 && hb.x + hb.w <= kConsoleW && hb.y >= kMenuTo.y + kMenuTo.h && hb.y + hb.h <= kConsoleH);
+        int chips = 0;
+        for (const ui::UiItem& it : m.ui) chips += it.kind == ui::UiItem::Chip;
+        CHECK(chips == 3);   // the right stick, A, the pause menu
+        // The furniture editor's: B too (its X).
+        if (sc == Screen::Unknown)
+        {
+            GameState g;
+            g.valid = true;
+            g.placement.valid = true;
+            const Composition e = BuildConsole({sc, Tab::None}, false, -1, SW, SH, nullptr, nullptr, &g);
+            int ec = 0;
+            bool b = false;
+            for (const ui::UiItem& it : e.ui)
+            {
+                ec += it.kind == ui::UiItem::Chip;
+                b |= it.kind == ui::UiItem::Chip && it.button == ui::Button::B;
+            }
+            CHECK(ec == 4 && b);
+            CHECK(e.ui[0].to.x >= 720 && e.ui[0].to.x + e.ui[0].to.w <= kConsoleW);
+        }
     }
     // The menu: the dimmed world swallows clicks and the camera; the touch screen 3x is the stylus.
     for (ScreenState s : {ScreenState {Screen::Panel, Tab::Goals}, ScreenState {Screen::Popup, Tab::None}, ScreenState {Screen::Gift, Tab::None}})
@@ -711,10 +1039,10 @@ int main()
         const CanvasFit fit = CanvasFit::For(dlg.cw, dlg.ch, 1280, 720);
         int tx, ty;
         // Over the portrait (piece 3) with a stale index.
-        TouchClampedComposition(dlg, 99, fit, kDialoguePortraitTo.x + 2 * 10 + 1, kDialoguePortraitTo.y + 2 * 5 + 1, tx, ty);
+        CHECK(TouchClampedComposition(dlg, 99, fit, kDialoguePortraitTo.x + 2 * 10 + 1, kDialoguePortraitTo.y + 2 * 5 + 1, tx, ty));
         CHECK(tx == kDialoguePortraitFrom.x + 10 && ty == kDialoguePortraitFrom.y + 5);
         // Over the world (piece 0, a top piece): the largest, the text.
-        TouchClampedComposition(dlg, 0, fit, 5, 5, tx, ty);
+        CHECK(TouchClampedComposition(dlg, 0, fit, 5, 5, tx, ty));
         CHECK(tx == kDialogueTextFrom.x && ty == kDialogueTextFrom.y);
         // A piece reaching past the DS screen: held to the screen, never an empty range.
         Composition odd {600, 400, {}, {}};
@@ -724,9 +1052,22 @@ int main()
         for (int idx : {0, 1})
             for (float p : {-500.0f, 10.0f, 110.0f, 5000.0f})
             {
-                TouchClampedComposition(odd, idx, f2, p, p, tx, ty);
+                CHECK(TouchClampedComposition(odd, idx, f2, p, p, tx, ty));
                 CHECK(tx >= 0 && tx < SW && ty >= 0 && ty < SH);
             }
+        // No touchable piece (a held CONSOLE picture: consolehold.h; a black load): no touch at
+        // all, never the whole touch screen under the canvas.
+        Composition held = dlg;
+        for (Piece& p : held.pieces) p.touch = false;
+        for (int idx : {-1, 0, 3, 99})
+        {
+            tx = ty = -7;
+            CHECK(!TouchClampedComposition(held, idx, fit, kDialoguePortraitTo.x + 21, kDialoguePortraitTo.y + 11, tx, ty));
+            CHECK(tx == -7 && ty == -7);
+        }
+        const Composition black = BuildConsole({Screen::Loading, Tab::None}, false, -1, SW, SH);
+        const CanvasFit fb = CanvasFit::For(black.cw, black.ch, 1280, 720);
+        CHECK(!TouchClampedComposition(black, 0, fb, 640, 360, tx, ty));
     }
     // The stick cursor: drawn through the piece that shows its point, hidden where none does.
     {
@@ -767,9 +1108,9 @@ int main()
         CHECK(TouchFromComposition(c, fit, 900 + 2 * 30, 2 * 5, tx, ty, &idx) && tx == 30 && ty == 101 && idx == 1);
         CHECK(!TouchFromComposition(c, fit, 850, 100, tx, ty)); // the gap between them
         // A drag that started on the first piece stays on it: past its right edge it is held.
-        TouchClampedComposition(c, 0, fit, 1300, 500, tx, ty);
+        CHECK(TouchClampedComposition(c, 0, fit, 1300, 500, tx, ty));
         CHECK(tx == SW - 1 && ty == 95);
-        TouchClampedComposition(c, 1, fit, 0, -50, tx, ty);
+        CHECK(TouchClampedComposition(c, 1, fit, 0, -50, tx, ty));
         CHECK(tx == 0 && ty == 96);
     }
     // A drag begun on FOCUS top-big's panel (piece 1) when the layout flips to bottom-big (where
@@ -784,11 +1125,11 @@ int main()
                 for (float py : {-100.0f, 360.0f, 5000.0f})
                 {
                     int tx = -1, ty = -1;
-                    TouchClampedComposition(big, idx, fit, px, py, tx, ty);
+                    CHECK(TouchClampedComposition(big, idx, fit, px, py, tx, ty));
                     CHECK(tx >= 0 && tx < SW && ty >= 0 && ty < SH);
                 }
         int tx, ty;
-        TouchClampedComposition(big, 1, fit, 480, 360, tx, ty); // the middle of the big touch screen
+        CHECK(TouchClampedComposition(big, 1, fit, 480, 360, tx, ty)); // the middle of the big touch screen
         CHECK(abs(tx - SW / 2) <= 1 && abs(ty - SH / 2) <= 1);
     }
     // Overlapping pieces: the later one is hit.
@@ -1072,7 +1413,14 @@ int main()
                 CHECK(MenuMove(p, 13, 1) == MenuFirst(p));
                 if (h.town.pockets.slot >= 0) CHECK(MenuFirst(p) == h.town.pockets.slot);
                 const MenuView g = GiftMenuViewOf(gs, h);
-                CHECK(g.valid && g.items.size() == 6 && g.back.size() == 1 && g.back[0].x == kGiftCloseX);
+                // The six slots, then the bow (focusable: it gives the game's selection, when it may).
+                CHECK(g.valid && g.items.size() == 7 && g.back.size() == 1 && g.back[0].x == kGiftCloseX && g.items[6].id == kGiftBowId);
+                {
+                    const int sl = h.town.gift.slot;
+                    const bool may = sl >= 0 && sl < 6 && g.items[sl].enabled;
+                    CHECK(g.items[6].action.empty() == !may);
+                    if (may) CHECK(g.items[6].action.size() == 1 && g.items[6].action[0].x == kGiftBowX && g.items[6].action[0].y == kGiftBowY);
+                }
                 for (int i = 0; i < 6; i++)
                 {
                     CHECK(g.items[i].enabled == (i < n && !(n == 4 && i == 2)));
@@ -1295,8 +1643,8 @@ int main()
                 q.catalogue.items[0].buyPrice = -20;
                 CHECK(!CataloguePays(q.catalogue));
             }
-            // The cells' A word is the mode their tap sets (none without the strings).
-            CHECK(CatalogueViewOf(cs, shop(false, 12, 0, 1, false, 0, 100)).items[0].word.empty());
+            // The cells' A word says what A does there: it selects (Pay buys); the port's own word.
+            CHECK(CatalogueViewOf(cs, shop(false, 12, 0, 1, false, 0, 100)).items[0].word == OwnWord(nullptr, OwnWordId::Select));
             // The ids: a re-rolled list is other items (the focus does not stay on a new item by its place).
             GameState k = shop(false, 12, 0, 0, false, 0, 100);
             const u32 before = CatalogueViewOf(cs, k).items[0].id;
@@ -1747,7 +2095,8 @@ int main()
                         {
                             CHECK(a[k].kind == MenuStep::Tap && a[k].x == kStCloseX && a[k].y == kStCloseY);
                             if (to == 0) CHECK(a.size() == k + 1);
-                            else CHECK(a.size() == k + 3 && a[k + 1].kind == MenuStep::Wait && a[k + 1].frames == kStSwitchWait && a[k + 2].x == kStButtonX[to] && a[k + 2].y == kStButtonY[to]);
+                            else CHECK(a.size() == k + 4 && a[k + 1].kind == MenuStep::Wait && a[k + 1].frames == kStSwitchWait && a[k + 2].x == kStButtonX[to] && a[k + 2].y == kStButtonY[to] &&
+                                       a[k + 3].kind == MenuStep::Wait && a[k + 3].frames == kStShowWait);
                         }
                         // Every tap inside the game's own rectangle for it.
                         for (const MenuStep& s : a)
@@ -1886,6 +2235,12 @@ int main()
                         for (int i = 0; i + 1 < (int)v.items.size(); i++)
                             CHECK(v.items[i].rect.y >= list.y && v.items[i].rect.y + v.items[i].rect.h <= list.y + list.h);
                         const Composition comp = check(gs, v, h, v.selected >= 0 ? v.selected : 0);
+                        // No goal: the port's words in the list (else none of them).
+                        {
+                            int said = 0;
+                            for (const ui::UiItem& u : comp.ui) said += u.text == OwnWord(&rom, OwnWordId::NoGoals);
+                            CHECK(said == (n == 0 ? 1 : 0));
+                        }
                         // A goal the touch screen shows: its bar lands on its lines.
                         for (int i = 0; i + 1 < (int)v.items.size(); i++)
                         {
@@ -1981,8 +2336,11 @@ int main()
                 const MenuView a = SaveSlotsViewOf(ss, pq);
                 CHECK(a.valid && a.items.size() == 3 && MenuFirst(a) == -1 && a.back.empty());
                 const MenuView ap = PopupViewOf(ss, pq);
-                CHECK(ap.valid && ap.popup && ap.own && ap.items.size() == 1 && !ap.replay);
-                CHECK(ap.items[0].action[0].x == 164 && ap.items[0].action[0].y == 108 && ap.back[0].x == 92 && ap.back[0].y == 108);
+                // No first and the first focus (the safe answer), Yes one Right away; B No.
+                CHECK(ap.valid && ap.popup && ap.own && ap.items.size() == 2 && !ap.replay && ap.question && MenuFirst(ap) == 0);
+                CHECK(ap.items[0].id == kPopNoId && ap.items[0].action[0].x == 92 && ap.items[0].action[0].y == 108 && ap.items[0].closes);
+                CHECK(ap.items[1].id == kPopYesId && ap.items[1].action[0].x == 164 && ap.items[1].action[0].y == 108 && ap.items[1].closes);
+                CHECK(ap.back[0].x == 92 && ap.back[0].y == 108 && MenuMove(ap, 0, 3) == 1 && MenuMove(ap, 1, 2) == 0);
                 pq.town.popup = {true, 2, 3, "Do not turn off", "Saving", -1, false, 48, 160, 6};
                 const MenuView w = SaveSlotsViewOf(ss, pq);
                 CHECK(w.valid && MenuFirst(w) == -1 && w.back.empty());
@@ -2021,7 +2379,8 @@ int main()
                     h.town.popup = {true, 2, kind, std::string(300, 'w'), kind == 2 ? "stale" : "Title", -1, false, 56, 160, 6};
                     h.town.options = {true, 4096, 2048};
                     const MenuView v = PopupViewOf(on, h);
-                    CHECK(v.valid && v.own && v.popup && (int)v.items.size() == (kind == 3 ? 0 : 1) && v.back.empty() == (kind == 3));
+                    CHECK(v.valid && v.own && v.popup && (int)v.items.size() == (kind == 3 ? 0 : kind == 2 ? 2 : 1) && v.back.empty() == (kind == 3));
+                    if (kind == 2) CHECK(MenuFirst(v) == 0 && v.items[0].id == kPopNoId);
                     CHECK(UnderScreen(on, h).screen == Screen::Panel);
                     Composition comp {kConsoleW, kConsoleH, {}, {}};
                     Piece world = ConsoleWorld(256, HudCropRows(192), true);
@@ -2079,8 +2438,8 @@ int main()
                     off.screen = GScreen::Catalogue; // (over the HD catalogue: the HD popup)
                     CHECK(PopupViewOf({Screen::Catalogue, Tab::None}, off).valid == PopupViewOf(on, h).valid);
                     off = h;
-                    off.town.popup.boxW = 0;
-                    CHECK(PopupViewOf(on, off).valid == (kind == 3));
+                    off.town.popup.boxW = 0;   // (its box not placed yet, sliding in: the HD popup, nothing to press)
+                    CHECK(PopupViewOf(on, off).valid && PopupViewOf(on, off).items.empty() && PopupViewOf(on, off).back.empty());
                     CHECK(!PopupView(on, &h, &rom).valid); // (no strings: milestone 1's)
                 }
             {
@@ -2164,7 +2523,16 @@ int main()
             {
                 const GameState h = phone(page, row, scroll, rows);
                 const MenuView v = PhoneViewOf(ps, h, &rom);
-                CHECK(v.valid && v.own && !v.popup && v.back.size() == 1 && v.back[0].x == kPhoneClose.x && v.backCloses);
+                CHECK(v.valid && v.own && !v.popup);
+                // B: back one level where the page ends on the game's Exit row (its highlight moved
+                // there, then A), else the game's X; MENU hangs up from any page: the X.
+                {
+                    const PhonePage bp = PhonePageOf(h, rom);
+                    const bool exitRow = page != 0 && page != 10 && bp.valid && !bp.crop && !bp.rows.empty() && bp.rows.back().text == MenuWords(rom, kStrPhExit);
+                    if (exitRow) CHECK(!v.backCloses && v.back.back().kind == MenuStep::Keys && v.back.back().keys == (1u << kA));
+                    else CHECK(v.back.size() == 1 && v.back[0].x == kPhoneClose.x && v.backCloses);
+                }
+                CHECK(v.menu.size() == 1 && v.menu[0].x == kPhoneClose.x && v.menu[0].y == kPhoneClose.y && v.menuCloses);
                 if (page == 10) { CHECK(v.items.empty()); continue; }
                 CHECK(MenuFocusable(v, v.selected));
                 const ViewItem& sel = v.items[v.selected];
@@ -2324,7 +2692,18 @@ int main()
                     if (phase == 0) lands(comp, {0, 0, kConsoleW, kConsoleH}, kFrBigButtonFrom.x, kFrBigButtonFrom.y, kFrBigButtonFrom.w, kFrBigButtonFrom.h);
                     else
                         for (int i = 0; i < kFrMenuButtons; i++)
+                        {
+                            if (i == kFrWireless)
+                            {
+                                // DS Wireless (a second DS): the mouse takes it nowhere.
+                                int tx, ty;
+                                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                                const Rect r = FrontButtonRect(i);
+                                CHECK(!TouchFromComposition(comp, fit, fit.ox + (r.x + r.w / 2) * fit.scale, fit.oy + (r.y + r.h / 2) * fit.scale, tx, ty));
+                                continue;
+                            }
                             lands(comp, FrontButtonRect(i), kFrMenuBoxX, kFrMenuBoxY0 + i * kFrMenuBoxDy, kFrMenuBoxW, kFrMenuBoxH);
+                        }
                 }
             const MenuAction& start = v.buttons[(int)MenuButton::Start];
             if (phase == 0)
@@ -2338,8 +2717,9 @@ int main()
             for (int i = 0; i < kFrMenuButtons; i++)
             {
                 const ViewItem& it = v.items[i];
-                CHECK(it.enabled == (phase == 3) && it.action.empty() == (phase != 3));
-                if (phase != 3) continue;
+                // DS Wireless: focusable at phase 3 (its note), never tapped (a second DS).
+                CHECK(it.enabled == (phase == 3) && it.action.empty() == (phase != 3 || i == kFrWireless));
+                if (phase != 3 || i == kFrWireless) continue;
                 CHECK(it.action.size() == 1 && it.action[0].kind == MenuStep::Tap);
                 const int x = it.action[0].x, y = it.action[0].y, y0 = kFrMenuBoxY0 + i * kFrMenuBoxDy;
                 CHECK(x >= kFrMenuBoxX && x < kFrMenuBoxX + kFrMenuBoxW && y >= y0 && y < y0 + kFrMenuBoxH);
@@ -2361,6 +2741,8 @@ int main()
                 {
                     CHECK(v.items[0].id == kFrBootId && v.items[0].action.size() == 1 && v.buttons[(int)MenuButton::Start] == v.items[0].action);
                     CHECK(v.items[0].action[0].x == kFrSplashX && v.items[0].action[0].y == kFrSplashY);
+                    // (held past the splash's slowest poll, 6 frames: a 3-frame tap was lost)
+                    CHECK(v.items[0].action[0].frames == kFrSplashHold && kFrSplashHold > 6);
                 }
                 Composition comp {kConsoleW, kConsoleH, {}, {}};
                 BuildFront(comp, v, MenuFirst(v), at, g, rom, nullptr, 256, 192);
@@ -2619,6 +3001,17 @@ int main()
                     }
         CHECK(lids.size() == (size_t)kLoadRows);
         for (u32 id : lids) CHECK(!ids.count(id));
+        // After the game's "Loading" popup (LoadScreen::loading): nothing to press, nothing but the
+        // backdrop drawn (the list never flashes back before the town).
+        {
+            GameState g = load(7, 0, false, false);
+            g.front.load.loading = true;
+            const MenuView v = LoadViewOf(none, g);
+            CHECK(v.valid && MenuFirst(v) < 0 && v.back.empty());
+            Composition comp {kConsoleW, kConsoleH, {}, {}};
+            BuildLoad(comp, v, -1, g, rom, nullptr, 256, 192);
+            CHECK(comp.ui.empty() && comp.pieces.size() == 1);
+        }
         GameState bad = load(7, 0, false, false);
         bad.front.load.valid = false;
         CHECK(!LoadViewOf(none, bad).valid);
@@ -2716,10 +3109,14 @@ int main()
                 const MenuAction& lb = v.buttons[(int)MenuButton::LB];
                 const MenuAction& rb = v.buttons[(int)MenuButton::RB];
                 const MenuAction& start = v.buttons[(int)MenuButton::Start];
-                CHECK(lb.size() == 1 && lb[0].x == kCasTabX && lb[0].y == kCasTabY0 + kCasTabDy * ((page + 4) % 5));
-                CHECK(rb.size() == 1 && rb[0].x == kCasTabX && rb[0].y == kCasTabY0 + kCasTabDy * ((page + 1) % 5));
+                // The pages' ends (no ring: LB on the Name page never lands on Keep this Sim?).
+                CHECK(page == 0 ? lb.empty() : lb.size() == 1 && lb[0].x == kCasTabX && lb[0].y == kCasTabY0 + kCasTabDy * (page - 1));
+                CHECK(page == 4 ? rb.empty() : rb.size() == 1 && rb[0].x == kCasTabX && rb[0].y == kCasTabY0 + kCasTabDy * (page + 1));
                 CHECK(start.empty() == (page == 4));
                 if (page < 4) CHECK(start == rb);
+                // Keep this Sim?: one B lands on the cross; only B there (or A) discards.
+                if (page == 4 && !v.back.empty()) CHECK(MenuFocusable(v, v.backFocus) && v.items[v.backFocus].id == kCasCrossId);
+                if (page != 4) CHECK(v.backFocus == -1);
             }
             for (int topW : {256, 341})
                 for (int focus : {-1, MenuFirst(v), (int)v.items.size() - 1})
@@ -2784,6 +3181,15 @@ int main()
                     const MenuAction& x = v.buttons[(int)MenuButton::X];
                     CHECK(x.size() == 1 && x[0].x == kCasKbX && x[0].y == kCasKbY[(kb + 1) % 3]);
                     for (int p = 0; p < 3; p++) CHECK(v.items[6 + p].action.empty() == (p == kb));
+                    // Down: the key under, else the next row's last key; the backspace only from the
+                    // last row (123!'s middle row never lands on it).
+                    const int base = 9, count = kCasKeyCount[kb], rows = (count + 8) / 9, bs = (int)v.items.size() - 1;
+                    for (int i = 0; i < count; i++)
+                    {
+                        const int down = MenuMove(v, base + i, 1);
+                        if (i / 9 + 1 < rows) CHECK(down == base + std::min(i + 9, count - 1));
+                        else CHECK(down == bs);
+                    }
                 }
         // Hair: the arrows only where the game shows them; the first focus the game's style when in view.
         for (int scroll : {0, 3, 7})
@@ -2871,6 +3277,19 @@ int main()
             check(g, "switching");
         }
         for (int page = 5; page < 8; page++) CHECK(!CasViewOf(cas, state(page)).valid);
+        // A page whose fields do not read yet (its object being filled): the page's tabs, nothing to press.
+        for (int page = 0; page < 5; page++)
+        {
+            GameState g = state(page);
+            CasState& c = g.front.cas;
+            c.nameKnown = c.hairKnown = c.clothesKnown = c.keepKnown = false;
+            c.face = -1;
+            const MenuView v = CasViewOf(cas, g);
+            CHECK(v.valid && v.items.empty());
+            Composition comp {1280, 720, {}, {}};
+            BuildCas(comp, v, -1, g, rom, nullptr, bottom.data(), 256, 192);
+            CHECK(!comp.ui.empty());
+        }
         {
             GameState g = state(0);
             g.front.cas.valid = false;
@@ -2880,6 +3299,113 @@ int main()
             CHECK(!CasViewOf(cas, g).valid);
         }
         CHECK(ids.size() == 2 + 4 + 26 + 1 + 3 + 8 + 4 + 9 + 6 + 6 + 2 + 4 + 2u);
+    }
+
+
+    // The world's prompt (port/prompt.h) on made-up Interact states: shown for a target with an
+    // enabled action (the first one, the lit row while A is held), never for none, all greyed or
+    // right after an action (pad mode 2); its hints; steady frames (a pad mode change keeps them, a
+    // new target restarts them); only on the panel's Interact tab, settled, steady 6 frames; the
+    // plate inside the canvas above row 650, every item inside it on its own layer, with the
+    // longest words and every hint; under the shell's veil its layer is what the window drops.
+    {
+        auto act = [](int code, bool grey) { InteractAction a; a.code = code; a.labelId = 1845 + code; a.greyed = grey; return a; };
+        InteractState in;
+        in.valid = true;
+        in.target.kind = TargetRef::Sim; in.target.index = 51; in.target.nameId = 374;
+        in.actions = {act(43, false)};
+        in.highlighted = 0;
+        WorldPrompt p = WorldPromptOf(in, nullptr);
+        CHECK(p.shown && !p.more && !p.others && !p.held && p.verb.empty());
+        InteractState none = in; none.target = {}; none.actions.clear();
+        CHECK(!WorldPromptOf(none, nullptr).shown);
+        InteractState grey = in; grey.actions = {act(2, true), act(0x3A, true)};
+        CHECK(!WorldPromptOf(grey, nullptr).shown);
+        InteractState after = in; after.padMode = 2;
+        CHECK(!WorldPromptOf(after, nullptr).shown);
+        InteractState invalid = in; invalid.valid = false;
+        CHECK(!WorldPromptOf(invalid, nullptr).shown);
+        InteractState many = in; many.actions = {act(2, true), act(6, false), act(71, false)}; many.prev.kind = TargetRef::Object; many.prev.nameId = 492;
+        p = WorldPromptOf(many, nullptr);
+        CHECK(p.shown && p.more && p.others && !p.held);
+        {
+            // Left / Right switch targets with A held only (without it the D-pad walks): no hint before.
+            Composition k {kConsoleW, kConsoleH, {}, {}};
+            BuildWorldPrompt(k, p, nullptr);
+            int chips = 0;
+            for (const ui::UiItem& it : k.ui) chips += it.kind == ui::UiItem::Chip && it.button == ui::Button::DPadH;
+            CHECK(chips == 0);
+        }
+        many.padMode = 0; many.highlighted = 2;
+        p = WorldPromptOf(many, nullptr);
+        CHECK(p.shown && p.held && p.more);
+        InteractState one = many; one.actions = {act(2, true), act(6, false)};
+        CHECK(!WorldPromptOf(one, nullptr).more);
+
+        PromptSteady st;
+        CHECK(st.Update(nullptr) == 0);
+        for (int i = 1; i <= 7; i++) CHECK(st.Update(&in) == i);
+        InteractState held = in; held.padMode = 0;
+        CHECK(st.Update(&held) == 8);
+        CHECK(st.Update(&many) == 1);
+        CHECK(st.Update(&invalid) == 0 && st.Update(&in) == 1);
+        CHECK(st.Update(&none) == 0 && !st.had && st.Update(&none) == 0);
+
+        GameState g;
+        g.valid = true; g.screen = GScreen::Panel; g.tab = 0; g.settled = true; g.town.interact = in;
+        const ScreenState town {Screen::Panel, Tab::Interact};
+        PromptSteady five, six, lots;
+        for (int i = 0; i < kPromptSteadyFrames - 1; i++) five.Update(&in);
+        for (int i = 0; i < kPromptSteadyFrames; i++) six.Update(&in);
+        for (int i = 0; i < 100; i++) lots.Update(&in);
+        CHECK(PromptUp(town, g, six) && !PromptUp(town, g, five) && !PromptUp(town, g, PromptSteady {}));
+        CHECK(!PromptUp({Screen::Panel, Tab::Pockets}, g, lots));
+        CHECK(!PromptUp({Screen::Popup, Tab::Interact}, g, lots));
+        GameState h = g; h.settled = false; CHECK(!PromptUp(town, h, lots));
+        h = g; h.screen = GScreen::Popup; CHECK(!PromptUp(town, h, lots));
+        h = g; h.tab = 1; CHECK(!PromptUp(town, h, lots));
+        h = g; h.town.interact.valid = false; CHECK(!PromptUp(town, h, lots));
+        h = g; h.screen = GScreen::Dialogue; CHECK(!PromptUp({Screen::Dialogue, Tab::None}, h, lots));
+        // The counter a frame behind the drawn state (Steer runs before the frame's RAM is read): a
+        // state loaded with another target, or the target just switched, never flashes the old
+        // one's words, nor the new one's before it is steady itself.
+        h = g; h.town.interact = many; CHECK(!PromptUp(town, h, lots));
+        h = g; h.town.interact.actions[0].greyed = true; CHECK(!PromptUp(town, h, lots));
+        {
+            Composition k {kConsoleW, kConsoleH, {}, {}};
+            RomData norom;
+            AddWorldPrompt(k, town, h, norom, lots);
+            CHECK(k.ui.empty());
+            AddWorldPrompt(k, town, g, norom, lots);
+            CHECK(!k.ui.empty());
+            DropWorldPrompt(k);
+            CHECK(k.ui.empty());
+        }
+
+        Composition c {kConsoleW, kConsoleH, {}, {}};
+        BuildWorldPrompt(c, WorldPromptOf(none, nullptr), nullptr);
+        CHECK(c.ui.empty());
+        const std::string longVerb = "Wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww (§99,999,999)", longName = "Wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwww";
+        for (const auto& [verb, name, more, others, held2] : {std::tuple<std::string, std::string, bool, bool, bool> {"Buy", "Jun", false, false, false},
+                                                               {longVerb, longName, true, true, false}, {longVerb, "", true, false, true},
+                                                               {"Talk", longName, false, true, true}})
+        {
+            WorldPrompt w;
+            w.shown = true; w.verb = verb; w.name = name; w.more = more; w.others = others; w.held = held2;
+            Composition k {kConsoleW, kConsoleH, {}, {}};
+            BuildWorldPrompt(k, w, nullptr);
+            const Rect r = WorldPromptRect(w, nullptr);
+            CHECK(!k.ui.empty() && r.w > 0 && r.x >= 16 && r.x + r.w <= kConsoleW - 16 && r.y >= 0 && r.y + r.h + kPromptShadow < 650);
+            CHECK(r.x + r.w / 2 >= 639 && r.x + r.w / 2 <= 641);
+            int chips = 0;
+            for (const ui::UiItem& it : k.ui)
+            {
+                CHECK(it.layer == kPromptLayer);
+                CHECK(it.to.x >= r.x && it.to.y >= r.y && it.to.x + it.to.w <= r.x + r.w && it.to.y + it.to.h <= r.y + r.h);
+                chips += it.kind == ui::UiItem::Chip;
+            }
+            CHECK(chips == 1 + (more ? 1 : 0) + (others && held2 ? 1 : 0));
+        }
     }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }

@@ -17,5 +17,15 @@
     <key>NSHighResolutionCapable</key><true/>
     <key>NSMicrophoneUsageDescription</key><string>Only when the microphone setting is “Real”: the game hears it, to blow or to record a sample.</string>
     <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+    <!-- A .nds opened with the app (or dropped on its icon) reaches the launch panel as a dropped file. -->
+    <key>CFBundleDocumentTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleTypeName</key><string>Nintendo DS ROM</string>
+            <key>CFBundleTypeExtensions</key><array><string>nds</string></array>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+        </dict>
+    </array>
 </dict>
 </plist>

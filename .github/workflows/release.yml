@@ -5,7 +5,8 @@ name: Release
 # build provenance, then creates the GitHub release with that version's section of CHANGELOG.md as
 # notes and the three archives attached. The version in CMakeLists.txt must be the tag's. The
 # archives hold the program, README.md, LICENSE, the embedded font's licence (OFL-Nunito.txt) and
-# the embedded controller mappings' (LICENSE-SDL_GameControllerDB.txt, zlib):
+# the embedded controller mappings' (LICENSE-SDL_GameControllerDB.txt, zlib); xBRZ (src/thirdparty/xbrz,
+# the game pictures' scaler) is GPLv3 like the program: LICENSE covers it, no file of its own:
 # never a ROM, a save or anything from the game.
 on:
   push:

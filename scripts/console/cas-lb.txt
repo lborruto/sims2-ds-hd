@@ -1,0 +1,4 @@
+# From s3 (Create-a-Sim's Name page), CONSOLE: LB → nothing (the pages end there: never Keep this
+# Sim?), RB → the Hair page.
+10 2 pad lb
+60 2 pad rb

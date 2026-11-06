@@ -164,10 +164,10 @@ static void lb_rb_tap_tabs()
 {
     Rig r;
     r.Frame(kInteract);
-    // In town L and R are the DS's (the camera).
+    // In town LB / RB are no longer the camera (the right stick is: world_camera_on_the_right_stick).
     PadState l;
     l.lb = true;
-    CHECK(r.Frame(kInteract, l) & (1u << kL));
+    CHECK(!(r.Frame(kInteract, l) & (1u << kL)));
     CHECK(!r.touch.Owns());
     r.Frame(kInteract);
     r.Press(kInteract, &PadState::menu);
@@ -228,7 +228,8 @@ static void phone_closed_by_b()
     r.Drain();
     r.Frame(kInteract);
     CHECK(!r.nav.MenuOpen());
-    // Opened from the menu's phone icon: closing it closes the menu as well.
+    // Opened from the menu's phone icon: closing it opens the menu again on the tab it came from
+    // (the game comes back on Interact: Goals' icon tapped, once the panel is there).
     r.Press(kInteract, &PadState::menu);
     r.Frame(kPhone);
     r.Press(kPhone, &PadState::menu);
@@ -236,7 +237,29 @@ static void phone_closed_by_b()
     CHECK(x == kPhoneClose.x && y == kPhoneClose.y);
     r.Drain();
     r.Frame(kInteract);
+    CHECK(r.nav.MenuOpen() && !r.touch.Owns());
+    r.Press(kInteract, &PadState::b);
     CHECK(!r.nav.MenuOpen());
+    r.Press(kInteract, &PadState::menu);
+    r.Press(kInteract, &PadState::rb);
+    r.Drain();
+    r.Frame(kGoals);
+    r.Frame(kPhone);
+    r.Press(kPhone, &PadState::b);
+    r.Drain();
+    r.Frame(kInteract);
+    CHECK(!r.nav.MenuOpen()); // (drawn closed while the tab comes back)
+    CHECK(r.Touched(x, y) && x == kTabIcon[2].x && y == kTabIcon[2].y);
+    r.Drain();
+    r.Frame(kGoals);
+    CHECK(r.nav.MenuOpen());
+    // From the world (not the menu): the phone's X leaves the menu closed.
+    r.Press(kGoals, &PadState::b);
+    r.Frame(kPhone);
+    r.Press(kPhone, &PadState::b);
+    r.Drain();
+    r.Frame(kInteract);
+    CHECK(!r.nav.MenuOpen() && !r.touch.Owns());
 }
 
 static void town_and_dialogue_keep_the_buttons()
@@ -264,6 +287,62 @@ static void town_and_dialogue_keep_the_buttons()
     CHECK(r.Frame(kInteract, p) & (1u << kA));
 }
 
+// The world's camera (the town, no HD menu open): the right stick holds the DS's L / R past its
+// dead zone (the game turns while they are held) and its vertical X (zoom in, up) / Y (out,
+// down), the axis pushed further winning; LB / RB (the shoulders' default L / R) no longer turn
+// there, the keyboard's L / R keys and a pad input of the player's own (turnL / turnR) still do;
+// X / Y themselves still zoom. Elsewhere LB / RB keep their work: the open menu's tabs, the
+// DS's L / R on a conversation.
+static void world_camera_on_the_right_stick()
+{
+    const u32 LR = (1u << kL) | (1u << kR), XY = (1u << kX) | (1u << kY);
+    Rig r;
+    r.Frame(kInteract);
+    auto with = [&](float rx, float ry) { PadState p; p.rx = rx; p.ry = ry; return r.Frame(kInteract, p) & (LR | XY); };
+    CHECK(with(-0.9f, 0) == (1u << kL));
+    CHECK(with(0.9f, 0) == (1u << kR));
+    CHECK(with(-0.4f, 0) == (1u << kL));          // (past the turn's dead zone)
+    CHECK(with(0.3f, 0) == 0);
+    CHECK(with(0, -0.9f) == (1u << kX));          // up: closer
+    CHECK(with(0, 0.9f) == (1u << kY));           // down: further
+    CHECK(with(0, -0.45f) == 0);
+    CHECK(with(-0.8f, -0.5f) == (1u << kL));      // a turn a little up never zooms
+    CHECK(with(0.5f, 0.85f) == (1u << kY));       // a zoom a little sideways never turns
+    // held: held every frame (the game's own pace), let go: nothing
+    for (int i = 0; i < 30; i++) CHECK(with(-1.0f, 0) == (1u << kL));
+    CHECK(with(0, 0) == 0);
+    PadState lb;
+    lb.lb = true;
+    CHECK((r.Frame(kInteract, lb) & LR) == 0);
+    PadState rb;
+    rb.rb = true;
+    CHECK((r.Frame(kInteract, rb) & LR) == 0);
+    PadState keyL;
+    keyL.lb = keyL.turnL = true;                    // (the keyboard's L key, or the player's own input)
+    CHECK((r.Frame(kInteract, keyL) & LR) == (1u << kL));
+    PadState keyR;
+    keyR.rb = keyR.turnR = true;
+    CHECK((r.Frame(kInteract, keyR) & LR) == (1u << kR));
+    PadState x;
+    x.x = true;
+    CHECK((r.Frame(kInteract, x) & XY) == (1u << kX));
+    CHECK(!r.nav.MenuOpen() && !r.touch.Owns());
+    // A conversation keeps the DS's L / R on the shoulders, and the stick changes nothing there.
+    CHECK((r.Frame(kDialogue, lb) & LR) == (1u << kL));
+    PadState stick;
+    stick.rx = -1.0f;
+    CHECK((r.Frame(kDialogue, stick) & (LR | XY)) == 0);
+    // The menu open: RB taps the next tab, never the DS's R; the stick turns nothing.
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    CHECK(r.nav.MenuOpen());
+    CHECK((r.Frame(kInteract, rb) & LR) == 0);
+    int tx, ty;
+    CHECK(r.Touched(tx, ty));
+    r.Drain();
+    CHECK((r.Frame(kInteract, stick) & LR) == 0);
+}
+
 static void unknown_presses_the_cursor()
 {
     Rig r;
@@ -279,6 +358,32 @@ static void unknown_presses_the_cursor()
     CHECK(!r.nav.CursorPress());
     r.Frame(kInteract);
     CHECK(!r.nav.CursorScreen());
+}
+
+// The hotel's furniture editor (an Unknown screen, the stick cursor's): B and MENU tap its X, B
+// never the DS's; on another Unknown screen B stays the DS's.
+static void placement_editor_leaves()
+{
+    Rig r;
+    ActivityRam ram;
+    ram.placement = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kUnknown);
+    for (bool PadState::*b : {&PadState::b, &PadState::menu})
+    {
+        PadState p;
+        p.*b = true;
+        CHECK(!(r.Frame(kUnknown, p) & (1u << kB)));
+        int x, y;
+        CHECK(r.Touched(x, y) && x == kPlacementX.x && y == kPlacementX.y);
+        r.Drain();
+        r.Frame(kUnknown);
+    }
+    r.nav.SetActivityRam(ActivityRam());
+    PadState p;
+    p.b = true;
+    CHECK(r.Frame(kUnknown, p) & (1u << kB));
+    CHECK(!r.touch.Owns());
 }
 
 static void unknown_without_a_cursor_keeps_a()
@@ -448,9 +553,18 @@ static void cards_quit_question()
     CHECK(r.Touched(x, y));
     CHECK(x == HotspotsFor(kCards)[Index(kCards, "deck")].x);
     r.Drain();
-    // B, then A: yes (the tick).
+    // B, then A: no (the question opens on its safe answer: A A never quits).
     r.Press(kCards, &PadState::b);
     r.Drain();
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y));
+    CHECK(x == kCardsQuitNo.x && y == kCardsQuitNo.y);
+    r.Drain();
+    // B, Right, A: yes (the tick).
+    r.Press(kCards, &PadState::b);
+    r.Drain();
+    r.Press(kCards, &PadState::right);
+    CHECK(!r.touch.Owns());
     r.Press(kCards, &PadState::a);
     CHECK(r.Touched(x, y));
     CHECK(x == kCardsQuitYes.x && y == kCardsQuitYes.y);
@@ -488,6 +602,27 @@ static void cards_ram_answered()
     r.Drain();
     r.Press(kCards, &PadState::a);
     CHECK(r.Touched(x, y) && x == HotspotsFor(kCards)[Index(kCards, "card 1")].x && y == HotspotsFor(kCards)[Index(kCards, "card 1")].y);
+}
+
+// The cards' question while a touch still runs (the stylus owned): Right still moves its focus to
+// Yes (an edge never lost), A meanwhile is dropped; once the stylus is free, A answers Yes.
+static void cards_question_moves_while_touching()
+{
+    Rig r;
+    r.Frame(kCards);
+    ActivityRam ram;
+    ram.cards = true;
+    ram.quitAsk = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kCards);
+    CHECK(r.nav.AskFocus() == 0);
+    r.touch.Tap(1, 1); // (a touch running)
+    r.Press(kCards, &PadState::right);
+    CHECK(r.nav.AskFocus() == 1);
+    r.Drain();
+    int x = -1, y = -1;
+    r.Press(kCards, &PadState::a);
+    CHECK(r.Touched(x, y) && x == kCardsQuitYes.x && y == kCardsQuitYes.y);
 }
 
 static void cards_ram()
@@ -557,12 +692,21 @@ static void vacuum_blows_drives_and_grabs()
         CHECK(blows >= 8);
         CHECK(!r.nav.Blow());
     }
-    // The D-pad and the stick drive; B, L and R stay the DS's.
+    // The D-pad and the stick drive; L and R stay the DS's; B taps the bowl's X (the way out), not the DS's B.
     PadState d;
     d.up = d.b = d.lb = true;
     d.lx = 1;
     u32 k = r.Frame(kVacuum, d);
-    for (int key : {kUp, kRight, kB, kL}) CHECK(k & (1u << key));
+    for (int key : {kUp, kRight, kL}) CHECK(k & (1u << key));
+    CHECK(!(k & (1u << kB)));
+    {
+        int tx, ty;
+        CHECK(r.Touched(tx, ty) && tx == kVacuumX.x && ty == kVacuumX.y);
+        r.Drain();
+        r.Frame(kVacuum, d);   // (held: once)
+        CHECK(!r.touch.Owns());
+        r.Frame(kVacuum);
+    }
     CHECK(r.nav.HandDx() == 0 && r.nav.HandDy() == 0);
     // X held: the D-pad moves the hand (no driving); the stick still drives.
     PadState hx;
@@ -873,6 +1017,10 @@ static void moogoo_scheme()
     ram.mooGooQuitAsk = true;
     q.nav.SetActivityRam(ram);
     q.Frame(kMooGoo);
+    q.Press(kMooGoo, &PadState::a);   // (No first: the safe answer)
+    CHECK(q.Touched(x, y) && x == kMooGooNo.x && y == kMooGooNo.y);
+    q.Drain();
+    q.Press(kMooGoo, &PadState::right);
     q.Press(kMooGoo, &PadState::a);
     CHECK(q.Touched(x, y) && x == kMooGooYes.x && y == kMooGooYes.y);
     q.Drain();
@@ -988,12 +1136,25 @@ static void drencher_scheme()
     CHECK(tapped(&PadState::y, kDrencherTarget));
     CHECK(tapped(&PadState::rb, kDrencherRefill));
     CHECK(tapped(&PadState::b, kDrencherX));
-    // Help mode (opened with the mouse): B taps the "?" (not the X); a help text closes on any press.
+    // Start taps the "?" (help); in its mode each button taps its own control (the game explains
+    // it), A not firing; B or Start the "?" again (not the X); a help text closes on any press.
+    CHECK(tapped(&PadState::start, kDrencherHelp));
     ram.drencherHelp = true;
     r.nav.SetActivityRam(ram);
     r.Frame(kDrencher);
     CHECK(tapped(&PadState::b, kDrencherHelp));
-    CHECK(!tapped(&PadState::y, kDrencherTarget));
+    CHECK(tapped(&PadState::start, kDrencherHelp));
+    CHECK(tapped(&PadState::y, kDrencherTarget));
+    CHECK(tapped(&PadState::x, kDrencherPumpBand));
+    CHECK(tapped(&PadState::rb, kDrencherRefill));
+    {
+        PadState fire;
+        fire.a = true;
+        CHECK(!(r.Frame(kDrencher, fire) & (1u << kA)));
+        CHECK(r.Touched(tx, ty) && tx == kDrencherFire.x && ty == kDrencherFire.y);
+        r.Drain();
+        r.Frame(kDrencher);
+    }
     ram.drencherHelpText = true;
     r.nav.SetActivityRam(ram);
     r.Frame(kDrencher);
@@ -1033,6 +1194,34 @@ static void crime_scheme()
     CHECK(tapped(&PadState::x, kCrimeScare));
     CHECK(tapped(&PadState::y, kCrimeSubdue));
     CHECK(tapped(&PadState::b, kCrimeX));
+    // Start taps the "?" (help); in its mode X / A / Y tap scare, the rat, subdue (no grab), B or
+    // Start the "?" again; a help text closes on any press; A still held after it grabs nothing.
+    CHECK(tapped(&PadState::start, kCrimeHelp));
+    ActivityRam ram;
+    ram.crime = ram.crimeHelp = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kCrime);
+    CHECK(tapped(&PadState::x, kCrimeScare));
+    CHECK(tapped(&PadState::y, kCrimeSubdue));
+    CHECK(tapped(&PadState::b, kCrimeHelp));
+    CHECK(tapped(&PadState::start, kCrimeHelp));
+    {
+        PadState held;
+        held.a = true;
+        r.Frame(kCrime, held);
+        CHECK(r.Touched(x, y) && x == kCrimeRat.x && y == kCrimeRat.y && !r.nav.PointerShown());
+        r.Drain();
+        ram.crimeHelp = false;
+        r.nav.SetActivityRam(ram);
+        for (int i = 0; i < 5; i++) r.Frame(kCrime, held);
+        CHECK(!r.nav.PointerDown() && !r.touch.Owns());   // (the help's A, still held: no grab)
+        r.Frame(kCrime);
+    }
+    ram.crimeHelp = ram.crimeHelpText = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kCrime);
+    CHECK(tapped(&PadState::a, kCrimeHelp));
+    CHECK(tapped(&PadState::rb, kCrimeHelp));
 }
 
 static const ScreenState kScratch {Screen::Scratch, Tab::None};
@@ -1213,12 +1402,27 @@ static void mixer_scheme()
     // The save question and help.
     ram.mixerPhase = 0xA;
     r.nav.SetActivityRam(ram);
+    CHECK(tapped(&PadState::a, kMixNo));    // (No first: the safe answer)
+    r.Press(kMixer, &PadState::right);
     CHECK(tapped(&PadState::a, kMixYes));
     CHECK(tapped(&PadState::b, kMixNo));
     CHECK(tapped(&PadState::x, kMixPreview));
     ram.mixerPhase = 8;
     r.nav.SetActivityRam(ram);
     CHECK(tapped(&PadState::b, kMixHelp));
+    CHECK(tapped(&PadState::start, kMixHelp));
+    ram.mixerPhase = 9;
+    r.nav.SetActivityRam(ram);
+    CHECK(tapped(&PadState::b, kMixHelp));
+    // Start from the idle mixer: its "?" (help).
+    ram.mixerPhase = 0;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kMixer);
+    CHECK(tapped(&PadState::start, kMixHelp));
+    ram.mixerPhase = 1;   // (playing: Start nothing)
+    r.nav.SetActivityRam(ram);
+    r.Press(kMixer, &PadState::start);
+    CHECK(!r.touch.Owns());
 }
 
 // The mixer's save page: the D-pad moves the focus over its table (from the first key), A taps the
@@ -1302,6 +1506,8 @@ static void art_scheme()
     CHECK(tapped(&PadState::x, ArtSwatch(0)));
     CHECK(tapped(&PadState::y, kArtUndo));
     CHECK(tapped(&PadState::b, kArtDone));
+    CHECK(tapped(&PadState::start, kArtDone));      // (Start too: the game reads no key here)
+    CHECK(tapped(&PadState::menu, kArtPageNext));   // MENU: the palette's next page
     // The buttons the game draws: the ten tools in two columns, the fifteen swatches in two rows.
     CHECK(ArtTool(0).x == 14 && ArtTool(5).y == 144 && ArtTool(6).x == 241 && ArtTool(6).y == 66 && ArtTool(9).y == 144);
     CHECK(ArtSwatch(5).x == 180 && ArtSwatch(5).y == 165 && ArtSwatch(7).x == 43 && ArtSwatch(14).y == 187);
@@ -1315,6 +1521,8 @@ static void art_scheme()
     ram.ask = true;
     r.nav.SetActivityRam(ram);
     r.Frame(kArt);
+    CHECK(tapped(&PadState::a, ram.askNo));   // (No first: the safe answer)
+    r.Press(kArt, &PadState::right);
     CHECK(tapped(&PadState::a, ram.askYes));
     CHECK(tapped(&PadState::b, ram.askNo));
     PadState a;
@@ -1992,6 +2200,220 @@ static void view_item_x_and_gift()
     CHECK(q.Touched(x, y) && x == 235 && y == 19);
 }
 
+// A slider's fast presses (ViewItem::queues): none dropped while a drag runs; each owed step runs
+// in the order pressed once the game has read the last one back (its Left / Right rebuilt from the
+// new value), past an end a step does nothing, and the queue runs on when the focus moves on.
+static void slider_presses_queue()
+{
+    const ScreenState opt {Screen::Panel, Tab::Options};
+    int value = 5;
+    MenuView v;
+    auto build = [&]() {
+        v = MenuView();
+        v.valid = v.own = true;
+        ViewItem s;
+        s.rect = {200, 300, 880, 130};
+        s.id = 0x7000010;
+        s.queues = true;
+        if (value > 0) s.left = {DragStep(72 + 16 * value, 121, 72 + 16 * (value - 1), 121)};
+        if (value < 10) s.right = {DragStep(72 + 16 * value, 121, 72 + 16 * (value + 1), 121)};
+        for (int& n : s.next) n = kNoMove;
+        s.next[1] = 1;
+        v.items.push_back(s);
+        ViewItem other;
+        other.rect = {200, 460, 880, 130};
+        other.id = 0x7000011;
+        other.next[0] = 0;
+        v.items.push_back(other);
+    };
+    build();
+    Rig r;
+    r.view = &v;
+    r.Frame(opt);
+    CHECK(r.nav.Focus() == 0);
+    // Left, Left, Right pressed while the first drag runs: one drag now.
+    r.Press(opt, &PadState::left);
+    r.Press(opt, &PadState::left);
+    r.Press(opt, &PadState::right);
+    int x0, y0, x1, y1;
+    CHECK(r.Path(x0, y0, x1, y1) && x0 == 72 + 16 * 5 && x1 == 72 + 16 * 4);
+    // The game has not read it back yet: nothing more.
+    r.Frame(opt);
+    CHECK(!r.touch.Owns());
+    value = 4; build();
+    r.Frame(opt);
+    CHECK(r.Path(x0, y0, x1, y1) && x0 == 72 + 16 * 4 && x1 == 72 + 16 * 3);
+    value = 3; build();
+    // The focus moves on: the owed Right still runs on the slider.
+    r.Press(opt, &PadState::down);
+    CHECK(r.nav.Focus() == 1);
+    CHECK(r.Path(x0, y0, x1, y1) && x0 == 72 + 16 * 3 && x1 == 72 + 16 * 4);
+    value = 4; build();
+    for (int i = 0; i < 40; i++) r.Frame(opt);
+    CHECK(!r.touch.Owns());
+    // Past an end: the press does nothing, the next one still counts.
+    r.Press(opt, &PadState::up);
+    value = 10; build();
+    r.Frame(opt);
+    r.Press(opt, &PadState::right);
+    CHECK(!r.touch.Owns());
+    r.Press(opt, &PadState::left);
+    CHECK(r.Path(x0, y0, x1, y1) && x0 == 72 + 16 * 10 && x1 == 72 + 16 * 9);
+}
+
+// A question (a popup's Yes / No) opens on No whatever the focus beneath was; Yes is one Right
+// away; when it goes, the screen beneath gets its item back (FocusFor: on the first frame too).
+static void question_opens_on_no()
+{
+    const ScreenState opt {Screen::Panel, Tab::Options};
+    MenuView panel;
+    panel.valid = true;
+    for (int i = 0; i < 2; i++)
+    {
+        ViewItem it;
+        it.rect = {200 + 440 * i, 206, 432, 80};
+        it.action = {TapStep(57 + 177 * i, 44)};
+        it.id = 0x7000001 + (u32)i;
+        panel.items.push_back(it);
+    }
+    MenuView q;
+    q.valid = q.own = q.popup = q.question = true;
+    q.replay = false;
+    for (int i = 0; i < 2; i++)
+    {
+        ViewItem it;
+        it.rect = {348 + 400 * i, 420, 260, 72};
+        it.action = {TapStep(92 + 72 * i, 116)};
+        it.id = 0x8000702 - (u32)i; // (No, Yes)
+        it.closes = true;
+        q.items.push_back(it);
+    }
+    q.back = {TapStep(92, 116)};
+    q.initial = 0;
+    Rig r;
+    r.view = &panel;
+    r.Frame(opt);
+    r.Press(opt, &PadState::menu);
+    r.Press(opt, &PadState::right);
+    CHECK(r.nav.Focus() == 1);
+    CHECK(r.nav.FocusFor(q) == 0); // (the first frame the popup is drawn)
+    r.view = &q;
+    r.Frame(opt);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(opt, &PadState::a);
+    int x, y;
+    CHECK(r.Touched(x, y) && x == 92 && y == 116);
+    r.Drain();
+    CHECK(r.nav.FocusFor(panel) == 1); // (the frame the popup has gone: Quit, not Save)
+    r.view = &panel;
+    r.Frame(opt);
+    CHECK(r.nav.Focus() == 1 && r.nav.MenuOpen());
+    // Again, Right then A: Yes.
+    r.view = &q;
+    r.Frame(opt);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(opt, &PadState::right);
+    for (int i = 0; i < 100; i++) r.Frame(opt); // (No's closing wait over)
+    CHECK(r.nav.Focus() == 1);
+    r.Press(opt, &PadState::a);
+    CHECK(r.Touched(x, y) && x == 164 && y == 116);
+}
+
+// A list page left for its question and back without the item it was on (Build Rooms' room
+// just bought): the focus on the item now in its place, never the list's top.
+static void page_back_without_its_item()
+{
+    const ScreenState build {Screen::Build, Tab::None};
+    auto list = [](std::vector<u32> ids) {
+        MenuView v;
+        v.valid = v.own = true;
+        for (size_t i = 0; i < ids.size(); i++)
+        {
+            ViewItem it;
+            it.rect = {200, 150 + (int)i * 110, 600, 100};
+            it.action = {TapStep(48, 68 + 35 * (int)i)};
+            it.id = ids[i];
+            v.items.push_back(it);
+        }
+        return v;
+    };
+    MenuView l = list({0x0B000001, 0x0B000002, 0x0B000003});
+    MenuView q = list({0x0B000101, 0x0B000102});
+    q.page = 1;
+    q.question = true;
+    q.initial = 0;
+    Rig r;
+    r.view = &l;
+    r.Frame(build);
+    r.Press(build, &PadState::down);
+    CHECK(r.nav.Focus() == 1);
+    r.view = &q;
+    r.Frame(build);
+    CHECK(r.nav.Focus() == 0);
+    MenuView after = list({0x0B000001, 0x0B000003});
+    r.view = &after;
+    r.Frame(build);
+    CHECK(r.nav.Focus() == 1 && after.items[1].id == 0x0B000003);
+}
+
+// B's safe landing (MenuView::backFocus, Keep this Sim?'s cross): one B moves the focus there,
+// B again there runs back.
+static void back_focus_first()
+{
+    const ScreenState cas {Screen::CreateASim, Tab::None};
+    MenuView v;
+    v.valid = v.own = true;
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {700 + 120 * i, 400, 100, 80};
+        it.action = {TapStep(80 + 40 * i, 170)};
+        it.id = 0x12000000 + (u32)i;
+        v.items.push_back(it);
+    }
+    v.back = {TapStep(160, 170)};
+    v.backFocus = 2;
+    v.initial = 0;
+    Rig r;
+    r.view = &v;
+    r.Frame(cas);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(cas, &PadState::b);
+    CHECK(r.nav.Focus() == 2 && !r.touch.Owns());
+    r.Press(cas, &PadState::b);
+    int x, y;
+    CHECK(r.Touched(x, y) && x == 160 && y == 170);
+
+    // A big picture (MenuView::picture: Settings' concept art): shown big once an A ran; the first
+    // B closes it (no tap), the next one is the screen's B; LB / RB close it too.
+    const ScreenState fe {Screen::FrontEnd, Tab::None};
+    MenuView p;
+    p.valid = p.own = p.picture = true;
+    ViewItem cell;
+    cell.rect = {840, 300, 88, 72};
+    cell.action = {TapStep(76, 88)};
+    cell.id = 0x11000200;
+    p.items.push_back(cell);
+    p.back = {TapStep(19, 17)};
+    p.buttons[(int)MenuButton::RB] = {TapStep(21, 54)};
+    Rig q;
+    q.view = &p;
+    q.Frame(fe);
+    CHECK(q.nav.PictureClosed());
+    q.Press(fe, &PadState::a);
+    q.Drain();
+    CHECK(!q.nav.PictureClosed());
+    q.Press(fe, &PadState::b);
+    CHECK(q.nav.PictureClosed() && !q.touch.Owns());
+    q.Press(fe, &PadState::b);
+    CHECK(q.Touched(x, y) && x == 19 && y == 17);
+    q.Drain();
+    q.Press(fe, &PadState::a);
+    q.Drain();
+    q.Press(fe, &PadState::rb);
+    CHECK(q.nav.PictureClosed());
+}
+
 // The HD Save slots (a valid view, no menu to open): a focus screen, not the stick cursor's; A
 // taps the focused slot's tick, B the game's X. Without a view: the cursor's, as before. Options'
 // slider: Left / Right drag the game's knob (its own actions), not a focus move.
@@ -2165,6 +2587,27 @@ static void view_tab_change_disarms_and_menu_is_b()
         z.Press(s, &PadState::menu);
         for (int i = 0; i < 3; i++) z.Frame(s);
         CHECK(!z.touch.Owns());
+    }
+    // A view with MENU's own action (the phone: its X from any page, while B goes back a level):
+    // MENU runs it, B its back.
+    {
+        MenuView o = ListView(3, -1);
+        o.own = true;
+        o.back = {TapStep(100, 100)};
+        o.menu = {TapStep(237, 15)};
+        o.menuCloses = true;
+        Rig q;
+        q.view = &o;
+        q.Frame(kPhone);
+        q.Press(kPhone, &PadState::menu);
+        for (int i = 0; i < 3 && !q.touch.Owns(); i++) q.Frame(kPhone);
+        CHECK(q.Touched(x, y) && x == 237 && y == 15);
+        Rig b;
+        b.view = &o;
+        b.Frame(kPhone);
+        b.Press(kPhone, &PadState::b);
+        for (int i = 0; i < 3 && !b.touch.Owns(); i++) b.Frame(kPhone);
+        CHECK(b.Touched(x, y) && x == 100 && y == 100);
     }
 }
 
@@ -2814,6 +3257,61 @@ static void view_front_menus()
     }
 }
 
+// A held CONSOLE picture (consolehold.h: Held instead of Update): a keys step already running
+// goes on to its end (the phone's Up / Down not released and pressed again mid-step), the step
+// after it waits for Update, and nothing new starts (no press taken, no tap).
+static void held_picture_finishes_the_keys_step()
+{
+    MenuView k = ListView(1, -1);
+    k.items[0].action = {KeysStep(1u << kDown, 4), TapStep(10, 20)};
+    Rig r;
+    r.view = &k;
+    r.Frame(kInteract);
+    r.Press(kInteract, &PadState::menu);
+    PadState a;
+    a.a = true;
+    CHECK(r.Frame(kInteract, a) == (1u << kDown));
+    CHECK(r.nav.Running());
+    // Held: its three frames left, Down each frame, then nothing (the tap waits).
+    for (int i = 0; i < 3; i++)
+    {
+        u32 keys = 0;
+        r.nav.Held(r.touch, keys);
+        CHECK(keys == (1u << kDown));
+    }
+    u32 keys = 0;
+    r.nav.Held(r.touch, keys);
+    CHECK(keys == 0);
+    CHECK(!r.touch.Owns());
+    CHECK(r.nav.Running());
+    // The hold over: the tap runs.
+    r.Frame(kInteract);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 10 && y == 20);
+    CHECK(!r.nav.Running());
+    // Nothing running: Held presses nothing.
+    MenuView w = ListView(1, -1);
+    w.items[0].action = {KeysStep(1u << kA, 2)};
+    Rig q;
+    q.view = &w;
+    q.Frame(kInteract);
+    q.Press(kInteract, &PadState::menu);
+    keys = 0;
+    q.nav.Held(q.touch, keys);
+    CHECK(keys == 0 && !q.nav.Running());
+    // A wait before the keys: not run while held (only a keys step already running goes on).
+    w.items[0].action = {WaitStep(2), KeysStep(1u << kA, 2)};
+    q.Frame(kInteract, a);
+    CHECK(q.nav.Running());
+    for (int i = 0; i < 4; i++)
+    {
+        keys = 0;
+        q.nav.Held(q.touch, keys);
+        CHECK(keys == 0);
+    }
+    CHECK(q.nav.Running());
+}
+
 int main()
 {
     view_front_menus();
@@ -2822,6 +3320,10 @@ int main()
     view_catalogue_spends_once();
     menu_opens_and_closes();
     view_save_slots_and_slider();
+    slider_presses_queue();
+    question_opens_on_no();
+    back_focus_first();
+    page_back_without_its_item();
     view_selection_phone_and_no_replay();
     dpad_moves_focus();
     a_taps_focused();
@@ -2829,7 +3331,9 @@ int main()
     popup_closed_by_a();
     phone_closed_by_b();
     town_and_dialogue_keep_the_buttons();
+    world_camera_on_the_right_stick();
     unknown_presses_the_cursor();
+    placement_editor_leaves();
     unknown_without_a_cursor_keeps_a();
     touch_menu_on_release_unless_start();
     leaving_console_releases_all();
@@ -2838,6 +3342,7 @@ int main()
     cards_quit_question();
     cards_ram();
     cards_ram_answered();
+    cards_question_moves_while_touching();
     vacuum_blows_drives_and_grabs();
     pointer_moves();
     autopsy_scheme();
@@ -2872,6 +3377,7 @@ int main()
     view_page_change_restarts_the_focus();
     view_lb_rb_pages();
     view_front_start();
+    held_picture_finishes_the_keys_step();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

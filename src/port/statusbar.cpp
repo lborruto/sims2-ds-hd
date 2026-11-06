@@ -147,7 +147,7 @@ bool FormatHud(const HudState& hud, const HudStrings& s, std::string& clock, std
     return true;
 }
 
-Rect AddStatusBar(Composition& c, const HudState& hud, const HudStrings& s, int x, int y, int maxW)
+Rect AddStatusBar(Composition& c, const HudState& hud, const HudStrings& s, int x, int y, int maxW, bool framed)
 {
     std::string clock, money;
     float fill = 0;
@@ -171,7 +171,7 @@ Rect AddStatusBar(Composition& c, const HudState& hud, const HudStrings& s, int 
     UiItem panel = PanelItem(bar);
     panel.radius = 14;
     panel.border = 3;
-    c.ui.push_back(panel);
+    if (framed) c.ui.push_back(panel);
 
     // Inside the band: everything is held to it (a value too wide for a narrow bar is clipped).
     const int ix0 = x + kPad, ix1 = x + w - kPad, iy = y + 5, ih = kStatusBarH - 10;
@@ -240,5 +240,26 @@ Rect AddStatusBar(Composition& c, const HudState& hud, const HudStrings& s)
 void AddStatusBar(Composition& c, const HudState& hud, const RomData* rom)
 {
     AddStatusBar(c, hud, HudStringsFrom(rom));
+}
+
+Rect AddStatusStrip(Composition& c, const HudState* hud, const HudStrings& s, int rightW, float zoom)
+{
+    // The kit panel's look across the canvas, held inside it (a window wider or taller than 16:9
+    // shows nothing past the canvas): the dark outline, the frame band, the fill to the foot.
+    const ui::Theme& t = ui::GameTheme();
+    const size_t first = c.ui.size();
+    c.ui.push_back(Plain({0, kStripY, c.cw, c.ch - kStripY}, t.fill, 0));
+    c.ui.push_back(Plain({0, kStripY, c.cw, 1}, t.shadow, 0));
+    c.ui.push_back(Plain({0, kStripY + 1, c.cw, kStripBand}, t.frame, 0));
+    for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
+    const Rect none {16, kStripContentY, 0, kStatusBarH};
+    if (!hud) return none;
+    const size_t items = c.ui.size();
+    const int room = c.cw - 32 - (rightW > 0 ? rightW + 24 : 0);
+    const Rect bar = AddStatusBar(c, *hud, s, 16, kStripContentY, zoom > 0 ? (int)std::floor(room / zoom) : room, false);
+    if (zoom != 1)
+        ZoomUi(c, items, c.pieces.size(), zoom, 16, kStripContentY + kStatusBarH / 2.0f,
+               {0, kStripY + 1 + kStripBand, c.cw, c.ch - kStripY - 1 - kStripBand});
+    return bar.w > 0 ? bar : none;
 }
 }

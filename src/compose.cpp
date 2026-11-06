@@ -43,18 +43,16 @@ bool TouchFromComposition(const Composition& c, const CanvasFit& fit, float px, 
     return false;
 }
 
-void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty)
+bool TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasFit& fit, float px, float py, int& tx, int& ty)
 {
     float cx, cy;
     fit.ToCanvas(px, py, cx, cy);
     auto usable = [&](int i) { return i >= 0 && i < (int)c.pieces.size() && c.pieces[i].src == Src::Bottom && c.pieces[i].touch; };
     // The piece the drag began on; if the layout changed since (the indices with it), the
-    // touchable bottom piece under the point, else the largest, else the whole touch screen.
-    Piece whole {Src::Bottom, {0, 0, SW, SH}, {0, 0, SW, SH}};
-    const Piece* pq = &whole;
-    if (usable(pieceIndex))
-        pq = &c.pieces[pieceIndex];
-    else
+    // touchable bottom piece under the point, else the largest; none (a held CONSOLE picture,
+    // a black load): no touch.
+    int at = pieceIndex;
+    if (!usable(at))
     {
         int under = -1, largest = -1;
         long largestArea = -1;
@@ -65,16 +63,17 @@ void TouchClampedComposition(const Composition& c, int pieceIndex, const CanvasF
             if (Inside(r, cx, cy)) under = i; // the later one is on top
             if ((long)r.w * r.h > largestArea) { largestArea = (long)r.w * r.h; largest = i; }
         }
-        if (under >= 0) pq = &c.pieces[under];
-        else if (largest >= 0) pq = &c.pieces[largest];
+        at = under >= 0 ? under : largest;
+        if (at < 0) return false;
     }
-    const Piece& q = *pq;
+    const Piece& q = c.pieces[at];
     const float x = q.from.x + (cx - q.to.x) * q.from.w / q.to.w, y = q.from.y + (cy - q.to.y) * q.from.h / q.to.h;
     // Held to the piece's source rectangle, itself held to the DS screen (lo <= hi always).
     const int x0 = std::clamp(q.from.x, 0, SW - 1), x1 = std::clamp(q.from.x + q.from.w - 1, x0, SW - 1);
     const int y0 = std::clamp(q.from.y, 0, SH - 1), y1 = std::clamp(q.from.y + q.from.h - 1, y0, SH - 1);
     tx = (int)std::clamp(std::floor(x), (float)x0, (float)x1);
     ty = (int)std::clamp(std::floor(y), (float)y0, (float)y1);
+    return true;
 }
 
 bool OverTopComposition(const Composition& c, const CanvasFit& fit, float px, float py)
@@ -152,5 +151,48 @@ bool CanvasFromTouch(const Composition& c, float tx, float ty, float& cx, float&
         return true;
     }
     return false;
+}
+
+Rect ZoomRect(Rect r, float z, float ax, float ay)
+{
+    const int x0 = (int)std::lround(ax + z * (r.x - ax)), y0 = (int)std::lround(ay + z * (r.y - ay));
+    const int x1 = (int)std::lround(ax + z * (r.x + r.w - ax)), y1 = (int)std::lround(ay + z * (r.y + r.h - ay));
+    return {x0, y0, x1 - x0, y1 - y0};
+}
+
+namespace
+{
+bool Fixed(const ui::UiItem& it, int cw)
+{
+    return it.to.x <= 0 && it.to.x + it.to.w >= cw;
+}
+bool Zoomed(const ui::UiItem& it) { return it.zoom != 1 || it.dx != 0 || it.dy != 0; }
+bool MousePiece(const Piece& p) { return p.src == Src::Bottom && p.alpha == 0 && p.touch; }
+}
+
+float ZoomUi(Composition& c, size_t item0, size_t piece0, float z, float ax, float ay, Rect limit)
+{
+    if (z == 1) return 1;
+    // The group's box: its items' rectangles (and its mouse pieces').
+    int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
+    bool any = false;
+    auto add = [&](Rect r) {
+        if (r.w <= 0 || r.h <= 0) return;
+        if (!any) { x0 = r.x; y0 = r.y; x1 = r.x + r.w; y1 = r.y + r.h; any = true; return; }
+        x0 = std::min(x0, r.x); y0 = std::min(y0, r.y); x1 = std::max(x1, r.x + r.w); y1 = std::max(y1, r.y + r.h);
+    };
+    for (size_t i = item0; i < c.ui.size(); i++)
+        if (!Fixed(c.ui[i], c.cw) && !Zoomed(c.ui[i])) add(c.ui[i].to);
+    for (size_t i = piece0; i < c.pieces.size(); i++)
+        if (MousePiece(c.pieces[i])) add(c.pieces[i].to);
+    if (!any) return 1;
+    float f = ui::FitZoom({x0, y0, x1 - x0, y1 - y0}, z, ax, ay, limit);
+    if (z > 1) f = std::max(f, 1.0f); // (larger only as far as it fits; never smaller for it)
+    if (f == 1) return 1;
+    for (size_t i = item0; i < c.ui.size(); i++)
+        if (!Fixed(c.ui[i], c.cw) && !Zoomed(c.ui[i])) ui::ZoomItem(c.ui[i], f, ax, ay);
+    for (size_t i = piece0; i < c.pieces.size(); i++)
+        if (MousePiece(c.pieces[i])) c.pieces[i].to = ZoomRect(c.pieces[i].to, f, ax, ay);
+    return f;
 }
 }

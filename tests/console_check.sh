@@ -256,6 +256,7 @@ wait
 run s3 s3 "${town[@]}" --console-focus 9 &
 run s3-2x s3 "${town[@]}" --console-focus 9 --compose-scale 2 &
 run s3-wide s3 "${town[@]}" --console-focus 9 --wide &
+run s3-res2 s3 "${town[@]}" --console-focus 9 --res3d 2 &
 run s4 s4 "${town[@]}" --console-focus 0 &
 wait
 run s4-it s4 "${town[@]}" --console-focus 4 --language 4 &
@@ -263,19 +264,43 @@ run cas-hair F-hair-s3-40 "${town[@]}" --console-focus 10 &
 run cas-face F-face-5-40 "${town[@]}" --console-focus 4 &
 run cas-clothes F-thr-6-40 "${town[@]}" --console-focus 11 &
 wait
+# The UI's size (task 10, --ui-scale) and the game's pictures (--game-pictures smooth): the
+# conversation and the panel's menu at 75 % and 150 %, the Pockets' and the catalogue's icons Smooth.
+run s5-hd-75 s5 "${town[@]}" --ui-scale 75 &
+run s5-hd-150 s5 "${town[@]}" --ui-scale 150 &
+run casino-menu-75 sit-casino "${late[@]}" --console-menu --console-focus 1 --print-hud --ui-scale 75 &
+run casino-menu-150 sit-casino "${late[@]}" --console-menu --console-focus 1 --print-hud --ui-scale 150 &
+wait
+run pockets-smooth A-pk-cnt3-slot1 "${late[@]}" --console-menu --console-focus 0 --game-pictures smooth &
+run shop-smooth sit-storebuy "${town[@]}" --console-focus 0 --game-pictures smooth &
+run shop-smooth-2x sit-storebuy "${town[@]}" --console-focus 0 --game-pictures smooth --compose-scale 2 &
+wait
+# The world's prompt (src/port/prompt.*): the store's clerk (A Buy), the hotel's concierge (three
+# actions: the hold hint), no target (City Hall), another tab up (Pockets: no Interact object).
+run prompt-store L-sit-store-none-250 "${late[@]}" &
+run prompt-concierge D-hotel-down "${hotel[@]}" &
+run prompt-none L-sit-cityhall-none-250 "${late[@]}" &
+run prompt-pockets A-pk-town-cnt1 "${late[@]}" &
+wait
+# The prompt at the UI's sizes (its own group: bottom centre, above the strip).
+run prompt-store-150 L-sit-store-none-250 "${late[@]}" --ui-scale 150 &
+run prompt-store-75 L-sit-store-none-250 "${late[@]}" --ui-scale 75 &
+wait
 
 fails=0
 for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-wide social vacuum cards s2 s3-m1 slots load casino casino-2x \
     cards-m1 cards-ask cards-wide vacuum-clog vacuum-2x social-wide autopsy autopsy-2x detector detector-wide art art-ask \
     moogoo moogoo-2x drencher drencher-wide crime scratch mixer mixer-wide mixer-save trading \
-    s3 s3-2x s3-wide s4 s4-it cas-hair cas-face cas-clothes \
+    s3 s3-2x s3-wide s3-res2 s4 s4-it cas-hair cas-face cas-clothes \
     title title-wide boot boot-wide menu-2x menu-wide menu-de \
     settings settings-2x settings-wide settings-concept settings-credits settings-fr loadgame loadgame-2x loadgame-wide loadgame-empty loadgame-loading \
     menu-m1 casino-menu casino-menu-2x casino-menu-wide pockets-menu pockets-armed gift-items gift-items-2x gift-items-wide \
     goals-menu rel-menu rel-menu-wide opt-menu slots-hd popup-goal popup-pause popup-quit popup-menu phone-msg phone-contacts phone-wide \
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
     registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint \
-    music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats; do
+    music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats \
+    s5-hd-75 s5-hd-150 casino-menu-75 casino-menu-150 pockets-smooth shop-smooth shop-smooth-2x \
+    prompt-store prompt-concierge prompt-none prompt-pockets prompt-store-150 prompt-store-75; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -284,7 +309,7 @@ for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-
     if "$python" -I - "$tmp/$name/c/f000119.png" "$tmp/$name/r/f000119.png" "$name" "$tmp/$name.log" <<'EOF'
 import re
 import sys
-from PIL import Image
+from PIL import Image, ImageChops
 
 comp_path, raw_path, case, log_path = sys.argv[1:5]
 comp = Image.open(comp_path).convert("RGB")
@@ -332,28 +357,18 @@ def world_full(rows=192):
     fx = (256 - fw) // 2
     return lambda cx, cy: top(fx + (cx - x0) * fw // rw, cy * rows // 720)
 
-def menu_hint_chip():
-    """The menu hint is a kit panel (the status bar's, the TOUCH MENU's chip in it: headless has no
-    pad and never polls one, so the chip stays the kit's default look, the Xbox one: a BACK pill
-    with a dark body), level with the status bar and ending at the canvas's right edge less 16:
-    its dark outline at x 1263, its frame band (#6171B2) inside it, the panel's fill, the pill."""
-    expect("menu hint chip's outline", C(1263, 684), OUTLINE)
-    expect("menu hint chip's frame band", C(1260, 684), hexrgb("6171B2"))
-    expect("menu hint chip's fill", C(1256, 684), FRAME)
-    expect("menu hint chip's BACK pill", C(1124, 684), (46, 48, 99))
-
 def rail():
     """No rail (the owner: the HD menu, Back / E, replaced it): where it was is the backdrop at 4:3
-    (the world ends at 1163); and the menu hint chip, its outline, at the canvas's right edge level
-    with the status bar (x 1262, row 684)."""
+    (the world ends at 1163); the menu's hint is in the strip (strip(hints=True))."""
     BACK = (16, 18, 24)
     expect("no rail: backdrop where its frame was", C(1170, 360), BACK)
     expect("no rail: backdrop where its tabs were", C(1200, 300), BACK)
     expect("no rail: backdrop where its phone was", C(1210, 174), BACK)
-    menu_hint_chip()
-    # The world without the game's status bar (its last 16 rows): 176 rows 720 high.
+    # The world without the game's status bar (its last 16 rows): 176 rows 720 high, its last
+    # rows under the strip (sampled clear of the world's prompt, src/port/prompt.*, centred above
+    # row 640, and its shadow).
     w = world_full(176)
-    for cx, cy in ((400, 100), (700, 650), (1000, 300), (900, 715)):
+    for cx, cy in ((400, 100), (1050, 650), (1000, 300), (900, 658)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
 
 WELL = hexrgb("6A72B8")
@@ -368,35 +383,9 @@ def hud_values():
             found = tuple(int(v) for v in m.groups())
     return found
 
-def status_bar(values=None, left=132):
-    """The HD status bar: its panel from x `left` (the 4:3 world's left + 16), rows 660-707, found
-    by its frame band (#6171B2) at both ends of row 684; inside it, and only there, white text;
-    with values (from --print-hud), the meter: its body in the tier's colour, filled cur / max of
-    the track (the well's inside less 2 pixels a side) within 2 pixels."""
-    BAND = hexrgb("6171B2")
-    x0, y0, y1 = left, 660, 708
-    expect("status bar band, top", C(x0 + 18, y0 + 2), BAND)
-    expect("status bar band, left", C(x0 + 2, 684), BAND)
-    band = [x for x in range(x0, 1160) if C(x, 684) == BAND]
-    # (the menu hint chip's panel, right of the bar, has the same band: the scan stops at x 1160,
-    # so it sees the chip's left edge, a run after the bar's own two)
-    runs = [[x] for x in band[:1]]
-    for x in band[1:]:
-        if x - runs[-1][-1] > 1: runs.append([x])
-        else: runs[-1].append(x)
-    if len(runs) >= 3: band = runs[0] + runs[1]
-    if not band or band[0] > x0 + 3:
-        errors.append("no status bar panel")
-        return
-    x1 = band[-1] + 2
-    if x1 - x0 < 200 or C(x1 - 1, 684) != OUTLINE:
-        errors.append(f"status bar panel {x0}..{x1}: no right edge")
-        return
-    inside = [C(x, y) for y in range(y0 + 4, y1 - 4) for x in range(x0 + 4, x1 - 4)]
-    if inside.count((255, 255, 255)) < 40:
-        errors.append("no status bar text")
-    if values is None:
-        return
+def meter(values, x0, x1, y0, y1):
+    """The Sanity meter in x0..x1, rows y0..y1: its body in the tier's colour, filled cur / max
+    of the track (the well's inside less 2 pixels a side) within 2 pixels."""
     money, hh, mm, cur, mx, tier = values
     body = BODY[tier]
     rows = {}
@@ -419,9 +408,38 @@ def status_bar(values=None, left=132):
     if abs(filled - want) > 2:
         errors.append(f"meter filled {filled} of {track_w} (want {want}: {cur}/{mx})")
 
+STRIP_Y = 661
+
+def strip(values=None, hints=False):
+    """The strip under the world (port/statusbar.h's AddStatusStrip): one kit panel the canvas's
+    whole width from row 661 (the widescreen world's foot): its dark outline, then the frame band
+    across, its fill below to the canvas's foot, never the backdrop; white text in the status at
+    the left (from x 16), no panel of its own there; with values (from --print-hud), the meter;
+    with hints (the town), at the right the BACK pill (headless: the kit's Xbox look)."""
+    BAND = hexrgb("6171B2")
+    for x in (0, 16, 640, 1263, 1279):
+        expect(f"strip's outline at {x}", C(x, STRIP_Y), OUTLINE)
+        expect(f"strip's band at {x}", C(x, STRIP_Y + 2), BAND)
+        expect(f"strip's fill at {x}", C(x, 717), FRAME)
+    back = sum(1 for y in range(STRIP_Y, 720, 2) for x in range(0, 1280, 4) if C(x, y) == (16, 18, 24))
+    if back:
+        errors.append(f"the backdrop in the strip ({back} samples)")
+    # (no panel of the status's own: the strip's fill left of its first value and between them)
+    expect("strip's fill left of the status", C(20, 691), FRAME)
+    inside = [C(x, y) for y in range(STRIP_Y + 6, 716) for x in range(16, 760)]
+    if inside.count((255, 255, 255)) < 40:
+        errors.append("no status text in the strip")
+    if values is not None:
+        meter(values, 16, 760, STRIP_Y + 4, 718)
+    if hints:
+        expect("the strip's BACK pill", C(1140, 698), (46, 48, 99))
+        right = [C(x, y) for y in range(STRIP_Y + 6, 716) for x in range(900, 1260)]
+        if right.count((255, 255, 255)) < 40:
+            errors.append("no hint words at the strip's right")
+
 def front():
     """No HUD: the top screen fitted in 24,72 568 x 480 (4:3: 568 x 426 at 24,99), the touch
-    screen 2.5x at 616,72, both framed; the hint's box below; the canvas dark elsewhere."""
+    screen 2.5x at 616,72, both framed; the hints' panel below; the canvas dark elsewhere."""
     expect("canvas", comp.size, (1280, 720))
     for x in range(0, 256, 7):
         for y in range(0, 192, 7):
@@ -434,7 +452,9 @@ def front():
     expect("top frame", C(20, 300), OUTLINE)
     expect("backdrop", C(5, 5), (16, 18, 24))
     expect("backdrop between", C(604, 300), (16, 18, 24))
-    expect("hint box", C(640, 604), FRAME)
+    # the hints: a kit panel of chips below (the right stick, A, the pause menu's), its fill and white words
+    if FRAME not in [C(x, y) for y in range(600, 660) for x in range(240, 1040)]:
+        errors.append("no hint panel")
     row = [C(x, y) for y in range(614, 646) for x in range(240, 1040)]
     if (255, 255, 255) not in row or OUTLINE not in row:
         errors.append("no hint text")
@@ -453,9 +473,14 @@ def front_cas(page, focus, raw_top=True):
         k = 664 / 256
         for x in range(0, 256, 11):
             for y in range(0, 192, 11):
+                # (the game's "L" / "R" pills on its turn arrows: covered by the pad's turn chips)
+                if (26 <= x <= 59 or 197 <= x <= 230) and 141 <= y <= 159:
+                    continue
                 expect(f"top DS {x},{y}", C(16 + int((x + 0.5) * k), 87 + int((y + 0.5) * k)), top(x, y))
                 if len(errors) > 4:
                     return
+        # The game's "L" pill (DS 29-56, 144-156) under the pad's chip's dark plate (#5961A2).
+        expect("turn pill covered", C(16 + int(31 * k), 87 + int(150 * k)), hexrgb("5961A2"))
     expect("top frame", C(12, 300), OUTLINE)
     expect("backdrop", C(5, 5), BACKDROP)
     expect("panel", C(704, 640), FRAME)
@@ -494,7 +519,8 @@ def front_cas(page, focus, raw_top=True):
 def front_menu(focus, raw_top=True):
     """The HD main menu (src/port/front.*): the top screen 3x at 24,72 framed, the panel at the
     right with four buttons, each a white label, the focused one ringed in green with the game's
-    green arrow, the others' arrows blue; the hints under them."""
+    green arrow, the others' arrows blue; DS Wireless (button 3) greyed: its label dim, no arrow;
+    the hints under them."""
     expect("canvas", comp.size, (1280, 720))
     if raw_top:
         for x in range(0, 256, 9):
@@ -508,8 +534,16 @@ def front_menu(focus, raw_top=True):
     for i in range(4):
         y0 = 84 + 128 * i
         white = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (255, 255, 255))
-        if white < 30: errors.append(f"button {i}: no label ({white} white pixels)")
         arrow = [C(x, y) for y in range(y0 + 18, y0 + 82) for x in range(1164, 1228)]
+        if i == 3:
+            # Greyed: a dim label (no white), no arrow.
+            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (0xB8, 0xBC, 0xE0))
+            if white or dim < 30: errors.append(f"button 3: not greyed ({white} white, {dim} dim pixels)")
+            if sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40) > 300: errors.append("button 3: an arrow")  # (an arrow: about 1100; the rim alone: under 100)
+            r, g, b = C(835, y0 + 50)
+            if (i == focus) != (g > r + 80 and g > b + 60): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
+            continue
+        if white < 30: errors.append(f"button {i}: no label ({white} white pixels)")
         green = sum(1 for r, g, b in arrow if g > r + 60 and g > b + 40)
         blue = sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40)
         if i == focus:
@@ -639,18 +673,33 @@ def big_over_dim(rows=176):
         r, g, b = w(cx, cy)
         expect(f"dimmed world at {cx},{cy}", C(cx, cy), tuple(v * (255 - 0x8C) // 255 for v in (r, g, b)))
 
-def activity(rows=192, hd=True):
+def activity(rows=192, hd=True, skip=0):
+    if case in ("cards-ask", "art-ask"):
+        # A question of the game's: the HD box over the playfield, everything else under its veil;
+        # the box's fill, its words and the focus's halo (No first).
+        fill = sum(1 for y in range(70, 640, 3) for x in range(40, 800, 3) if C(x, y) == FRAME)
+        if fill < 3000:
+            errors.append(f"no HD box over the playfield ({fill} fill pixels)")
+        white_text("question box", 80, 150, 760, 600)
+        if not any(C(x, y) == RING for y in range(150, 640, 2) for x in range(60, 800, 2)):
+            errors.append("no focus halo on the question's No")
+        return
     expect("background", C(10, 10), PANEL)
     expect("touch screen frame", C(32, 300), OUTLINE)
     expect("touch screen 3x top-left", C(36, 68), bottom(0, 0))
-    piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
+    if case in ("moogoo", "moogoo-2x"):
+        # (MooGoo's line, DS rows 2-21, is the HD plate's: the table below it.)
+        piece("touch screen 3x", 0, 27, 256, 165, 36, 68 + 81, 3, step=9)
+    else:
+        piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
     expect("world frame", C(855, 200), OUTLINE)
     # The small world, 384 wide; without the game's status bar (176 rows: 264 high) where the
     # HD bar sits under it.
-    h = round(384 * rows / 256)
+    # (skip: the social game's own bar, its top rows, left out.)
+    h = round(384 * (rows - skip) / 256)
     # (At --compose-scale 2 the small world is sampled from twice as many pixels: not compared.)
     for x, y in ((0, 0), (100, 50), (383, h - 1), (200, h - 8)) if not case.endswith("-2x") else ():
-        expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, y * rows // h))
+        expect(f"world small {x},{y}", C(858 + x, 68 + y), top(x * 256 // 384, skip + y * (rows - skip) // h))
     if rows < 192:
         region = [C(x, y) for y in range(68 + h + 14, 68 + h + 58) for x in range(852, 1248)]
         if (255, 255, 255) not in region or OUTLINE not in region:
@@ -700,8 +749,9 @@ def minigame_frame(side_top):
     if case == "cards-ask":
         if not has(green) or not has(red) or has(blue):
             errors.append("the question's prompts are not A and B alone")
-    elif case.startswith("cards") and not (has(green) and has(red) and has(blue)):
-        errors.append("the cards' prompts lack A, B or X")
+    elif case.startswith("cards") and not (has(red) and has(blue)):
+        # (The turn's first step: draw, X, and quit, B.)
+        errors.append("the cards' prompts lack X or B")
     # (Lit too: the autopsy's tweezers while a parasite eats, G-A-para; the detector's dig with a find in range.)
     if (case in ("vacuum-clog", "autopsy", "autopsy-2x", "detector", "detector-wide")) != has(lit):
         errors.append("a hint lit when the game asks for nothing, or not lit when it does")
@@ -786,7 +836,7 @@ def hd_phone(y, wide=False):
 
 def hd_popup(kind, title, menu):
     """A popup in HD: its outline and fill, the text's well with white letters, the title plate,
-    the buttons (kind 0: Close focused; kind 2: No plain, Yes focused)."""
+    the buttons (kind 0: Close focused; kind 2: No focused, the safe answer, Yes plain)."""
     expect("popup outline", C(300, 350), OUTLINE)
     expect("popup fill", C(310, 350), FRAME)
     expect("popup well", C(340, 300), WELL)
@@ -798,9 +848,12 @@ def hd_popup(kind, title, menu):
         r, g, b = C(477, 448)
         if not (g > r + 60 and g > b + 40): errors.append("no focus ring around Close")
     else:
-        expect("No", C(400, 448), WELL)
+        expect("No", C(400, 448), hexrgb("9AA2E3"))
+        r, g, b = C(345, 448)
+        if not (g > r + 60 and g > b + 40): errors.append("no focus ring around No")
         r, g, b = C(670, 448)
-        if not (g > r + 60 and g > b + 40): errors.append("no focus ring around Yes")
+        if g > r + 60 and g > b + 40: errors.append("a focus ring around Yes")
+        expect("Yes", C(880, 448), WELL)
     if menu:
         r, g, b = C(190, 300)
         if not b > r + 30: errors.append("no HD menu beneath")
@@ -809,26 +862,23 @@ def hd_popup(kind, title, menu):
 if case == "cityhall":
     expect("canvas", comp.size, (1280, 720))
     rail()
-    status_bar()
+    strip(hints=True)
 elif case == "cityhall-wide":
     # Widescreen: the world without the game's bar keeps its sides (never cut to make room for
-    # the crop): 341 x 176 fitted to the canvas's width, 1280 x 661, top-aligned; the backdrop
-    # in the strip below, where the bar sits.
+    # the crop): 341 x 176 fitted to the canvas's width, 1280 x 661, top-aligned; the strip right
+    # under it, the canvas's whole width: no black between (the owner's playtest).
     big = Image.open(raw_path.replace(".png", "-top.png")).convert("RGB")
     expect("wide picture", big.size, (341, 192))
-    for cx, cy in ((0, 300), (1279, 100), (640, 400), (300, 655), (1000, 660)):
+    for cx, cy in ((0, 300), (1279, 100), (640, 400), (300, 655), (780, 660), (1000, 660)):
         expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * 341 // 1280, cy * 176 // 661)))
-    for cx, cy in ((1000, 680), (1270, 715), (700, 700)):
-        expect(f"backdrop below the world at {cx},{cy}", C(cx, cy), (16, 18, 24))
-    menu_hint_chip()
-    status_bar(left=16)
+    strip(hints=True)
 elif case == "s7":
     hd_phone(None)
-    status_bar()
+    strip()
 elif case == "cityhall-menu":
     # City Hall: no target (the plumbob; the title "Interact" alone), no row, the focus on the phone.
     hd_menu(0, -1)
-    status_bar()
+    strip()
 elif case == "menu-m1":
     # Without the game's text (--no-romdata): milestone 1's menu, the touch screen 3x (and the
     # game's own status bar in the world: no HD bar without its words).
@@ -836,7 +886,7 @@ elif case == "menu-m1":
 elif case in ("casino-menu", "casino-menu-2x"):
     # Keelhaulin' Cards: three rows, the focus on the second (Hotseat).
     hd_menu(3, 1)
-    status_bar(hud_values())
+    strip(hud_values())
 elif case == "casino-menu-wide":
     hd_menu(3, 0, wide=True)
 elif case in ("casino", "casino-2x"):
@@ -846,7 +896,7 @@ elif case in ("casino", "casino-2x"):
         errors.append("no hud line from --print-hud")
     else:
         expect("tier", values[5], 2)
-        status_bar(values)
+        strip(values, hints=True)
         rail()
 elif case == "s7-menu":
     # --console-focus 0: the HD phone's first row (the game's own highlight).
@@ -1121,7 +1171,67 @@ elif case in ("s5-hd", "s5-hd-wide"):
         h = round(1280 * rows / tw)
         for cx, cy in ((2, 100), (1277, 100), (640, 300), (40, 440)):
             expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * tw // 1280, cy * rows // h)))
-elif case in ("social", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",
+elif case in ("s5-hd-75", "s5-hd-150", "casino-menu-75", "casino-menu-150"):
+    # The UI's size: the same picture as at 100 % (the case without the suffix, run beside it), its
+    # HD group zoomed about its anchor (the conversation about the canvas's bottom centre, 75 % or as
+    # wide as the canvas holds, 120 %; the menu about 640,338, 75 % or never larger), the world
+    # unchanged where the group no longer lies; the strip's status at its own size (75 %, or the
+    # strip's 108 %) at the strip's left.
+    from PIL import ImageStat
+    base_name = case.rsplit("-", 1)[0]
+    base = Image.open(comp_path.replace(f"/{case}/", f"/{base_name}/")).convert("RGB")
+    z = 0.75 if case.endswith("-75") else 1.0
+    dialogue = case.startswith("s5")
+    if dialogue and case.endswith("-150"): z = 636 / 530
+    ax, ay = (640, 720) if dialogue else (640, 338)
+    box = (110, 426, 1170, 706) if dialogue else (176, 30, 1104, 646)
+    T = lambda x, y: (ax + z * (x - ax), ay + z * (y - ay))
+    if z == 1:
+        # (the menu at 150 %: as at 100 %, the strip apart)
+        diff = sum(1 for y in range(0, 655, 3) for x in range(0, 1280, 3) if C(x, y) != base.getpixel((x, y)))
+        if diff: errors.append(f"the menu at 150 % differs from 100 % at {diff} samples")
+    else:
+        # The group: the 100 % picture's box made z times smaller / larger, nearly the same pixels.
+        x0, y0 = T(box[0], box[1])
+        x1, y1 = T(box[2], box[3])
+        want = base.crop(box).resize((round(x1 - x0), round(y1 - y0)), Image.BILINEAR)
+        got = comp.crop((round(x0), round(y0), round(x0) + want.size[0], round(y0) + want.size[1]))
+        mean = sum(ImageStat.Stat(ImageChops.difference(want, got)).mean) / 3
+        if mean > 14: errors.append(f"the zoomed group differs from 100 % (mean {mean:.1f})")
+        if z < 1:
+            # Where the group was and no longer is: the world (the conversation's) or the dimmed world (the menu's).
+            for px, py in ((box[0] + 70, (box[1] + box[3]) // 2), (box[2] - 70, box[1] + 12)):
+                if dialogue:
+                    expect(f"world at {px},{py}", C(px, py), world_full(176)(px, py))
+                elif not all(v < 80 for v in C(px, py)):
+                    errors.append(f"no dimmed world at {px},{py}: {C(px, py)}")
+    if not dialogue:
+        # The strip: the status's white words end further left at 75 %, further right at 150 %.
+        def right_end(im):
+            xs = [x for y in range(668, 716, 2) for x in range(0, 900) if min(im.getpixel((x, y))) > 235]
+            return max(xs) if xs else 0
+        a, b = right_end(base), right_end(comp)
+        if not (b < a - 20 if case.endswith("-75") else b > a + 10):
+            errors.append(f"the status's words end at {b} (at 100 %: {a})")
+elif case in ("pockets-smooth", "shop-smooth", "shop-smooth-2x"):
+    # Smooth game pictures: the still items as with Pixel (the case without "-smooth"), the icons
+    # enlarged by the pixel-art scaler: blended edges (more colours than Pixel's), close to Pixel's.
+    from PIL import ImageStat
+    base_name = case.replace("-smooth", "-menu" if case.startswith("pockets") else "")
+    base = Image.open(comp_path.replace(f"/{case}/", f"/{base_name}/")).convert("RGB")
+    if case.endswith("-2x"): base = base.resize((1280, 720), Image.NEAREST)
+    icon = (215, 215, 290, 290) if case.startswith("pockets") else (318, 190, 395, 262)
+    still = (692, 222, 900, 258) if case.startswith("pockets") else (220, 60, 440, 95)
+    a, b = base.crop(icon), comp.crop(icon)
+    ca, cb = len(a.getcolors(1 << 20)), len(b.getcolors(1 << 20))
+    if cb <= ca: errors.append(f"the icon is not smoothed ({cb} colours, Pixel {ca})")
+    mean = sum(ImageStat.Stat(ImageChops.difference(a, b)).mean) / 3
+    if not 0 < mean < 30: errors.append(f"the smooth icon is not close to Pixel's (mean {mean:.1f})")
+    if ImageChops.difference(base.crop(still), comp.crop(still)).getbbox():
+        errors.append("the still items differ from Pixel's")
+elif case == "social":
+    activity(176, skip=16)
+elif case in ("vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",
               "moogoo", "moogoo-2x", "drencher", "crime", "scratch", "mixer", "mixer-save", "trading"):
     activity(176)
 elif case in ("cards", "cards-ask", "cards-m1"):
@@ -1133,7 +1243,7 @@ elif case in ("cards-wide", "social-wide", "detector-wide", "drencher-wide", "mi
     expect("background", C(10, 10), PANEL)
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
     expect("world frame", C(855, 100), OUTLINE)
-    minigame_frame(round(384 * (192 if case == "cards-wide" else 176) / 341) + (18 if case == "cards-wide" else 72))
+    minigame_frame(round(384 * (192 if case == "cards-wide" else 160 if case == "social-wide" else 176) / 341) + (18 if case == "cards-wide" else 72))
 elif case == "s2":
     front_menu(0)
 elif case in ("menu-2x", "menu-wide", "menu-de"):
@@ -1160,6 +1270,14 @@ elif case == "s3-m1":
     front()
 elif case in ("s3", "s3-2x", "s3-wide"):
     front_cas(0, (731, 352, 50, 50), raw_top=case != "s3-wide")
+elif case == "s3-res2":
+    # --res3d 2: the top picture is 512 x 384; the game's "L" / "R" pills (DS 29-56 / 200-227,
+    # 144-156) must still be under the pad's chips' dark plates (#5961A2), at the DS's places.
+    front_cas(0, (731, 352, 50, 50), raw_top=False)
+    k = 664 / 256
+    for name, dx in (("L", 31), ("R", 202)):
+        expect(f"turn pill {name} covered", C(16 + int(dx * k), 87 + int(150 * k)), hexrgb("5961A2"))
+        expect(f"turn pill {name} covered (its end)", C(16 + int((dx + 23) * k), 87 + int(146 * k)), hexrgb("5961A2"))
 elif case == "s4":
     front_cas(4, (746, 186, 108, 112))
 elif case == "s4-it":
@@ -1237,6 +1355,35 @@ elif case == "opt-menu":
     expect("SFX knob", C(1012, 536), FRAME)
     r, g, b = C(197, 360)
     if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the music volume")
+elif case.startswith("prompt-"):
+    # The world's prompt: a kit plate (the panel's fill) centred at the world's foot, it and its
+    # shadow above the strip (row 661), white words in it; none without a target or on another tab.
+    # -75 / -150: the UI's size (its own group, zoomed about its bottom centre, x 640 row 640).
+    z = 1.5 if case.endswith("-150") else 0.75 if case.endswith("-75") else 1.0
+    cols = [x for x in range(0, 1280) if any(C(x, y) == FRAME for y in range(644 - int(88 * z), 640, 6))]
+    if case.startswith(("prompt-store", "prompt-concierge")):
+        if not cols:
+            errors.append("no prompt plate")
+        else:
+            lo, hi = min(cols), max(cols)
+            if abs((lo + hi) / 2 - 640) > 12: errors.append(f"the plate not centred: {lo}..{hi}")
+            if lo < 4 or hi > 1275: errors.append(f"the plate outside the canvas: {lo}..{hi}")
+            if case.startswith("prompt-store") and not 120 * z < hi - lo < 320 * z:
+                errors.append(f"the store's plate (A Buy, the clerk) at {z}: {lo}..{hi}")
+            if case == "prompt-concierge" and hi - lo < 340: errors.append(f"no hint beside the concierge's verb: {lo}..{hi}")
+            if (255, 255, 255) not in [C(x, y) for y in range(640 - int(88 * z), 640) for x in range(lo, hi)]: errors.append("no verb")
+            # Nothing of it from row 648 to the strip, its drop shadow (7 rows, zoomed) neither:
+            # the world's own pixels there.
+            w = world_full(176)
+            for y in range(648 + (4 if z > 1 else 0), STRIP_Y):
+                bad = [x for x in range(lo - 8, hi + 9, 4) if C(x, y) != w(x, y)]
+                if bad:
+                    errors.append(f"the plate or its shadow at {bad[0]},{y}: {C(bad[0], y)} (the world {w(bad[0], y)})")
+                    break
+    elif len(cols) > 20:
+        errors.append(f"a prompt plate where none belongs ({len(cols)} columns)")
+    # (below 100 % the strip's hints zoom about its right end: the BACK pill moves)
+    strip(hints=z >= 1)
 for e in errors[:5]:
     print(f"  {case}: {e}")
 sys.exit(1 if errors else 0)
@@ -1259,6 +1406,9 @@ in_order() {
         from=$((from + n))
     done
 }
+# (the frame of a log line, the first one matching)
+first_frame() { grep -m 1 -E "$2" "$tmp/$1.log" | sed -n 's/^frame \([0-9]*\):.*/\1/p'; }
+last_before() { awk -v F="$2" -v P="$3" '$1=="frame" && ($2+0)<=F && $0 ~ P {l=$0} END{print l}' "$tmp/$1.log"; }
 # pad_late NAME STATE SCRIPT FRAMES: the same on the complete save (its clock).
 pad_late() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4
@@ -1343,7 +1493,7 @@ pad_late pad-ask-yes B-cas-opt-save saveslots-ask-yes 200 &
 pad pad-pause-a B-pause popup-pause-a 120 &
 pad pad-pause-start B-pause popup-pause-start 120 &
 pad_late pad-quit-no B-cas-opt popup-quit-no 260 &
-pad pad-phone s7 phone-pages 380 &
+pad pad-phone s7 phone-pages 540 &
 pad_late pad-phone-msg C-cas-msg1 phone-message 160 &
 pad pad-tabs s7 tabs 320 &
 pad pad-popup s6 popup 120 &
@@ -1560,7 +1710,7 @@ quit_no() {
     if grep -q -E 'game FrontEnd|console menu closed' "$tmp/pad-quit-no.log"; then echo "  pad-quit-no: the menu closed or the game quit"; return 1; fi
 }
 phone_pages() {
-    in_order pad-phone 'phone page=0 row=1' 'phone page=5' 'phone page=7 .*list=22' 'phone page=9 .*caller=22' 'phone page=9 row=5' 'phone page=7' 'game Panel/Interact'
+    in_order pad-phone 'phone page=0 row=1' 'phone page=5' 'phone page=7 .*list=22' 'phone page=9 .*caller=22' 'phone page=9 row=5' 'phone page=7' 'phone page=5' 'phone page=0' 'game Panel/Interact'
 }
 phone_msg() { in_order pad-phone-msg 'phone page=3 row=0 .*shown=0' 'phone page=3 row=10 ' 'phone page=3 row=0 .*shown=1'; }
 check_pad pad-pause-a pause_a
@@ -1593,7 +1743,7 @@ wait
 pixels() {
     "$python" -I - "$tmp/$1" "$2" <<'EOF'
 import sys
-from PIL import Image
+from PIL import Image, ImageChops
 
 d, case = sys.argv[1:3]
 shot = lambda f: Image.open(f"{d}/f{f:06d}.png").convert("RGB")
@@ -1686,7 +1836,7 @@ pages() {
     done
     "$python" -I - "$tmp/dlg-pages" <<'EOF'
 import sys
-from PIL import Image
+from PIL import Image, ImageChops
 
 d = sys.argv[1]
 shot = lambda f: Image.open(f"{d}/f{f:06d}.png").convert("RGB")
@@ -1740,7 +1890,7 @@ for lang in 1 2 3 4 5; do
     # name plate (above the well's top edge); the portrait's column left out.
     if "$python" -I - "$tmp/$name/f000030.png" <<'EOF'
 import sys
-from PIL import Image
+from PIL import Image, ImageChops
 
 im = Image.open(sys.argv[1]).convert("RGB")
 # The well's top edge: the first row of the well's colour at x 600, from y 380 down.
@@ -1759,8 +1909,9 @@ EOF
 done
 # The front end (src/port/front.*, --print-front): from F-title0, A → the main menu, A on
 # Create-a-Sim once it is live → Create-a-Sim; Start → the menu, A twice while it fades in →
-# nothing chosen (no press lands mid-fade); from s2, A on Load-a-Sim, Settings and DS Wireless →
-# each screen, and B (the game's own) → the title at phase 0, never the menu; from F-boot-900, A
+# nothing chosen (no press lands mid-fade); from s2, A on Load-a-Sim and Settings → each screen,
+# and B (the game's own) → the title at phase 0, never the menu; A on DS Wireless (greyed: a
+# second DS) → nothing, still the menu; from F-boot-900, A
 # or Start (the splash's touch) → the title.
 # (Settings, Load-a-Sim and Wireless have no GScreen: Unknown in RAM, None in the pixels, which
 # PixelsAgree takes as one: --print-game logs no "pixels disagree" there.)
@@ -1789,7 +1940,11 @@ check_pad pad-front-title front_title
 check_pad pad-front-fade front_fade
 check_pad pad-front-load front_back pad-front-load Load
 check_pad pad-front-settings front_back pad-front-settings Settings
-check_pad pad-front-wireless front_back pad-front-wireless Wireless
+front_wireless() {
+    in_order pad-front-wireless 'title phase=3' || return 1
+    ! grep -q -E 'front Wireless' "$tmp/pad-front-wireless.log" || { echo "  pad-front-wireless: DS Wireless opened"; return 1; }
+}
+check_pad pad-front-wireless front_wireless
 check_pad pad-front-boot-a front_boot pad-front-boot-a
 check_pad pad-front-boot-start front_boot pad-front-boot-start
 # Settings and Load-a-Sim (src/port/frontmenus.*, --print-front, copies of the complete save):
@@ -1857,6 +2012,7 @@ pad_cas pad-cas-looks s3 cas-looks 640 &
 pad_cas pad-cas-keep s4 cas-keep 400 &
 wait
 pad_cas pad-cas-cross s4 cas-cross 200 &
+pad_cas pad-cas-type s3 cas-type 260 &
 pad_cas pad-cas-turn s3 cas-turn 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-turn" &
 pad_cas pad-cas-still s3 cas-cross 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-still" &
 wait
@@ -1866,12 +2022,24 @@ cas_name() {
     ! grep -q -E 'len=[89]' "$tmp/pad-cas-name.log" || { echo "  pad-cas-name: past seven"; return 1; }
 }
 cas_empty() { in_order pad-cas-empty 'name= len=0' 'name=A len=1'; }
+# The name typed on the keyboard (Input::TypeName, scripts/console/cas-type.txt): the game's own keys
+# and page labels tapped, never more than seven, committed by Start.
+cas_type() {
+    in_order pad-cas-type 'name=Si len=2 keyboard=0' 'name=Si len=2 keyboard=1' 'name=Sia len=3' 'name=Sia len=3 keyboard=0' 'name=SiaB len=4' \
+        'keyboard=2' 'name=SiaB1 len=5' 'name=SiaB1x len=6' 'name=SiaB1xy len=7' 'cas page=1 .* switching' 'simname=SiaB1xy ' || return 1
+    ! grep -q -E 'len=[89]' "$tmp/pad-cas-type.log" || { echo "  pad-cas-type: past seven"; return 1; }
+}
 cas_looks() {
     in_order pad-cas-looks 'cas page=0 gender=1 ' 'gender=1 .*skin=1 ' 'cas page=1 ' 'haircolour=4 hair=0 ' 'haircolour=4 hair=1 scroll=0' 'scroll=1' 'scroll=2' 'scroll=3' \
         'scroll=2' 'scroll=1' 'scroll=0' 'cas page=2 ' 'face=4' 'cas page=3 ' 'item=15' 'clothespage=1 item=15'
 }
 cas_keep() { in_order pad-cas-keep 'aspiration=0 answer=0' 'aspiration=2 answer=0' 'aspiration=2 answer=1' 'game Panel/Interact'; }
-cas_cross() { in_order pad-cas-cross 'aspiration=0 answer=2' 'front Title' 'title phase=0'; }
+# (one B only puts the focus on the cross: the answer comes from the second, at frame 60)
+cas_cross() {
+    in_order pad-cas-cross 'aspiration=0 answer=2' 'front Title' 'title phase=0' || return 1
+    local f; f=$(first_frame pad-cas-cross 'answer=2')
+    [ -n "$f" ] && [ "$f" -ge 60 ] || { echo "  pad-cas-cross: one B discarded the Sim (frame $f)"; return 1; }
+}
 cas_turn() {
     "$python" -I -c '
 import sys
@@ -1881,10 +2049,91 @@ sys.exit(0 if ImageChops.difference(a, b).getbbox() else 1)' "$tmp/pad-cas-turn/
 }
 check_pad pad-cas-name cas_name
 check_pad pad-cas-empty cas_empty
+check_pad pad-cas-type cas_type
 check_pad pad-cas-looks cas_looks
 check_pad pad-cas-keep cas_keep
 check_pad pad-cas-cross cas_cross
 check_pad pad-cas-turn cas_turn
+# The HD screens hold through the game's swaps (src/consolehold.*, --print-console: each frame's
+# composition, milestone 1's marked -m1, and the counts at the end): Create-a-Sim's pages from s3 by
+# RB, LB and Start (every page change the game makes), the front end (title → menu → Create-a-Sim,
+# Load-a-Sim and Settings and back), the panel's tabs, the phone, Give Gift closing after a gift, the
+# Registry ↔ room info, a save loaded into the town: no frame shows milestone 1's picture (a frame of
+# the game's own between two objects shows the last HD picture, 12 frames at most, taking no input);
+# the tabs, the phone and the Registry's swaps are held (the hold is exercised).
+hold_walk() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 save=$5; shift 5
+    rm -f "$tmp/$name.sav"
+    [ "$save" = complete ] && { cp "$complete_save" "$tmp/$name.sav" || return; }
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
+        --layout console --print-console --print-front --print-game "$@" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+hold_walk hold-cas s3 cas-walk 640 complete "${town[@]}" &
+hold_walk hold-title F-title0 front-title 300 fresh "${town[@]}" &
+hold_walk hold-load s2 front-load 330 fresh "${town[@]}" &
+hold_walk hold-settings s2 front-settings 330 fresh "${town[@]}" &
+wait
+hold_walk hold-tabs s7 tabs 320 fresh "${town[@]}" &
+hold_walk hold-phone s7 phone-pages 540 fresh "${town[@]}" &
+hold_walk hold-gift A-gift2-base gift-give 200 complete "${late[@]}" &
+hold_walk hold-registry D-hotel-down registry-concierge 380 fresh "${hotel[@]}" &
+hold_walk hold-load-slot F-cload-150 load-slot 360 complete "${late[@]}" &
+wait
+# (no frame shows milestone 1's picture; held: at least that many frames held)
+hold_none() {
+    local name=$1 held=${2:-0} line
+    line=$(grep '^console: ' "$tmp/$name.log") || { echo "  $name: no console summary"; return 1; }
+    echo "$line" | grep -q ', 0 milestone-1 shown$' || { echo "  $name: $line"; grep -E 'console [a-z-]+-m1( |$)' "$tmp/$name.log" | grep -v ' held ' | head -n 3; return 1; }
+    [ "$(echo "$line" | sed -n 's/.* \([0-9]*\) held,.*/\1/p')" -ge "$held" ] || { echo "  $name: fewer than $held held ($line)"; return 1; }
+}
+hold_cas() {
+    in_order hold-cas 'cas page=1 ' 'cas page=2 ' 'cas page=3 ' 'cas page=4 ' 'cas page=3 ' 'cas page=2 ' 'cas page=1 ' 'cas page=0 ' \
+        'cas page=1 ' 'cas page=2 ' 'cas page=3 ' 'cas page=4 ' || return 1
+    hold_none hold-cas
+}
+hold_title() { in_order hold-title 'game CreateASim' 'console cas$' && hold_none hold-title; }
+hold_load() { in_order hold-load 'front Load' 'front Title' && hold_none hold-load; }
+hold_settings() { in_order hold-settings 'front Settings' 'front Title' && hold_none hold-settings; }
+hold_tabs() { in_order hold-tabs 'game Panel/Pockets' 'game Panel/Goals' && hold_none hold-tabs 1; }
+hold_phone() { hold_none hold-phone 1; }
+hold_gift() { in_order hold-gift 'game Gift' 'game Panel/Interact' && hold_none hold-gift; }
+hold_registry() { hold_none hold-registry 1; }
+hold_load_slot() { in_order hold-load-slot 'front Load' 'game Panel/Interact' 'game Dialogue' && hold_none hold-load-slot; }
+check_pad hold-cas hold_cas
+check_pad hold-title hold_title
+check_pad hold-load hold_load
+check_pad hold-settings hold_settings
+check_pad hold-tabs hold_tabs
+check_pad hold-phone hold_phone
+check_pad hold-gift hold_gift
+check_pad hold-registry hold_registry
+check_pad hold-load-slot hold_load_slot
+# The world's camera on the right stick (navigator.h, WorldKeys; from s7, the phone closed): held
+# left it turns (the DS's L), held up it zooms in (X): the world's picture differs from the same
+# run without it; LB held (the shoulders' default L) changes nothing there any more.
+pad_world() {
+    local name=$1 input=$repo/scripts/console/$2.txt
+    "$bin" "$rom" --headless --frames 260 --state-load "$shots/s7.st" --save "$tmp/$name.sav" \
+        --layout console --print-game "${town[@]}" --input "$input" --compose --shot-at 259 --shot-dir "$tmp/$name" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_world pad-world-turn world-turn &
+pad_world pad-world-zoom world-zoom &
+pad_world pad-world-lb world-lb &
+pad_world pad-world-still world-still &
+wait
+# world_differs NAME 0|1: the world (above the strip) differs from world-still's (1) or not (0).
+world_differs() {
+    "$python" -I -c '
+import sys
+from PIL import Image, ImageChops
+a, b = (Image.open(p).convert("RGB").crop((0, 0, 1280, 640)) for p in sys.argv[1:3])
+sys.exit(0 if bool(ImageChops.difference(a, b).getbbox()) == (sys.argv[3] == "1") else 1)' "$tmp/$1/f000259.png" "$tmp/pad-world-still/f000259.png" "$2"
+}
+check_pad pad-world-turn world_differs pad-world-turn 1
+check_pad pad-world-zoom world_differs pad-world-zoom 1
+check_pad pad-world-lb world_differs pad-world-lb 0
 # The HD Interact tab's words in each language (src/port/interact.*: --measure-menu): every verb
 # in its row and in the A hint, every Sim's and object's name in the title and the strip, held in
 # their boxes (shrunk at most; a neighbour's name beside the plate may end in an ellipsis).
@@ -2095,5 +2344,522 @@ for f, (y0, y1) in (("f000020.png", (13, 56)), ("f000040.png", (135, 178))):
         sys.exit(1)
 EOF
 then echo "ok   mg-crime-buttons"; else echo "FAIL mg-crime-buttons"; fails=$((fails + 1)); fi
+# No dead ends (the controller alone leaves every screen; copies of the complete save):
+# pad_t1 NAME STATE SCRIPT FRAMES CLOCK. The vacuum's B taps the bowl's X (the panel); the
+# painting's MENU its palette's next page (1, 2: all 240 colours), Start its X (the question); the
+# Drencher's, the crime game's and the mixer's Start their "?" (help mode), a button its control's
+# text, any press closing it, B leaving help; the furniture editor's B its X (the panel); the boot's
+# last splash takes Start and A at frames where a 3-frame touch fell between its slow polls.
+pad_t1() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 clock=$5
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-game --print-town --print-minigame --print-front --print-hotel --clock "$clock" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_t1 mg-vacuum-leave act-vacuum vacuum-leave 120 "2026-01-01 14:00" &
+pad_t1 mg-art-palette G-X-artgal art-palette 200 "2026-11-05 12:05" &
+pad_t1 mg-drencher-help G-C-wg-pump drencher-help 240 "2026-11-05 12:05" &
+pad_t1 mg-crime-help G-X-crime crime-help 240 "2026-11-05 12:05" &
+wait
+pad_t1 mg-mixer-help G-X-music mixer-help 280 "2026-11-05 12:05" &
+pad_t1 pad-placement-leave BD-place-lobby placement-leave 120 "2026-11-05 12:05" &
+pad_t1 pad-boot-late-start F-boot-900 boot-late-start 220 "2026-11-05 12:05" &
+pad_t1 pad-boot-late-a F-boot-900 boot-late-a 220 "2026-11-05 12:05" &
+wait
+vacuum_leave() { in_order mg-vacuum-leave 'game Vacuum' 'minigame none' 'game Panel/Interact'; }
+check_pad mg-vacuum-leave vacuum_leave
+art_palette() {
+    in_order mg-art-palette 'minigame art .*swatch=3 page=0 ' 'minigame art .*page=1 ' 'minigame art .*page=2 ' 'minigame art .*swatch=4 page=2 ' \
+        'popup state=2 kind=2 .*done painting'
+}
+check_pad mg-art-palette art_palette
+drencher_help() {
+    in_order mg-drencher-help 'minigame drencher .*help=00' 'minigame drencher .*help=10' 'minigame drencher .*help=11' 'minigame drencher .*help=00' \
+        'minigame drencher .*help=10' 'minigame drencher .*help=00'
+}
+check_pad mg-drencher-help drencher_help
+crime_help() {
+    in_order mg-crime-help 'crime help=0 text=0 ' 'crime help=1 text=0 ' 'crime help=1 text=1 ' 'crime help=0 text=0 ' 'crime help=1 text=0 ' \
+        'crime help=0 text=0 ' && ! grep -q 'game Panel' "$tmp/mg-crime-help.log"
+}
+check_pad mg-crime-help crime_help
+mixer_help() {
+    in_order mg-mixer-help 'minigame mixer .* phase=0 ' 'minigame mixer .* phase=8 ' 'minigame mixer .* phase=9 ' 'minigame mixer .* phase=0 ' \
+        'minigame mixer .* phase=8 ' 'minigame mixer .* phase=0 ' && ! grep -q 'game Panel' "$tmp/mg-mixer-help.log"
+}
+check_pad mg-mixer-help mixer_help
+placement_leave() { in_order pad-placement-leave 'game Unknown\(ov=-1,vt=0x021351A8\)' 'placement none' 'game Panel/Interact'; }
+check_pad pad-placement-leave placement_leave
+boot_late() { in_order "$1" 'boot mode=0' 'front Title' 'title phase=0'; }
+check_pad pad-boot-late-start boot_late pad-boot-late-start
+check_pad pad-boot-late-a boot_late pad-boot-late-a
+# Console manners (the remake's polish, task 2; copies of the complete save, pad only): a question
+# opens on No (two quick A on "Overwrite this save?" and on Quit answer No), one B on Keep this Sim?
+# lands on its cross (the second discards), LB on the Name page goes nowhere, 123!'s Down never lands
+# on the backspace, fast slider presses all count (Settings: twelve Lefts at five a second → 0 %,
+# three Rights → 30 %; Options: five Lefts six frames apart → 50 %), B on a concept art shown big
+# closes it (still Settings), B from the Save slots or the phone opened from the menu comes back to
+# the menu on Options and on the item, Right on Interact's single target or Pockets' key items stays,
+# the Give Gift bow takes the focus and gives, the stat panel keeps the page it leaves (held) while
+# it goes by Main, Load-a-Sim's list is done after "Loading", Create-a-Sim's fade in from black shows
+# no panel of black crops.
+pad_t2() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 clock=$5; shift 5
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-game --print-screen --print-town --print-front --print-hotel --clock "$clock" --input "$input" "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+pad_t2 t2-ask-aa B-cas-opt-save saveslots-ask-aa 200 "2026-11-05 12:05" &
+pad_t2 t2-quit-aa B-cas-opt popup-quit-aa 280 "2026-11-05 12:05" &
+pad_t2 t2-cas-lb s3 cas-lb 120 "2026-01-01 12:00" &
+pad_t2 t2-cas-kb s3 cas-keyboard-down 170 "2026-01-01 12:00" &
+wait
+pad_t2 t2-settings-fast F-mm-opt-150 settings-fast 460 "2026-11-05 12:05" &
+pad_t2 t2-options-fast B-cas-opt options-fast 300 "2026-11-05 12:05" &
+pad_t2 t2-concept-b F-copt-concept-80 concept-b 240 "2026-11-05 12:05" &
+pad_t2 t2-return-slots B-cas-opt return-slots 340 "2026-11-05 12:05" &
+wait
+pad_t2 t2-return-phone B-cas-opt return-phone 340 "2026-11-05 12:05" &
+pad_t2 t2-interact-one sit-casino interact-one 100 "2026-11-05 12:05" &
+pad_t2 t2-pockets-right A-pk-cnt3-slot1 pockets-right 120 "2026-11-05 12:05" &
+pad_t2 t2-gift-bow A-gift2-base gift-bow 200 "2026-01-01 12:00" &
+wait
+pad_t2 t2-cas-arrive s2 cas-arrive 140 "2026-01-01 12:00" --compose --shot-every 1 --shot-dir "$tmp/t2-cas-arrive" &
+wait
+ask_aa() {
+    in_order t2-ask-aa 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup none' || return 1
+    if grep -q -E 'kind=3|2=Jun/14843' "$tmp/t2-ask-aa.log"; then echo "  t2-ask-aa: saved by the second A"; return 1; fi
+}
+quit_aa() {
+    in_order t2-quit-aa 'popup state=1 kind=2 .*Quit' 'console menu open, focus 0' 'popup none' 'game Panel/Options' 'console menu open, focus 1' || return 1
+    if grep -q 'game FrontEnd' "$tmp/t2-quit-aa.log"; then echo "  t2-quit-aa: quit by the second A"; return 1; fi
+}
+cas_lb() {
+    in_order t2-cas-lb 'cas page=0 ' 'cas page=1 ' || return 1
+    if grep -q 'cas page=4' "$tmp/t2-cas-lb.log"; then echo "  t2-cas-lb: LB went round to Keep this Sim?"; return 1; fi
+}
+cas_kb() { in_order t2-cas-kb 'keyboard=2' 'name=[^ ]*\) len='; }
+settings_fast() {
+    last_before t2-settings-fast 320 'settings page' | grep -q 'page=0 music=0 sfx=4096' || { echo "  t2-settings-fast: music not 0 % after twelve Lefts"; return 1; }
+    last_before t2-settings-fast 459 'settings page' | grep -q -E 'page=0 music=1(1[5-9]|2[0-9]|30)[0-9] sfx=4096' || { echo "  t2-settings-fast: music not 30 % after three Rights"; return 1; }
+}
+options_fast() {
+    in_order t2-options-fast 'options music=3686 ' 'options music=3277 ' 'options music=2867 ' 'options music=2458 ' 'options music=2048 sfx=4096' || return 1
+    if grep -q -E 'music=1638|sfx=3686' "$tmp/t2-options-fast.log"; then echo "  t2-options-fast: a press counted twice or on SFX"; return 1; fi
+}
+concept_b() {
+    in_order t2-concept-b 'settings page=2 .*art=1' 'front Title' || return 1
+    local f; f=$(first_frame t2-concept-b 'front Title')
+    [ -n "$f" ] && [ "$f" -ge 160 ] || { echo "  t2-concept-b: Settings left by the B that closed the picture (frame $f)"; return 1; }
+}
+return_slots() { in_order t2-return-slots 'game SaveSlots' 'game Panel/Interact' 'game Panel/Options' 'console menu open, focus 0'; }
+return_phone() { in_order t2-return-phone 'console menu open, focus 4' 'game Phone' 'game Panel/Interact' 'game Panel/Options' 'console menu open, focus 4'; }
+interact_one() {
+    in_order t2-interact-one 'console menu open, focus 0' || return 1
+    if grep -q -E 'focus [1-9]' "$tmp/t2-interact-one.log"; then echo "  t2-interact-one: Right moved the focus"; return 1; fi
+}
+pockets_right() {
+    in_order t2-pockets-right 'console menu open, focus 0' 'focus 6' || return 1
+    if grep -q 'focus 13' "$tmp/t2-pockets-right.log"; then echo "  t2-pockets-right: Right went to the phone"; return 1; fi
+}
+gift_bow() { in_order t2-gift-bow 'game Gift' 'console menu closed, focus 6' 'inventory slots=106:[^,]* counted' 'game Panel/Interact'; }
+cas_arrive() {
+    in_order t2-cas-arrive 'game CreateASim' || return 1
+    # Every frame: an HD panel drawn (its fill at the right) never over black tab crops.
+    "$python" -I - "$tmp/t2-cas-arrive" <<'PYEOF'
+import glob, sys
+from PIL import Image, ImageChops
+bad = []
+for f in sorted(glob.glob(sys.argv[1] + "/f*.png")):
+    im = Image.open(f).convert("RGB")
+    panel = im.getpixel((980, 640)) == (0x82, 0x8A, 0xCB)
+    tabs = [im.getpixel((x, 67)) for x in (820, 900, 980, 1060, 1140)]  # (the five tabs' crops' centres)
+    if panel and all(max(p) < 16 for p in tabs):
+        bad.append(f.rsplit("/", 1)[1])
+if bad:
+    print(f"  t2-cas-arrive: a panel over black crops: {bad[:3]}")
+sys.exit(1 if bad else 0)
+PYEOF
+}
+check_pad t2-ask-aa ask_aa
+check_pad t2-quit-aa quit_aa
+check_pad t2-cas-lb cas_lb
+check_pad t2-cas-kb cas_kb
+check_pad t2-settings-fast settings_fast
+check_pad t2-options-fast options_fast
+check_pad t2-concept-b concept_b
+check_pad t2-return-slots return_slots
+check_pad t2-return-phone return_phone
+check_pad t2-interact-one interact_one
+check_pad t2-pockets-right pockets_right
+check_pad t2-gift-bow gift_bow
+check_pad t2-cas-arrive cas_arrive
+stat_held() { grep -q -E 'stat page=0 .* held=[1-4]' "$tmp/pad-stat.log" || { echo "  pad-stat: the page left not held while the game showed Main"; return 1; }; }
+check_pad pad-stat stat_held
+load_done() { in_order pad-load-slot 'popup state=[1-3] kind=3 .*title="Loading"' 'load .* loading' 'front None'; }
+check_pad pad-load-slot load_done
+# The minigames' messages in HD (the remake's polish, task 3; copies of the complete save, pad only): a
+# question of a minigame (the cards' and MooGoo's quit, the painting's "done?", the mixer's save
+# question) opens on No, so A A never answers Yes (the question closed, the game goes on); the HD box
+# hides the game's (its words, its buttons, the focus's halo on No); the cards' end of a turn in an HD
+# box, then the opponent's turn with no focus ring on its cards; MooGoo's line in HD over the game's
+# ("Touch a Monkey!" in the port's words); the help texts read back from the stylus's point (the
+# Drencher's fire 1666, the crime game's scare 1667, the mixer's variations 1798); the phone's B goes
+# back one level (the ringtones → the menu), then hangs up; the detector powered off never shows
+# milestone 1's rail.
+pad_t3() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 clock=$5; shift 5
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-game --print-town --print-minigame --clock "$clock" --input "$input" "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+t3shots() { echo --compose --shot-dir "$tmp/$1" --shot-at "$2"; }
+pad_t3 t3-cards-aa act-cards cards-quit-aa 220 "2026-01-01 12:00" $(t3shots t3-cards-aa 70) &
+pad_t3 t3-cards-turn act-cards cards-turn 700 "2026-01-01 12:00" $(t3shots t3-cards-turn 10,230,640) &
+pad_t3 t3-art-aa G-X-artgal art-done-aa 160 "2026-11-05 12:05" $(t3shots t3-art-aa 40) &
+pad_t3 t3-moogoo-aa G-B-mg-r1-full moogoo-quit-aa 200 "2026-11-05 12:05" $(t3shots t3-moogoo-aa 5,50) &
+wait
+pad_t3 t3-mixer-aa G-X-music mixer-save-aa 300 "2026-11-05 12:05" $(t3shots t3-mixer-aa 170) &
+pad_t3 t3-mixer-help G-X-music mixer-help-text 200 "2026-11-05 12:05" $(t3shots t3-mixer-help 100) &
+pad_t3 t3-phone-back s7 phone-back 300 "2026-01-01 12:00" &
+pad_t3 t3-detector-off G-A-md-walk detector-off 120 "2026-11-05 12:05" --compose --shot-dir "$tmp/t3-detector-off" --shot-every 1 &
+wait
+pad_t3 t3-scratch-win G-B-sc-two-p10 scratch-win 480 "2026-11-05 12:05" $(t3shots t3-scratch-win 330) &
+wait
+# A picture's HD box over the playfield: the kit's fill and white words inside it, the focus's halo
+# (#309A41) on its No when `halo`, none when not; `ring_free`: no green ring over the playfield.
+t3_pic() {
+    "$python" -I - "$@" <<'PYEOF'
+import sys
+from PIL import Image, ImageChops
+path, what = sys.argv[1], sys.argv[2]
+im = Image.open(path).convert("RGB")
+px = lambda x, y: im.getpixel((x, y))
+area = [(x, y) for y in range(70, 640, 3) for x in range(40, 800, 3)]
+green = sum(1 for x, y in area if px(x, y) == (0x30, 0x9A, 0x41))
+fill = sum(1 for x, y in area if px(x, y) == (0x82, 0x8A, 0xCB))
+white = sum(1 for x, y in area if px(x, y) == (255, 255, 255))
+err = []
+if what in ("box", "halo"):
+    if fill < 3000: err.append(f"no HD box ({fill} fill pixels)")
+    if white < 20: err.append("no white words in the box")
+    if what == "halo" and green < 50: err.append("no focus halo on No")
+if what == "ring_free" and green > 0: err.append(f"a green ring over the playfield ({green} pixels)")
+if what == "moo_line":
+    plate = sum(1 for y in range(74, 134, 2) for x in range(100, 740, 4) if px(x, y) == (0x5A, 0x20, 0x38))
+    if plate < 200: err.append(f"no HD line over MooGoo's ({plate} plate pixels)")
+if err: print(f"  {path.rsplit('/', 2)[-2]}: {'; '.join(err)}")
+sys.exit(1 if err else 0)
+PYEOF
+}
+t3_cards_aa() {
+    in_order t3-cards-aa 'cards .*quit=1 ' 'cards .*quit=0 ' || return 1
+    if grep -q -E 'game (Panel|Loading)' "$tmp/t3-cards-aa.log"; then echo "  t3-cards-aa: quit by A A"; return 1; fi
+    t3_pic "$tmp/t3-cards-aa/f000070.png" halo
+}
+t3_cards_turn() {
+    in_order t3-cards-turn 'cards .*message=1 .*phase=6 turn=0 ' 'cards .*message=0 .*turn=1 ' || return 1
+    t3_pic "$tmp/t3-cards-turn/f000230.png" box && t3_pic "$tmp/t3-cards-turn/f000640.png" ring_free
+}
+t3_art_aa() {
+    in_order t3-art-aa 'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=0,1' 'popup none' 'minigame art .*painted=[1-9]' || return 1
+    if grep -q 'pressed=1,1' "$tmp/t3-art-aa.log"; then echo "  t3-art-aa: Yes by A A"; return 1; fi
+    t3_pic "$tmp/t3-art-aa/f000040.png" halo
+}
+t3_moogoo_aa() {
+    in_order t3-moogoo-aa 'moogoo .*quit=01 ' 'moogoo .*quit=00 ' 'moogoo phase=13 sub=[2-4] ' || return 1
+    if grep -q 'game Panel' "$tmp/t3-moogoo-aa.log"; then echo "  t3-moogoo-aa: quit by A A"; return 1; fi
+    t3_pic "$tmp/t3-moogoo-aa/f000005.png" moo_line && t3_pic "$tmp/t3-moogoo-aa/f000050.png" halo
+}
+t3_mixer_aa() {
+    in_order t3-mixer-aa 'mixer .*phase=10 ' 'mixer .*phase=0 ' || return 1
+    if grep -q -E 'game MixerSave|mixer .*phase=1 ' "$tmp/t3-mixer-aa.log"; then echo "  t3-mixer-aa: saved or played by A A"; return 1; fi
+    t3_pic "$tmp/t3-mixer-aa/f000170.png" halo
+}
+t3_mixer_help() { in_order t3-mixer-help 'mixer .*phase=8 ' 'mixer .*phase=9 .*helpid=1798' 'mixer .*phase=0 ' && t3_pic "$tmp/t3-mixer-help/f000100.png" box; }
+t3_help() {
+    grep -q 'drencher .*help=11 .*helpid=1666' "$tmp/mg-drencher-help.log" || { echo "  mg-drencher-help: the fire's text not read back (1666)"; return 1; }
+    grep -q 'crime help=1 text=1 .*helpid=1667' "$tmp/mg-crime-help.log" || { echo "  mg-crime-help: the scare's text not read back (1667)"; return 1; }
+}
+t3_phone_back() {
+    in_order t3-phone-back 'phone page=4 ' 'phone page=0 ' 'phone page=10 ' 'game Panel/Interact' || return 1
+    [ "$(first_frame t3-phone-back 'phone page=10 ')" -ge 250 ] || { echo "  t3-phone-back: the first B hung up"; return 1; }
+}
+t3_detector_off() {
+    in_order t3-detector-off 'game Detector' 'game Panel/Interact' || return 1
+    # (From the first frame on the panel, its tab read or not: the town's world, never a black rail.)
+    "$python" -I - "$tmp/t3-detector-off" "$(first_frame t3-detector-off 'game Panel')" <<'PYEOF'
+import glob, sys
+from PIL import Image, ImageChops
+bad = []
+for f in sorted(glob.glob(sys.argv[1] + "/f*.png")):
+    if int(f.rsplit("/f", 1)[1][:-4]) < int(sys.argv[2]):
+        continue
+    im = Image.open(f).convert("RGB")
+    # milestone 1's rail: a tall black box at the right where the town's world shows
+    if sum(1 for y in range(100, 600, 10) for x in range(1190, 1270, 10) if sum(im.getpixel((x, y))) < 30) > 5:
+        bad.append(f.rsplit("/", 1)[1])
+if bad: print(f"  t3-detector-off: milestone 1's rail in {bad[:3]}")
+sys.exit(1 if bad else 0)
+PYEOF
+}
+t3_scratch_win() { in_order t3-scratch-win 'popup state=2 kind=0 .*Congratulations' 'game Panel' && t3_pic "$tmp/t3-scratch-win/f000330.png" box; }
+check_pad t3-cards-aa t3_cards_aa
+check_pad t3-cards-turn t3_cards_turn
+check_pad t3-art-aa t3_art_aa
+check_pad t3-moogoo-aa t3_moogoo_aa
+check_pad t3-mixer-aa t3_mixer_aa
+check_pad t3-mixer-help t3_mixer_help
+check_pad mg-drencher-help t3_help
+check_pad t3-phone-back t3_phone_back
+check_pad t3-detector-off t3_detector_off
+check_pad t3-scratch-win t3_scratch_win
+# The review fixes of the polish's tasks 1-3: the phone's MENU hangs up from a sub-page (never its
+# menu first); B from the phone opened from the menu: the dimmed world while the menu comes back,
+# never the town's flash (the frames between the phone and the menu open on its tab darker than
+# the town).
+pad_t3 fx-phone-menu s7 phone-menu 260 "2026-01-01 12:00" &
+pad_t3 fx-return-veil B-cas-opt return-phone 240 "2026-11-05 12:05" --print-screen --compose --shot-dir "$tmp/fx-return-veil" --shot-every 1 &
+wait
+fx_phone_menu() {
+    in_order fx-phone-menu 'phone page=4 ' 'phone page=10 ' 'game Panel/Interact' || return 1
+    ! awk '/phone page=4 /{s=1} s && /phone page=0 /{f=1} END{exit !f}' "$tmp/fx-phone-menu.log" || { echo "  fx-phone-menu: the phone's menu before hanging up"; return 1; }
+}
+fx_return_veil() {
+    in_order fx-return-veil 'game Phone' 'game Panel' 'console menu open, focus 4' || return 1
+    local from to phone
+    from=$(awk '/game Phone/{p=1} p && /game Panel/{sub(":","",$2); print $2; exit}' "$tmp/fx-return-veil.log")
+    to=$(awk -v F="$from" '$1=="frame" && ($2+0)>=F && /console menu open/{sub(":","",$2); print $2; exit}' "$tmp/fx-return-veil.log")
+    # (the phone's last frames and the Unknown ones before the panel: from the last "game Phone" line)
+    phone=$(awk -v F="$from" '$1=="frame" && ($2+0)<F && /game Phone/{sub(":","",$2); p=$2} END{print p}' "$tmp/fx-return-veil.log")
+    "$python" -I - "$tmp/fx-return-veil" "$from" "$to" "$phone" <<'PYEOF'
+import sys
+from PIL import Image, ImageChops, ImageStat
+d, a, b, p = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+def frame(n):
+    return Image.open(f"{d}/f{n:06d}.png").convert("L").crop((0, 0, 1280, 600))
+def mean(n):
+    return ImageStat.Stat(frame(n)).mean[0]
+town = mean(10)   # (the town, the menu not yet opened)
+bad = [n for n in range(a, b) if mean(n) > 0.6 * town]
+if bad: print(f"  fx-return-veil: the town shown undimmed at frames {bad[:5]} (town {town:.1f})")
+# From the phone's last frames to the panel (Phone, Unknown): never the town itself (the HD phone
+# is brighter than the town, so the picture is compared with the town's, not its brightness).
+t = frame(10)
+flash = [n for n in range(p, a) if ImageStat.Stat(ImageChops.difference(frame(n), t)).mean[0] < 5]
+if flash: print(f"  fx-return-veil: the town flashes between the phone and the panel at frames {flash[:5]}")
+sys.exit(1 if bad or flash else 0)
+PYEOF
+}
+check_pad fx-phone-menu fx_phone_menu
+check_pad fx-return-veil fx_return_veil
+# The HD shell (src/shell.*, src/shellhost.*, scripts/shell/), the pad alone, its files in a scratch
+# --data-dir: from s7, Start + Back opens the pause menu, slot 1 saved (its state and picture),
+# the phone closed, slot 1 loaded after its question (No first: one A closes it, then A, Right, A),
+# the phone back; Undo: the panel back; Quit asked (No first), then Yes: the suspend state written
+# and the run ends. Then --launch from the same folder: Continue (the first item, A) starts the
+# game where it was left (the panel, from frame 5: the launch's turns count) and the suspend
+# state is gone. Pictures: each page of the pause menu over s7 (--shell) and the launch panel:
+# the panel's fill and the world dimmed under the veil.
+mkdir -p "$tmp/shell-data"
+"$bin" "$rom" --headless --frames 700 --state-load "$shots/s7.st" --save "$tmp/shell-states.sav" --data-dir "$tmp/shell-data" \
+    "${town[@]}" --print-shell --print-game --input "$repo/scripts/shell/states.txt" > "$tmp/shell-states.log" 2>&1 &&
+    grep -q '^clock: ' "$tmp/shell-states.log" && touch "$tmp/shell-states.ok"
+"$bin" "$rom" --headless --launch --frames 60 --save "$tmp/shell-states.sav" --data-dir "$tmp/shell-data" \
+    "${town[@]}" --print-shell --print-game --input "$repo/scripts/shell/continue.txt" > "$tmp/shell-continue.log" 2>&1 &&
+    grep -q '^clock: ' "$tmp/shell-continue.log" && touch "$tmp/shell-continue.ok"
+shell_states() {
+    in_order shell-states 'shell open page=main' 'page=states' 'shell save 1 ok' 'shell closed' 'game Panel/Interact' \
+        'ask=load \(no\)' 'ask=none' 'ask=load \(no\)' 'ask=load \(yes\)' 'shell load 1 ok' 'game Phone' \
+        'shell undo 0 ok' 'game Panel/Interact' 'ask=quit \(no\)' 'ask=none' 'ask=quit \(yes\)' 'shell suspend written' || return 1
+    [ -f "$tmp/shell-data/states/ASJP/slot1.st" ] && [ -f "$tmp/shell-data/states/ASJP/slot1.thumb" ] || { echo "  shell-states: no slot 1 files"; return 1; }
+}
+shell_continue() {
+    in_order shell-continue 'shell launch .*\(continue\)' 'suspend state: loaded' '^frame 5: game Panel/Interact' || return 1
+    [ ! -f "$tmp/shell-data/states/ASJP/suspend.st" ] || { echo "  shell-continue: the suspend state kept"; return 1; }
+}
+check_pad shell-states shell_states
+check_pad shell-continue shell_continue
+# The review's round (scripts/shell/): Change game keeps the place and comes back to the launch
+# panel, whose Continue puts it back (no press left over from the menu's A); a broken slot's load
+# fails, the state before it is put back (the phone still there) and the menu says so; a slot that
+# cannot be written says so; a place the game saved after is refused by Continue (the .sav
+# changed) and dropped; a new start of the same ROM drops its place.
+mkdir -p "$tmp/shell-change-data" "$tmp/shell-bad-data/states/ASJP/slot1.st" "$tmp/shell-stale-data" "$tmp/shell-undo-data/states/ASJP" \
+    "$tmp/shell-cont-data"
+head -c 5000 /dev/urandom > "$tmp/shell-bad-data/states/ASJP/slot2.st"
+# (an older before-load.st, another place (s6): the failed load must never put it back, nor write
+# over it; slot 1's maker, from before, must outlive the failed save)
+cp "$shots/s6.st" "$tmp/shell-bad-data/states/ASJP/before-load.st"
+printf 'rom=older.nds\nheader=1\nsave=0\n' > "$tmp/shell-bad-data/states/ASJP/slot1.meta"
+cp "$tmp/shell-bad-data/states/ASJP/slot1.meta" "$tmp/shell-bad-slot1.meta"
+head -c 5000 /dev/urandom > "$tmp/shell-undo-data/states/ASJP/before-load.st"
+shell_run() {
+    local name=$1 frames=$2 data=$3 script=$4; shift 4
+    "$bin" "$rom" --headless --frames "$frames" --save "$tmp/$name.sav" --data-dir "$tmp/$data" "${town[@]}" --print-shell --print-game \
+        --input "$repo/scripts/shell/$script.txt" "$@" > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+shell_run shell-change 300 shell-change-data change --state-load "$shots/s7.st" &
+shell_run shell-badload 200 shell-bad-data badload --state-load "$shots/s7.st" &
+shell_run shell-badundo 120 shell-undo-data badundo --state-load "$shots/s7.st" &
+wait
+# A Continue whose suspend state is broken: the place written by a quit, then its bytes spoilt.
+( shell_run shell-cont-quit 100 shell-cont-data quit --state-load "$shots/s7.st" &&
+  head -c 5000 /dev/urandom > "$tmp/shell-cont-data/states/ASJP/suspend.st" && cp "$tmp/shell-cont-quit.sav" "$tmp/shell-badcont.sav" &&
+  shell_run shell-badcont 40 shell-cont-data continue --launch ) &
+( shell_run shell-stale-quit 100 shell-stale-data quit --state-load "$shots/s7.st" && printf 'x' >> "$tmp/shell-stale-quit.sav" &&
+  cp "$tmp/shell-stale-quit.sav" "$tmp/shell-stale.sav" && shell_run shell-stale 60 shell-stale-data stale --launch &&
+  cp "$tmp/shell-stale.sav" "$tmp/shell-newstart-quit.sav" && shell_run shell-newstart-quit 100 shell-stale-data quit --state-load "$shots/s7.st" &&
+  cp "$tmp/shell-newstart-quit.sav" "$tmp/shell-newstart.sav" && shell_run shell-newstart 5 shell-stale-data quit ) &
+wait
+shell_change() {
+    in_order shell-change 'shell suspend written' 'shell change 0 ok' '^frame 80: shell launch .*\(continue\)' 'suspend state: loaded' 'game Phone' || return 1
+    ! grep -q -E '^frame (5[1-9]|[67][0-9]): shell launch' "$tmp/shell-change.log" || { echo "  shell-change: the menu's A chose on the panel"; return 1; }
+}
+shell_badload() {
+    in_order shell-badload 'ask=load \(yes\)' 'shell restore ok' 'shell load 2 failed' 'shell says That did not work' 'shell save 1 failed' 'shell says That did not work' || return 1
+    # (never the older before-load.st, s6's place: the game stays on the phone)
+    [ "$(grep -c -E 'game ' "$tmp/shell-badload.log")" = 1 ] || { echo "  shell-badload: the game moved: $(grep -E 'game ' "$tmp/shell-badload.log" | tail -n 1)"; return 1; }
+    cmp -s "$shots/s6.st" "$tmp/shell-bad-data/states/ASJP/before-load.st" || { echo "  shell-badload: before-load.st written by a failed load"; return 1; }
+    cmp -s "$tmp/shell-bad-slot1.meta" "$tmp/shell-bad-data/states/ASJP/slot1.meta" || { echo "  shell-badload: slot 1's maker lost by a failed save"; return 1; }
+}
+shell_badundo() {
+    in_order shell-badundo 'page=states focus=4' 'shell restore ok' 'shell undo 0 failed' 'shell says That did not work' || return 1
+    [ "$(grep -c -E 'game ' "$tmp/shell-badundo.log")" = 1 ] || { echo "  shell-badundo: the game moved"; return 1; }
+}
+shell_badcont() {
+    in_order shell-cont-quit 'shell suspend written' || return 1
+    in_order shell-badcont 'shell launch .*\(continue\)' 'shell restore ok' 'suspend state: cannot load' 'shell says Your place could not be loaded' || return 1
+    [ ! -f "$tmp/shell-cont-data/states/ASJP/suspend.st" ] || { echo "  shell-badcont: the broken place kept"; return 1; }
+}
+shell_stale() {
+    in_order shell-stale-quit 'shell suspend written' || return 1
+    in_order shell-stale 'shell launch refused continue: saved since' '^frame 25: shell launch sims2' || return 1
+    ! grep -q 'suspend state: loaded' "$tmp/shell-stale.log" || { echo "  shell-stale: the old place loaded"; return 1; }
+}
+shell_newstart() {
+    in_order shell-newstart-quit 'shell suspend written' || return 1
+    in_order shell-newstart 'suspend state: dropped' || return 1
+    [ ! -f "$tmp/shell-stale-data/states/ASJP/suspend.st" ] || { echo "  shell-newstart: the place kept"; return 1; }
+}
+check_pad shell-change shell_change
+check_pad shell-badload shell_badload
+check_pad shell-badundo shell_badundo
+check_pad shell-badcont shell_badcont
+check_pad shell-stale shell_stale
+check_pad shell-newstart shell_newstart
+for page in main settings controls keys states quit; do
+    "$bin" "$rom" --headless --frames 64 --state-load "$shots/s7.st" --save "$tmp/shell-$page.sav" --compose \
+        --shell "$page" --shell-at 60 --shot-at 59,62 --shot-dir "$tmp/shell-$page" "${town[@]}" > "$tmp/shell-$page.log" 2>&1 &
+done
+"$bin" "$rom" --headless --launch --frames 4 --save "$tmp/shell-launch.sav" --data-dir "$tmp/shell-data" --compose \
+    --shot-at 2 --shot-dir "$tmp/shell-launch" "${town[@]}" > "$tmp/shell-launch.log" 2>&1 &
+wait
+if "$python" -I - "$tmp" <<'PYEOF'
+import sys
+from PIL import Image, ImageStat
+t = sys.argv[1]
+bad = []
+def near(p, q, d=8): return all(abs(a - b) <= d for a, b in zip(p, q))
+for page in ["main", "settings", "controls", "keys", "states", "quit"]:
+    try:
+        before = Image.open(f"{t}/shell-{page}/f000059.png").convert("RGB")
+        im = Image.open(f"{t}/shell-{page}/f000062.png").convert("RGB")
+    except OSError:
+        bad.append(f"{page}: no picture"); continue
+    fill = (0x82, 0x8A, 0xCB) if page != "quit" else None
+    # The panel's fill under the hints (veiled once more by the quit question's).
+    if fill and not near(im.getpixel((220, 650)), fill): bad.append(f"{page}: no panel fill at 220,650: {im.getpixel((220, 650))}")
+    # The world beside the panel: darker than without the menu.
+    a = ImageStat.Stat(before.crop((120, 0, 190, 600))).mean
+    b = ImageStat.Stat(im.crop((120, 0, 190, 600))).mean
+    if not sum(b) < 0.6 * sum(a): bad.append(f"{page}: the world not dimmed ({sum(a):.0f} -> {sum(b):.0f})")
+    # White words in the title band (the quit question: in its box, over the veiled title).
+    box = (500, 780, 50, 100) if page != "quit" else (420, 860, 250, 310)
+    if not any(min(im.getpixel((x, y))) > 240 for x in range(box[0], box[1]) for y in range(box[2], box[3], 2)): bad.append(f"{page}: no title")
+try:
+    im = Image.open(f"{t}/shell-launch/f000002.png").convert("RGB")
+    if not near(im.getpixel((10, 10)), (0x10, 0x12, 0x18), 2): bad.append(f"launch: no backdrop {im.getpixel((10, 10))}")
+    if not near(im.getpixel((60, 690)), (0x82, 0x8A, 0xCB)): bad.append(f"launch: no list panel {im.getpixel((60, 690))}")
+    if not near(im.getpixel((1220, 690)), (0x82, 0x8A, 0xCB)): bad.append(f"launch: no controls card {im.getpixel((1220, 690))}")
+except OSError:
+    bad.append("launch: no picture")
+for b in bad: print("  " + b)
+sys.exit(1 if bad else 0)
+PYEOF
+then echo "ok   shell pictures: the pause menu's pages and the launch panel"
+else echo "FAIL shell pictures"; fails=$((fails + 1)); fi
+# Platform (task 5). The game's language: --game-language 2 sets the DS firmware's, so the boot's
+# last splash (frame 900, a fresh boot) says the game's French words: its touch screen differs from
+# English's and the strings load in French; fast boot (--fast-boot, the window's rule, logged) ends
+# at that splash and never before it, pressed nothing (the title still waits: an A then opens it);
+# a press during the splashes ends it at once. A save that cannot be written beside the ROM (a
+# read-only file in a read-only folder) goes to the data folder's saves/, a copy first, and the
+# game's own save (Options > Save > slot 2) lands there, the original untouched.
+for l in 1 2; do
+    cp "$complete_save" "$tmp/lang$l.sav"
+    "$bin" "$rom" --headless --frames 902 --save "$tmp/lang$l.sav" --game-language $l --shot-at 900 --shot-dir "$tmp/lang$l" \
+        > "$tmp/lang$l.log" 2>&1 && grep -q '^clock: ' "$tmp/lang$l.log" && touch "$tmp/lang$l.ok" &
+done
+wait
+if [ -f "$tmp/lang1.ok" ] && [ -f "$tmp/lang2.ok" ] && grep -q 'firmware language: 2' "$tmp/lang2.log" &&
+   "$python" -I -c '
+import sys
+from PIL import Image, ImageChops
+a, b = (Image.open(p).convert("RGB").crop((0, 192, 256, 384)) for p in sys.argv[1:3])
+sys.exit(0 if ImageChops.difference(a, b).getbbox() else 1)' "$tmp/lang1/f000900.png" "$tmp/lang2/f000900.png"
+then echo "ok   game-language: the firmware's French reaches the game (the last splash differs from English's)"
+else echo "FAIL game-language"; fails=$((fails + 1)); fi
+printf '900 2 pad a\n' > "$tmp/fastboot-a.txt"
+printf '100 2 pad a\n' > "$tmp/fastboot-early.txt"
+cp "$complete_save" "$tmp/fastboot.sav"
+"$bin" "$rom" --headless --frames 1000 --save "$tmp/fastboot.sav" --fast-boot --layout console --print-front --input "$tmp/fastboot-a.txt" \
+    > "$tmp/fastboot.log" 2>&1 && grep -q '^clock: ' "$tmp/fastboot.log" && touch "$tmp/fastboot.ok" &
+cp "$complete_save" "$tmp/fastboot-early.sav"
+"$bin" "$rom" --headless --frames 200 --save "$tmp/fastboot-early.sav" --fast-boot --layout console --input "$tmp/fastboot-early.txt" \
+    > "$tmp/fastboot-early.log" 2>&1 && grep -q '^clock: ' "$tmp/fastboot-early.log" && touch "$tmp/fastboot-early.ok" &
+wait
+fastboot() {
+    in_order fastboot 'fast boot: on' 'fast boot: done \(the boot waits for a touch\)' 'front Title' || return 1
+    [ "$(first_frame fastboot 'fast boot: done')" = "$(first_frame fastboot 'boot mode=0 ')" ] || { echo "  fastboot: not done on the last splash's first frame"; return 1; }
+    local f; f=$(first_frame fastboot 'fast boot: done')
+    [ -n "$f" ] && [ "$f" -ge 800 ] && [ "$f" -le 900 ] || { echo "  fastboot: done at frame $f, not at the last splash"; return 1; }
+    [ "$(first_frame fastboot 'front Title')" -ge 900 ] || { echo "  fastboot: the title before the A"; return 1; }
+    grep -q '^frame 100: fast boot: done (a press)' "$tmp/fastboot-early.log" || { echo "  fastboot: a press did not end it"; return 1; }
+    [ -f "$tmp/fastboot-early.ok" ]
+}
+check_pad fastboot fastboot
+mkdir -p "$tmp/ro" "$tmp/ro-data"
+"$bin" "$rom" --headless --frames 1 --state-load "$shots/B-st-opt-save.st" --save "$tmp/ro/game.sav" > /dev/null 2>&1
+chmod 444 "$tmp/ro/game.sav"; chmod 555 "$tmp/ro"
+ro_before=$(cksum < "$tmp/ro/game.sav")
+"$bin" "$rom" --headless --frames 300 --state-load "$shots/B-st-opt-save.st" --save "$tmp/ro/game.sav" --data-dir "$tmp/ro-data" \
+    --layout console --print-town "${town[@]}" --input "$repo/scripts/console/saveslots-save.txt" > "$tmp/save-elsewhere.log" 2>&1 &&
+    grep -q '^clock: ' "$tmp/save-elsewhere.log" && touch "$tmp/save-elsewhere.ok"
+chmod 755 "$tmp/ro"; chmod 644 "$tmp/ro/game.sav"
+save_elsewhere() {
+    in_order save-elsewhere 'cannot be written: the game saves to .*/ro-data/saves/game.sav' 'saves current=1 0=empty 1=Sim' || return 1
+    [ "$(cksum < "$tmp/ro/game.sav")" = "$ro_before" ] || { echo "  save-elsewhere: the read-only save changed"; return 1; }
+    [ -f "$tmp/ro-data/saves/game.sav" ] && [ "$(cksum < "$tmp/ro-data/saves/game.sav")" != "$ro_before" ] || { echo "  save-elsewhere: the game's save not in saves/"; return 1; }
+}
+check_pad save-elsewhere save_elsewhere
+# Round 2: the folder writable again (above) and the copy in saves/ newer (the game saved there):
+# at the next start the newer save goes back beside the ROM (verified), loads from there, and the
+# copy is set aside as .moved.
+copy_sum=$(cksum < "$tmp/ro-data/saves/game.sav" 2>/dev/null)
+"$bin" "$rom" --headless --frames 5 --save "$tmp/ro/game.sav" --data-dir "$tmp/ro-data" --layout console > "$tmp/save-back.log" 2>&1 &&
+    grep -q '^clock: ' "$tmp/save-back.log" && touch "$tmp/save-back.ok"
+save_back() {
+    [ -n "$copy_sum" ] || { echo "  save-back: no copy in saves/ from round 1"; return 1; }
+    in_order save-back '/ro/game.sav can be written again: the save is back there' 'save: .*/ro/game.sav \([0-9]+ bytes\)' || return 1
+    ! grep -q 'cannot be written' "$tmp/save-back.log" || { echo "  save-back: still saving elsewhere"; return 1; }
+    [ "$(cksum < "$tmp/ro/game.sav")" = "$copy_sum" ] || { echo "  save-back: the save beside the ROM is not the newer copy"; return 1; }
+    [ ! -f "$tmp/ro-data/saves/game.sav" ] && [ "$(cksum < "$tmp/ro-data/saves/game.sav.moved")" = "$copy_sum" ] ||
+        { echo "  save-back: the copy not set aside as .moved"; return 1; }
+}
+check_pad save-back save_back
 if [ "$fails" != 0 ]; then echo "console_check: $fails failure(s)"; exit 1; fi
 echo "console_check: ok"

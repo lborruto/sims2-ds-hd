@@ -1,0 +1,9 @@
+# From s7 (the phone), CONSOLE: Down, Down, A (Options: the ringtones), Down, A (Ringtone 1), B (back one
+# level: the menu, by the page's Exit), B (the menu has none above: the phone's X, the panel).
+20 2 pad down
+40 2 pad down
+60 2 pad a
+100 2 pad down
+130 2 pad a
+170 2 pad b
+260 2 pad b

@@ -34,18 +34,18 @@ Recorder::Recorder(std::string dir) : dir_(std::move(dir))
     }
 }
 
-void Recorder::Frame(const App& app, long frame, melonDS::NDS& nds)
+bool Recorder::Frame(const App& app, long frame, melonDS::NDS& nds)
 {
-    if (dir_.empty() || count_ >= kMaxPerRun || !app.portSupported) return; // (no RAM map on other ROMs)
+    if (dir_.empty() || count_ >= kMaxPerRun || !app.portSupported) return false; // (no RAM map on other ROMs)
     const GameState& g = app.game;
     // The pair to watch, or none: loads (between, or black) are never unmapped screens.
     bool watch = false; int need = 0;
     std::pair<int, u32> pair{-1, 0};
     if (g.valid && g.settled && g.screen == GScreen::Unknown) { watch = true; need = kUnknownFrames; pair = {g.overlay, g.vtable}; }
     else if (!g.valid && !g.between && frame >= kInvalidFrom && !ScreensBlack(app.Top(), app.Bottom())) { watch = true; need = kInvalidFrames; }
-    if (!watch) { cur_ = {-2, 0}; run_ = 0; return; }
+    if (!watch) { cur_ = {-2, 0}; run_ = 0; return false; }
     if (pair != cur_) { cur_ = pair; run_ = 0; }
-    if (++run_ != need || done_.count(pair)) return;
+    if (++run_ != need || done_.count(pair)) return false;
     done_.insert(pair);
 
     // Once per screen across sessions: a capture of this pair already in the folder, or a full folder.
@@ -60,9 +60,9 @@ void Recorder::Frame(const App& app, long frame, melonDS::NDS& nds)
         const std::string f = U8String(it->path().filename());
         if (it->path().extension() != ".st") continue;
         inFolder++;
-        if (f.size() > strlen(tag) && f.compare(f.size() - strlen(tag), strlen(tag), tag) == 0) return;
+        if (f.size() > strlen(tag) && f.compare(f.size() - strlen(tag), strlen(tag), tag) == 0) return false;
     }
-    if (inFolder >= kMaxInFolder) return;
+    if (inFolder >= kMaxInFolder) return false;
     std::filesystem::create_directories(dir, ec);
     char stamp[32];
     const time_t t = time(nullptr);
@@ -80,16 +80,17 @@ void Recorder::Frame(const App& app, long frame, melonDS::NDS& nds)
     {
         std::filesystem::remove(U8Path(base + ".st"), ec);
         fprintf(stderr, "recorder: cannot save %s.st\n", base.c_str());
-        return;
+        return false;
     }
     WriteShot(base + ".png", app.Top(), app.Bottom());
     if (!std::filesystem::exists(U8Path(base + ".png"), ec))
     {
         std::filesystem::remove(U8Path(base + ".st"), ec);
         fprintf(stderr, "recorder: cannot save %s.png\n", base.c_str());
-        return;
+        return false;
     }
     count_++;
     fprintf(stderr, "recorded: %s.st\n", base.c_str());
+    return true;
 }
 }

@@ -25,5 +25,8 @@ struct Audio
     // After each emulated frame: takes the frame's samples and plays them. While fast
     // forwarding, muted or at normal pitch skipping what does not fit (Settings::fastSound).
     void Frame(melonDS::NDS& nds, bool fast, const Settings& s);
+    // The window not in front (and not running in the background): silent, what was queued dropped.
+    bool paused = false;
+    void Pause(bool on);
 };
 }

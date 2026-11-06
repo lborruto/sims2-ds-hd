@@ -7,7 +7,7 @@
 //   app.h      shared state          input.*   keyboard, mouse, controller   video.*   the window
 //   audio.*    sound                 layout.*  where the screens go          scene.*   AUTO's detection
 //   script.*   headless input        shots.*   PNG pictures                  state.*   save states
-//   picker.*   ROM file picker       menu.*    pause menu and overlay        ui.*      overlay drawing
+//   picker.*   ROM file picker       shell*.*  pause menu, launch panel       slots.*   save states' files
 //   settings.* the settings file     controls.* key and button bindings      backup.*  save copies
 #include <SDL.h>
 
@@ -15,6 +15,8 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -33,7 +35,6 @@
 #include "host.h"
 #include "input.h"
 #include "looks.h"
-#include "menu.h"
 #include "mic.h"
 #include "picker.h"
 #include "romdata.h"
@@ -56,10 +57,13 @@
 #include "port/phone.h"
 #include "port/popup.h"
 #include "port/pockets.h"
+#include "port/prompt.h"
 #include "port/relations.h"
 #include "script.h"
 #include "shots.h"
 #include "recorder.h"
+#include "shellhost.h"
+#include "slots.h"
 #include "state.h"
 #include "video.h"
 #include "port/ownwords.h"
@@ -84,6 +88,9 @@ static void Usage()
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
         "  --compose-scale N             --compose pictures N times the canvas (1 to 4; the UI drawn at that size)\n"
         "  --ui-demo                     (checks) the HD interface kit's demonstration over the picture\n"
+        "  --ui-scale N                  the HD interface's size, 60 to 150 percent by 5 (default: the settings', Auto; 100 headless)\n"
+        "  --game-pictures smooth|pixel  the game's icons and portraits in the HD interface: the pixel-art scaler or\n"
+        "                                nearest pixels (default: the settings', smooth; pixel headless)\n"
         "  --res3d N                     3D drawn N times sharper (1 = the DS's own; default 2 in the window, 1 headless)\n"
         "  --wide                        widescreen 16:9 world\n"
         "  --interp                      60 fps in-between frames for the 3D\n"
@@ -101,6 +108,7 @@ static void Usage()
         "  --print-hotel                 print the hotel block (rooms, score, guests, songs) and the hotel's and shops' screens (registry, room info, music, build rooms, placement, catalogue, stat panel), read from RAM, when they change\n"
         "  --print-minigame              print the minigame the bottom screen shows (Alien Autopsy, Metal Detector, MooGoo Monkey, scratch lottery, Super Drencher, Crime, Music Mixer and its save menu, Art Gallery), read from RAM, when it changes\n"
         "  --print-front                 print the front end (title, Settings, Load-a-Sim, Create-a-Sim, boot screens, video), read from RAM, when it changes\n"
+        "  --print-console               print CONSOLE's composition (which branch; milestone 1's marked m1, a held picture) when it changes, and the counts at the end\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
         "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
@@ -122,12 +130,24 @@ static void Usage()
         "  --language N                  the text's language for those and the HD interface's words: 0 Japanese (the\n"
         "                                English file), 1 English, 2 French, 3 German, 4 Italian, 5 Spanish (default:\n"
         "                                the firmware's; the game itself keeps the firmware's)\n"
+        "  --game-language N             the game's own language (the DS firmware's: 1 English .. 5 Spanish; the HD\n"
+        "                                words follow it); default: the settings' (automatic: the computer's) in the\n"
+        "                                window, the built-in firmware's (English) headless\n"
+        "  --fast-boot                   (checks) the boot's splashes at full speed, as the window does (logged)\n"
         "  --no-romdata                  (checks) do not read the game's text: milestone 1's CONSOLE\n"
+        "  --launch                      the launch panel first (shown anyway in the window without a ROM)\n"
+        "  --data-dir DIR                where the save states, the suspend state and the recent ROMs go (default: the\n"
+        "                                settings folder in the window; none headless unless given)\n"
+        "  --shell PAGE [--shell-at N]   (checks) the pause menu opened on PAGE (main, settings, controls, keys, states,\n"
+        "                                quit) at frame N (default 60); headless, Start + Back held in a script open it too\n"
+        "  --print-shell                 print what the pause menu and the launch panel do (frame N: shell ...)\n"
         "  --version, --help\n"
         "keys: arrows, X=A Z=B S=X A=Y Q=L W=R Enter=Start RShift=Select, M blow (all remappable)\n"
-        "      Esc menu (settings, save states, quit), Space fast forward, Tab swaps the big screen\n"
+        "      Esc (a controller: Start + Back) the pause menu (settings, controls, save states, quit),\n"
+        "      Space fast forward, Tab swaps the big screen\n"
         "      CONSOLE: E opens the touch screen's menu (arrows move, A taps, L/R tabs, B closes)\n"
-        "      0 auto, 1/2/3/4 focus/side/stacked/console, F5/F7 save/load state, F11 fullscreen, F12 screenshot\n"
+        "      0 auto, 1/2/3/4 focus/side/stacked/console, F5/F7 save/load state, F11 fullscreen, F12 screenshot (the window's)\n"
+        "      Create-a-Sim's name: type it\n"
         "      mouse: the touch screen; over the world, wheel zooms and a right-button drag turns\n");
 }
 
@@ -158,19 +178,26 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, printConsole = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
+    int uiScaleArg = 0;     // --ui-scale N (60-150): the HD interface's size for this run; 0 the settings' (headless 100)
+    int picturesArg = -1;   // --game-pictures: 1 smooth, 0 pixel; -1 the settings' (headless pixel)
     bool uiDemo = false;
     int res3d = 0;
     bool wide = false, interp = false;
     int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
+    int gameLanguage = -1;              // the DS firmware's language (--game-language)
+    bool fastBootFlag = false;
     bool stringsCount = false, noRomData = false;
     int dumpResource = -1, dumpSprite = -1, dumpFrame = -1; // the archive's data (--dump-resource, --dump-sprite)
     std::string dumpFile;
     std::string measure; // --measure-string ID|all
     bool measureMenu = false;
     int dialogueString = -1; // (a check) the HD conversation shows this string instead of the page's
+    bool launchFlag = false, printShell = false;
+    std::string dataDir, shellPageArg;
+    long shellAt = 60;
     for (int i = 1; i < argc; i++)
     {
         std::string a = argv[i];
@@ -181,6 +208,18 @@ int main(int argc, char** argv)
         else if (a == "--compose") compose = true;
         else if (a == "--compose-scale") composeScale = std::clamp(atoi(next().c_str()), 1, 4);
         else if (a == "--ui-demo") uiDemo = true;
+        else if (a == "--ui-scale")
+        {
+            long n = 0;
+            if (!WholeNumber(next(), 1000, n) || n < 60 || n > 150 || n % 5) { Usage(); return 1; }
+            uiScaleArg = (int)n;
+        }
+        else if (a == "--game-pictures")
+        {
+            const std::string v = next();
+            if (v != "smooth" && v != "pixel") { Usage(); return 1; }
+            picturesArg = v == "smooth";
+        }
         else if (a == "--res3d") res3d = std::clamp(atoi(next().c_str()), 1, 8);
         else if (a == "--wide") wide = true;
         else if (a == "--interp") interp = true;
@@ -201,6 +240,7 @@ int main(int argc, char** argv)
         else if (a == "--print-hotel") printHotel = true;
         else if (a == "--print-minigame") printMinigame = true;
         else if (a == "--print-front") printFront = true;
+        else if (a == "--print-console") printConsole = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -216,6 +256,13 @@ int main(int argc, char** argv)
             if (a == "--language" && number > 5) { Usage(); return 1; }
             (a == "--language" ? language : dumpString) = (int)number;
         }
+        else if (a == "--game-language")
+        {
+            long number;
+            if (!WholeNumber(next(), 5, number) || number < 1) { Usage(); return 1; }
+            gameLanguage = (int)number;
+        }
+        else if (a == "--fast-boot") fastBootFlag = true;
         else if (a == "--strings-count") stringsCount = true;
         else if (a == "--no-romdata") noRomData = true;
         // The archive's data to a file (tests/romdata_check.sh): whole numbers, else the usage.
@@ -239,6 +286,11 @@ int main(int argc, char** argv)
             dialogueString = (int)number;
         }
         else if (a == "--measure-menu") measureMenu = true;
+        else if (a == "--launch") launchFlag = true;
+        else if (a == "--print-shell") printShell = true;
+        else if (a == "--data-dir") dataDir = next();
+        else if (a == "--shell") shellPageArg = next();
+        else if (a == "--shell-at") shellAt = atol(next().c_str());
         else if (a == "--measure-string")
         {
             measure = next();
@@ -257,20 +309,326 @@ int main(int argc, char** argv)
     }
     if (headless && frames < 0) { fprintf(stderr, "--headless needs --frames\n"); return 1; }
 
-    // No ROM on the command line (a double click on the app): ask for one.
-    const bool picked = romPath.empty();
-    if (picked)
+    // The pause menu's page for --shell.
+    int shellPage = -1;
+    if (!shellPageArg.empty())
     {
-        if (headless) { Usage(); return 1; }
-        romPath = PickRom();
-        if (romPath.empty()) return 0; // cancelled
+        static const char* pages[] = {"main", "settings", "controls", "keys", "states", "quit"};
+        for (int i = 0; i < 6; i++)
+            if (shellPageArg == pages[i]) shellPage = i;
+        if (shellPage < 0) { Usage(); return 1; }
     }
-    const bool dialogs = picked; // started without a terminal, most likely
-    // The game's save, the quick save state and the screenshot go beside the ROM: a program
-    // started from the Finder or Explorer has no useful current folder.
+    // A run that prints or measures and stops opens no window.
+    const bool tool = stringsCount || dumpString >= 0 || dumpResource >= 0 || dumpSprite >= 0 || measureMenu || !measure.empty();
+    const bool window = !headless && !tool;
+
+    App app;
+    // (For the checks' pictures: pinned, the navigator no longer moves them; it still steers.)
+    app.consoleMenu = consoleMenu;
+    app.consoleFocus = consoleFocus;
+    app.consolePinned = consolePinned;
+    app.uiDemo = uiDemo;
+    // The settings file (not headless: those runs stay the same on every machine).
+    const std::string settingsPath = headless ? "" : Settings::DefaultPath();
+    if (!settingsPath.empty() && app.settings.Load(settingsPath)) fprintf(stderr, "settings: %s\n", settingsPath.c_str());
+    // The HD interface's size and the game's pictures (ui/kit.h): headless 100 % and Pixel unless the
+    // flags say (every check's picture as it was); the window the settings' (Auto from the window's
+    // physical size, AutoUiScale), the flags over them. Set again every frame (applyUi, below).
+    ui::SetUiScale(uiScaleArg ? uiScaleArg / 100.0f : 1.0f);
+    ui::SetGamePictures(picturesArg == 1);
+
+    // The HD shell (shell.h): its files in the settings folder (--data-dir: a check's; none
+    // headless without it).
+    ShellHost host;
+    host.headless = headless;
+    host.print = printShell;
+    host.settingsPath = settingsPath;
+    if (!dataDir.empty()) host.data.root = dataDir + (dataDir.back() == '/' || dataDir.back() == '\\' ? "" : "/");
+    else if (window)
+    {
+        const std::string sp = Settings::DefaultPath();
+        if (const size_t slash = sp.find_last_of("/\\"); slash != std::string::npos) host.data.root = sp.substr(0, slash + 1);
+    }
+
+    // Window, sound, controllers: up before the launch panel.
+    Video video;
+    float lastAuto = 0;
+    auto applyUi = [&]() {
+        if (!window || !video.win) return;
+        ui::SetGamePictures(picturesArg >= 0 ? picturesArg == 1 : app.settings.smoothPictures);
+        float z = uiScaleArg / 100.0f;
+        if (!uiScaleArg)
+        {
+            const float a = app.settings.uiScale == 0 ? video.AutoUiScale() : 1;
+            if (app.settings.uiScale == 0 && a != lastAuto)
+            {
+                float mm = 0, diag = 0;
+                video.DisplayMetrics(mm, diag);
+                fprintf(stderr, "ui: auto size %d %% (%.3f mm an output pixel, a %.1f\" display)\n", (int)std::lround(a * 100), mm, diag / 25.4f);
+                lastAuto = a;
+            }
+            z = UiZoomOf(app.settings.uiScale, a);
+        }
+        ui::SetUiScale(z);
+    };
+    Audio audio;
+    Input input;
+    if (window)
+    {
+        // Controllers: SDL's hints first (pads.h), then the joystick and game controller parts
+        // (SDL_GAMECONTROLLERCONFIG, which Steam sets for a non-Steam game, is read here).
+        Pads::Hints();
+#ifdef _WIN32
+        // Windows: the window in real pixels on every screen (per-monitor DPI, v2), sized in
+        // points as on a Mac (SDL scales the window's size by the screen's scale): never a blurry
+        // picture stretched by the system.
+        SDL_SetHint(SDL_HINT_WINDOWS_DPI_AWARENESS, "permonitorv2");
+        SDL_SetHint(SDL_HINT_WINDOWS_DPI_SCALING, "1");
+#endif
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
+        // Haptics (DirectInput pads' rumble) only if the system has them: never a reason not to start.
+        if (SDL_InitSubSystem(SDL_INIT_HAPTIC) != 0) fprintf(stderr, "SDL haptic: %s\n", SDL_GetError());
+        Pads::LoadMappings(Pads::UserMappingsPath());
+        // The keymap is known now: the keys asked by position have their values, so the swap
+        // can move them out of the way of a key the settings file gave another action.
+        app.settings.controls.ResolveKeys();
+        if (!video.Open(app.settings)) return 1;
+        input.window = video.win;
+        // (SDL starts with text input on: off until Create-a-Sim's Name page, Video::TextInput.)
+        SDL_StopTextInput();
+        input.OpenPads(app.settings);
+        // The words before the game's strings are read: the computer's language.
+        if (SDL_Locale* loc = SDL_GetPreferredLocales())
+        {
+            if (loc[0].language) host.autoLanguage = LanguageOfLocale(loc[0].language);
+            SDL_free(loc);
+        }
+    }
+    std::vector<InputEvent> script;
+    if (!inputPath.empty()) script = LoadScript(inputPath);
+    bool winShots = false;
+    for (const InputEvent& e : script) winShots |= e.winShot;
+    if (!shotAt.empty() || shotEvery || winShots) { std::string cmd = "mkdir -p '" + shotDir + "'"; (void)system(cmd.c_str()); }
+
+    // The launch panel, before the DS starts: in the window without a ROM (a double click on
+    // the app), with a ROM that is not The Sims 2, or with --launch (headless too, from the
+    // script's "pad" events). Its turns count as frames: a script and the shots go on from there.
+    long launchFrames = 0;
+    bool continueSuspend = false;
+    auto padEdges = [](const PadState& p, const PadState& q) {
+        shell::Input in;
+        auto edge = [](bool now, bool before) { return now && !before; };
+        in.up = edge(p.up || p.ly < -0.5f, q.up || q.ly < -0.5f);
+        in.down = edge(p.down || p.ly > 0.5f, q.down || q.ly > 0.5f);
+        in.left = edge(p.left || p.lx < -0.5f, q.left || q.lx < -0.5f);
+        in.right = edge(p.right || p.lx > 0.5f, q.right || q.lx > 0.5f);
+        in.a = edge(p.a, q.a);
+        in.b = edge(p.b, q.b);
+        in.x = edge(p.x, q.x);
+        in.y = edge(p.y, q.y);
+        return in;
+    };
+    // The window's mouse in output pixels -> the shell's 1280 x 720 canvas.
+    auto shellInput = [&](shell::Input in) {
+        if ((in.hover || in.click) && video.ren)
+        {
+            int ow, oh;
+            video.OutputSize(ow, oh);
+            CanvasFit::For(shell::kW, shell::kH, ow, oh).ToCanvas(in.mx, in.my, in.mx, in.my);
+        }
+        return in;
+    };
+    // Which save a ROM's start will load: the one beside it (or --save), or its copy in the data
+    // folder's saves/ when that one leads (ResolveSave's rule, NewerSave); nothing is made or moved.
+    auto SaveOf = [&](const std::string& rom) {
+        const std::string beside = savePath.empty() ? rom.substr(0, rom.rfind('.')) + ".sav" : savePath;
+        return NewerSave(beside, SaveFallbackAt(host.data, beside));
+    };
+    auto launch = [&](const std::string& message) -> bool {
+        host.model = shell::Model();
+        host.shell.Open(shell::Page::Launch);
+        host.model.message = message;
+        std::vector<std::string> paths = host.data.Recents();
+        for (const std::string& p : paths) host.model.recents.push_back(BaseName(p));
+        std::string firstCode;
+        StateMeta suspendMeta;
+        if (!paths.empty() && ClassifyRom(paths[0], &firstCode) != RomKind::Unreadable)
+            host.model.hasSuspend = ReadMeta(host.data.SuspendMeta(firstCode), suspendMeta) && suspendMeta.rom == paths[0] &&
+                                    FileExists(host.data.Suspend(firstCode)) && ReadThumb(host.data.SuspendThumb(firstCode), host.model.suspend);
+        PadState prev;
+        if (launchFrames > 0) ScriptPad(script, launchFrames - 1, prev); // (Change game: a button still held is no press)
+        for (long iter = 0;; iter++)
+        {
+            applyUi();
+            shell::Input in;
+            std::string tryPath;
+            if (headless)
+            {
+                if (frames >= 0 && launchFrames >= frames) return false;
+                PadState p;
+                ScriptPad(script, launchFrames, p);
+                in = padEdges(p, prev);
+                prev = p;
+            }
+            else
+            {
+                SDL_Event ev;
+                input.PushScript(script, iter, video);
+                while (SDL_PollEvent(&ev))
+                {
+                    video.Event(ev);
+                    input.HandleEvent(ev, app, video, true);
+                }
+                input.Poll(app, true);
+                if (input.wantQuit) return false;
+                in = shellInput(input.nav);
+                if (!input.droppedFile.empty()) { tryPath = input.droppedFile; input.droppedFile.clear(); }
+                input.EndFrame();
+            }
+            host.frame = launchFrames;
+            host.Refresh(app, input);
+            const shell::Result r = host.shell.Update(in, host.model);
+            if (printShell && r.act != shell::Act::None) fprintf(stderr, "frame %ld: shell launch act %d %d\n", launchFrames, (int)r.act, r.arg);
+            switch (r.act)
+            {
+            case shell::Act::Continue:
+                tryPath = paths[0];
+                continueSuspend = host.model.hasSuspend;
+                if (continueSuspend)
+                {
+                    // The game saved since the place was kept (its save is not the one the place
+                    // left): loading the place would put the older save back. Said, and the place dropped.
+                    const std::string sav = SaveOf(paths[0]);
+                    if (suspendMeta.save != HashFile(sav))
+                    {
+                        std::error_code ec;
+                        for (const std::string& f : {host.data.Suspend(firstCode), host.data.SuspendThumb(firstCode), host.data.SuspendMeta(firstCode)})
+                            std::filesystem::remove(f, ec);
+                        host.model.hasSuspend = continueSuspend = false;
+                        host.model.message = OwnWordIn(host.model.language, OwnWordId::LaunchSaveNewer);
+                        if (printShell) fprintf(stderr, "frame %ld: shell launch refused continue: saved since\n", launchFrames);
+                        tryPath.clear();
+                    }
+                }
+                break;
+            case shell::Act::OpenRecent: tryPath = paths[r.arg]; break;
+            case shell::Act::ChooseFile: if (window) tryPath = PickRom(); break;
+            case shell::Act::Exit: return false;
+            case shell::Act::Setting:
+                if (!settingsPath.empty())
+                {
+                    if (window) video.RememberSize(app.settings);
+                    app.settings.Save(settingsPath);
+                }
+                break;
+            default: break;
+            }
+            if (!tryPath.empty())
+            {
+                const int lang = host.model.language;
+                const RomKind k = ClassifyRom(tryPath);
+                std::string msg;
+                if (k == RomKind::Unreadable) msg = OwnWordIn(lang, OwnWordId::LaunchUnreadable);
+                else if (k == RomKind::NotSims2) msg = OwnWordIn(lang, OwnWordId::LaunchWrong);
+                if (msg.empty())
+                {
+                    romPath = tryPath;
+                    host.shell.Close();
+                    if (printShell) fprintf(stderr, "frame %ld: shell launch %s%s\n", launchFrames, BaseName(romPath).c_str(), continueSuspend ? " (continue)" : "");
+                    return true;
+                }
+                if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, BaseName(tryPath));
+                host.model.message = msg;
+                continueSuspend = false;
+                if (printShell) fprintf(stderr, "frame %ld: shell launch refused %s\n", launchFrames, BaseName(tryPath).c_str());
+            }
+            const std::vector<ui::UiItem> items = host.shell.Build(host.model);
+            if (headless)
+            {
+                if (shotAt.count(launchFrames) || (shotEvery && launchFrames % shotEvery == 0))
+                {
+                    char name[64];
+                    snprintf(name, sizeof name, "/f%06ld.png", launchFrames);
+                    Composition c {shell::kW, shell::kH, {}, {}, items};
+                    static const std::vector<u32> black(SW * SH, 0xFF000000);
+                    WriteCompose(shotDir + name, c, black.data(), SW, SH, black.data(), composeScale);
+                }
+            }
+            else
+            {
+                if (ScriptWindowShot(script, iter))
+                {
+                    char name[64];
+                    snprintf(name, sizeof name, "/w%06ld.png", iter);
+                    video.shotPath = shotDir + name;
+                }
+                video.PresentUi(items);
+                SDL_Delay(15);
+            }
+            launchFrames++;
+        }
+    };
+    bool relaunching = false; // Change game: the launch panel again, after the game before
+relaunch:
+    std::string launchMessage;
+    if (window && !romPath.empty() && !relaunching)
+    {
+        // A ROM on the command line that is not The Sims 2: said on the launch panel.
+        const RomKind k = ClassifyRom(romPath);
+        const int lang = shell::WordsLanguage(app.settings, host.autoLanguage);
+        if (k == RomKind::Unreadable) launchMessage = OwnWordIn(lang, OwnWordId::LaunchUnreadable);
+        else if (k == RomKind::NotSims2) launchMessage = OwnWordIn(lang, OwnWordId::LaunchWrong);
+        if (size_t at = launchMessage.find("@1"); at != std::string::npos) launchMessage.replace(at, 2, BaseName(romPath));
+    }
+    if ((window && (romPath.empty() || launchFlag || !launchMessage.empty())) || (headless && launchFlag) || relaunching)
+    {
+        continueSuspend = false;
+        if (!launchMessage.empty()) romPath.clear();
+        if (!launch(launchMessage))
+        {
+            if (window) { if (!settingsPath.empty()) app.settings.Save(settingsPath); input.ClosePads(); SDL_Quit(); }
+            return 0;
+        }
+    }
+    if (romPath.empty()) { Usage(); return 1; }
+    const bool dialogs = window; // started without a terminal, most likely
+    // (Remembered whole: the next start may be from another folder.)
+    {
+        std::error_code ec;
+        const std::filesystem::path whole = std::filesystem::absolute(romPath, ec);
+        host.romPath = ec ? romPath : whole.lexically_normal().string();
+    }
+    host.data.PushRecent(host.romPath);
+    host.romHeader = 0;
+    // The game's save and the screenshot go beside the ROM: a program started from the Finder or
+    // Explorer has no useful current folder.
     const std::string romBase = romPath.substr(0, romPath.rfind('.'));
     Host::SavePath = savePath.empty() ? romBase + ".sav" : savePath;
-    const std::string quickState = romBase + ".quick.st", shotFile = romBase + "-shot.png";
+    // A save that cannot be written there (a read-only folder: a write-protected card, a shared
+    // folder, Program Files): in the data folder's saves/ instead, the one beside the ROM copied
+    // there first, said in the window and on the pause menu. A copy left there from an earlier
+    // start goes back beside the ROM once it can be written again (the newer of the two leads:
+    // ResolveSave), said in a toast.
+    Host::SaveMoved = false;
+    Host::SaveFallback = SaveFallbackAt(host.data, Host::SavePath);
+    host.saveElsewhere.clear();
+    bool saveMovedBack = false;
+    {
+        const std::string beside = Host::SavePath;
+        const SaveStart start = ResolveSave(host.data, beside);
+        if (start.movedBack)
+            fprintf(stderr, "save: %s can be written again: the save is back there (the copy in saves/ set aside as .moved)\n", beside.c_str());
+        else if (!start.elsewhere.empty() && CanWrite(beside))
+            fprintf(stderr, "save: the copy in %s could not be put back beside the ROM: the game keeps saving there\n", start.elsewhere.c_str());
+        else if (!start.elsewhere.empty())
+            fprintf(stderr, "save: %s cannot be written: the game saves to %s%s\n", beside.c_str(), start.elsewhere.c_str(),
+                    start.copyFailed ? " (the save beside it could not be copied)" : "");
+        Host::SavePath = start.path;
+        host.saveElsewhere = start.elsewhere;
+        saveMovedBack = start.movedBack;
+    }
+    std::string quickState = romBase + ".quick.st";
+    const std::string shotFile = romBase + "-shot.png";
 
     // The ROM and its save.
     std::ifstream rf(romPath, std::ios::binary);
@@ -290,18 +648,8 @@ int main(int argc, char** argv)
     }
     auto cart = melonDS::NDSCart::ParseROM(rom.data(), (u32)rom.size(), nullptr, std::move(cartArgs));
     if (!cart) { Tell(dialogs, "Not a Nintendo DS ROM: " + romPath); return 1; }
-
-    App app;
-    // (For the checks' pictures: pinned, the navigator no longer moves them; it still steers.)
-    app.consoleMenu = consoleMenu;
-    app.consoleFocus = consoleFocus;
-    app.consolePinned = consolePinned;
-    app.uiDemo = uiDemo;
-    app.quickState = quickState;
     app.shotFile = shotFile;
-    // The settings file (not headless: those runs stay the same on every machine).
-    const std::string settingsPath = headless ? "" : Settings::DefaultPath();
-    if (!settingsPath.empty() && app.settings.Load(settingsPath)) fprintf(stderr, "settings: %s\n", settingsPath.c_str());
+    host.romHeader = HashBytes(rom.data(), std::min<size_t>(rom.size(), 0x200)); // (StateMeta: the cartridge's header)
     if (headless)
     {
         // Settings default to CONSOLE's looks; headless never loads them, so it starts with the
@@ -326,6 +674,20 @@ int main(int argc, char** argv)
     app.portSupported = app.romCode == "ASJP";
     melonDS::NDSArgs args;
     args.JIT = std::nullopt;
+    // The game's language: the DS firmware's user language, which the game reads when it starts
+    // (--game-language; the window: the settings', automatic being the computer's). Headless runs
+    // keep the built-in firmware's, English (every check's output depends on it).
+    {
+        int firm = gameLanguage;
+        if (firm < 0 && window) firm = app.settings.language >= 1 && app.settings.language <= 5 ? app.settings.language : host.autoLanguage;
+        if (firm >= 1 && firm <= 5)
+        {
+            for (melonDS::Firmware::UserData& u : args.Firmware.GetUserData())
+                u.Settings = (u16)((u.Settings & ~melonDS::Firmware::Language::Reserved) | firm);
+            args.Firmware.UpdateChecksums();
+            fprintf(stderr, "firmware language: %d\n", firm);
+        }
+    }
     app.nds = std::make_unique<NDS>(std::move(args), nullptr);
     NDS& nds = *app.nds;
     nds.SetNDSCart(std::move(cart));
@@ -494,10 +856,16 @@ int main(int argc, char** argv)
         printf("cas: %d words, tallest %d (%d lines), %d shrunk, %d cut", ca.checked, ca.tallestId, ca.tallestLines, ca.shrunk, ca.cut);
         for (int id : ca.cutIds) printf(" %d", id);
         printf("\n");
+        // The world's prompt (port/prompt.*): every verb beside the A chip, every name above it, the hints.
+        BlockMeasure pr;
+        MeasurePrompt(*app.rom, pr);
+        printf("prompt: %d words, %d shrunk, %d cut, %d names cut", pr.checked, pr.shrunk, pr.cut, pr.namesCut);
+        for (int id : pr.cutIds) printf(" %d", id);
+        printf("\n");
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || mg.cut > 0 || fe.cut > 0 || fm.cut > 0 || ca.cut > 0 ||
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 || mg.cut > 0 || fe.cut > 0 || fm.cut > 0 || ca.cut > 0 || pr.cut > 0 ||
                        !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
@@ -551,44 +919,69 @@ int main(int argc, char** argv)
         return bad || raw || !lacking.empty() ? 2 : 0;
     }
 
-    std::vector<InputEvent> script;
-    if (!inputPath.empty()) script = LoadScript(inputPath);
-    bool winShots = false;
-    for (const InputEvent& e : script) winShots |= e.winShot;
-    if (!shotAt.empty() || shotEvery || winShots) { std::string cmd = "mkdir -p '" + shotDir + "'"; (void)system(cmd.c_str()); }
-
-    // Window, sound, controllers, the save's backups.
-    Video video;
-    Audio audio;
-    Input input;
-    PauseMenu menu;
+    // A cartridge other than the European one: CONSOLE keeps its old rules; the window says so
+    // over the game until A.
     if (!app.portSupported)
-    {   // the pause menu's font: capitals, digits and a few signs only
-        const char* msg = "THIS ROM IS NOT THE EUROPEAN ONE: CONSOLE USES ITS OLD SCREEN RULES";
-        fprintf(stderr, "rom %s: %s\n", app.romCode.c_str(), msg);
-        menu.Say(msg, 0);
-    }
-    Backups backups;
-    if (!headless)
     {
-        // Controllers: SDL's hints first (pads.h), then the joystick and game controller parts
-        // (SDL_GAMECONTROLLERCONFIG, which Steam sets for a non-Steam game, is read here).
-        Pads::Hints();
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
-        // Haptics (DirectInput pads' rumble) only if the system has them: never a reason not to start.
-        if (SDL_InitSubSystem(SDL_INIT_HAPTIC) != 0) fprintf(stderr, "SDL haptic: %s\n", SDL_GetError());
-        Pads::LoadMappings(Pads::UserMappingsPath());
-        // The keymap is known now: the keys asked by position have their values, so the swap
-        // can move them out of the way of a key the settings file gave another action.
-        app.settings.controls.ResolveKeys();
-        if (!video.Open(app.settings)) return 1;
-        audio.Open();
-        input.OpenPads(app.settings);
+        fprintf(stderr, "rom %s: THIS ROM IS NOT THE EUROPEAN ONE: CONSOLE USES ITS OLD SCREEN RULES\n", app.romCode.c_str());
+        if (window)
+        {
+            std::string msg = OwnWord(app.rom.get(), OwnWordId::NotEU);
+            if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, app.romCode);
+            host.Message(app, input, msg);
+        }
+    }
+    host.code = app.romCode;
+    host.canUndo = FileExists(host.data.Undo(app.romCode)); // (a load from an earlier run can be undone too)
+    host.Refresh(app, input); // (the toasts in the game's language before the menu is ever opened)
+    if (window && (!host.saveElsewhere.empty() || saveMovedBack))
+    {
+        std::string msg = OwnWordIn(host.model.language, saveMovedBack ? OwnWordId::SaveMovedBack : OwnWordId::SaveElsewhere);
+        if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, saveMovedBack ? Host::SavePath : host.saveElsewhere);
+        video.Toast(msg, 10000);
+    }
+    // The quick save state (F5 / F7) in the settings folder with the slots, not beside the ROM.
+    if (host.data.Ok()) quickState = host.data.GameDir(app.romCode) + "quick.st";
+    Backups backups;
+    if (window)
+    {
+        static bool audioOpen = false; // (once: Change game comes back here)
+        if (!audioOpen) audio.Open();
+        audioOpen = true;
         backups.Start(Host::SavePath);
+    }
+    // Every state load copies the game's save first (melonDS writes the cartridge's memory to disk
+    // on a load): the backups' copy, which skips a copy equal to the newest.
+    host.beforeLoad = [&backups]() { backups.Copy(); };
+    host.afterLoad = [&]() { input.navigator.Leave(input.touchScript); app.consoleHold.Reset(); };
+    // Continue: the place kept on quitting, once (then the game's own save leads again). Any other
+    // start of the same ROM (the command line, a file chosen, a recent, a drop) drops its place:
+    // the game's save leads from then on, and an older place never comes back over it.
+    {
+        StateMeta meta;
+        const bool same = ReadMeta(host.data.SuspendMeta(app.romCode), meta) && meta.rom == host.romPath;
+        bool drop = same && !continueSuspend;
+        if (continueSuspend)
+        {
+            const bool ok = host.Load(app, host.data.Suspend(app.romCode));
+            fprintf(stderr, "suspend state: %s\n", ok ? "loaded" : "cannot load");
+            if (!ok) host.Say(video, OwnWord(app.rom.get(), host.restoreFailed ? OwnWordId::StFailed : OwnWordId::LaunchContinueFailed));
+            drop = true;
+        }
+        if (drop)
+        {
+            std::error_code ec;
+            for (const std::string& f : {host.data.Suspend(app.romCode), host.data.SuspendThumb(app.romCode), host.data.SuspendMeta(app.romCode)})
+                std::filesystem::remove(f, ec);
+            if (printShell && !continueSuspend) fprintf(stderr, "suspend state: dropped (a new start)\n");
+        }
     }
 
     // frame counts the game's frames (shots, scripts); iter every turn of the loop, paused too.
-    long frame = 0;
+    long frame = launchFrames; // (the launch panel's turns came first)
+    bool shellChord = false;   // headless: the script's Start + Back held last frame
+    PadState shellPrev;        // headless: the script's pad last frame (the shell's presses)
+    bool saveFailed = false;   // the game's save did not write (said once while it lasts)
     std::unique_ptr<Recorder> recorder;
     if (!headless || !recordDir.empty()) recorder = std::make_unique<Recorder>(recordDir);
     // The window keeps the DS's own pace, 59.83 frames a second: vsync alone would follow the
@@ -602,25 +995,112 @@ int main(int argc, char** argv)
     int disagree = 0; // frames the game's settled screen and the pixels' answer have disagreed
     int lastTouchX = -1, lastTouchY = -1; // the stylus's last point down (room info's hint: which line)
     bool wasTouching = false;
+    // Fast boot (Settings::fastBoot; --fast-boot headless, logged only): from a fresh start, the
+    // boot's splashes, which take no touch (port/front.h, BootPassesBy), run unpaced, silent and
+    // seldom drawn, until the last splash ("Touch the Touch Screen"), the player's first press, or
+    // kFastBootFrames. Nothing is pressed for the player.
+    constexpr long kFastBootFrames = 1500;
+    bool fastBoot = (window ? app.settings.fastBoot : fastBootFlag) && stateLoad.empty() && !continueSuspend && app.portSupported;
+    // (Only a press that begins once it runs ends it: a key or button still held from the launch
+    // panel counts once let go, after a frame with nothing held.)
+    bool fastBootArmed = false;
+    if (fastBoot) fprintf(stderr, "fast boot: on\n");
+    std::string pendingShot;      // a window screenshot asked for: said once the picture is written
+    bool pointerHidden = false;   // the mouse pointer hidden (still for a while: Settings::hidePointer)
     auto keepPace = [&]() {
-        if (headless || app.fast) { nextFrameAt = 0; return; }
+        // Fast forward at its speed (Settings::fastSpeed; 0: as fast as it goes), fast boot unpaced.
+        const int speed = app.fast ? app.settings.fastSpeed : 1;
+        if (headless || fastBoot || speed < 1) { nextFrameAt = 0; return; }
+        const double step = dsFrame / speed;
         double now = SDL_GetPerformanceCounter() / perfFreq;
-        if (nextFrameAt == 0 || now - nextFrameAt > 4 * dsFrame) nextFrameAt = now; // start, or fell behind
-        nextFrameAt += dsFrame;
+        if (nextFrameAt == 0 || now - nextFrameAt > 4 * step) nextFrameAt = now; // start, or fell behind
+        nextFrameAt += step;
         double wait = nextFrameAt - now;
         if (wait > 0.002) SDL_Delay((Uint32)((wait - 0.001) * 1000)); // sleep most of it
         while (SDL_GetPerformanceCounter() / perfFreq < nextFrameAt) {} // then the last moment
     };
+    // This frame's shots (the pause menu's items over the picture when it is open headless).
+    auto writeShots = [&](bool withShell) {
+        const u32* top = app.Top();
+        const u32* bottom = app.Bottom();
+        if (shotAt.count(frame) || (shotEvery && frame % shotEvery == 0))
+        {
+            char name[64];
+            snprintf(name, sizeof name, "/f%06ld.png", frame);
+            int tw, th;
+            const u32* big = app.TopImage(tw, th);
+            // (The other layouts sized from the picture itself, as they always were here.)
+            if (compose)
+            {
+                Composition c = app.shown == Layout::Console ? video.Composed(app) : Compose(app.shown, app.mainIsTop, (float)tw / th, tw, th);
+                if (app.uiDemo) c.ui = ui::DemoItems(bottom);
+                if (withShell)
+                {
+                    // (Above every layer of the game's: the window draws it on a canvas of its own.)
+                    std::vector<ui::UiItem> items = host.shell.Build(host.model);
+                    for (ui::UiItem& it : items) it.layer += 20;
+                    std::stable_partition(c.ui.begin(), c.ui.end(), [](const ui::UiItem& it) { return it.kind != ui::UiItem::Image; });
+                    const auto firstImage = std::find_if(c.ui.begin(), c.ui.end(), [](const ui::UiItem& it) { return it.kind == ui::UiItem::Image; });
+                    const auto shellImages = std::stable_partition(items.begin(), items.end(), [](const ui::UiItem& it) { return it.kind != ui::UiItem::Image; });
+                    std::vector<ui::UiItem> merged(c.ui.begin(), firstImage);
+                    merged.insert(merged.end(), items.begin(), shellImages);
+                    // The game's pictures lie under the menu: dropped (images are drawn above every still item).
+                    merged.insert(merged.end(), shellImages, items.end());
+                    c.ui = std::move(merged);
+                }
+                WriteCompose(shotDir + name, c, big, tw, th, bottom, composeScale);
+            }
+            else WriteShot(shotDir + name, top, bottom);
+            // The looks' top picture at its size, beside the DS's screens.
+            if (!compose && !app.topBig.empty())
+            {
+                snprintf(name, sizeof name, "/f%06ld-top.png", frame);
+                WriteImage(shotDir + name, big, tw, th);
+            }
+        }
+    };
     for (long iter = 0; (frames < 0 || iter < frames) && !app.quit; iter++)
     {
+        applyUi();
         u32 keys = 0;
         bool blow = false, touching = false;
         int tx = 0, ty = 0;
         ApplyScript(script, frame, keys, blow, touching, tx, ty);
         ScriptPad(script, frame, input.scriptPad);
         if (const int l = ScriptLayout(script, frame); l >= 0) app.layout = (Layout)l;
+        // (A script's typed text: Create-a-Sim's name, as from the keyboard.)
+        if (const std::string t = ScriptText(script, frame); !t.empty() && Input::TypingName(app))
+            for (size_t i = 0; i < t.size();)
+            {
+                size_t j = i + 1;
+                while (j < t.size() && ((unsigned char)t[j] & 0xC0) == 0x80) j++;
+                input.typed.push_back(t.substr(i, j - i));
+                i = j;
+            }
         if (headless)
         {
+            // The pause menu: Start + Back held in the script (or --shell at its frame); while it
+            // is open the game stands still and the frames still count (the script goes on).
+            const PadState& sp = input.scriptPad;
+            const bool chord = sp.start && sp.menu;
+            host.frame = frame;
+            if (!host.Open() && ((chord && !shellChord) || (shellPage >= 0 && frame == shellAt)))
+            {
+                host.OpenMenu(app, input, chord || shellPage == 5 ? shell::Page::Main : (shell::Page)shellPage);
+                if (!chord && shellPage == 5) host.shell.AskQuit();
+            }
+            else if (host.Open() && chord && !shellChord && host.model.capturing < 0) { host.shell.Close(); if (printShell) fprintf(stderr, "frame %ld: shell closed\n", frame); }
+            else if (host.Open()) host.Frame(app, video, input, padEdges(sp, shellPrev));
+            shellChord = chord;
+            shellPrev = sp;
+            if (host.Open() || app.quit)
+            {
+                if (host.Open()) writeShots(true);
+                frame++;
+                wasPaused = true;
+                continue;
+            }
+            if (wasPaused) { input.navigator.Resync(); wasPaused = false; }
             // CONSOLE's navigator from the script's "pad" events; its taps over the script's touch.
             input.Steer(app, input.scriptPad, keys);
             input.PointerTouch(app, touching, tx, ty);
@@ -630,7 +1110,11 @@ int main(int argc, char** argv)
         {
             SDL_Event ev;
             input.PushScript(script, iter, video);
-            while (SDL_PollEvent(&ev)) input.HandleEvent(ev, app, video, menu.open);
+            while (SDL_PollEvent(&ev))
+            {
+                video.Event(ev);
+                input.HandleEvent(ev, app, video, host.Open());
+            }
             // A controller connected (at start too): how to pause, now that Guide is Steam's.
             for (const Pads::Connected& pc : input.pads.TakeConnected())
             {
@@ -646,26 +1130,87 @@ int main(int argc, char** argv)
                 snprintf(name, sizeof name, "/w%06ld.png", iter);
                 video.shotPath = shotDir + name;
             }
+            // The window's close: asked first (focus on No); asked again while the question is up: quit.
+            if (input.wantQuit) host.CloseAsked(app, video, input);
+            input.droppedFile.clear(); // (a file dropped mid-game: the launch panel's only)
             if (app.quit) break;
-            input.Poll(app, menu.open);
-            if (menu.open) menu.Frame(app, video, input, settingsPath);
-            else if (input.wantMenu) menu.Toggle(app, input);
-            if (menu.open)
+            host.frame = frame;
+            input.Poll(app, host.Open());
+            // The keyboard's text only on Create-a-Sim's Name page (not under the pause menu).
+            video.TextInput(!host.Open() && Input::TypingName(app));
+            // The mouse pointer hidden after three seconds still over the game (never over a menu).
+            {
+                const bool hide = app.settings.hidePointer && !host.Open() && !input.mouseDown && !input.rightDown &&
+                                  SDL_GetTicks() - input.mouseMovedAt > 3000;
+                if (hide != pointerHidden) SDL_ShowCursor(hide ? SDL_DISABLE : SDL_ENABLE);
+                pointerHidden = hide;
+            }
+            if (host.Open())
+            {
+                // The pause buttons again (Start + Back, the MENU key): back to the game.
+                if (input.wantMenu && host.model.capturing < 0 && host.model.message.empty()) host.shell.Close();
+                else host.Frame(app, video, input, shellInput(input.nav));
+            }
+            else if (input.wantMenu || (shellPage >= 0 && frame == shellAt && iter == shellAt))
+            {
+                host.OpenMenu(app, input, input.wantMenu || shellPage == 5 ? shell::Page::Main : (shell::Page)shellPage);
+                if (!input.wantMenu && shellPage == 5) host.shell.AskQuit();
+            }
+            if (host.Open() || app.quit)
             {
                 // Paused: the last picture with the menu over it; nothing is emulated.
                 input.EndFrame();
-                menu.Draw(app, video, input, frame);
-                video.Present(app, &menu.canvas);
+                if (app.quit) break;
+                const std::vector<ui::UiItem> items = host.shell.Build(host.model);
+                video.Present(app, Video::Marks {}, &items);
                 keepPace();
                 wasPaused = true;
                 continue;
             }
-            if (input.wantSave) menu.Say(SaveState(nds, quickState) ? "STATE SAVED" : "STATE NOT SAVED", frame);
-            if (input.wantLoad) menu.Say(LoadState(nds, quickState) ? "STATE LOADED" : "NO STATE TO LOAD", frame);
-            if (input.wantShot) { WriteShot(shotFile, app.Top(), app.Bottom()); menu.Say("SCREENSHOT SAVED", frame); }
+            // The window not in front: the game stands still and is silent (unless it runs in the
+            // background), the last picture shown with a pause mark; the computer waits for an event.
+            if (!input.focused && !app.settings.runInBackground)
+            {
+                audio.Pause(true);
+                input.EndFrame();
+                Video::Marks pm;
+                pm.paused = true;
+                video.Present(app, pm, nullptr);
+                SDL_WaitEventTimeout(nullptr, 100);
+                nextFrameAt = 0;
+                wasPaused = true;
+                continue;
+            }
+            audio.Pause(false);
+            const int lang = host.model.language;
+            if (input.wantSave)
+            {
+                if (host.data.Ok()) host.QuickSave(app, video);
+                else host.Say(video, OwnWordIn(lang, SaveState(nds, quickState) ? OwnWordId::ToastStateSaved : OwnWordId::StFailed));
+            }
+            if (input.wantLoad)
+            {
+                if (host.data.Ok()) host.QuickLoad(app, video);
+                else
+                {
+                    const bool ok = host.Load(app, quickState);
+                    host.Say(video, OwnWordIn(lang, ok ? OwnWordId::ToastStateLoaded : host.restoreFailed ? OwnWordId::StFailed : OwnWordId::ToastNoState));
+                }
+            }
+            if (input.wantShot && pendingShot.empty())
+            {
+                // The window's picture as it is drawn (its own size: HD), in the data folder's
+                // screenshots/ (else beside the ROM), named by the time; said once written.
+                const std::string dir = host.data.Ok() ? host.data.Screenshots() : shotFile.substr(0, shotFile.find_last_of("/\\") + 1);
+                const long long now = (long long)time(nullptr);
+                int n = 1;
+                while (FileExists(dir + ShotName(now, n)) && n < 100) n++;
+                pendingShot = video.shotPath = dir + ShotName(now, n);
+            }
             if (input.wantLayout >= 0) app.settings.layout = app.layout = (Layout)input.wantLayout;
             if (input.wantFullscreen)
             {
+                video.RememberSize(app.settings); // (the window's, before it fills the screen)
                 app.settings.fullscreen = !app.settings.fullscreen;
                 video.SetFullscreen(app.settings.fullscreen);
                 app.settings.Save(settingsPath);
@@ -673,7 +1218,25 @@ int main(int argc, char** argv)
             if (wasPaused) { input.navigator.Resync(); wasPaused = false; }
             input.Frame(app, video, frame, keys, touching, tx, ty);
             input.EndFrame();
-            backups.Tick(SDL_GetTicks());
+            if (backups.Tick(SDL_GetTicks())) host.Say(video, OwnWordIn(lang, OwnWordId::ToastBackup));
+            // The game's save not written (a folder it cannot write to): said when it starts.
+            if (Host::SaveFailed && !saveFailed)
+            {
+                std::string msg = OwnWordIn(lang, OwnWordId::ToastNotSaving);
+                if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, Host::SavePath);
+                video.Toast(msg, 8000);
+            }
+            saveFailed = Host::SaveFailed;
+            // The save moved to the data folder mid-game (its folder became read-only): said, and
+            // kept on the pause menu's main page.
+            if (Host::SaveMoved && host.saveElsewhere != Host::SavePath)
+            {
+                host.saveElsewhere = Host::SavePath;
+                backups.savePath = Host::SavePath; // (the copies follow the save: backups/ beside it)
+                std::string msg = OwnWordIn(lang, OwnWordId::SaveElsewhere);
+                if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, Host::SavePath);
+                video.Toast(msg, 10000);
+            }
         }
 
         // Playable: what the DS hears this frame (the setting, the blow key or the script's
@@ -681,7 +1244,7 @@ int main(int argc, char** argv)
         Host::MicMode = app.settings.mic;
         Host::MicBlow = app.micBlow || blow;
         Host::MicForce = app.micForce;
-        if (!headless || app.fast) clock::Frame(nds, app.fast);
+        if (!headless || app.fast) clock::Frame(nds, app.fast || (fastBoot && !headless));
 
         nds.SetKeyMask(~keys & 0xFFF);
         if (touching) nds.TouchScreen((melonDS::u16)tx, (melonDS::u16)ty); else nds.ReleaseScreen();
@@ -705,6 +1268,17 @@ int main(int argc, char** argv)
                 if (ph.valid && ph.page == 7 && !ph.contactsKnown && ph.contacts == 0)
                     ph.contactsWait = before.town.phone.valid ? before.town.phone.contactsWait + 1 : 1;
             }
+            {   // the stat panel: the page left drawn while the pad's action goes by Main to another page
+                StatState& st = app.game.stat;
+                if (st.valid && st.page == 0 && before.stat.valid && input.navigator.Running())
+                    st.held = before.stat.held > 0 ? before.stat.held : before.stat.page > 0 ? before.stat.page : 0;
+            }
+            {   // Load-a-Sim's "Loading" popup seen (kind 3): the list is done, never shown again after it
+                LoadScreen& ld = app.game.front.load;
+                const PopupState& p = app.game.town.popup;
+                if (ld.valid)
+                    ld.loading = (before.front.load.valid && before.front.load.loading) || (p.valid && p.kind == 3 && p.state >= 1 && p.state <= 3);
+            }
             {   // room info's hint: which line the stylus opened it on (not in RAM), kept while it is up
                 RoomInfoState& ri = app.game.roomInfo;
                 // (a touch before the room info rose opened it, or something else: never a line's)
@@ -713,7 +1287,35 @@ int main(int argc, char** argv)
                     ri.hintId = before.roomInfo.valid && before.roomInfo.hint && before.roomInfo.hintId >= 0 ? before.roomInfo.hintId
                                 : lastTouchX >= 0 ? RoomInfoHintAt(lastTouchX, lastTouchY, ri.occupied) : -1;
             }
+            {   // a minigame's help text (the Drencher's, the crime game's, the mixer's): which control the stylus
+                // asked about (not in RAM), kept while it is up; a text up with no touch since the screen rose: none
+                MinigameState& mg = app.game.minigame;
+                if (app.game.screen != before.screen) lastTouchX = lastTouchY = -1;
+                // the game's popup just gone (on any screen; only the minigames' box, BoxOf, reads
+                // popupGone): its box still drawn this frame, as the game's slides out
+                const PopupState& p0 = before.town.popup;
+                const bool upBefore = p0.valid && p0.state >= 1 && p0.state <= 3, upNow = app.game.town.popup.valid && app.game.town.popup.state >= 1 && app.game.town.popup.state <= 3;
+                if (upBefore && !upNow && app.game.screen == before.screen) mg.popupGone = p0;
+                // (decided once, when the text rises: kept while it is up, even when it was not
+                // known then (-1), never taken from a later touch)
+                auto fill = [&](bool up, bool wasUp, int was, int& id) {
+                    if (up) id = wasUp ? was : lastTouchX >= 0 ? MinigameHelpAt(app.ConsoleScreen().screen, lastTouchX, lastTouchY) : -1;
+                };
+                fill(mg.drencher.valid && mg.drencher.helpText, before.minigame.drencher.valid && before.minigame.drencher.helpText, before.minigame.drencher.helpId, mg.drencher.helpId);
+                fill(mg.crime.valid && mg.crime.helpText, before.minigame.crime.valid && before.minigame.crime.helpText, before.minigame.crime.helpId, mg.crime.helpId);
+                fill(mg.mixer.valid && mg.mixer.phase == 9, before.minigame.mixer.valid && before.minigame.mixer.phase == 9, before.minigame.mixer.helpId, mg.mixer.helpId);
+            }
             if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
+            if (fastBoot)
+            {
+                const bool held = keys || touching, pressed = held && fastBootArmed;
+                if (!held) fastBootArmed = true;
+                if (pressed || frame >= kFastBootFrames || !BootPassesBy(app.game))
+                {
+                    fastBoot = false;
+                    fprintf(stderr, "frame %ld: fast boot: done (%s)\n", frame, pressed ? "a press" : frame >= kFastBootFrames ? "its time" : "the boot waits for a touch");
+                }
+            }
             if (app.portSupported && printHud)
             {
                 const HudState& h = app.game.hud;
@@ -958,8 +1560,9 @@ int main(int argc, char** argv)
                     const StatState& v = g.stat;
                     if (!v.valid) fprintf(stderr, "frame %ld: stat none\n", frame);
                     else
-                        fprintf(stderr, "frame %ld: stat page=%d transition=%d aspiration=%d level=%d points=%d gauge=%d skills=%d,%d,%d,%d,%d score=%d stayed=%d earned=%d spent=%d aliens=%d goons=%d vacuum=%d metal=%d\n", frame, v.page,
-                                v.transition, v.aspiration, v.level, v.points, v.gaugeFrame, v.skills[0], v.skills[1], v.skills[2], v.skills[3], v.skills[4], v.score, v.guestsStayed, v.earned, v.spent, v.aliens, v.goons, v.vacuum, v.metal);
+                        fprintf(stderr, "frame %ld: stat page=%d transition=%d aspiration=%d level=%d points=%d gauge=%d skills=%d,%d,%d,%d,%d score=%d stayed=%d earned=%d spent=%d aliens=%d goons=%d vacuum=%d metal=%d%s\n", frame, v.page,
+                                v.transition, v.aspiration, v.level, v.points, v.gaugeFrame, v.skills[0], v.skills[1], v.skills[2], v.skills[3], v.skills[4], v.score, v.guestsStayed, v.earned, v.spent, v.aliens, v.goons, v.vacuum, v.metal,
+                                v.held > 0 ? (" held=" + std::to_string(v.held)).c_str() : "");
                 }
             }
             if (app.portSupported && printFront)
@@ -1001,7 +1604,7 @@ int main(int argc, char** argv)
                                 }
                                 rows += (rows.empty() ? "" : ",") + e;
                             }
-                            fprintf(stderr, "frame %ld: load wireless=%d green=%d tapped=%d rows=%s\n", frame, l.wireless ? 1 : 0, l.green, l.tapped, rows.c_str());
+                            fprintf(stderr, "frame %ld: load wireless=%d green=%d tapped=%d rows=%s%s\n", frame, l.wireless ? 1 : 0, l.green, l.tapped, rows.c_str(), l.loading ? " loading" : "");
                         }
                     }
                     if (!(v.cas == b.cas) || frame == 0)
@@ -1035,7 +1638,7 @@ int main(int argc, char** argv)
             }
             if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
         }
-        if (recorder) recorder->Frame(app, frame, nds);
+        if (recorder && recorder->Frame(app, frame, nds) && window) host.Say(video, OwnWord(app.rom.get(), OwnWordId::ToastCapture));
         const u32* top = app.Top();
         const u32* bottom = app.Bottom();
         {
@@ -1062,6 +1665,7 @@ int main(int argc, char** argv)
                 app.consoleMenu = false;
                 app.consoleFocus = -1;
             }
+            input.FocusForDrawing(app, !(consoleNow == consoleBefore)); // (the focus by id on the view drawn now)
             if (printScreen && !(now == before)) fprintf(stderr, "frame %ld: screen %s\n", frame, ScreenStateName(now).c_str());
             // The game's screen and the pixels' answer apart for more than 90 frames while the
             // game's screen is settled: said once (RAM leads the pixels by up to about 60 frames).
@@ -1075,39 +1679,50 @@ int main(int argc, char** argv)
             lastMenu = app.consoleMenu;
             lastFocus = app.consoleFocus;
         }
-        if (shotAt.count(frame) || (shotEvery && frame % shotEvery == 0))
         {
-            char name[64];
-            snprintf(name, sizeof name, "/f%06ld.png", frame);
-            int tw, th;
-            const u32* big = app.TopImage(tw, th);
-            // (The other layouts sized from the picture itself, as they always were here.)
-            if (compose)
-            {
-                Composition c = app.shown == Layout::Console ? video.Composed(app) : Compose(app.shown, app.mainIsTop, (float)tw / th, tw, th);
-                if (app.uiDemo) c.ui = ui::DemoItems(bottom);
-                WriteCompose(shotDir + name, c, big, tw, th, bottom, composeScale);
-            }
-            else WriteShot(shotDir + name, top, bottom);
-            // The looks' top picture at its size, beside the DS's screens.
-            if (!compose && !app.topBig.empty())
-            {
-                snprintf(name, sizeof name, "/f%06ld-top.png", frame);
-                WriteImage(shotDir + name, big, tw, th);
-            }
+            // What CONSOLE shows this frame (consolehold.h): its own composition, or the last HD
+            // one held through a swap of the game's.
+            const ConsoleBranch fresh = app.consoleHold.Branch(), shown = app.consoleHold.ShownBranch();
+            const bool held = app.consoleHold.Holding();
+            app.consoleHold.Frame(app);
+            if (printConsole && app.shown == Layout::Console &&
+                (frame == 0 || fresh != app.consoleHold.Branch() || shown != app.consoleHold.ShownBranch() || held != app.consoleHold.Holding()))
+                fprintf(stderr, "frame %ld: console %s%s\n", frame, ConsoleBranchName(app.consoleHold.Branch()),
+                        app.consoleHold.Holding() ? (std::string(" held ") + ConsoleBranchName(app.consoleHold.ShownBranch())).c_str() : "");
         }
+        writeShots(false);
         frame++;
 
         if (headless) continue;
-        audio.Frame(nds, app.fast, app.settings);
-        if (app.fast && frame % 4) continue; // fast forward: one picture in four
-        video.Present(app, menu.Draw(app, video, input, frame) ? &menu.canvas : nullptr);
+        audio.Frame(nds, app.fast || fastBoot, app.settings);
+        // Fast forward: one picture in four (as fast as it goes) or in its speed; fast boot one in eight.
+        const int every = fastBoot ? 8 : app.fast ? (app.settings.fastSpeed >= 2 ? app.settings.fastSpeed : 4) : 1;
+        if (frame % every == 0)
+        {
+            Video::Marks marks;
+            marks.cursor = frame < input.cursorShownUntil;
+            marks.x = input.cursorX;
+            marks.y = input.cursorY;
+            marks.press = input.cursorPress;
+            marks.fast = app.fast || fastBoot;
+            video.Present(app, marks, nullptr);
+            if (!pendingShot.empty() && video.shotPath.empty())
+            {
+                std::string msg = OwnWordIn(host.model.language, FileExists(pendingShot) ? OwnWordId::ToastShotAt : OwnWordId::StFailed);
+                if (size_t at = msg.find("@1"); at != std::string::npos) msg.replace(at, 2, BaseName(pendingShot));
+                host.Say(video, msg);
+                pendingShot.clear();
+            }
+        }
         keepPace();
     }
 
     Looks::Shutdown();
     if (app.settings.interpolate60) fprintf(stderr, "looks: %u in-between frames\n", melonDS::Looks3D.InterpolatedFrames);
     if (!stateSave.empty()) fprintf(stderr, "state save %s: %s\n", stateSave.c_str(), SaveState(nds, stateSave) ? "ok" : "failed");
+    if (printConsole)
+        fprintf(stderr, "console: %ld frames, %ld milestone-1 compositions, %ld held, %ld milestone-1 shown\n", app.consoleHold.frames,
+                app.consoleHold.fresh1, app.consoleHold.held, app.consoleHold.shown1);
     if (headless)
     {
         // For the tests: what the DS clock says at the end, and whether the game listened.
@@ -1117,11 +1732,47 @@ int main(int argc, char** argv)
                 "a minute ahead on %ld frames)  mic: %ld samples read by the game\n",
                 t.year, t.month, t.day, t.hour, t.minute, t.second, cs.writes, cs.maxAhead, cs.minuteAhead, mic::SamplesRead());
     }
-    if (!headless)
+    // Change game: everything of this game let go, then the launch panel again.
+    if (host.relaunch)
+    {
+        host.relaunch = false;
+        host.shell.Close();
+        relaunching = true;
+        launchFrames = frame;
+        stateLoad.clear();
+        shellPage = -1;
+        if (window)
+        {
+            video.RememberSize(app.settings);
+            video.TextInput(false);
+        }
+        app.nds.reset();
+        // (The 60 fps frames of the game before: never blended into the next one's first frame.)
+        melonDS::Looks3D.RawPrevious.clear();
+        melonDS::Looks3D.RawCurrent.clear();
+        app.rom.reset();
+        app.icons.reset();
+        app.hudStrings = HudStrings();
+        app.game = GameState();
+        app.consoleHold.Reset();
+        app.consolePrompt = {};
+        app.topBig.clear();
+        app.topBigW = app.topBigH = 0;
+        app.screens = ScreenTracker();
+        app.autoLayout = AutoLayout();
+        app.consoleMenu = consoleMenu;
+        app.consoleFocus = consoleFocus;
+        app.quit = app.fast = app.micBlow = app.micForce = false;
+        input.navigator = Navigator();
+        input.touchScript = TouchScript();
+        goto relaunch;
+    }
+    if (window)
     {
         video.RememberSize(app.settings);
         if (!app.settings.Save(settingsPath)) fprintf(stderr, "cannot write %s\n", settingsPath.c_str());
         input.ClosePads();
+        video.Close();
         SDL_Quit();
     }
     return 0;

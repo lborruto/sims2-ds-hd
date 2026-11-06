@@ -454,6 +454,9 @@ struct StatState
     bool valid = false;
     int page = 0;                     // 0 Main, 1 Aspirations, 2 Hotel Info, 3 Skills, 4 Game Stats
     int transition = 0;               // 0 settled, 1 fading out, 2 fading in
+    // (Not RAM's: the frame loop's) the page the pad is leaving for another (page > 0) while the
+    // game shows Main between them and the navigator's action runs: CONSOLE draws it; 0 none.
+    int held = 0;
     int aspiration = 0, level = 0, points = 0, gaugeFrame = 0;   // Fortune 0, Romance 1, Popularity 2, Party 3; the gauge 0..20
     int skills[5] = {};               // Creativity, Business, Body, Charisma, Mechanical: 0..10
     int score = 0, guestsStayed = 0, earned = 0, spent = 0;
@@ -595,6 +598,7 @@ struct DrencherState
     bool pumping = false, firing = false;
     bool targetMode = false;          // the target button is lit
     bool help = false, helpText = false;   // help mode / a help text is up (the next tap closes it)
+    int helpId = -1;                  // the text up (1661..1666), not in RAM: main.cpp fills it from the stylus's last point down (MinigameHelpAt)
     int water = 0;                    // the tank, whole units of 100 (G)
     int pressure = 0;                 // the pressure, whole units of 125 (G)
     bool operator==(const DrencherState&) const = default;
@@ -605,6 +609,8 @@ struct CrimeState
 {
     bool valid = false;
     bool help = false;                // help mode
+    bool helpText = false;            // a help text is up (S+0x4D: the next press closes it)
+    int helpId = -1;                  // the text up (1667..1669): main.cpp's, from the stylus's last point down (MinigameHelpAt)
     bool dragging = false;            // the aim slider is held
     int phase = 0;                    // the throw: 0 idle, 1 grabbed, 2 aiming, 3 released
     int angle = 0;                    // -90..90 degrees
@@ -623,6 +629,7 @@ struct MixerState
     bool valid = false;
     int mode = 0;                     // 0 song, 1 ringtone, 2 resumed from the save menu
     int phase = 0;                    // 0 idle, 1 playing, 2 recording, 5 VOX (microphone) recording, 7 song select, 8 help, 9 a help text, 0xA the save prompt
+    int helpId = -1;                  // phase 9's text: its title 1778 + 2h (the body the next id), main.cpp's from the stylus's last point down (MinigameHelpAt)
     int tracks = 0xFF;                // bit t: track t+1 is audible
     int keys[kMixerKeys] = {-1, -1, -1};   // the keys held (0..12 C4..C5: note 60 + key + 12 * octave), -1 none
     int octave = 0;                   // -1..1
@@ -683,6 +690,11 @@ struct CardsState
     bool message = false;             // the "End of Turn. Touch for @1's turn." message (any touch goes on)
     bool quitAsk = false;             // "Are you sure you want to quit?" (its tick and cross: kCardsQuitYes / No)
     std::string name;                 // the player's name as the board shows it (ASCII; empty: unreadable)
+    // The turn (S+0x2F0, S+0x2F1): its step, the top screen's line (0 "Draw a card!" 1673, 1 "Play your
+    // cards or discard!" 1674, 2 "Discard a card!", 3 "Walkin' the plank!", 4 "Firing the cannon!", 5
+    // "Drawing two cards!", 6 the end of a turn ("Switching Players"), 8 a card drawn ("Drawing Card");
+    // measured), and whose turn it is (0 the player, 1 the opponent: "Other Player's Turn").
+    int phase = 0, turn = 0;
     bool operator==(const CardsState&) const = default;
 };
 
@@ -709,6 +721,9 @@ struct MinigameState
     MixerState mixer;
     MixerSaveState mixerSave;
     ArtState art;
+    // Not RAM's: main.cpp's copy of the game's popup on the frame after it went over a minigame (its
+    // box is still in the touch screen that frame: the HD box stays over it), else not valid.
+    PopupState popupGone;
     bool operator==(const MinigameState&) const = default;
 };
 
@@ -755,6 +770,9 @@ struct LoadScreen
     bool wireless = false;            // the DS Wireless screen (same rows)
     int green = -1;                   // the slot drawn green (0x0213D84C), -1 none
     int tapped = -1;                  // S+0x70: the row whose tick was tapped, -1 none
+    // (Not RAM's: the frame loop's) the game's "Loading" popup has been up on this screen: the slot
+    // list is done (the game goes on to the town once it closes).
+    bool loading = false;
     LoadRow rows[kLoadRows];
     bool operator==(const LoadScreen&) const = default;
 };

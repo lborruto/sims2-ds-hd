@@ -9,9 +9,11 @@
 #include "NDS.h"
 #include "common.h"
 #include "activities.h"
+#include "consolehold.h"
 #include "gamestate.h"
 #include "layout.h"
 #include "port/icons.h"
+#include "port/prompt.h"
 #include "port/statusbar.h"
 #include "romdata.h"
 #include "scene.h"
@@ -32,9 +34,14 @@ struct App
     ScreenTracker screens;         // which screen the touch screen shows (screens.h), every frame
     bool consoleMenu = false;      // CONSOLE: the menu is up (the touch screen 3x over the dimmed world)
     int consoleFocus = -1;         // CONSOLE: the focused target, an index in HotspotsFor (-1: none)
+    bool consolePictureClosed = false; // CONSOLE: the view's big picture closed by B (Navigator::PictureClosed)
+    bool consoleVeiled = false;    // CONSOLE: the panel's menu coming back (Navigator::Returning): the dimmed world, no flash
+    int consoleWorldOnly = 0;      // CONSOLE: frames in a row on the panel without its tab / no bottom object (Input::Steer)
     u32 consoleArmed = 0;          // CONSOLE: the HD view item whose X is armed (Navigator::Armed), 0 none
     PointerView consolePointer;    // CONSOLE: a pointing minigame's pointer (the navigator's), drawn by its HD frame
+    PromptSteady consolePrompt;    // CONSOLE: how long the Interact target has been steady (Input::Steer), for the world's prompt
     int consolePayout = 0;         // CONSOLE: the money's last change, for kPayoutFrames frames (Input::Steer), 0 none
+    ConsoleHold consoleHold;       // CONSOLE: the picture shown, the last HD one held through the game's swaps (consolehold.h)
     // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
     // pinned them for a check's picture.
     bool consolePinned = false;
@@ -75,7 +82,6 @@ struct App
     // widescreen world is on. Layouts size the top screen from it.
     float topAspect = 4.0f / 3.0f;
 
-    std::string quickState;        // F5 / F7
     std::string shotFile;          // F12
 
     // The top screen's picture at its real size when the looks are on (looks.cpp builds it after

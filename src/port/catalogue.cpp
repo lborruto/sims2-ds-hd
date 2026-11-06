@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "romdata.h"
 #include "ui/kit.h"
@@ -54,7 +55,7 @@ void AddItemIcon(Composition& c, IconCache* icons, const ShopItem& it, Rect cell
     if (!f || f->w <= 0 || f->h <= 0) return;
     const int scale = std::clamp((cell.w - 16) / std::max(f->w, f->h), 1, 3);
     if (const SpriteFrame* a = icons->Scaled(ref, 0, scale))
-        c.ui.push_back(ImageItem({cell.x + (cell.w - a->w) / 2, cell.y + (cell.h - a->h) / 2, a->w, a->h}, a->argb.data(), a->w, a->h, {0, 0, a->w, a->h}));
+        c.ui.push_back(icons->Image(ref, 0, *a, {cell.x + (cell.w - a->w) / 2, cell.y + (cell.h - a->h) / 2, a->w, a->h}));
 }
 
 // "§1,200" (the game's "$@1", its '$' the simoleon drawn §); a negative price is not shown.
@@ -85,6 +86,14 @@ std::string PayWord(const RomData* rom, const CatalogueState& ca)
     if (const ShopItem* s = Selected(ca))
         if (const std::string p = Price(*rom, PriceOf(*s, ca.sell)); !p.empty()) w += " " + p;
     return w;
+}
+// Under it, what it buys or sells: the selection's name (the info shows the focused item: the
+// two may differ, so Pay names its own).
+std::string PayName(const RomData* rom, const CatalogueState& ca)
+{
+    if (!rom) return {};
+    const ShopItem* s = Selected(ca);
+    return s ? MenuWords(*rom, s->nameId) : std::string();
 }
 }
 
@@ -158,7 +167,7 @@ MenuView CatalogueViewOf(ScreenState s, const GameState& game, const RomData* ro
             it.id = CatalogueCellId(ca.items[i].row, i);
             const DsPoint p = CellPoint(ca.vendor, c);
             it.action = {TapStep(p.x, p.y)};
-            if (rom) it.word = MenuWords(*rom, kStrBuy); // (the mode the tap sets)
+            it.word = OwnWord(rom, OwnWordId::Select); // (A selects it, sets the mode; Pay buys)
         }
         else it.id = kCaEmptyId + (u32)c;
         v.items.push_back(it);
@@ -193,7 +202,7 @@ MenuView CatalogueViewOf(ScreenState s, const GameState& game, const RomData* ro
                 it.id = CatalogueOwnedId(ca.owned[i].id, i);
                 const DsPoint p = OwnedPoint(i);
                 it.action = {TapStep(p.x, p.y)};
-                if (rom) it.word = MenuWords(*rom, kStrSell);
+                it.word = OwnWord(rom, OwnWordId::Select);
             }
             else it.id = kCaEmptyId + 8 + (u32)i;
             v.items.push_back(it);
@@ -352,12 +361,26 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
         b.layer = 1;
         c.ui.push_back(b);
         const FittedText w = FitLine(PayWord(&rom, ca), kCaPaySize, kCaPayMin, g.payText.w, Weight::ExtraBold);
-        UiItem wt = TextItem(g.payText, w.text, w.size, Align::Left, Weight::ExtraBold);
+        const std::string name = PayName(&rom, ca);
+        // With a selection: the mode and price, then the selection's name under them.
+        const Rect top = name.empty() ? g.payText : Rect {g.payText.x, g.payText.y + 10, g.payText.w, 46};
+        UiItem wt = TextItem(top, w.text, w.size, Align::Left, Weight::ExtraBold);
         wt.wrap = false;
         wt.middle = true;
         if (!canPay) { wt.colour = kDim; wt.shadowArgb = kDimShadow; }
         wt.layer = 1;
         c.ui.push_back(wt);
+        if (!name.empty())
+        {
+            const FittedText n = FitLine(name, kCaPayNameSize, kCaPayNameMin, g.payText.w, Weight::Bold);
+            UiItem nt = TextItem({g.payText.x, g.payText.y + 54, g.payText.w, 32}, n.text, n.size, Align::Left, Weight::Bold);
+            nt.wrap = false;
+            nt.middle = true;
+            nt.colour = canPay ? kPriceColour : kDim;
+            if (!canPay) nt.shadowArgb = kDimShadow;
+            nt.layer = 1;
+            c.ui.push_back(nt);
+        }
         AddMousePiece(c, ButtonHit(ca.vendor ? kCaVendorPayX : kCaPayX, kCaPayY), g.pay);
     }
     // The game's arrows (the store), lit while the game has them enabled; the D-pad scrolls.
@@ -423,6 +446,7 @@ void MeasureCatalogue(const RomData& rom, BlockMeasure& m)
         note(id, f.size < size, f.fits);
     };
     const CatalogueGeometry store = CatalogueLayout(false), vendor = CatalogueLayout(true);
+    line(9000 + (int)OwnWordId::Select, OwnWord(&rom, OwnWordId::Select), kPmHintSize, kPmHintSize, HintAWidth(rom)); // (a cell's A)
     // Every item: any object may be on the list or owned. A name may end in an ellipsis (the
     // Italian table's sentence at 463, as Pockets): counted apart.
     for (int id = 0; id <= kItemIdLast; id++)
@@ -434,6 +458,10 @@ void MeasureCatalogue(const RomData& rom, BlockMeasure& m)
             const FittedText f = FitLine(MenuWords(rom, nameId), kCaNameSize, kCaNameMin, g->name.w, Weight::ExtraBold);
             m.checked++;
             if (f.size < kCaNameSize) m.shrunk++;
+            // (Pay's line under its word: the selection's name; an ellipsis allowed, as the name's.)
+            const FittedText pn = FitLine(MenuWords(rom, nameId), kCaPayNameSize, kCaPayNameMin, g->payText.w, Weight::Bold);
+            m.checked++;
+            if (pn.size < kCaPayNameSize) m.shrunk++;
             if (!f.fits) m.namesCut++;
             if (unused(descId)) continue;
             const FittedBlock b = FitBlock(MenuWords(rom, descId), kCaDescSize, kCaDescMin, g->desc);
@@ -455,7 +483,7 @@ void MeasureCatalogue(const RomData& rom, BlockMeasure& m)
         line(id, w, kCaPaySize, kCaPayMin, store.payText.w);
         line(id, w, kCaPaySize, kCaPayMin, vendor.payText.w);
         line(id, w, kPmHintSize, kPmHintSize, HintAWidth(rom)); // (the A hint beside B's)
-        line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, HintAWidth(rom)); // (a cell's A)
+        line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, HintAWidth(rom));
     }
 }
 }

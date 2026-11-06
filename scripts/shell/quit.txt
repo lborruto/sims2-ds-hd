@@ -1,0 +1,8 @@
+# From s7: Start + Back, Up (Quit, the last item), A (asked, No first), Right, A: the place kept,
+# the run ends.
+10 2 pad start
+10 2 pad menu
+20 2 pad up
+30 2 pad a
+40 2 pad right
+50 2 pad a

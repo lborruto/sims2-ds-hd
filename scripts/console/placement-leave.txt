@@ -1,0 +1,3 @@
+# From BD-place-lobby (the hotel's furniture editor, the stick cursor's screen), CONSOLE: B taps
+# the game's X (235,18): the panel.
+20 2 pad b

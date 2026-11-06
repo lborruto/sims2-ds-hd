@@ -49,6 +49,20 @@ MenuView GiftMenuViewOf(ScreenState s, const GameState& game, const RomData* rom
         }
         v.items.push_back(it);
     }
+    // The bow itself, focusable like the game's button (Right from the slots): it gives the game's
+    // selected slot, when that one may be given.
+    {
+        ViewItem bow;
+        bow.rect = kGiftBow;
+        bow.id = kGiftBowId;
+        const bool ok = g.slot >= 0 && g.slot < kSlots && v.items[g.slot].enabled;
+        if (ok)
+        {
+            bow.action = {TapStep(kGiftBowX, kGiftBowY)};
+            bow.word = give;
+        }
+        v.items.push_back(bow);
+    }
     v.back = {TapStep(kGiftCloseX, kGiftCloseY)};
     v.initial = g.slot;
     v.own = true;
@@ -110,8 +124,8 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
         AddItemCell(c, SlotRect(i), focus == i && v.items[i].enabled, g.slot == i && used, !used);
         AddMousePiece(c, hs[i].area, SlotRect(i));
     }
-    // The focused item's name and description (else the game's selection's).
-    int shown = MenuFocusable(v, focus) ? focus : g.slot;
+    // The focused item's name and description (else, the bow too, the game's selection's).
+    int shown = MenuFocusable(v, focus) && focus < kSlots ? focus : g.slot;
     int nameId = -1, descId = -1;
     if (shown >= 0 && PocketsItemText(inv, shown, nameId, descId))
     {
@@ -127,7 +141,8 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
         c.ui.push_back(dt);
     }
     // The bow: the game's own button on a bar with A and the game's "Give Gift".
-    const bool canGive = MenuFocusable(v, focus);
+    const bool canGive = MenuFocusable(v, focus) && !v.items[focus].action.empty();
+    if (focus == kSlots) AddFocusRing(c, kGiftBow, 24);
     {
         UiItem b = PanelItem(kGiftBow);
         b.fill = th.fill; // (the game's panel colour: the live button's corners meet it)

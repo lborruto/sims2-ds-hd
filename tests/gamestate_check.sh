@@ -343,8 +343,8 @@ mg_want mg-G-B-sc-x '^none$' "minigame: nothing after the ticket's X (the panel)
 mg_want mg-G-C-wg-pump '^drencher pump=20 target=-1/-1 pumping=0 firing=0 targetmode=0 help=00 water=65 pressure=125$' "minigame: the Drencher pumped to full pressure"
 mg_want mg-G-C-wg-target '^drencher .* target=29/11 .* targetmode=1 ' "minigame: the Drencher's target locked on an object (11)"
 mg_want mg-G-C-wg-help-pump '^drencher .* help=11 ' "minigame: the Drencher's help text up"
-mg_want mg-G-C-cr-grab '^crime help=0 drag=0 phase=[0-3] angle=82 ' "minigame: the Ratarang aimed at 82 degrees"
-mg_want mg-G-C-cr-help '^crime help=1 ' "minigame: Crime's help mode"
+mg_want mg-G-C-cr-grab '^crime help=0 text=0 drag=0 phase=[0-3] angle=82 ' "minigame: the Ratarang aimed at 82 degrees"
+mg_want mg-G-C-cr-help '^crime help=1 text=1 ' "minigame: Crime's help mode, its text up"
 mg_want mg-G-D-mus-rec '^mixer mode=0 phase=2 tracks=0xff keys=-1,-1,-1 octave=0 instrument=1 sustain=0 sliders=13,0 tempo=105 variation=0 song=0 events=[0-9]+/[0-9]+ .* unlocked=0,1,2,3,4,5$' "minigame: the mixer recording, the six songs unlocked"
 mg_want mg-G-D-mus-pick '^mixer mode=0 phase=0 .* tempo=110 variation=0 song=1 ' "minigame: the mixer's second song, tempo 110"
 mg_want mg-G-D-mus-vox '^mixer mode=0 phase=5 ' "minigame: the mixer recording the voice"
@@ -353,7 +353,7 @@ mg_want mg-G-X-musicsave '^none$' "minigame: the save menu patched without a con
 mg_want mg-G-D-art-stroke '^art stroke=0 button=0 tool=0 swatch=3 page=0 brush=0 cell=17,21 painted=15 ' "minigame: the canvas with a pencil stroke of 15 cells, the stylus on cell (17, 21)"
 mg_want mg-G-D-art-line '^art .* button=7 tool=2 swatch=3 .* painted=16 ' "minigame: the line tool, 16 cells"
 mg_want mg-G-D-art-page '^art .* swatch=3 page=1 .* painted=0 ' "minigame: the second palette page, blank canvas"
-mg_want mg-G-X-pirate '^cards deck=40/60 hand=8 opponent=8 score=0,0 treasure=0 box=0 message=0 quit=0 name="Jun"$' "minigame: the cards dealt (eight each, forty in the deck), no box"
+mg_want mg-G-X-pirate '^cards deck=40/60 hand=8 opponent=8 score=0,0 treasure=0 box=0 message=0 quit=0 phase=7 turn=0 name="Jun"$' "minigame: the cards dealt (eight each, forty in the deck), no box, the deal's step (7), the player's turn"
 # The front end (--print-front; milestone 5): the title and menu, Settings, Load-a-Sim, Create-a-Sim's pages, Keep this Sim?
 # and the boot screens, from copies of the research's F-* states in shots/. The first line of each kind (the state's own frame 0).
 front_run() { # NAME STATE: the front lines in NAME.front

@@ -63,6 +63,19 @@ struct Bindings
     }
     int Key(int a) const { return key[a] == kDefault ? DefaultKey(a) : key[a]; }
     int Pad(int a) const { return pad[a] == kDefault ? DefaultPad(a) : pad[a]; }
+    // The player gave `a` a pad input of his own: not its default (a file that names the default,
+    // `pad_l=lb` from an older build or a capture of the same button, counts as the default).
+    // In the world the DS's L / R turn the camera only on such an input: the shoulders' default
+    // (LB / RB) is the menus' pages there, and the right stick turns (navigator.h).
+    bool PadOwn(int a) const { return pad[a] != kDefault && pad[a] != DefaultPad(a); }
+    // The world's camera turns (PadState::turnL / turnR, what Input::Actions sets): the keyboard's
+    // L / R keys held (keyL / keyR), a pad's L / R input held (padL / padR) only when it is the
+    // player's own (PadOwn): the shoulders' default is the menus' pages.
+    void CameraTurns(bool keyL, bool keyR, bool padL, bool padR, bool& turnL, bool& turnR) const
+    {
+        turnL = keyL || (PadOwn(L) && padL);
+        turnR = keyR || (PadOwn(R) && padR);
+    }
     bool Custom() const
     {
         for (int a = 0; a < COUNT; a++)

@@ -1,0 +1,18 @@
+# From F-mm-opt-150 (Settings, Music at 100 %), CONSOLE: twelve Lefts five times a second (every
+# press counts: the knob down to 0 %, the two past the end nothing), then three Rights as fast
+# (30 %, read back from RAM).
+10 2 pad left
+22 2 pad left
+34 2 pad left
+46 2 pad left
+58 2 pad left
+70 2 pad left
+82 2 pad left
+94 2 pad left
+106 2 pad left
+118 2 pad left
+130 2 pad left
+142 2 pad left
+330 2 pad right
+342 2 pad right
+354 2 pad right

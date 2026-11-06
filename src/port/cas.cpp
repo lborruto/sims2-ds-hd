@@ -97,6 +97,40 @@ std::string CasNameText(const std::string& name)
     return o;
 }
 
+CasType CasTypeAction(const CasState& cs, const RomData& rom, const std::string& typed)
+{
+    CasType t;
+    if (!cs.valid || cs.page != 0 || !cs.nameKnown || typed.empty()) return t;
+    if (typed == "\b")
+    {
+        if (!cs.name.empty()) t.taps = {Tap(kCasBackX, kCasBackY)};
+        return t;
+    }
+    if (cs.nameLength >= kCasName) return t;
+    const std::string ch = typed == "$" ? "\xC2\xA7" : typed;
+    const int kb = std::clamp(cs.keyboard, 0, 2);
+    // The page shown first, then the others; the exact character, then a letter's other case
+    // (the game's keyboards have both).
+    for (int pass = 0; pass < 2; pass++)
+        for (int n = 0; n < 3; n++)
+        {
+            const int page = (kb + n) % 3;
+            for (int i = 0; i < kCasKeyCount[page]; i++)
+            {
+                const std::string key = CasKeyText(rom, page, i);
+                if (key.empty() || (pass == 0 ? key != ch : GameLower(key) != GameLower(ch))) continue;
+                if (page == kb) t.taps = {Tap(kCasKeyX0 + kCasKeyDx * (i % 9), kCasKeyY0 + kCasKeyDy * (i / 9))};
+                else
+                {
+                    t.taps = {Tap(kCasKbX, kCasKbY[page])};
+                    t.done = false;
+                }
+                return t;
+            }
+        }
+    return t;
+}
+
 MenuView CasView(ScreenState s, const GameState* game, const RomData* rom)
 {
     if (!game || !rom || rom->StringCount() <= kStrCasKeep) return {};
@@ -118,8 +152,9 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
     // A page change in flight: the new page's tab, nothing to press until its object is there.
     if (cs.switching) { v.page = 0x7F; return v; }
     v.page = 0x40 + cs.page;
-    v.buttons[(int)MenuButton::LB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * ((cs.page + kCasPages - 1) % kCasPages))};
-    v.buttons[(int)MenuButton::RB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * ((cs.page + 1) % kCasPages))};
+    // LB / RB the pages, ends included (no ring: LB on the Name page never lands on Keep this Sim?).
+    if (cs.page > 0) v.buttons[(int)MenuButton::LB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page - 1))};
+    if (cs.page < kCasPages - 1) v.buttons[(int)MenuButton::RB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page + 1))};
     if (cs.page < 4) v.buttons[(int)MenuButton::Start] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page + 1))};
     // X / Y turn the model on every page but the Name page (there the keyboard's page and the
     // backspace): the keyboard's way, with no right stick.
@@ -154,6 +189,13 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
         ViewItem back = Item(kCasBackRect, kCasBackId, {});
         if (!cs.name.empty()) back.action = {Tap(kCasBackX, kCasBackY)};
         v.items.push_back(back);
+        // Down from a key: the key under it, else the next row's last key (123!'s short last
+        // row), and only from the last row the backspace: never by surprise from the middle.
+        {
+            const int base = v.initial, count = kCasKeyCount[kb], rows = (count + 8) / 9;
+            for (int i = 0; i < count; i++)
+                v.items[base + i].next[1] = i / 9 + 1 < rows ? base + std::min(i + 9, count - 1) : base + kCasKeys;
+        }
         v.buttons[(int)MenuButton::Y] = back.action;
         v.buttons[(int)MenuButton::X] = {Tap(kCasKbX, kCasKbY[(kb + 1) % 3])};
         break;
@@ -179,6 +221,7 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
         break;
     }
     case 2:
+        if (cs.face < 0) return v;   // (the face not read yet: the page's tab alone)
         for (int i = 0; i < 9; i++)
             v.items.push_back(Item(CasFaceRect(i), kCasFaceId + (u32)i, {Tap(kCasFaceX0 + kCasFaceDx * (i % 3), kCasFaceY0 + kCasFaceDy * (i / 3))}));
         v.initial = std::clamp(cs.face, 0, 8);
@@ -238,6 +281,9 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
         {
             v.back = cross.action;
             v.backCloses = true;
+            // One B only puts the focus on the cross ("No": the Sim is discarded); B again there
+            // (or A) answers.
+            v.backFocus = (int)v.items.size() - 1;
         }
         v.initial = live ? Slot(cs.aspiration) : -1;
         break;
@@ -260,13 +306,38 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     FrontFramed(c, {Src::Top, {0, 0, topW, topH}, top});
     {
         // What turns it: the right stick (RStick); off the Name page X (left) and Y (right) too, either side of it.
+        // The keyboard (the device used last) has no stick: its X / Y keys alone, off the Name page (on
+        // it, the mouse's right drag; its L / R keys are the pages here).
+        const bool keys = ui::ChipLookNow().face == Face::Keyboard;
         const Rect rs = ChipRect(0, 0, Button::RStick, "", 28), xr = ChipRect(0, 0, Button::X, "", 28);
         const int y = top.y + top.h + 22, cx = top.x + top.w / 2;
-        c.ui.push_back(ChipItem(cx - rs.w / 2, y, Button::RStick, "", 28));
+        const int half = keys ? 0 : rs.w / 2;
+        if (!keys) c.ui.push_back(ChipItem(cx - rs.w / 2, y, Button::RStick, "", 28));
         if (v.xyTurns)
         {
-            c.ui.push_back(ChipItem(cx - rs.w / 2 - 16 - xr.w, y + (rs.h - xr.h) / 2, Button::X, "", 28));
-            c.ui.push_back(ChipItem(cx + rs.w / 2 + 16, y + (rs.h - xr.h) / 2, Button::Y, "", 28));
+            c.ui.push_back(ChipItem(cx - half - (keys ? 8 : 16) - xr.w, y + (rs.h - xr.h) / 2, Button::X, "", 28));
+            c.ui.push_back(ChipItem(cx + half + (keys ? 8 : 16), y + (rs.h - xr.h) / 2, Button::Y, "", 28));
+        }
+        // The game's own "L" / "R" pills on its arrows (the DS's shoulder buttons: LB / RB are the
+        // pages here) covered by the pad's turn chips: X / Y off the Name page, else the right stick.
+        // The top picture is SW x SH DS pixels at --res3d's n (n = topH / SH, the 3D resolution's
+        // factor), wider with --wide (the 2D layer centred): a pill's DS rectangle is n times its size there.
+        const float n = (float)topH / SH;
+        const float sx = (float)top.w / topW * n, sy = (float)top.h / topH * n; // canvas pixels per DS pixel
+        const float ox = (topW / n - SW) / 2;                                  // DS pixels left of the 2D layer
+        for (int k = 0; k < 2; k++)
+        {
+            const Rect pill = kCasTurnPill[k];
+            const Rect r {top.x + (int)((pill.x + ox) * sx) - 3, top.y + (int)(pill.y * sy) - 3, (int)(pill.w * sx) + 6, (int)(pill.h * sy) + 6};
+            UiItem plate = PanelItem(r);
+            plate.plain = true;
+            plate.fill = th.frameDark;
+            plate.radius = r.h / 2.0f;
+            c.ui.push_back(plate);
+            const Button b = v.xyTurns ? (k == 0 ? Button::X : Button::Y) : Button::RStick;
+            if (keys && !v.xyTurns) continue; // (the keyboard on the Name page: the plate alone)
+            const Rect cr = ChipRect(0, 0, b, "", 26);
+            c.ui.push_back(ChipItem(r.x + (r.w - cr.w) / 2, r.y + (r.h - cr.h) / 2, b, "", 26));
         }
     }
 
@@ -475,7 +546,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
                 if (const SpriteFrame* f = icons->Scaled(SpriteRef::Of(kSprCasAsp), j, kCasAspIcon, kCasAspIcon))
                 {
                     const Rect r = v.items[j].rect;
-                    UiItem im = ImageItem({r.x + (r.w - f->w) / 2, r.y + (r.h - f->h) / 2, f->w, f->h}, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h});
+                    UiItem im = icons->Image(SpriteRef::Of(kSprCasAsp), j, *f, {r.x + (r.w - f->w) / 2, r.y + (r.h - f->h) / 2, f->w, f->h});
                     im.fill = cs.aspiration == kCasAspOfSlot[j] ? 0 : 0xA0000000;
                     images.push_back(im);
                 }

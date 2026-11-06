@@ -136,6 +136,7 @@ MenuView SettingsViewOf(ScreenState s, const GameState& game, const RomData* rom
         const int l = SettingsNotchX(vol, -1), r = SettingsNotchX(vol, +1);
         if (l >= 0) it.left = {DragStep(from, y, l, y)};
         if (r >= 0) it.right = {DragStep(from, y, r, y)};
+        it.queues = true; // (fast presses all count)
         for (int& n : it.next) n = kNoMove;
         v.items.push_back(it);
     }
@@ -163,6 +164,7 @@ MenuView SettingsViewOf(ScreenState s, const GameState& game, const RomData* rom
         v.initial = 0;
         for (int i = kSeCells - 1; i >= 0; i--)
             if (st.conceptBits & (1u << i)) v.initial = i;
+        v.picture = st.art; // (the art on the top screen: shown big until B)
     }
     // (Credits: nothing to press; the game scrolls them.)
     v.buttons[(int)MenuButton::LB] = {TapStep(kSeTabX, TabTapY((st.page + kSeTabs - 1) % kSeTabs))};
@@ -176,14 +178,28 @@ MenuView SettingsViewOf(ScreenState s, const GameState& game, const RomData* rom
     return v;
 }
 
-void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom, IconCache* icons, int topW, int topH)
+void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom, IconCache* icons, int topW, int topH,
+                   bool big)
 {
     const Theme& th = GameTheme();
     const SettingsState& st = game.front.settings;
     if (!st.valid || st.page < 0 || st.page >= kSeTabs) return;
     const size_t first = c.ui.size();
-    // The top screen (the game's backdrop, or the concept art it shows) at the left, framed.
     const Rect from = FrontTopFrom(topW, topH);
+    if (big)
+    {
+        // The concept art big, as a picture viewer: B closes it (the grid back, the art still on
+        // the game's top screen beside it).
+        FrontFramed(c, {Src::Top, from, FrontFit(kSeArtBig, from.w, from.h), 255, false});
+        const std::string close = MenuWords(rom, kStrClose);
+        const Rect r = ChipRect(0, 0, Button::B, close, kPmHintSize, 0, Weight::ExtraBold);
+        UiItem hint = ChipItem(kSeArtHints.x + kSeArtHints.w - r.w, kSeArtHints.y + (kSeArtHints.h - r.h) / 2, Button::B, close, kPmHintSize, 0, Weight::ExtraBold);
+        hint.layer = 1;
+        c.ui.push_back(hint);
+        SortUi(c.ui, first);
+        return;
+    }
+    // The top screen (the game's backdrop, or the concept art it shows) at the left, framed.
     FrontFramed(c, {Src::Top, from, FrontFit(kFrTopBox, from.w, from.h), 255, false});
 
     // Layer 0: the panel, the title's well, the tab bar and its LB / RB.
@@ -354,7 +370,8 @@ MenuView LoadViewOf(ScreenState s, const GameState& game, const RomData* rom)
     if (!FrontScreenState(s) || !game.valid || !ld.valid || ld.wireless) return v;
     if (rom) v.title = MenuWords(*rom, kStrLdTitle);
     // A popup over the slots (the game's "Loading"): the slots wait under it (port/popup.h).
-    const bool popup = game.town.popup.valid && game.town.popup.state >= 1 && game.town.popup.state <= 3;
+    // (After the game's "Loading" popup: nothing left to press while it goes on to the town.)
+    const bool popup = (game.town.popup.valid && game.town.popup.state >= 1 && game.town.popup.state <= 3) || ld.loading;
     for (int i = 0; i < kLoadRows; i++)
     {
         ViewItem it;
@@ -399,6 +416,9 @@ void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& ga
     top.touch = false;
     c.pieces.push_back(top);
     c.overlays.push_back({{0, 0, kConsoleW, kConsoleH}, kDimArgb, 0, 0, 0});
+    // The "Loading" popup gone: the game goes on to the town; the slot list does not flash back.
+    const bool popupUp = game.town.popup.valid && game.town.popup.state >= 1 && game.town.popup.state <= 3;
+    if (ld.loading && !popupUp) return;
 
     UiItem panel = PanelItem(kPmPanel);
     panel.radius = 22;
@@ -446,8 +466,10 @@ void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& ga
             PanelText(c, {tx + tw - mw, r.y + 22, mw, 48}, money, 32, 32, Align::Right, Weight::ExtraBold);
             const std::string time = SlotTimeText(format, row, am, pm);
             const int timeW = time.empty() ? 0 : (int)TextWidth(time, 28, Weight::Bold) + 8;
-            if (row.placeNameId >= 0) PanelText(c, {tx, r.y + 74, tw - timeW - 24, 44}, MenuWords(rom, row.placeNameId), 28, 20, Align::Left, Weight::Bold, kLabel);
-            if (!time.empty()) PanelText(c, {tx + tw - timeW, r.y + 74, timeW, 44}, time, 28, 28, Align::Right, Weight::Bold, kLabel);
+            // (the subtitles' pale lavender on a plain row; white on the focused row's light fill)
+            const u32 sub = focused ? 0xFFFFFFFF : kLabel;
+            if (row.placeNameId >= 0) PanelText(c, {tx, r.y + 74, tw - timeW - 24, 44}, MenuWords(rom, row.placeNameId), 28, 20, Align::Left, Weight::Bold, sub);
+            if (!time.empty()) PanelText(c, {tx + tw - timeW, r.y + 74, timeW, 44}, time, 28, 28, Align::Right, Weight::Bold, sub);
         }
         // The mouse: the row onto its tick (a click loads, as A), while it can.
         if (v.items[i].enabled) AddMousePiece(c, {kLdTickX - 12, kLdTickY[i] - 12, 24, 24}, r);

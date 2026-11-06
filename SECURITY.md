@@ -23,19 +23,25 @@ with, endorsed by or supported by Electronic Arts, Maxis, Nintendo or the melonD
 
 - **No network at all.** It opens no port and makes no connection: no update check, no
   telemetry. The DS's Wi-Fi and wireless play are stubs that send and receive nothing.
-- **It reads what you give it.** The ROM on the command line or chosen in the file picker, its save (`.sav` beside it, or
-  `--save`), a save state (`--state-load`, F7) and an input script (`--input`). melonDS parses
-  the ROM, the save and the save state: treat ones from other people as untrusted files, as you
-  would any file an emulator opens.
-- **It writes in a few known places.** Beside the ROM: the game's save (or `--save`),
-  `<rom>.quick.st` (F5) and `<rom>-shot.png` (F12). In its per-user settings folder:
-  `last-rom.txt`, the path of the ROM chosen last time, and `captures/`, a picture and a save
-  state of each screen the game shows that the program does not know yet (at most 200). Where you say: the `--state-save` file and
-  the `--shot-dir` folder (default `shots`, in the folder you run it from). Nothing else.
+- **It reads what you give it.** The ROM on the command line, chosen in the file picker or
+  dropped on the window (and the recent ones it lists), its save (`.sav` beside it, or `--save`),
+  save states (the pause menu's, F7, Continue, `--state-load`), an input script (`--input`) and
+  your own `gamecontrollerdb.txt`. melonDS parses the ROM, the save and the save states: treat
+  ones from other people as untrusted files, as you would any file an emulator opens.
+- **It writes in a few known places.** Beside the ROM: the game's save (or `--save`) and its
+  `backups/`. In its per-user settings folder (`%APPDATA%\sims2-ds-wide`, `~/Library/Application
+  Support/sims2-ds-wide` or `~/.local/share/sims2-ds-wide`): `settings.ini`, `recent.txt` and
+  `last-rom.txt` (the paths of your recent ROMs and of the file picker's folder), `states/` (save states, their pictures, the place kept on quitting),
+  `screenshots/` (F12), `saves/` (the game's save when the ROM's folder cannot be written) and
+  `captures/`, a picture and a save state of each screen the game shows that the program does not
+  know yet (at most 200). Where you say: the `--state-save` file, the `--shot-dir` folder and
+  `--data-dir`. Nothing else.
 - **Not signed by Apple or Microsoft.** The Mac app is ad-hoc signed and not notarised, the
   Windows program not signed: the systems warn the first time. Check a download with
   `gh attestation verify <archive> --repo lborruto/sims2-ds-wide` instead.
-- **No microphone or camera.** They are stubs; nothing is recorded.
+- **The microphone only if you ask.** By default the DS hears a key (the blow key) or nothing;
+  your real microphone is opened only with the Microphone setting (or `--mic real`) and only while
+  the game listens (the vacuum, the music mixer). Nothing is recorded or kept. The camera is a stub.
 
 ### What it does not protect against
 

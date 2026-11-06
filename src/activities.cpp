@@ -52,11 +52,31 @@ void Social(const PadState& pad, TouchScript& touch, ActivityState& st, bool can
     if (canTap) touch.Tap(h[pick].x, h[pick].y);
 }
 
+int Question(const PadState& pad, ActivityState& st, bool up);
+
 void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap)
 {
     const std::vector<Hotspot>& h = HotspotsFor({Screen::Cards, Tab::None});
     if (st.focus < 0 || st.focus >= (int)h.size() || h[st.focus].dragOnly) st.focus = Named(h, "card 1");
-    if (!canTap) return; // a press while a touch runs is dropped
+    // The question as RAM shows it (opened by the mouse too: it still reads Cards). Once RAM has
+    // shown it, RAM also says when it has gone (answered by the mouse, or by A / B a frame ago).
+    if (st.ram.cards)
+    {
+        if (st.ram.quitAsk) st.confirm = st.askSeen = true;
+        else if (st.askSeen) st.confirm = st.askSeen = false;
+    }
+    if (!canTap)
+    {
+        // A press while a touch runs is dropped; the question's Left / Right still move its focus
+        // (they tap nothing: an edge never lost).
+        if (st.confirm)
+        {
+            PadState moves = pad;
+            moves.a = moves.b = false;
+            Question(moves, st, true);
+        }
+        return;
+    }
     auto pressed = [&](bool PadState::*b) { return pad.*b && !(st.prev.*b); };
     const Hotspot& f = h[st.focus];
     const int card = CardOf(f);
@@ -66,13 +86,6 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
         touch.Tap(q.x, q.y);
         st.confirm = true;
     };
-    // The question as RAM shows it (opened by the mouse too: it still reads Cards). Once RAM has
-    // shown it, RAM also says when it has gone (answered by the mouse, or by A / B a frame ago).
-    if (st.ram.cards)
-    {
-        if (st.ram.quitAsk) st.confirm = st.askSeen = true;
-        else if (st.askSeen) st.confirm = st.askSeen = false;
-    }
     if (!st.confirm && st.ram.cards && st.ram.message)
     {
         // The end of a turn: a touch anywhere goes on (the other buttons wait).
@@ -81,11 +94,13 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
     }
     if (st.confirm)
     {
-        // The question: A yes, B no (the other buttons wait for the answer).
-        if (pressed(&PadState::a)) { touch.Tap(kCardsQuitYes.x, kCardsQuitYes.y); st.confirm = false; }
-        else if (pressed(&PadState::b)) { touch.Tap(kCardsQuitNo.x, kCardsQuitNo.y); st.confirm = false; }
+        // The question: No first (Question), A the focused answer, B no (the other buttons wait).
+        const int ans = Question(pad, st, true);
+        if (ans == 1) { touch.Tap(kCardsQuitYes.x, kCardsQuitYes.y); st.confirm = false; }
+        else if (ans == 0) { touch.Tap(kCardsQuitNo.x, kCardsQuitNo.y); st.confirm = false; }
         return;
     }
+    Question(pad, st, false);
     if (pressed(&PadState::a))
     {
         if (card < 0)
@@ -120,8 +135,10 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
     else if (pressed(&PadState::b)) quit();
 }
 
-void Vacuum(const PadState& pad, u32& dsKeys, ActivityState& st)
+void Vacuum(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
 {
+    // B: the bowl's X, the game's only way out (its own B does nothing here).
+    if (pad.b && !st.prev.b && canTap) touch.Tap(kVacuumX.x, kVacuumX.y);
     // A tap on Y is 4-6 frames and the game wants 7: a press holds the blow for 8.
     if (pad.y && !st.prev.y) st.blowFrames = 8;
     st.blow = pad.y || st.blowFrames > 0;
@@ -139,12 +156,34 @@ void Vacuum(const PadState& pad, u32& dsKeys, ActivityState& st)
     set((pad.down && !hand) || pad.ly > kStick, kDown);
     set((pad.left && !hand) || pad.lx < -kStick, kLeft);
     set((pad.right && !hand) || pad.lx > kStick, kRight);
-    set(pad.b, kB);
     set(pad.lb, kL);
     set(pad.rb, kR);
 }
 
 bool Pressed(const PadState& pad, const ActivityState& st, bool PadState::*b) { return pad.*b && !(st.prev.*b); }
+
+// A yes / no question up (`up`): the focus opens on No, Left / Right (the D-pad or the left stick
+// past half) move it, A answers the focused one, B is No. The answer this frame: -1 none, 0 No, 1 Yes.
+int Question(const PadState& pad, ActivityState& st, bool up)
+{
+    if (!up) { st.askOpen = false; st.askFocus = 0; return -1; }
+    if (!st.askOpen) { st.askOpen = true; st.askFocus = 0; }
+    const bool left = (pad.left && !st.prev.left) || (pad.lx < -0.5f && st.prev.lx >= -0.5f);
+    const bool right = (pad.right && !st.prev.right) || (pad.lx > 0.5f && st.prev.lx <= 0.5f);
+    if (left) st.askFocus = 0;
+    else if (right) st.askFocus = 1;
+    if (Pressed(pad, st, &PadState::a)) return st.askFocus;
+    if (Pressed(pad, st, &PadState::b)) return 0;
+    return -1;
+}
+
+// Any face button, shoulder or Start newly pressed (a help text closes on any press).
+bool AnyPressed(const PadState& pad, const ActivityState& st)
+{
+    for (bool PadState::*b : {&PadState::a, &PadState::b, &PadState::x, &PadState::y, &PadState::lb, &PadState::rb, &PadState::start})
+        if (Pressed(pad, st, b)) return true;
+    return false;
+}
 
 // The stylus at the pointer while A is held (not when a tap runs, nor after a glide until A is let go).
 void PressPointer(const PadState& pad, ActivityState& st, bool canTap)
@@ -236,12 +275,15 @@ void Art(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap
     st.pointer = true;
     if (st.ram.askUp)
     {
-        // "Are you done painting?": A its tick, B its cross; the rest waits.
+        // "Are you done painting?": No first (Question), A the focused answer (the tick or the cross),
+        // B its cross; the rest waits.
+        const int ans = Question(pad, st, true);
         if (!canTap || !st.ram.ask) return;   // (opening and closing: nothing to tap)
-        if (Pressed(pad, st, &PadState::a)) { touch.Tap(st.ram.askYes.x, st.ram.askYes.y); st.latch = true; }
-        else if (Pressed(pad, st, &PadState::b)) { touch.Tap(st.ram.askNo.x, st.ram.askNo.y); st.latch = true; }
+        if (ans == 1) { touch.Tap(st.ram.askYes.x, st.ram.askYes.y); st.latch = true; }
+        else if (ans == 0) { touch.Tap(st.ram.askNo.x, st.ram.askNo.y); st.latch = true; }
         return;
     }
+    Question(pad, st, false);
     MovePointer(pad, st, pad.a ? kPtrDrag : kPtrMax, true);
     PressPointer(pad, st, canTap);
     if (pad.a || !canTap) return;
@@ -249,8 +291,9 @@ void Art(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap
     if (Pressed(pad, st, &PadState::lb)) { const Point t = ArtTool((button + kArtTools - 1) % kArtTools); touch.Tap(t.x, t.y); }
     else if (Pressed(pad, st, &PadState::rb)) { const Point t = ArtTool((button + 1) % kArtTools); touch.Tap(t.x, t.y); }
     else if (Pressed(pad, st, &PadState::x)) { const Point t = ArtSwatch((std::clamp(st.ram.artSwatch, 0, kArtSwatches - 1) + 1) % kArtSwatches); touch.Tap(t.x, t.y); }
+    else if (Pressed(pad, st, &PadState::menu)) touch.Tap(kArtPageNext.x, kArtPageNext.y);
     else if (Pressed(pad, st, &PadState::y)) touch.Tap(kArtUndo.x, kArtUndo.y);
-    else if (Pressed(pad, st, &PadState::b)) touch.Tap(kArtDone.x, kArtDone.y);
+    else if (Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::start)) touch.Tap(kArtDone.x, kArtDone.y);
 }
 
 void Walk(const PadState& pad, u32& dsKeys)
@@ -306,12 +349,14 @@ void MooGoo(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState&
     }
     if (r.mooGooQuitAsk)
     {
-        // "Are you sure you want to quit?": A its Yes, B its No; the rest waits.
+        // "Are you sure you want to quit?": No first (Question), A the focused answer, B its No; the rest waits.
+        const int ans = Question(pad, st, true);
         if (!canTap) return;
-        if (a) tap(kMooGooYes);
-        else if (b) tap(kMooGooNo);
+        if (ans == 1) tap(kMooGooYes);
+        else if (ans == 0) tap(kMooGooNo);
         return;
     }
+    Question(pad, st, false);
     const int sub = r.mooGooSub;
     const bool turn = r.mooGooHuman && (r.mooGooPhase == 6 || r.mooGooPhase == 0xD) && (sub == 1 || sub == 3 || sub == 5);
     if (!turn)
@@ -363,22 +408,28 @@ void Drencher(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityStat
 {
     Walk(pad, dsKeys);
     auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
-    set(pad.a, kA);    // fire (held)
     set(pad.lb, kB);   // run
     const ActivityRam& r = st.ram;
-    // Help (opened with the mouse): a help text closes on any press (a tap on the "?"), the mode leaves with B.
+    auto tap = [&](Point p) { touch.Tap(p.x, p.y); };
+    // Help: a help text closes on any press (a tap on the "?"); in help mode each button taps the
+    // control it plays (the game explains it), B or Start the "?" again (the mode leaves).
     if (r.drencherHelpText)
     {
-        if (canTap && (Pressed(pad, st, &PadState::a) || Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::x) || Pressed(pad, st, &PadState::y) ||
-                       Pressed(pad, st, &PadState::lb) || Pressed(pad, st, &PadState::rb) || Pressed(pad, st, &PadState::start)))
-            touch.Tap(kDrencherHelp.x, kDrencherHelp.y);
+        if (canTap && AnyPressed(pad, st)) tap(kDrencherHelp);
         return;
     }
     if (r.drencherHelp)
     {
-        if (canTap && Pressed(pad, st, &PadState::b)) touch.Tap(kDrencherHelp.x, kDrencherHelp.y);
+        if (!canTap) return;
+        if (Pressed(pad, st, &PadState::a)) tap(kDrencherFire);
+        else if (Pressed(pad, st, &PadState::x)) tap(kDrencherPumpBand);
+        else if (Pressed(pad, st, &PadState::y)) tap(kDrencherTarget);
+        else if (Pressed(pad, st, &PadState::rb)) tap(kDrencherRefill);
+        else if (Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::start)) tap(kDrencherHelp);
         return;
     }
+    set(pad.a, kA);    // fire (held)
+    if (Pressed(pad, st, &PadState::start) && canTap) { tap(kDrencherHelp); return; }
     // X held: the pump, the stylus swept along its band.
     if (pad.x && (canTap || st.pumpFrames > 0))
     {
@@ -407,6 +458,31 @@ void Drencher(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityStat
 
 void Crime(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
 {
+    const ActivityRam& r = st.ram;
+    auto tap = [&](Point p) { touch.Tap(p.x, p.y); };
+    // Help: a text closes on any press (a tap on the "?"); in help mode X / A / Y tap scare, the
+    // rat and subdue (the game explains each), B or Start the "?" again. Not while aiming.
+    if (r.crimeHelpText && st.aimFrames == 0)
+    {
+        Walk(pad, dsKeys);
+        if (canTap && AnyPressed(pad, st)) { tap(kCrimeHelp); st.latch = true; }
+        return;
+    }
+    if (r.crimeHelp && st.aimFrames == 0)
+    {
+        Walk(pad, dsKeys);
+        if (!pad.a) st.latch = false;
+        if (!canTap) return;
+        if (Pressed(pad, st, &PadState::x)) tap(kCrimeScare);
+        else if (Pressed(pad, st, &PadState::a)) { tap(kCrimeRat); st.latch = true; }
+        else if (Pressed(pad, st, &PadState::y)) tap(kCrimeSubdue);
+        else if (Pressed(pad, st, &PadState::b) || Pressed(pad, st, &PadState::start)) tap(kCrimeHelp);
+        return;
+    }
+    // (A still held from a help press: not a grab.)
+    if (!pad.a) st.latch = false;
+    if (st.latch) { Walk(pad, dsKeys); return; }
+    if (Pressed(pad, st, &PadState::start) && canTap && st.aimFrames == 0) { tap(kCrimeHelp); return; }
     // A held: the Rat-A-Rang grabbed (the stylus on the centre rat), aimed, thrown when let go.
     if (pad.a && (canTap || st.aimFrames > 0))
     {
@@ -522,13 +598,15 @@ void Mixer(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& 
     const bool a = Pressed(pad, st, &PadState::a), b = Pressed(pad, st, &PadState::b), x = Pressed(pad, st, &PadState::x);
     if (phase == 0xA)
     {
-        // "Do you want to save your song?": A Yes, B No, X Preview.
+        // "Do you want to save your song?": No first (Question), A the focused answer, B No, X Preview.
+        const int ans = Question(pad, st, true);
         if (!canTap) return;
-        if (a) { Tap(touch, kMixYes); st.latch = true; }
-        else if (b) Tap(touch, kMixNo);
+        if (ans == 1) { Tap(touch, kMixYes); st.latch = true; }
+        else if (ans == 0) Tap(touch, kMixNo);
         else if (x) Tap(touch, kMixPreview);
         return;
     }
+    Question(pad, st, false);
     if (phase == 7)
     {
         // The song's list: Up / Down a focus over its rows, A picks, B cancels.
@@ -556,7 +634,8 @@ void Mixer(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& 
     MovePointer(pad, st, pad.a ? kPtrDrag : kPtrMax, false);
     PressPointer(pad, st, canTap);
     if (pad.a || !canTap) return;
-    if (phase == 8 || phase == 9) { if (b) Tap(touch, kMixHelp); return; }
+    if (phase == 8 || phase == 9) { if (b || Pressed(pad, st, &PadState::start)) Tap(touch, kMixHelp); return; }
+    if (Pressed(pad, st, &PadState::start) && phase == 0) { Tap(touch, kMixHelp); return; }
     if (x) Tap(touch, kMixPlay);
     else if (Pressed(pad, st, &PadState::rb)) Tap(touch, kMixRecord);
     else if (Pressed(pad, st, &PadState::lb) && phase == 0) Tap(touch, kMixGenre);
@@ -633,6 +712,8 @@ std::vector<Point> ScratchRub(int tier, int i)
 void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
 {
     const float ox = st.px, oy = st.py;
+    // (The player's cursor speed lifts the free move's cap with it, never a drag's or the laser's.)
+    cap = cap >= kPtrMax ? cap * pad.speed : cap;
     // The stick over further: either one, the one further over.
     float sx = pad.lx, sy = pad.ly;
     if (pad.rx * pad.rx + pad.ry * pad.ry > sx * sx + sy * sy) { sx = pad.rx; sy = pad.ry; }
@@ -640,7 +721,7 @@ void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
     if (mag > kPtrDead)
     {
         const float m = std::min(1.0f, (mag - kPtrDead) / (1.0f - kPtrDead));
-        float speed = kPtrMax * m * m;
+        float speed = kPtrMax * m * m * pad.speed;
         if (pad.lt > 0.5f) speed *= kPtrSlow;
         speed = std::min(speed, cap);
         st.px += sx / mag * speed;
@@ -676,9 +757,10 @@ void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKey
     st.voice = false;
     // (The autopsy quits on Start at once: its Start asks first, ActivityInput's Autopsy; MooGoo's
     // Start is its X; the lottery's Start asks as its B; the mixer's and its save page's do nothing
-    // in the game; the wireless lobby's are its own.)
+    // in the game (the mixer's is its help); the wireless lobby's are its own; the painting's is its
+    // X, the Drencher's and the crime game's their help: the game reads none of them there.)
     if (pad.start && s != Screen::Autopsy && s != Screen::MooGoo && s != Screen::Scratch && s != Screen::Mixer && s != Screen::MixerSave &&
-        s != Screen::Trading)
+        s != Screen::Trading && s != Screen::Art && s != Screen::Drencher && s != Screen::Crime)
         dsKeys |= 1u << kStart;
     if (pad.select && s != Screen::Trading) dsKeys |= 1u << kSelect;
     const bool canTap = !touch.Owns();
@@ -686,7 +768,7 @@ void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKey
     {
     case Screen::Social: Social(pad, touch, st, canTap); break;
     case Screen::Cards: Cards(pad, touch, st, canTap); break;
-    case Screen::Vacuum: Vacuum(pad, dsKeys, st); st.focus = -1; break;
+    case Screen::Vacuum: Vacuum(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     case Screen::Autopsy: Autopsy(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     case Screen::Detector: Detector(pad, touch, dsKeys, st, canTap); st.focus = -1; break;
     case Screen::Art: Art(pad, touch, st, canTap); st.focus = -1; break;

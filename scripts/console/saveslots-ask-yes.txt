@@ -1,5 +1,6 @@
 # From B-cas-opt-save (the complete save, the slot list, Jun's slot 3 the current one), CONSOLE:
-# A (the game's tick: "Overwrite this save?"), A (its tick: "Saving", slot 3 saved again). Run
-# it with a scratch --save: it writes the game's save.
+# A (the game's tick: "Overwrite this save?", the focus on No), Right (Yes), A (its tick: "Saving",
+# slot 3 saved again). Run it with a scratch --save: it writes the game's save.
 20 2 pad a
-90 2 pad a
+90 2 pad right
+110 2 pad a

@@ -1,0 +1,4 @@
+# From G-X-music: Start (help mode), A on the pointer (the middle: the variations) shows its help text, A closes it.
+20 2 pad start
+60 2 pad a
+140 2 pad a

@@ -60,7 +60,8 @@ constexpr Rect kCaTitle {200, 44, 880, 64};
 constexpr Rect kCaClose {1016, 48, 56, 56};      // the game's X, in the title band
 constexpr int kCaTop = 124, kCaBottom = 578;     // the content's band
 constexpr int kCaHeadH = 40, kCaGridY = 176;     // the Buy / Sell headers, the grids under them
-constexpr float kCaNameSize = 30, kCaNameMin = 18, kCaPriceSize = 28, kCaDescSize = 24, kCaDescMin = 18, kCaPaySize = 28, kCaPayMin = 20;
+constexpr float kCaNameSize = 30, kCaNameMin = 18, kCaPriceSize = 28, kCaDescSize = 24, kCaDescMin = 18, kCaPaySize = 28, kCaPayMin = 20,
+                kCaPayNameSize = 22, kCaPayNameMin = 16;
 // The store: the shop grid 3 x 2 at the left with the arrows under it, the info in the middle,
 // the owned places 2 x 3 at the right. A vendor: its grid 2 x 3, the info beside it.
 struct CatalogueGeometry

@@ -11,6 +11,7 @@
 #include "activities.h"
 #include "compose.h"
 #include "gamestate.h"
+#include "port/prompt.h"
 #include "port/statusbar.h"
 #include "screens.h"
 
@@ -67,12 +68,12 @@ constexpr int kHintPad = 14, kHintGap = 8, kHintChipH = 33, kHintTextX = kHintBo
 
 // No HUD (FrontEnd, CreateASim, None: the title, the main menu, Create-a-Sim, unmapped screens):
 // the top screen in kFrontTopBox at its own shape (fitted, centred), the touch screen 2.5x at
-// the right, both framed on the dark canvas, and the buttons' hint in a box centred below (these
-// screens are touch-only: the navigator's A presses the stick cursor there).
+// the right, both framed on the dark canvas, and the buttons' hint (the kit's chips: the right
+// stick, A) in a panel centred below (these screens are touch-only: the navigator's A presses the
+// stick cursor there).
 constexpr Rect kFrontBottomTo {616, 72, SW * 5 / 2, SH * 5 / 2};
 constexpr Rect kFrontTopBox {24, 72, 568, SH * 5 / 2};
-constexpr int kFrontHintY = 600, kFrontHintPad = 14;
-constexpr const char* kFrontHint = "STICK: CURSOR - A: TOUCH";
+constexpr int kFrontHintY = 600;
 
 // The top picture's rows without the game's status bar (its last 16 of 192, whatever the
 // picture's size): the world CONSOLE shows wherever the HD bar or a conversation's box replaces it.
@@ -103,12 +104,47 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // milestone 1's: the touch screen 3x over the dimmed world. armed: the view item whose X is
 // armed (the navigator's Armed(): Pockets' bin asking), 0 none. pointer: a pointing minigame's
 // pointer (port/minigame.h draws it; null: none).
+// Which of BuildConsole's compositions a frame got (--print-console; ConsoleHold, consolehold.h).
+// The *M1 ones are milestone 1's (the game's own screen framed): FrontM1 the front end's two
+// screens, CursorM1 the touch screen 3x over the dimmed world, DialogueM1 the game's box rebuilt,
+// ActivityM1 an activity's two screens; the rest are the HD ones (Backdrop the bare canvas of a
+// black load, WorldOnly / Veiled the world while the panel comes).
+enum class ConsoleBranch { Front, Cas, CasFade, Backdrop, FrontM1, Screen, Veiled, WorldOnly, CursorM1, Town, Dialogue, DialogueM1, Minigame, ActivityM1 };
+const char* ConsoleBranchName(ConsoleBranch b);
+inline bool IsMilestone1(ConsoleBranch b) { return b == ConsoleBranch::FrontM1 || b == ConsoleBranch::CursorM1 || b == ConsoleBranch::DialogueM1 || b == ConsoleBranch::ActivityM1; }
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
                          const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
                          const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0, const PointerView* pointer = nullptr,
-                         int payout = 0);
+                         int payout = 0, bool pictureClosed = false, bool veiled = false, int worldOnlyFrames = 0,
+                         ConsoleBranch* branch = nullptr, const PromptSteady* prompt = nullptr);
+// pictureClosed: the view's big picture (MenuView::picture: Settings' concept art) closed by B.
+// veiled: the panel's menu is coming back (Navigator::Returning: B from the Save slots or the phone
+// opened from it, the game passing through Interact first): the dimmed world and the status bar
+// alone while the panel shows with its menu closed, never the world's flash. worldOnlyFrames: the
+// frames in a row the panel was coming without its tab read, or no bottom object at all
+// (App::consoleWorldOnly): the town's world for kWorldOnlyMax of them, then milestone 1's framed
+// touch screen and the cursor's hints (an unforeseen screen is never a dead end).
+constexpr int kWorldOnlyMax = 10;
+// prompt: the Interact target's steadiness (App::consolePrompt, port/prompt.h; null: none): the
+// town's world shows what A does there ("A Buy", the target's name) once the target drawn has been
+// steady kPromptSteadyFrames, on its own layer above the status bar.
 // payout (above): the money's last change (App::consolePayout: the slot machine's coin and its
 // payout, a ticket's prize, ...), shown on the panel's world beside the HD status bar while not 0.
+
+// The town's hints at the strip's right (unzoomed; console.cpp zooms them about kTownHintsRight):
+// the camera's (the right stick; the keyboard's own L / R keys when it was used last: its two
+// keycaps) and the TOUCH MENU's, "Menu". w: their width together.
+constexpr float kTownHintSize = 24;
+constexpr int kTownHintsRight = kConsoleW - 30, kTownHintsBetween = 22, kTownKeysGap = 6;
+struct TownHints
+{
+    const char* menu = "";
+    const char* camera = "";
+    bool keys = false;
+    int w = 0, menuW = 0;
+};
+TownHints TownHintsFor(const RomData* rom, const ui::ChipLook& look);
+void AddTownHints(Composition& c, const TownHints& h);
 
 // The world (the top picture's first `rows` rows, topW wide) as CONSOLE draws it: 720 high,
 // centred when narrower than the canvas; keepSides: never cut at its sides (fitted to the

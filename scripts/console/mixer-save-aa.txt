@@ -1,0 +1,9 @@
+# From G-X-music: RB records, the stick and A play the D key, RB stops ("save your song?"), A A:
+# No (it opens on No), then a key: the save page never opens.
+10 2 pad rb
+40 11 pad lx-
+60 16 pad ly+
+90 10 pad a
+120 2 pad rb
+180 2 pad a
+240 2 pad a

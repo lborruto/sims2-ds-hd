@@ -104,6 +104,9 @@ constexpr const char* kCasKbLabel[3] = {"ABC", "abc", "123!"};
 
 // HD geometry (canvas).
 constexpr Rect kCasTopBox {16, 16, 664, 640};                  // the model, fitted at its shape
+// The game's "L" / "R" pills over its turn arrows on the top screen (DS pixels, measured on s3):
+// covered by the pad's chips.
+constexpr Rect kCasTurnPill[2] = {{29, 144, 28, 13}, {200, 144, 28, 13}};
 constexpr Rect kCasPanel {696, 16, 568, 688};
 constexpr int kCasX = 716, kCasW = 528;                        // the panel's inside
 constexpr Rect kCasTabBar {kCasX, 30, kCasW, 76};
@@ -138,6 +141,18 @@ constexpr Rect kCasTick {756, 544, 210, 88}, kCasCross {994, 544, 210, 88};
 std::string CasKeyText(const RomData& rom, int page, int i);
 // A name as the HD shows it: the game's '$' its simoleon, drawn §.
 std::string CasNameText(const std::string& name);
+// Create-a-Sim's name typed on the computer's keyboard: the taps for one character ("\b" the
+// backspace; "$" is the game's §) on the game's own keyboard as it is now: its key when the page
+// shown has it (done), else the label of the page that has it (not done: the key once the game
+// shows that page); nothing and done for a character no page has, a full name, or a backspace on
+// an empty one. The port never writes the name: the game types it, as from its own keys.
+struct CasType
+{
+    std::vector<MenuStep> taps;
+    bool done = true;
+};
+CasType CasTypeAction(const CasState& cs, const RomData& rom, const std::string& ch);
+constexpr int kCasTypeWait = 6; // frames after a tap before the next character (the game reads a tap within 4-6)
 
 // The view (valid when the RAM's part reads, the screen is Create-a-Sim's and the game's strings
 // are there: CONSOLE's HD Create-a-Sim; else milestone 1's picture); the Of form without the

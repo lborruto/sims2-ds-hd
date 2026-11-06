@@ -1,5 +1,6 @@
-# From G-X-artgal (CONSOLE): B asks the game's "Are you done painting?", B answers No, B again and A Yes.
+# From G-X-artgal (CONSOLE): B asks the game's "Are you done painting?", B answers No, B again, Right and A Yes (it opens on No).
 10 2 pad b
 50 2 pad b
 90 2 pad b
+120 2 pad right
 130 2 pad a

@@ -261,6 +261,15 @@ static void triggers_and_dead_zone()
     Axis(x, SDL_CONTROLLER_AXIS_RIGHTX, 1);
     Pump(pads);
     CHECK(std::fabs(pads.Read(wide).rx - 1) < 0.01f && std::fabs(pads.Read(opt).rx - 1) < 0.01f);
+    // Swap the sticks (left_handed): the right stick's push read as the left's and the other way,
+    // their clicks too, so the world's camera (the right stick's, navigator.h) is the left one's.
+    Axis(x, SDL_CONTROLLER_AXIS_LEFTX, 0);
+    Axis(x, SDL_CONTROLLER_AXIS_LEFTY, -1);
+    Pump(pads);
+    r = pads.Read(opt);
+    r.btn[IN_RS] = true;
+    SwapSticks(r);
+    CHECK(std::fabs(r.lx - 1) < 0.01f && r.ly == 0 && std::fabs(r.ry + 1) < 0.01f && r.rx == 0 && r.btn[IN_LS] && !r.btn[IN_RS]);
     pads.CloseAll();
     Detach(x);
     Pump(pads);

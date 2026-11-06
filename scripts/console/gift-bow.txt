@@ -1,0 +1,5 @@
+# From A-gift2-base (Give Gift, slot 1 the game's selection), CONSOLE: Right, Right (onto the bow:
+# the game's own button takes the focus), A → the selected item given (the second one kept), the panel.
+20 2 pad right
+40 2 pad right
+90 2 pad a

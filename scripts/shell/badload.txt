@@ -1,0 +1,18 @@
+# From s7, a broken slot 2 (written by the check): Start + Back, Down x3, A (the save states),
+# Right (slot 2), A (asked), Right, A: the load fails, the state before it is put back (still the
+# phone), the menu stays; B B back to the game. Then slot 1 is a folder: A on slot 1 (empty, so it
+# saves) fails and says so.
+10 2 pad start
+10 2 pad menu
+20 2 pad down
+26 2 pad down
+32 2 pad down
+40 2 pad a
+50 2 pad right
+60 2 pad a
+70 2 pad right
+80 2 pad a
+90 2 pad left
+100 2 pad a
+110 2 pad b
+120 2 pad b

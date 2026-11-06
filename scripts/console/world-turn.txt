@@ -1,0 +1,4 @@
+# From s7, CONSOLE: B closes the phone, then the right stick held left 40 frames (the DS's L: the
+# world's camera turns).
+20 2 pad b
+120 40 pad rsleft

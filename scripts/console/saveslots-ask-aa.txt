@@ -1,0 +1,4 @@
+# From B-cas-opt-save, CONSOLE: A (the game's tick: "Overwrite this save?"), A again at once: the
+# question opened on No, so the second A answers No (nothing saved).
+20 2 pad a
+75 2 pad a

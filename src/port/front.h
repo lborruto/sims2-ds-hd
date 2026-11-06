@@ -48,8 +48,14 @@ constexpr Rect kFrBigButtonFrom {64, 41, 128, 128};
 constexpr int kFrBigX = 128, kFrBigY = 105;
 constexpr int kFrMenuButtons = 4, kFrMenuBoxX = 170, kFrMenuBoxY0 = 22, kFrMenuBoxDy = 40, kFrMenuBoxW = 26, kFrMenuBoxH = 26;
 constexpr int kFrSplashX = 128, kFrSplashY = 100;
+// How long A / Start hold the splash's touch: while the intro video plays the splash's object
+// updates only every 4 to 6 frames (the video's decoding slows its loop), so the touch script's
+// usual 3-frame tap fell between two of its polls about one press in four (pad-boot-late); 8
+// frames always span one.
+constexpr int kFrSplashHold = 8;
 // The game's strings: the four buttons' labels.
 constexpr int kStrFrMenu[kFrMenuButtons] = {6, 7, 39, 9};
+constexpr int kFrWireless = 3; // DS Wireless: greyed (a second DS), its note in the hints
 // The game's sprites (descriptors): the buttons' ▶ (normal, pressed), the DS Wireless icon.
 constexpr int kSprFrArrow = 2506, kSprFrArrowOn = 2503, kSprFrWireless = 8769;
 
@@ -59,6 +65,7 @@ constexpr Rect kFrTopBox {24, 72, 768, 576};   // 3x the DS's 4:3
 constexpr Rect kFrPanel {816, 48, 440, 624};
 constexpr int kFrButtonX = kFrPanel.x + 24, kFrButtonW = kFrPanel.w - 48, kFrButtonY0 = 84, kFrButtonDy = 128, kFrButtonH = 100;
 constexpr Rect kFrHints {kFrPanel.x + 24, kFrPanel.y + kFrPanel.h - 64, kFrPanel.w - 48, 40};
+constexpr Rect kFrNote {kFrHints.x, kFrHints.y - 16, kFrHints.w, kFrHints.h + 20}; // DS Wireless's note (between the last button and the panel's foot)
 constexpr Rect kFrSplash {838, 216, 384, 288};
 constexpr float kFrLabelSize = 34, kFrLabelMin = 24;
 constexpr int kFrArrow = 64, kFrIconW = 56;   // the ▶'s box at the button's right end; DS Wireless's icon before its label
@@ -68,6 +75,11 @@ constexpr Rect FrontButtonRect(int i) { return {kFrButtonX, kFrButtonY0 + i * kF
 // Whether the front end shows one of this file's screens, and its view (valid false otherwise:
 // milestone 1's front-end picture): the boot (a splash 0-3, 5, 6), the title, the main menu, read
 // from RAM, with the game's strings. Built every frame by the navigator's caller and CONSOLE.
+// The boot goes by on its own: nothing up yet, the intro video, or a splash that takes no touch
+// (the legal, EA and Maxis ones, modes 1-3, and the zoom and blank between, 5-6). False from the
+// last splash (mode 0, "Touch the Touch Screen"), a popup splash (4) or any other screen: fast
+// boot (main.cpp) runs only while this holds, and never presses anything.
+bool BootPassesBy(const GameState& g);
 MenuView FrontView(ScreenState s, const GameState* game, const RomData* rom);
 // The same without the strings' check (tests): rom null leaves the words empty.
 MenuView FrontViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);

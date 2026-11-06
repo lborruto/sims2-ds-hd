@@ -1,0 +1,6 @@
+# From B-cas-opt, CONSOLE: MENU, Up (the phone button), A (the phone), B (its X): the menu open
+# again on Options, on the phone button.
+20 2 pad menu
+50 2 pad up
+80 2 pad a
+200 2 pad b

@@ -736,7 +736,8 @@ static void phone_gift_note()
     q.W32(kS + 0x4C, 0); q.W32(kS + 0x34, kE); q.W8(kE + 0x94, 1);
     GiftState gf = ReadGameState(q.View()).town.gift;
     CHECK(gf.valid && gf.recipient == 22 && gf.recipientNameId == 345 && gf.slot == 0 && gf.refused[0]);
-    q.W32(kS + 0x4C, 1); CHECK(!ReadGameState(q.View()).town.gift.valid);   // slot past the pockets
+    q.W32(kS + 0x4C, 1); gf = ReadGameState(q.View()).town.gift; CHECK(gf.valid && gf.slot == -1);   // the slot just given (past the pockets): no selection
+    q.W32(kS + 0x4C, 6); CHECK(!ReadGameState(q.View()).town.gift.valid);   // past the six slots: garbage
     q.W32(kS + 0x4C, 0); q.W16(kActor + 0xA, 46); CHECK(!ReadGameState(q.View()).town.gift.valid);
     q.W16(kActor + 0xA, 22); q.W8(kE + 0x94, 2); CHECK(!ReadGameState(q.View()).town.gift.valid);
 
@@ -1195,13 +1196,16 @@ static void drencher_and_crime()
     r = mg_ram(0x02134EC8, -1);
     r.W8(kS + 0x61, 0x10);   // unset before the first throw
     CrimeState c = ReadGameState(r.View()).minigame.crime;
-    CHECK(c.valid && !c.help && c.phase == 0 && c.angle == 0 && !c.hit && !c.canScare);
+    CHECK(c.valid && !c.help && !c.helpText && c.phase == 0 && c.angle == 0 && !c.hit && !c.canScare);
+    r.W8(kS + 0x4D, 1);
+    CHECK(ReadGameState(r.View()).minigame.crime.helpText);
+    r.W8(kS + 0x4D, 0);
     r.W8(kS + 0x4C, 1); r.W8(kS + 0x52, 1); r.W8(kS + 0x58, 2); r.W16(kS + 0x5A, 82); r.W8(kS + 0x5C, 1); r.W8(kS + 0x5D, 1); r.W8(kS + 0x5E, 1); r.W8(kS + 0x5F, 1); r.W8(kS + 0x60, 1); r.W8(kS + 0x61, 1);
     c = ReadGameState(r.View()).minigame.crime;
     CHECK(c.valid && c.help && c.dragging && c.phase == 2 && c.angle == 82 && c.canScare && c.armed && c.canSubdue && c.scarePressed && c.subduePressed && c.hit);
     r.W16(kS + 0x5A, (u32)(-90 & 0xFFFF));
     CHECK(ReadGameState(r.View()).minigame.crime.angle == -90);
-    for (auto [off, val] : {std::pair<u32, u32>{0x4C, 2}, {0x58, 4}, {0x5C, 2}, {0x60, 3}})
+    for (auto [off, val] : {std::pair<u32, u32>{0x4C, 2}, {0x4D, 2}, {0x58, 4}, {0x5C, 2}, {0x60, 3}})
     {
         Ram q = r;
         q.W8(kS + off, val);
@@ -1284,7 +1288,11 @@ static void cards_and_vacuum()
     CardsState k = g.minigame.cards;
     CHECK(g.screen == GScreen::Cards && k.valid && k.deck == 39 && k.total == 60 && k.hand == 9 && k.opponent == 5 && k.score == -10 && k.opponentScore == 30 &&
           k.treasure == 10 && k.name == "Jun" && !k.box && !k.message && !k.quitAsk);
-    CHECK(MinigameLine(g) == "cards deck=39/60 hand=9 opponent=5 score=-10,30 treasure=10 box=0 message=0 quit=0 name=\"Jun\"");
+    CHECK(MinigameLine(g) == "cards deck=39/60 hand=9 opponent=5 score=-10,30 treasure=10 box=0 message=0 quit=0 phase=0 turn=0 name=\"Jun\"");
+    // The turn: its step and whose it is (the opponent's play: "Other Player's Turn").
+    { Ram q = r; q.W8(kS + 0x2F0, 1); q.W8(kS + 0x2F1, 1); k = ReadGameState(q.View()).minigame.cards; CHECK(k.valid && k.phase == 1 && k.turn == 1); }
+    { Ram q = r; q.W8(kS + 0x2F0, 16); CHECK(!ReadGameState(q.View()).minigame.cards.valid); }
+    { Ram q = r; q.W8(kS + 0x2F1, 2); CHECK(!ReadGameState(q.View()).minigame.cards.valid); }
     r.W8(kS + 0x306, 1); r.W8(kS + 0x307, 1);
     k = ReadGameState(r.View()).minigame.cards;
     CHECK(k.valid && k.box && k.quitAsk && !k.message);
@@ -1512,12 +1520,14 @@ static void front_cas()
     CHECK(!ReadGameState(r.View()).front.cas.switching);
     setpage(1, 1); r.W16(kFN + 0x3E, 2); r.W16(kFN + 0x38, 3); r.W16(kFN + 0x3A, 13);
     g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.hairKnown && g.front.cas.hairStyle == 2 && g.front.cas.hairScroll == 3 && g.front.cas.hairPos == 13 && !g.front.cas.nameKnown);
-    r.W16(kFN + 0x3A, 18); CHECK(!ReadGameState(r.View()).front.cas.valid); r.W16(kFN + 0x3A, 13);
-    r.W16(kFN + 0x3E, 18); CHECK(!ReadGameState(r.View()).front.cas.valid); r.W16(kFN + 0x3E, 17);
-    setpage(2, 2); r.W16(kFN + 0x10, 8); CHECK(ReadGameState(r.View()).front.cas.face == 8); r.W16(kFN + 0x10, 9); CHECK(!ReadGameState(r.View()).front.cas.valid);
+    // (a field out of its range, the page object being filled: the page without its fields, still valid)
+    auto unknown = [&]() { const CasState c = ReadGameState(r.View()).front.cas; return c.valid && !c.switching && !c.hairKnown && !c.clothesKnown && !c.keepKnown && c.face < 0; };
+    r.W16(kFN + 0x3A, 18); CHECK(unknown()); r.W16(kFN + 0x3A, 13);
+    r.W16(kFN + 0x3E, 18); CHECK(unknown()); r.W16(kFN + 0x3E, 17);
+    setpage(2, 2); r.W16(kFN + 0x10, 8); CHECK(ReadGameState(r.View()).front.cas.face == 8); r.W16(kFN + 0x10, 9); CHECK(unknown());
     setpage(3, 3); r.W16(kFN + 0x14, 4); r.W16(kFN + 0x16, 1); r.W16(kFN + 0x18, 16);
     g = ReadGameState(r.View()); CHECK(g.front.cas.clothesKnown && g.front.cas.category == 4 && g.front.cas.clothesPage == 1 && g.front.cas.item == 16);
-    r.W16(kFN + 0x14, 6); CHECK(!ReadGameState(r.View()).front.cas.valid); r.W16(kFN + 0x14, 4);
+    r.W16(kFN + 0x14, 6); CHECK(unknown()); r.W16(kFN + 0x14, 4);
     CHECK(!ReadGameState(r.View()).front.cas.arrowsKnown && ReadGameState(r.View()).front.cas.clothesCell == -1);   // no sprite list
     {   // the page's sprites (a null-ended list of CActorSprites): its arrows [6] / [7] and its ring [8] on a cell
         const u32 list = 0x021A5000, spr = 0x021A5100;
@@ -1540,7 +1550,13 @@ static void front_cas()
     }
     setpage(4, 4); r.W8(kFN + 0x10, 3); r.W8(kFN + 0x11, 1);
     g = ReadGameState(r.View()); CHECK(g.front.kind == FrontKind::KeepSim && g.front.cas.keepKnown && g.front.cas.aspiration == 3 && g.front.cas.answer == 1);
-    r.W8(kFN + 0x11, 3); CHECK(!ReadGameState(r.View()).front.cas.valid && ReadGameState(r.View()).front.kind == FrontKind::None);
+    r.W8(kFN + 0x11, 3); CHECK(unknown() && ReadGameState(r.View()).front.kind == FrontKind::KeepSim);
+    // the overlay number lagging behind the swap: Create-a-Sim when the page object agrees, not when it does not
+    r.W8(kFN + 0x11, 1);
+    r.W32(kP + 0xE34, 4); CHECK(ReadGameState(r.View()).screen == GScreen::CreateASim && ReadGameState(r.View()).front.cas.keepKnown);
+    setpage(4, 1); CHECK(ReadGameState(r.View()).screen == GScreen::Unknown);
+    setpage(4, 4); r.W32(kP + 0xE34, 3); CHECK(ReadGameState(r.View()).screen == GScreen::CreateASim);
+    r.W8(kFN + 0x11, 3);
     // the page and its object must agree; the in-game pages reuse the Hair / Clothes objects
     setpage(4, 1); g = ReadGameState(r.View()); CHECK(g.front.cas.valid && g.front.cas.switching && g.front.cas.page == 4 && !g.front.cas.keepKnown && !g.front.cas.hairKnown);
     setpage(6, 1); r.W16(kFN + 0x3E, 1); r.W16(kFN + 0x38, 0); CHECK(ReadGameState(r.View()).front.cas.valid && ReadGameState(r.View()).front.cas.page == 6);

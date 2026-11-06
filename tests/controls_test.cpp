@@ -5,6 +5,7 @@
 #define SDL_MAIN_HANDLED // (a plain main, on Windows too)
 #include <SDL.h>
 
+#include <cmath>
 #include <cstdio>
 #include <fstream>
 #include <iterator>
@@ -221,8 +222,96 @@ static void controller_settings()
     remove(path.c_str());
 }
 
+// The world's camera (navigator.h): the shoulders' default L / R no longer turn there, a pad input
+// the player gave L / R himself does (PadOwn). An older file that names the default (`pad_l=lb`,
+// written by a capture of the same button) moves with the default; a remap is kept, through a
+// save and a load too; LB / RB stay L / R's inputs (the menus' pages and tabs).
+static void world_camera_bindings()
+{
+    Bindings d;
+    CHECK(d.Pad(L) == IN_LB && d.Pad(R) == IN_RB && !d.PadOwn(L) && !d.PadOwn(R));
+    Bindings old;
+    old.Apply("pad_l", "lb");
+    old.Apply("pad_r", "rb");
+    CHECK(old.Pad(L) == IN_LB && !old.PadOwn(L) && !old.PadOwn(R) && OneEach(old));
+    Bindings own;
+    own.Apply("pad_l", "lt");          // L on the left trigger: TOUCH (LT's default) gets LB
+    CHECK(own.Pad(L) == IN_LT && own.PadOwn(L) && !own.PadOwn(R) && OneEach(own));
+    Bindings back;
+    for (size_t at = 0, nl; (nl = own.Lines().find('\n', at)) != std::string::npos; at = nl + 1)
+    {
+        const std::string line = own.Lines().substr(at, nl - at);
+        const size_t eq = line.find('=');
+        back.Apply(line.substr(0, eq), line.substr(eq + 1));
+    }
+    CHECK(back.Pad(L) == IN_LT && back.PadOwn(L) && OneEach(back));
+    Bindings swapped;
+    swapped.Apply("pad_l", "rb");      // the shoulders swapped: both the player's own
+    CHECK(swapped.Pad(L) == IN_RB && swapped.Pad(R) == IN_LB && swapped.PadOwn(L) && swapped.PadOwn(R));
+    Bindings none;
+    none.Apply("pad_l", "none");
+    CHECK(none.Pad(L) == kNone && none.PadOwn(L));
+}
+
+// Input::Actions' turnL / turnR (Bindings::CameraTurns): the keyboard's L / R keys always turn; a
+// pad's L / R only on an input of the player's own (the default LB / RB, or an older file naming
+// them, never: they are the menus' pages); held both, both.
+static void camera_turns()
+{
+    bool l = true, r = true;
+    Bindings d;
+    d.CameraTurns(false, false, false, false, l, r);
+    CHECK(!l && !r);
+    d.CameraTurns(true, false, false, false, l, r);
+    CHECK(l && !r);
+    d.CameraTurns(false, true, false, false, l, r);
+    CHECK(!l && r);
+    d.CameraTurns(false, false, true, true, l, r); // (LB / RB by default: no turn)
+    CHECK(!l && !r);
+    Bindings old;
+    old.Apply("pad_l", "lb");
+    old.Apply("pad_r", "rb");
+    old.CameraTurns(false, false, true, true, l, r);
+    CHECK(!l && !r);
+    Bindings own;
+    own.Apply("pad_l", "lt");
+    own.CameraTurns(false, false, true, true, l, r); // (L the player's own, R still the default)
+    CHECK(l && !r);
+    own.CameraTurns(true, true, false, false, l, r);
+    CHECK(l && r);
+    Bindings swapped;
+    swapped.Apply("pad_l", "rb");
+    swapped.CameraTurns(false, false, false, true, l, r);
+    CHECK(!l && r);
+}
+
+// The UI's Auto size (settings.h's AutoUiScale): the canvas pixel's millimetres and the display's
+// diagonal for the displays the rule was chosen on (fullscreen unless said), as printed in the
+// task's report; nonsense or nothing known: 100 %.
+static void auto_ui_scale()
+{
+    auto at = [](float widthMm, float heightMm, float canvasMm) {
+        return std::lround(AutoUiScale(canvasMm / 1280, std::hypot(widthMm, heightMm)) * 100);
+    };
+    CHECK(at(708.4f, 398.5f, 708.4f) == 65);    // 32" 4K (16:9): 63 % wanted (the capitals 7.6 mm)
+    CHECK(at(708.4f, 398.5f, 354.2f) == 125);   // the same, a 1280 x 720 window at "looks like 2560 x 1440"
+    CHECK(at(531.4f, 298.9f, 531.4f) == 75);    // 24" 1080p
+    CHECK(at(597.7f, 336.2f, 597.7f) == 70);    // 27" 1440p
+    CHECK(at(286.5f, 179.1f, 286.5f) == 100);   // 13.3" 2560 x 1600 laptop (16:10: the canvas as wide as the screen)
+    CHECK(at(286.5f, 179.1f, 254.7f) == 110);   // the same, a 1280 x 720 window at "looks like 1440 x 900"
+    CHECK(at(344.2f, 193.6f, 344.2f) == 90);    // 15.6" 1080p laptop
+    CHECK(at(150.8f, 94.2f, 150.8f) == 130);    // 7" 1280 x 800 handheld (the Steam Deck)
+    CHECK(at(1209.6f, 680.4f, 1209.6f) == 115); // 55" TV
+    CHECK(AutoUiScale(1, 800) == 0.6f);          // (the floor: 60 %)
+    CHECK(AutoUiScale(0, 0) == 1 && AutoUiScale(0.5f, 0) == 1 && AutoUiScale(0.5f, 5000) == 1 && AutoUiScale(10, 500) == 1);
+    CHECK(UiZoomOf(0, 0.8f) == 0.8f && UiZoomOf(125, 0.8f) == 1.25f);
+}
+
 int main(int, char**)
 {
+    auto_ui_scale();
+    camera_turns();
+    world_camera_bindings();
     controller_settings();
     upgrade_looks();
     upgrade_layout();

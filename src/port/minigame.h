@@ -5,8 +5,9 @@
 // the kit's look: a title plate with the minigame's name in the game's words, the HD status bar
 // where the game keeps its HUD, and a side panel with the game's values from RAM (a well) and the
 // controller's hints as the kit's chips, for the minigame's scheme (activities.h). What the game
-// says changes the hints: the cards' quit question (A its "Yes", B its "No"), the end-of-turn
-// message (A goes on), the vacuum's clog (the blow's hint lit red).
+// says changes the hints: a question (No first: the D-pad, A the focused answer, B No), the end-of-turn
+// message (A goes on), the vacuum's clog (the blow's hint lit red). The games' own messages and
+// questions (and the game's popup over a minigame) are HD boxes over the playfield (BuildGameBox).
 // The hints and the side panels' labels the game has no word for are the port's own, translated
 // into the game's five languages (port/ownwords.*, by RomData::Language).
 // Without the game's strings or RAM: milestone 1's activity layout (console.cpp, the 5 x 7 hints).
@@ -73,7 +74,18 @@ constexpr int kStrMgMixer = 491, kStrMgMixSong0 = 1770, kStrMgMixPlay = 1778, kS
 constexpr int kStrMgMixVox = 1788, kStrMgMixPrep = 1790, kStrMgMixTempo = 1794, kStrMgMixTracks = 1796;
 constexpr int kStrMgMixSelect = 1763, kStrMgMixMic = 1764, kStrMgMixSaveAsk = 1765, kStrMgMixPreview = 1766;
 constexpr int kStrMgSongTitle = 1804, kStrMgBurn = 1805, kStrMgNoData = 11, kStrMgWireless = 2026, kStrMgExit = 2030;
-constexpr int kStrMgMax = kStrMgExit;   // the largest id used
+// The games' own boxes in HD (BuildMinigame): the cards' line (1673 "Draw a card!" + the turn's step:
+// 1674 play or discard, 1675 discard, 1676 the plank, 1677 the cannon, 1678 two cards drawn; 1679
+// "Switching Players", 1681 "Drawing Card", 1682 "Other Player's Turn"), their end of a turn (1695:
+// its first line, "End of Turn.", then MooGoo's "@1's turn" 1740: not the game's "Touch for…"),
+// the quit question (2589, the cards' and MooGoo's); MooGoo's line ("Shuffling" 1741, "Dealing"
+// 1742, "Play a Card" 1744, "Pick a monkey to target!" 1748; its bet's "Touch a Monkey!" in the
+// port's words); the help texts (the Drencher's 1661..1666, the crime game's 1667..1669, the
+// mixer's pages: titles 1778 + 2h, bodies the next ids, to 1803).
+constexpr int kStrMgCardsLine0 = 1673, kStrMgCardsSwitching = 1679, kStrMgCardsDrawing = 1681, kStrMgCardsOther = 1682, kStrMgEndOfTurn = 1695;
+constexpr int kStrMgTurnOf = 1740, kStrMgMooShuffling = 1741, kStrMgMooDealing = 1742, kStrMgMooPlayCard = 1744, kStrMgMooTarget = 1748;
+constexpr int kStrMgQuitAsk = 2589, kStrMgDrHelp0 = 1661, kStrMgCrHelp0 = 1667, kStrMgMixHelp0 = 1778, kStrMgMixHelpEnd = 1804;
+constexpr int kStrMgMax = kStrMgQuitAsk;   // the largest id used
 
 // The frame's geometry (canvas pixels). The playfield stays milestone 1's kActivityBottomTo (36,68,
 // 768 x 576, framed), the secondary panel kActivityTopX/Y (384 wide); the title plate over the
@@ -96,7 +108,25 @@ constexpr float kMgValueSize = 24, kMgValueMin = 16, kMgHeadSize = 18;
 // The cards' deck on the touch screen (a thumbnail of the game's own: the values' well) and the
 // social answers' labels (left, middle, right: the game's own words, live crops shown 2x).
 constexpr Rect kMgDeckFrom {110, 6, 36, 53};
+// The social game's own bar at its top screen's top (the Sim's name and the relationship's meter,
+// rows 0-15): left out of the secondary panel.
+constexpr int kMgSocialBarRows = 16;
 constexpr Rect kMgAnswerFrom[3] = {{6, 169, 82, 19}, {87, 150, 82, 19}, {168, 169, 82, 19}};
+
+// The games' boxes on the touch screen (DS pixels, measured on their pictures), which the HD box
+// hides: the cards' quit question and end of a turn, MooGoo's quit question, the mixer's save
+// question (and its microphone's), a help text; MooGoo's line and turn banner; the area the HD
+// boxes are centred in (the playfield's frame).
+constexpr Rect kMgCardsBox {56, 32, 146, 146}, kMgMooGooBox {33, 71, 190, 46}, kMgMixerBox {40, 72, 176, 48}, kMgMicBox {40, 130, 162, 54};
+constexpr Rect kMgHelpBox {16, 16, 224, 160};
+constexpr Rect kMgMooLineFrom {20, 2, 216, 20}, kMgMooBannerFrom {60, 78, 136, 48};
+constexpr Rect kMgBoxArea {kActivityBottomTo.x - 6, kActivityBottomTo.y - 6, kActivityBottomTo.w + 12, kActivityBottomTo.h + 12};
+
+// The cards' line for its state (CardsState::phase / turn), -1 none.
+int CardsLineId(const CardsState& k);
+// A minigame's help text the stylus's point (x, y) on its touch screen asks for in help mode (the
+// Drencher's 1661..1666, the crime game's 1667..1669, the mixer's page title 1778 + 2h), -1 none.
+int MinigameHelpAt(Screen s, int x, int y);
 
 // Whether the HD frame draws screen s: an activity (Social, Cards, Vacuum, the pointing and timing games), the game's RAM read
 // (game valid) and its strings there (rom with every id above).

@@ -1,5 +1,6 @@
 #include "input.h"
 
+#include "port/cas.h"
 #include "port/minigame.h"
 #include "port/popup.h"
 
@@ -94,7 +95,24 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
     Settings& s = app.settings;
     // Controllers plugged in or out, and which one drives (the last used).
     if (pads.Event(ev, PadOptionsOf(s))) lastKeyboard = false;
-    if (ev.type == SDL_QUIT) app.quit = true;
+    if (ev.type == SDL_QUIT) wantQuit = true;
+    else if (ev.type == SDL_TEXTINPUT)
+    {
+        // Create-a-Sim's name: each character (UTF-8) in turn, a few queued at most.
+        if (!menuOpen && TypingKeys(app))
+            for (const char* p = ev.text.text; *p;)
+            {
+                const char* q = p + 1;
+                while (*q && ((unsigned char)*q & 0xC0) == 0x80) q++;
+                if (typed.size() < 16) typed.emplace_back(p, q);
+                p = q;
+            }
+    }
+    else if (ev.type == SDL_DROPFILE)
+    {
+        if (ev.drop.file) droppedFile = ev.drop.file;
+        SDL_free(ev.drop.file);
+    }
     else if (ev.type == SDL_KEYDOWN || ev.type == SDL_KEYUP)
     {
         const bool down = ev.type == SDL_KEYDOWN;
@@ -104,6 +122,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
         if (!down)
         {
             if (a >= 0) held[a] = false;
+            if (k == SDLK_RETURN || k == SDLK_KP_ENTER) enterA = false;
             return;
         }
         if (capturing)
@@ -121,10 +140,22 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
             else if (k == SDLK_DOWN) nav.down = true;
             else if (k == SDLK_LEFT) nav.left = true;
             else if (k == SDLK_RIGHT) nav.right = true;
-            else if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE || a == A) nav.accept = true;
-            else if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE || a == B) nav.back = true;
+            else if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE || a == A) nav.a = true;
+            else if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE || a == B) nav.b = true;
+            else if (k == SDLK_DELETE || a == X) nav.x = true;
+            else if (a == Y) nav.y = true;
             else if (a == MENU && !ev.key.repeat) wantMenu = true;
             return;
+        }
+        // Create-a-Sim's Name page: Enter is the navigator's A (the focused key types, a gender or
+        // skin is chosen); Backspace erases; with the focus on the game's keyboard, a key that types
+        // (a letter, a digit, a sign) types, its action resting. (The text comes as SDL_TEXTINPUT,
+        // after this.)
+        if (TypingName(app) && ev.key.windowID != kScriptedWindow)
+        {
+            if (k == SDLK_RETURN || k == SDLK_KP_ENTER) { enterA = true; return; }
+            if (k == SDLK_BACKSPACE) { if (typed.size() < 16) typed.emplace_back("\b"); return; }
+            if (TypingKeys(app) && k >= SDLK_SPACE && !(k & SDLK_SCANCODE_MASK) && k != SDLK_DELETE) return;
         }
         if (a >= 0) held[a] = true;
         if (ev.key.repeat) return;
@@ -143,6 +174,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
     }
     else if (ev.type == SDL_MOUSEMOTION)
     {
+        mouseMovedAt = SDL_GetTicks();
         mouseX = ev.motion.x;
         mouseY = ev.motion.y;
         if (menuOpen)
@@ -164,6 +196,7 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
     else if (ev.type == SDL_MOUSEBUTTONDOWN || ev.type == SDL_MOUSEBUTTONUP)
     {
         const bool down = ev.type == SDL_MOUSEBUTTONDOWN;
+        mouseMovedAt = SDL_GetTicks();
         mouseX = ev.button.x;
         mouseY = ev.button.y;
         if (ev.button.button == SDL_BUTTON_LEFT)
@@ -215,6 +248,13 @@ bool Input::PadPressed(const Settings& s, int action) const
 void Input::Poll(const App& app, bool menuOpen)
 {
     const Settings& s = app.settings;
+    // In front: the window's own flags (keyboard focus, not minimised), read every frame (an event
+    // missed or a window that never got focus leaves no stale state).
+    if (window)
+    {
+        const Uint32 f = SDL_GetWindowFlags(window);
+        focused = (f & SDL_WINDOW_INPUT_FOCUS) && !(f & SDL_WINDOW_MINIMIZED);
+    }
     prevPad = pad;
     panelPulse = false;
     // The HD chips: the keys when the keyboard was used last, else the driving pad's buttons.
@@ -224,6 +264,8 @@ void Input::Poll(const App& app, bool menuOpen)
     ui::SetChipLook(ChipLookFor(lastKeyboard, padStyle, s.controls, labels, pads.Type()));
     // One controller drives: the last one used (pads.h), its sticks outside the dead zone.
     pad = pads.Read(PadOptionsOf(s));
+    // Left-handed: the two sticks (and their clicks) swapped; the camera with them.
+    if (s.leftHanded) SwapSticks(pad);
     if (!pads.Any()) { panelButton = ReleasePulse(); return; }
     // TOUCH MENU on the pad: on release, spoiled by Start (Start + Back opens the pause menu
     // whichever goes down first), by the pause menu and by a binding being captured.
@@ -234,14 +276,33 @@ void Input::Poll(const App& app, bool menuOpen)
     }
     if (capturing)
     {
-        // (Any button, the menu's too: it may be what the action is being given.)
+        // Any button, the menu's too (it may be what the action is being given), taken when it is
+        // let go: Start and Back down together then are the cancel (Esc on a pad).
+        bool any = false;
         for (int i = 0; i < IN_COUNT; i++)
-            if (pad.btn[i] && !prevPad.btn[i]) { newPad = i; break; }
+        {
+            if (pad.btn[i] && !prevPad.btn[i])
+            {
+                if (captureFirst < 0) captureFirst = i;
+                captureSeen |= 1u << i;
+            }
+            any |= pad.btn[i];
+        }
+        if (captureFirst >= 0 && !any)
+        {
+            if ((captureSeen & (1u << IN_START)) && (captureSeen & (1u << IN_BACK))) captureCancel = true;
+            else newPad = captureFirst;
+            captureFirst = -1;
+            captureSeen = 0;
+        }
         return;
     }
     // The menu opens with its button, or with START and BACK together.
     const bool combo = pad.btn[IN_START] && pad.btn[IN_BACK];
-    if (PadPressed(s, MENU) || (combo && !prevCombo)) wantMenu = true;
+    // (In the shell, a MENU on the pad's accept or back is that, not a second action too.)
+    const shell::PadIns shellIns = shell::ShellPadIns(s.controls);
+    const bool menuIsNav = menuOpen && (s.controls.Pad(MENU) == shellIns.accept || s.controls.Pad(MENU) == shellIns.back);
+    if ((PadPressed(s, MENU) && !menuIsNav) || (combo && !prevCombo)) wantMenu = true;
     prevCombo = combo;
     auto stickUp = [](const PadRaw& p) { return p.btn[IN_UP] || p.ly < -0.5f; };
     auto stickDown = [](const PadRaw& p) { return p.btn[IN_DOWN] || p.ly > 0.5f; };
@@ -249,12 +310,23 @@ void Input::Poll(const App& app, bool menuOpen)
     auto stickRight = [](const PadRaw& p) { return p.btn[IN_RIGHT] || p.lx > 0.5f; };
     if (menuOpen)
     {
-        nav.up |= stickUp(pad) && !stickUp(prevPad);
-        nav.down |= stickDown(pad) && !stickDown(prevPad);
-        nav.left |= stickLeft(pad) && !stickLeft(prevPad);
-        nav.right |= stickRight(pad) && !stickRight(prevPad);
-        nav.accept |= PadPressed(s, A);
-        nav.back |= PadPressed(s, B);
+        // A direction held repeats: after 18 frames, then every 6.
+        auto rep = [&](bool now, bool before, int& held) {
+            if (!now) { held = 0; return false; }
+            held++;
+            return !before || (held > 18 && (held - 18) % 6 == 0);
+        };
+        nav.up |= rep(stickUp(pad), stickUp(prevPad), navHeld[0]);
+        nav.down |= rep(stickDown(pad), stickDown(prevPad), navHeld[1]);
+        nav.left |= rep(stickLeft(pad), stickLeft(prevPad), navHeld[2]);
+        nav.right |= rep(stickRight(pad), stickRight(prevPad), navHeld[3]);
+        // (A cleared or moved A / B never locks the menu: without a pad input, the pad's own south / east;
+        // one press is one shell action.)
+        const shell::PadNav pn = shell::ShellPadNav(s.controls, pad.btn, prevPad.btn);
+        nav.a |= pn.a;
+        nav.b |= pn.b;
+        nav.x |= pn.x;
+        nav.y |= pn.y;
         return;
     }
     if (PadPressed(s, SAVESTATE)) wantSave = true;
@@ -265,12 +337,17 @@ PadState Input::Actions(const Settings& s) const
 {
     auto on = [&](int a) { return held[a] || PadOn(s, a); };
     PadState p = scriptPad;
-    p.a |= on(A);
+    p.a |= on(A) || enterA;
     p.b |= on(B);
     p.x |= on(X);
     p.y |= on(Y);
     p.lb |= on(L);
     p.rb |= on(R);
+    // The world's camera: the keyboard's L / R keys, a pad's only when the player gave them one.
+    bool turnL, turnR;
+    s.controls.CameraTurns(held[L], held[R], PadOn(s, L), PadOn(s, R), turnL, turnR);
+    p.turnL |= turnL;
+    p.turnR |= turnR;
     p.start |= on(START);
     p.select |= on(SELECT);
     // The keyboard's on the press; the pad's on release (Poll: Start + Back is the pause menu).
@@ -290,7 +367,18 @@ PadState Input::Actions(const Settings& s) const
         p.rt = pad.btn[IN_RT] ? 1.0f : 0.0f;
     }
     p.cursor = s.stickCursor && pads.Any();
+    p.speed = s.cursorSpeed / 100.0f;
     return p;
+}
+
+void Input::FocusForDrawing(App& app, bool screenChanged)
+{
+    if (app.shown != Layout::Console || app.consolePinned || !steering) return;
+    const GameState* game = app.portSupported ? &app.game : nullptr;
+    const MenuView v = ConsoleView(app.ConsoleScreen(), game, app.rom.get());
+    if (!v.valid || !(navigator.ViewFocus() || v.own || v.popup)) return;
+    if (!screenChanged && v.popup == navigator.PopupUp()) return;
+    app.consoleFocus = navigator.FocusFor(v);
 }
 
 void Input::Steer(App& app, const PadState& p, u32& keys)
@@ -304,12 +392,25 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         // What RAM says on the minigame (activities.h): the cards' question and message, the
         // pointing games' tools and sliders, a question of the game's popup.
         navigator.SetActivityRam(MinigameRam(game));
-        navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
+        // A held picture (consolehold.h: the last HD one through a swap of the game's) takes no
+        // input: the navigator waits for the screen to read again (nothing typed meanwhile either);
+        // only a keys step already running goes on (Navigator::Held).
+        if (!app.consoleHold.Holding())
+        {
+            navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
+            TypeName(app);
+        }
+        else navigator.Held(touchScript, keys);
         steering = true;
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
         app.consoleArmed = navigator.Armed();
+        app.consolePictureClosed = navigator.PictureClosed();
+        app.consoleVeiled = navigator.Returning();
+        app.consoleWorldOnly = screen.screen == Screen::Unknown && game && (game->between || game->screen == GScreen::Panel || game->vtable == 0)
+                                   ? app.consoleWorldOnly + 1
+                                   : 0;
         app.consolePointer = {navigator.PointerShown(), navigator.PointerDown(), navigator.QuitArmed(), navigator.PointerX(), navigator.PointerY(),
-                              navigator.Mark()};
+                              navigator.Mark(), navigator.AskFocus()};
         // The money's last change, shown on the panel's world for kPayoutFrames frames (an
         // animation's payout: the slot machine's coin then its win; a ticket's prize).
         // (Only on the panel and the activities: the front end, Create-a-Sim and a load show another save's money.)
@@ -320,6 +421,8 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
             lastMoney_ = game->hud.money;
         }
         if (payoutFrames_ > 0 && --payoutFrames_ == 0) app.consolePayout = 0;
+        // The world's prompt (port/prompt.h): the Interact target's steadiness.
+        app.consolePrompt.Update(game && game->valid && game->screen == GScreen::Panel && game->tab == 0 ? &game->town.interact : nullptr);
         // The vacuum's Y (headless runs read it here; the window's Frame adds the BLOW binding); the
         // mixer's Y (its VOX): the computer's microphone when the settings choose it, else the blow.
         const bool voiceBlow = navigator.Voice() && app.settings.mic != MicMode::Real;
@@ -333,13 +436,51 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         steering = false;
         if (!app.consolePinned) { app.consoleMenu = false; app.consoleFocus = -1; }
         app.consoleArmed = 0;
+        app.consolePictureClosed = false;
+        app.consoleVeiled = false;
+        app.consoleWorldOnly = 0;
         app.consolePointer = {};
         app.consolePayout = 0;
+        app.consolePrompt = {};
         payoutFrames_ = 0;
         lastMoney_ = -1;
         app.micBlow = false;
         app.micForce = false;
     }
+}
+
+bool Input::TypingName(const App& app)
+{
+    if (app.shown != Layout::Console || !app.portSupported || !app.rom) return false;
+    const CasState& cs = app.game.front.cas;
+    return app.game.valid && cs.valid && cs.page == 0;
+}
+
+bool Input::TypingKeys(const App& app) const
+{
+    if (!TypingName(app)) return false;
+    const u32 id = navigator.FocusId();
+    return id >= kCasKeyId && id < kCasKbPageId + 3;
+}
+
+void Input::TypeName(App& app)
+{
+    if (typed.empty()) { typeTries = 0; return; }
+    if (!TypingName(app)) { typed.clear(); typeTries = 0; return; }
+    if (typeWait > 0) { typeWait--; return; }
+    // One at a time, when the game shows its keyboard, nothing else runs and the stylus is free.
+    const CasState& cs = app.game.front.cas;
+    if (cs.switching || !cs.nameKnown || navigator.Running() || touchScript.Owns() || !app.Settled()) return;
+    const CasType t = CasTypeAction(cs, *app.rom, typed.front());
+    for (const MenuStep& st : t.taps) touchScript.Tap(st.x, st.y);
+    // The key's page shown first (its label tapped): the key itself once the game has turned it,
+    // at most three tries; a character the game has not, or a full name, is dropped.
+    if (t.done || ++typeTries > 3)
+    {
+        typed.erase(typed.begin());
+        typeTries = 0;
+    }
+    typeWait = t.taps.empty() ? 0 : kCasTypeWait;
 }
 
 void Input::PointerTouch(const App& app, bool& touching, int& tx, int& ty)
@@ -383,7 +524,8 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     }
     if (PadPressed(s, SWAP)) app.mainIsTop = !app.mainIsTop;
     const bool fastNow = held[FAST] || PadOn(s, FAST);
-    if (fastNow != fastPrev) app.fast = fastNow;
+    if (s.fastToggle) { if (fastNow && !fastPrev) app.fast = !app.fast; } // pressed once on, once off
+    else if (fastNow != fastPrev) app.fast = fastNow;
     fastPrev = fastNow;
     app.micBlow = held[BLOW] || PadOn(s, BLOW) || (app.shown == Layout::Console && (navigator.Blow() || (navigator.Voice() && s.mic != MicMode::Real)));
 
@@ -394,8 +536,13 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     else if (rotate < 0) { keys |= 1u << kL; rotate++; }
 
     int mx, my;
-    if (mouseDown && stylusDrag) { video.TouchClampedAt(app, dragPiece, mouseX, mouseY, mx, my); touching = true; tx = mx; ty = my; }
-    else if (tapFrames > 0) { touching = true; tx = tapX; ty = tapY; }
+    // (A held CONSOLE picture, consolehold.h: the stylus is up, the drag goes on after it.)
+    const bool pictureHeld = app.shown == Layout::Console && app.consoleHold.Holding();
+    if (!pictureHeld)
+    {
+        if (mouseDown && stylusDrag && video.TouchClampedAt(app, dragPiece, mouseX, mouseY, mx, my)) { touching = true; tx = mx; ty = my; }
+        else if (tapFrames > 0) { touching = true; tx = tapX; ty = tapY; }
+    }
     if (tapFrames > 0) tapFrames--;
 
     // The stick cursor: faster with a fuller deflection, for both precision and reach.
@@ -415,7 +562,7 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
         {
             if (mag > 0)
             {
-                const float step = 1.0f + 3.5f * mag;
+                const float step = (1.0f + 3.5f * mag) * s.cursorSpeed / 100.0f;
                 cursorX = std::clamp(cursorX + pad.rx * step, 0.0f, (float)(SW - 1));
                 cursorY = std::clamp(cursorY + pad.ry * step, 0.0f, (float)(SH - 1));
             }
@@ -443,9 +590,9 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
 
 void Input::EndFrame()
 {
-    wantMenu = wantSave = wantLoad = wantShot = wantFullscreen = false;
+    wantMenu = wantSave = wantLoad = wantShot = wantFullscreen = wantQuit = false;
     wantLayout = -1;
-    nav = MenuInput();
+    nav = shell::Input();
     newKey = kDefault;
     newPad = -1;
     captureCancel = false;

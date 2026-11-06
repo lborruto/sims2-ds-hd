@@ -44,10 +44,28 @@ constexpr int kStatusBarLayer = 2;
 // The status bar (UI items appended to c.ui) with its top-left at (x, y), at most maxW wide: the
 // meter shrinks to fit, then the label goes; every item stays inside the bar's panel. Returns
 // the panel's rectangle ({x, y, 0, 0} when nothing is drawn).
-Rect AddStatusBar(Composition& c, const HudState& hud, const HudStrings& s, int x, int y, int maxW);
+// framed false: the bar's items without its own panel (inside the strip below, whose panel it is).
+Rect AddStatusBar(Composition& c, const HudState& hud, const HudStrings& s, int x, int y, int maxW, bool framed = true);
 // The bar at the bottom left of the composition's world (its first top-screen piece), at
 // kStatusBarY: below CONSOLE's menu frame, so the same place in town and with the menu up.
 constexpr int kStatusBarY = 660;
 Rect AddStatusBar(Composition& c, const HudState& hud, const HudStrings& s);
 void AddStatusBar(Composition& c, const HudState& hud, const RomData* rom);
+
+// The strip under the world (the town, an HD screen over the dimmed world): the kit panel's look
+// the canvas's whole width from kStripY to its foot (its top edge alone: the dark outline and the
+// frame band kStripBand high, then the fill; inside the canvas), on the bar's layer, the status bar's
+// items in it at the left without a panel of their own (hud null or not formatted: the strip
+// alone, its height kept). The widescreen world ends at kStripY (1280 x 661), so no black shows
+// under it; the 4:3 world's last rows go under it. rightW: what the caller puts at the strip's
+// right (the town's hints), kept clear. Returns the status's rectangle ({16, y, 0, 48} when it is
+// not drawn), its items' box: the caller's own items go right of it.
+constexpr int kStripY = 661, kStripBand = 3;
+// zoom: the UI's size for the status (console.cpp's StripZoom: no larger than the strip holds):
+// its items zoomed about the strip's content row at its left (16), laid out to leave rightW (the
+// hints' width as drawn, zoomed) clear; the returned rectangle is the status as laid out, before
+// its zoom.
+Rect AddStatusStrip(Composition& c, const HudState* hud, const HudStrings& s, int rightW = 0, float zoom = 1);
+// The strip's content row (the status bar's and the hints' box): kStatusBarH high, centred.
+constexpr int kStripContentY = kStripY + (720 - kStripY - kStatusBarH + 1) / 2;
 }

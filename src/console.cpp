@@ -24,6 +24,7 @@
 #include "port/phone.h"
 #include "port/statusbar.h"
 #include "port/popup.h"
+#include "port/prompt.h"
 #include "port/ownwords.h"
 #include "romdata.h"
 
@@ -32,6 +33,31 @@ namespace sims2wide
 namespace
 {
 constexpr Rect kCanvas {0, 0, kConsoleW, kConsoleH};
+// Create-a-Sim's fade in (the bottom's brightest channel: every page has a white of 251): black
+// below kCasFadeBlack, a veil until kCasFadeWhite, on a layer above every still one.
+constexpr int kCasFadeBlack = 16, kCasFadeWhite = 245, kCasFadeLayer = 9;
+
+// The UI's size (ui::UiScale) per group of HD items: each group zoomed about its anchor and held
+// inside its limit (compose.h's ZoomUi). The menus and the screens over the dimmed world about the
+// space above the strip's centre, never larger than at 100 % (they fill it); the conversation
+// about the canvas's bottom centre; the strip's status at its left and hints at its right, about
+// the strip's content row, as large as the strip's height lets them (the strip itself, the world's
+// foot, keeps its place).
+constexpr Rect kUiLimit {4, 4, kConsoleW - 8, kConsoleH - 8};
+constexpr Rect kMenuLimit {4, 4, kConsoleW - 8, kStripY - 8};
+constexpr float kMenuAnchorY = 338; // (the menu's 30..646, centred)
+constexpr Rect kStripInside {0, kStripY + 1 + kStripBand, kConsoleW, kConsoleH - kStripY - 1 - kStripBand};
+constexpr float kStripAnchorY = kStripContentY + kStatusBarH / 2.0f;
+float StripZoom(float z) { return std::min(z, (kStripAnchorY - kStripInside.y) / (kStatusBarH / 2.0f)); }
+float MenuZoom(float z) { return std::min(z, 1.0f); }
+// The world's prompt (port/prompt.h): its plate's bottom and its drop shadow above the strip.
+constexpr Rect kPromptLimit {4, 4, kConsoleW - 8, kStripY - kPromptShadow - 4};
+// The stick cursor's screens (the touch screen at kMenuTo in its frame, FrameAround: 6 pixels):
+// the hints and the HD status bar below the frame (10 pixels below the touch screen, where they sit
+// at 100 %), the pause panel right of it (6 pixels clear, above the hints).
+constexpr int kCursorBelow = kMenuTo.y + kMenuTo.h + 10, kCursorFrameRight = kMenuTo.x + kMenuTo.w + 6;
+constexpr Rect kCursorHintsLimit {4, kCursorBelow, kConsoleW - 8, kConsoleH - 4 - kCursorBelow};
+constexpr Rect kCursorPauseLimit {kCursorFrameRight + 6, 4, kConsoleW - 4 - (kCursorFrameRight + 6), kCursorBelow - 4};
 
 Overlay Frame(Rect r, int before) { return {r, kFrameArgb, 16, 6, kOutlineArgb, before}; }
 // A frame hugging a piece: its 6-pixel border just outside it.
@@ -66,12 +92,12 @@ Overlay Text(int x, int y, const char* text, int scale)
 
 // The money's last change (port/statusbar.h's bar at `bar`): a small kit panel right of it, "+§12"
 // in a light green or "-§1" in a light red, on the bar's layer.
-void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom)
+void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom, int right = kConsoleW - 8)
 {
     const std::string text = (payout > 0 ? "+" : "-") + MenuWords(rom, kStrMgMoney, std::abs(payout));
     const float size = 26;
     const int w = (int)std::ceil(ui::TextWidth(text, size, ui::Weight::ExtraBold)) + 36;
-    if (bar.x + bar.w + 12 + w > kConsoleW - 8) return;
+    if (bar.x + bar.w + 12 + w > right) return;
     ui::UiItem p = ui::PanelItem({bar.x + bar.w + 12, bar.y, w, bar.h});
     p.layer = kStatusBarLayer;
     c.ui.push_back(p);
@@ -130,37 +156,105 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
     c.overlays[box].to.h = std::min(y - kHintGap + kHintPad - kHintBox.y, kHintBox.h);
 }
 
-// The cursor's hint box at y: the text with its shadow (TextRect) and, on each side, the padding
-// and the box's 4-pixel border; centred, or (right) at the canvas's right edge, clear of the HD
-// status bar under the touch screen. Kept on the canvas.
-static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right = false)
+// The stick cursor's hints at y, as the kit's chips in a panel: the right stick moves the cursor,
+// A touches, and (close: the hotel's furniture editor) B taps the game's X; beside them a second
+// panel, the pause menu's chip (Start + Back, as the device used last prints them; Esc on the
+// keyboard). Centred side by side, or (right) at the canvas's right edge, clear of the HD status
+// bar under the touch screen, the pause panel above it right of the touch screen's frame. Kept on
+// the canvas.
+static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right = false, bool close = false)
 {
-    constexpr int border = 4;
-    const Rect t = TextRect(0, 0, kFrontHint, 3);
-    const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset;
-    // Beside it, a kit panel: the pause menu's chip (Start + Back, as the device used last prints
-    // them; Esc on the keyboard) and the word, now that the Guide button is Steam's.
     constexpr float kSize = 24;
-    constexpr int kGap = 12, kPad = 14;
+    constexpr int kGap = 12, kPad = 14, kBetween = 22, kH = 58;
+    struct CursorChip
+    {
+        ui::Button b;
+        const char* word;
+    };
+    std::vector<CursorChip> hints {{ui::Button::RStick, OwnWord(rom, OwnWordId::Cursor)}, {ui::Button::A, OwnWord(rom, OwnWordId::MixerPoint)}};
+    if (close) hints.push_back({ui::Button::B, OwnWord(rom, OwnWordId::Close)});
+    const size_t first = c.ui.size();
+    int bw = 2 * kPad - kBetween;
+    for (const CursorChip& h : hints) bw += ui::ChipRect(0, 0, h.b, h.word, kSize).w + kBetween;
     const char* word = OwnWord(rom, OwnWordId::Pause);
     const Rect chip = ui::ChipRect(0, 0, ui::Button::Pause, word, kSize);
     const int pw = kPad + chip.w + kPad;
-    // Centred: side by side. At the right (the stick cursor's screens, the status bar at the left
-    // of the same rows): the panel above the hint, right of the touch screen's frame.
     const int bx = right ? kConsoleW - bw - 24 : (kConsoleW - (bw + kGap + pw)) / 2;
-    y = std::min(y, kConsoleH - bh - 4);
-    c.overlays.push_back({{bx, y, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
-    c.overlays.push_back(Text(bx + inset, y + inset, kFrontHint, 3));
-    const Rect panel = right ? Rect {std::max(kMenuTo.x + kMenuTo.w + 12, kConsoleW - 16 - pw), y - bh - kGap, pw, bh}
-                             : Rect {bx + bw + kGap, y, pw, bh};
+    y = std::min(y, kConsoleH - kH - 4);
+    c.ui.push_back(ui::PanelItem({bx, y, bw, kH}));
+    int x = bx + kPad;
+    for (const CursorChip& h : hints)
+    {
+        const Rect r = ui::ChipRect(0, 0, h.b, h.word, kSize);
+        c.ui.push_back(ui::ChipItem(x, y + (kH - r.h) / 2, h.b, h.word, kSize));
+        x += r.w + kBetween;
+    }
+    // The UI's size: about the hints' bottom right (or bottom centre). At the right (the stick
+    // cursor's framed touch screen above), the hints below the frame (kCursorHintsLimit), the pause
+    // panel its own group about its bottom right, right of the frame (kCursorPauseLimit).
+    if (right) ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW - 24.0f, (float)(y + kH), kCursorHintsLimit);
+    const Rect panel = right ? Rect {std::max(kCursorPauseLimit.x, kConsoleW - 16 - pw), y - kH - kGap, pw, kH}
+                             : Rect {bx + bw + kGap, y, pw, kH};
+    const size_t pause = c.ui.size();
     c.ui.push_back(ui::PanelItem(panel));
-    c.ui.push_back(ui::ChipItem(panel.x + kPad, panel.y + (bh - chip.h) / 2, ui::Button::Pause, word, kSize));
+    c.ui.push_back(ui::ChipItem(panel.x + kPad, panel.y + (kH - chip.h) / 2, ui::Button::Pause, word, kSize));
+    if (right) ZoomUi(c, pause, c.pieces.size(), ui::UiScale(), (float)(panel.x + panel.w), (float)(panel.y + panel.h), kCursorPauseLimit);
+    else ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW / 2.0f, (float)(y + kH), kUiLimit);
+}
+
+TownHints TownHintsFor(const RomData* rom, const ui::ChipLook& look)
+{
+    TownHints h;
+    h.menu = OwnWord(rom, OwnWordId::Menu);
+    h.camera = OwnWord(rom, OwnWordId::CtlCamera);
+    // The keyboard turns the camera with its own L / R keys (Input::Actions' turnL / turnR): their
+    // keycaps rather than a stick it has not got.
+    h.keys = look.face == ui::Face::Keyboard && !look.glyph[(int)ui::Button::LB].empty() && !look.glyph[(int)ui::Button::RB].empty();
+    const Rect chip = ui::ChipRect(0, 0, ui::Button::Back, h.menu, kTownHintSize);
+    int cam;
+    if (h.keys) cam = ui::ChipRect(0, 0, ui::Button::LB, "", kTownHintSize).w + kTownKeysGap + ui::ChipRect(0, 0, ui::Button::RB, h.camera, kTownHintSize).w;
+    else cam = ui::ChipRect(0, 0, ui::Button::RStick, h.camera, kTownHintSize).w;
+    h.menuW = chip.w;
+    h.w = cam + kTownHintsBetween + chip.w;
+    return h;
+}
+
+void AddTownHints(Composition& c, const TownHints& h)
+{
+    const size_t first = c.ui.size();
+    const int y = kStripContentY + kStatusBarH / 2;
+    int x = kTownHintsRight - h.w;
+    if (h.keys)
+    {
+        const Rect l = ui::ChipRect(0, 0, ui::Button::LB, "", kTownHintSize);
+        c.ui.push_back(ui::ChipItem(x, y - l.h / 2, ui::Button::LB, "", kTownHintSize));
+        x += l.w + kTownKeysGap;
+        const Rect r = ui::ChipRect(0, 0, ui::Button::RB, h.camera, kTownHintSize);
+        c.ui.push_back(ui::ChipItem(x, y - r.h / 2, ui::Button::RB, h.camera, kTownHintSize));
+    }
+    else
+    {
+        const Rect cam = ui::ChipRect(0, 0, ui::Button::RStick, h.camera, kTownHintSize);
+        c.ui.push_back(ui::ChipItem(x, y - cam.h / 2, ui::Button::RStick, h.camera, kTownHintSize));
+    }
+    const Rect chip = ui::ChipRect(0, 0, ui::Button::Back, h.menu, kTownHintSize);
+    c.ui.push_back(ui::ChipItem(kTownHintsRight - chip.w, y - chip.h / 2, ui::Button::Back, h.menu, kTownHintSize));
+    for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
+}
+
+const char* ConsoleBranchName(ConsoleBranch b)
+{
+    static const char* const kNames[] = {"front", "cas", "cas-fade", "backdrop", "front-m1", "screen", "veiled", "world-only", "cursor-m1", "town",
+                                         "dialogue", "dialogue-m1", "minigame", "activity-m1"};
+    return kNames[(int)b];
 }
 
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
                          const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed, const PointerView* pointer,
-                         int payout)
+                         int payout, bool pictureClosed, bool veiled, int worldOnlyFrames, ConsoleBranch* branch, const PromptSteady* prompt)
 {
+    ConsoleBranch dummy;
+    ConsoleBranch& b = branch ? *branch : dummy;
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
     const bool bar = hud && strings && strings->ok;
@@ -174,7 +268,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             // which win over Settings and Load in FrontState::kind).
             const FrontKind kind = game->front.kind;
             auto screen = [&](const MenuView& view, int f) {
-                if (kind == FrontKind::Settings) BuildSettings(c, view, f, *game, *rom, bottom, icons, topW, topH);
+                if (kind == FrontKind::Settings) BuildSettings(c, view, f, *game, *rom, bottom, icons, topW, topH, view.picture && !pictureClosed);
                 else if (kind == FrontKind::Load) BuildLoad(c, view, f, *game, *rom, icons, topW, topH);
                 else BuildFront(c, view, f, s, *game, *rom, icons, topW, topH);
             };
@@ -185,17 +279,42 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
                 SortUi(c.ui);
             }
             else screen(v, focus);
+            b = ConsoleBranch::Front;
             return c;
         }
     // Create-a-Sim in HD (port/cas.h): the whole canvas its.
     if (s.screen == Screen::CreateASim)
         if (const MenuView v = ConsoleView(s, game, rom); v.valid)
         {
+            // The game fading in from black (from the main menu or a load, about 14 frames): the
+            // bare backdrop while it is black, then the HD screen under a veil as dark as the
+            // game's fade (every page has a white of 251 at full brightness), so the panel never
+            // shows bright around black crops.
+            int brightest = 255;
+            if (bottom)
+            {
+                brightest = 0;
+                for (int i = 0; i < SW * SH; i += 3)
+                    brightest = std::max({brightest, (int)((bottom[i] >> 16) & 0xFF), (int)((bottom[i] >> 8) & 0xFF), (int)(bottom[i] & 0xFF)});
+            }
+            b = ConsoleBranch::CasFade;
+            if (brightest < kCasFadeBlack) return c;
+            b = ConsoleBranch::Cas;
             BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH);
+            if (brightest < kCasFadeWhite)
+            {
+                ui::UiItem veil = ui::PanelItem(kCanvas);
+                veil.plain = true;
+                veil.radius = 0;
+                veil.fill = (u32)(255 * (kCasFadeWhite - brightest) / kCasFadeWhite) << 24;
+                veil.layer = kCasFadeLayer;
+                c.ui.push_back(veil);
+                SortUi(c.ui);
+            }
             return c;
         }
     // A black load (both screens black, RAM between screens): the bare backdrop.
-    if (s.screen == Screen::Loading) return c;
+    if (s.screen == Screen::Loading) { b = ConsoleBranch::Backdrop; return c; }
     const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::Unknown;
     if (s.screen == Screen::None || s.screen == Screen::FrontEnd || s.screen == Screen::CreateASim)
     {
@@ -208,6 +327,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back({Src::Top, {0, 0, topW, topH}, topTo});
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kFrontBottomTo));
         AddCursorHint(c, kFrontHintY, rom);
+        b = ConsoleBranch::FrontM1;
     }
     else if (MenuView v = ConsoleView(s, game, rom); v.valid && (v.own || (s.screen == Screen::Panel && menuOpen)))
     {
@@ -219,6 +339,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         world.touch = false;
         c.pieces.push_back(world);
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
+        const size_t i0 = c.ui.size(), p0 = c.pieces.size();
         auto screen = [&](ScreenState at, const MenuView& view, int f) {
             if (at.screen == Screen::Panel) BuildPanelMenu(c, at, view, f, *game, *rom, icons, bottom);
             else if (at.screen == Screen::Gift) BuildGiftMenu(c, view, f, *game, *rom, icons, bottom);
@@ -232,24 +353,55 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             else if (game->stat.valid) BuildStatPanel(c, view, f, *game, *rom, icons);
             else BuildNote(c, view, f, *game, *rom, icons);
         };
+        bool lone = false; // (a popup over the dimmed world alone: no screen beneath)
         if (v.popup && PopupOver(s, *game))
         {
             // What the popup is over: its HD screen (the panel's menu while it was open) without a
             // focus, or the dimmed world.
             const ScreenState at = UnderScreen(s, *game);
             if (const MenuView u = ScreenView(at, game, rom); u.valid && (u.own || (at.screen == Screen::Panel && menuOpen))) screen(at, u, -1);
-            if (bar) AddStatusBar(c, *hud, *strings);
+            else lone = true;
+            if (bar) AddStatusStrip(c, hud, *strings, 0, StripZoom(ui::UiScale()));
             BuildPopup(c, v, focus, *game, *rom);
         }
         else
         {
             screen(s, v, focus);
-            if (bar) AddStatusBar(c, *hud, *strings);
+            if (bar) AddStatusStrip(c, hud, *strings, 0, StripZoom(ui::UiScale()));
             // Room info's own hint box (a popup of the screen's: port/roominfo.h), over the bar too.
             if (s.screen == Screen::Unknown && RoomHintUp(*game)) BuildRoomHint(c, v, focus, *game, *rom);
         }
+        // The UI's size: the screen and its popup together (the strip's own already done); a lone
+        // popup (a goal, Game Paused, Quit over the world) as large as the UI's size, as far as the
+        // canvas above the strip holds it.
+        ZoomUi(c, i0, p0, lone ? ui::UiScale() : MenuZoom(ui::UiScale()), kConsoleW / 2.0f, kMenuAnchorY, kMenuLimit);
         SortUi(c.ui); // (the bar's layer after the screen's, a popup's after it, the images last)
+        b = ConsoleBranch::Screen;
         return c;     // (the focus is the view's: no ring from HotspotsFor)
+    }
+    else if (veiled && !menuOpen && (s.screen == Screen::Panel || s.screen == Screen::Unknown))
+    {
+        // The panel's menu coming back (B from the Save slots or the phone opened from it): the
+        // dimmed world it will open over, never the town's flash while the game passes Interact.
+        Piece world = World(topW, worldRows, bar);
+        world.touch = false;
+        c.pieces.push_back(world);
+        c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
+        if (bar) AddStatusStrip(c, hud, *strings, 0, StripZoom(ui::UiScale()));
+        SortUi(c.ui);
+        b = ConsoleBranch::Veiled;
+        return c;
+    }
+    else if (s.screen == Screen::Unknown && !menuOpen && game && (game->valid || game->between) && rom && rom->StringCount() > 0 &&
+             (game->between || game->screen == GScreen::Panel || game->vtable == 0) && worldOnlyFrames <= kWorldOnlyMax)
+    {
+        // The panel coming (its tab not read yet) or no bottom object at all (between two, after a
+        // minigame): the town's world (and bar when it reads), never the cursor's framed black touch
+        // screen; for kWorldOnlyMax frames in a row at most, then the cursor's screen below (a screen
+        // that stays so is not a dead end: the stick cursor and its hints).
+        c.pieces.push_back(World(topW, worldRows, bar));
+        if (bar) AddStatusStrip(c, hud, *strings, 0, StripZoom(ui::UiScale()));
+        b = ConsoleBranch::WorldOnly;
     }
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {
@@ -262,42 +414,66 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         if (cursorScreen)
         {
             c.overlays.push_back(FrameAround(kMenuTo, 1));
-            AddCursorHint(c, kMenuTo.y + kMenuTo.h + 10, rom, true);   // (a controller player: how to leave, as on the title)
+            // (a controller player: how to leave, as on the title; the furniture editor's B its X)
+            AddCursorHint(c, kCursorBelow, rom, true, s.screen == Screen::Unknown && game && game->placement.valid);
         }
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
         // Not dimmed: the game keeps its status bar up while the touch screen is used.
-        if (bar) AddStatusBar(c, *hud, *strings);
+        const size_t i0 = c.ui.size();
+        if (bar && AddStatusBar(c, *hud, *strings).w > 0)
+            ZoomUi(c, i0, c.pieces.size(), ui::UiScale(), 16, kStatusBarY + kStatusBarH, kCursorHintsLimit);
+        b = ConsoleBranch::CursorM1;
     }
     else if (s.screen == Screen::Panel)
     {
+        b = ConsoleBranch::Town;
         c.pieces.push_back(World(topW, worldRows, bar));
-        if (ConsoleView(s, game, rom).valid)
-        {
-            // The HD menu has the tabs: no rail. A small kit panel level with the status bar says
-            // how to open it: the TOUCH MENU's button as the device used last prints it (the pad's
-            // Back / View, Share, -; the keyboard's key, E by default: ui::ChipLook) and the word.
-            const char* word = OwnWord(rom, OwnWordId::Menu);
-            constexpr float kSize = 24;
-            constexpr int kPad = 14;
-            const Rect chip = ui::ChipRect(0, 0, ui::Button::Back, word, kSize);
-            const Rect box {kConsoleW - 16 - (chip.w + 2 * kPad), kStatusBarY, chip.w + 2 * kPad, kStatusBarH};
-            const size_t first = c.ui.size();
-            c.ui.push_back(ui::PanelItem(box));
-            c.ui.push_back(ui::ChipItem(box.x + kPad, box.y + (box.h - chip.h) / 2, ui::Button::Back, word, kSize));
-            for (size_t i = first; i < c.ui.size(); i++) c.ui[i].layer = kStatusBarLayer;
-        }
-        else
+        // (The HD town whenever RAM and the game's strings read: a frame whose tab does not read yet,
+        // the panel coming back from a minigame, never flashes milestone 1's rail.)
+        const bool hd = ConsoleView(s, game, rom).valid || (game && game->valid && rom && rom->StringCount() > 0 && bar);
+        if (!hd)
         {
             // Milestone 1 (no strings, another ROM): the rail, the only way to see the tabs.
             c.overlays.push_back(Frame(kRailFrame, 1));
             c.pieces.push_back(Bottom(kRailPhoneFrom, kRailPhoneTo));
             c.pieces.push_back(Bottom(kRailTabsFrom, kRailTabsTo));
         }
-        if (bar)
+        if (hd || bar)
         {
-            const Rect r = AddStatusBar(c, *hud, *strings);
-            // The money's last change (an animation's payout, a prize) beside the bar, in the game's words.
-            if (payout != 0 && rom && rom->StringCount() > kStrMgMoney) AddPayout(c, r, payout, *rom);
+            // The strip under the world, the canvas's whole width (port/statusbar.h): the status at
+            // the left; with the HD menu (it has the tabs: no rail) the hints at the right, in the
+            // strip, no panel of their own: the camera's, the right stick (navigator.h's world: it
+            // turns and zooms), and how to open the menu: the TOUCH MENU's button as the device used
+            // last prints it (the pad's Back / View, Share, -; the keyboard's key, E by default:
+            // ui::ChipLook) and the word.
+            const TownHints h = TownHintsFor(rom, ui::ChipLookNow());
+            const float zs = StripZoom(ui::UiScale());
+            const int hintsW = hd ? h.w : 0, hintsWz = (int)std::ceil(hintsW * zs);
+            static const HudStrings kNoWords;
+            const Rect r = AddStatusStrip(c, bar ? hud : nullptr, strings ? *strings : kNoWords, hintsWz, zs);
+            if (hd)
+            {
+                const size_t first = c.ui.size();
+                AddTownHints(c, h);
+                ZoomUi(c, first, c.pieces.size(), zs, (float)kTownHintsRight, kStripAnchorY, kStripInside);
+            }
+            // The money's last change (an animation's payout, a prize) beside the status, in the game's words
+            // (zoomed with the status, about its left: its room ends where the zoomed hints begin).
+            if (bar && payout != 0 && rom && rom->StringCount() > kStrMgMoney)
+            {
+                const size_t first = c.ui.size();
+                AddPayout(c, r, payout, *rom, 16 + (int)std::floor((kTownHintsRight - hintsWz - 12 - 16) / zs));
+                ZoomUi(c, first, c.pieces.size(), zs, 16, kStripAnchorY, kStripInside);
+            }
+            // What A does here (port/prompt.h), on its own layer above the strip's: its own group,
+            // zoomed about its bottom centre (kPromptBottom, the canvas's centre), held above the
+            // strip (its drop shadow too) at every UI size.
+            if (bar && hd && game && rom && rom->StringCount() > 0 && prompt)
+            {
+                const size_t first = c.ui.size();
+                AddWorldPrompt(c, s, *game, *rom, *prompt);
+                ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW / 2.0f, (float)kPromptBottom, kPromptLimit);
+            }
         }
     }
     else if (s.screen == Screen::Dialogue && game && game->valid && rom && rom->StringCount() > 0 && bottom)
@@ -305,6 +481,9 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         // The HD conversation (port/dialogue.h): the game's words, its speaker and portrait (the
         // panel alone while no page is drawn yet: the frames between two speeches).
         BuildDialogue(c, *game, *rom, bottom, topW, topH);
+        // The UI's size: the box about the canvas's bottom centre (its margin below zoomed too).
+        ZoomUi(c, 0, 0, ui::UiScale(), kConsoleW / 2.0f, kConsoleH, kUiLimit);
+        b = ConsoleBranch::Dialogue;
     }
     else if (s.screen == Screen::Dialogue)
     {
@@ -316,17 +495,20 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(Bottom(kDialogueNameFrom, kDialogueNameTo));
         c.pieces.push_back(Bottom(kDialoguePortraitFrom, kDialoguePortraitTo));
         c.pieces.push_back(Bottom(kDialogueArrowFrom, kDialogueArrowTo));
+        b = ConsoleBranch::DialogueM1;
     }
     else if (MinigameFramed(s, game, rom))
     {
         // The HD minigame frame (port/minigame.h): the playfield big, the top screen beside it, the
         // title, the game's values and the hints' chips.
         BuildMinigame(c, s, topW, topH, hud, strings, *game, *rom, bottom, icons, pointer, focus);
+        b = ConsoleBranch::Minigame;
     }
     else
     {
         // Social, Vacuum, Cards, Catalogue, Build; the hints' box for the activities. All but the
         // cards keep the HUD: their small world without it, the HD bar under it.
+        b = ConsoleBranch::ActivityM1;
         const bool hudHere = bar && s.screen != Screen::Cards;
         const int rows = hudHere ? worldRows : topH;
         const int h = (int)std::lround((double)kActivityTopW * rows / topW);
@@ -347,7 +529,9 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         }
         if (hudHere) AddStatusBar(c, *hud, *strings, topTo.x - 6, topTo.y + topTo.h + kActivityBarGap, topTo.w + 12);
     }
-    AddRing(c, s, focus);
+    // (The cards' focus only while the player's turn takes a card: never on the opponent's hand.)
+    const CardsState* k = game && s.screen == Screen::Cards && game->minigame.cards.valid ? &game->minigame.cards : nullptr;
+    if (!k || (k->turn == 0 && k->phase <= 2)) AddRing(c, s, focus);
     return c;
 }
 }

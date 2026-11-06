@@ -378,6 +378,301 @@ static void still_layers()
     CHECK(worst <= 2);
 }
 
+// Made-up items of every kind (panels raised or not, wells, plain fills, texts, chips of every
+// button with and without a label or a column's labelAt, pictures opaque or not), for the checks
+// below that compare one way of drawing with another.
+struct Rng
+{
+    u64 v = 88172645463325252ull;
+    u32 Next() { v ^= v << 13; v ^= v >> 7; v ^= v << 17; return (u32)v; }
+    int In(int a, int b) { return a + (int)(Next() % (u32)(b - a + 1)); }
+};
+static bool gZoomed = false; // (raster_ways' second pass: items zoomed by the UI's size, pictures Smooth)
+static UiItem RandomItem(Rng& g, const u32* pic, const u32* icon)
+{
+    static const char* words[] = {"Hello", "Crème brûlée", "Talk about the weather", "§1,200", "A", "Pneumonoultramicroscopicsilicovolcanoconiosis and more to wrap"};
+    const Rect r {g.In(0, 600), g.In(0, 400), g.In(4, 500), g.In(4, 300)};
+    UiItem it;
+    switch (g.In(0, 6))
+    {
+    case 0: it = PanelItem(r); it.radius = (float)g.In(0, 40); it.border = (float)g.In(0, 6); it.raised = g.In(0, 1); break;
+    case 1: it = WellItem(r); break;
+    case 2: it = PanelItem(r); it.plain = true; it.fill = g.Next() | (g.In(0, 1) ? 0xFF000000u : 0); break;
+    case 3: it = TextItem(r, words[g.In(0, 5)], (float)g.In(12, 40), (Align)g.In(0, 2), (Weight)g.In(0, 1)); it.middle = g.In(0, 1); it.wrap = g.In(0, 1); break;
+    case 4: it = ChipItem(r.x, r.y, (Button)g.In(0, kButtonCount - 1), g.In(0, 1) ? words[g.In(0, 4)] : "", (float)g.In(14, 34), g.In(0, 1) ? (float)g.In(40, 90) : 0); break;
+    case 5: it = ImageItem(r, pic, 256, 192, {g.In(0, 100), g.In(0, 100), g.In(1, 120), g.In(1, 90)}); if (g.In(0, 2) == 0) it.fill = (u32)g.In(1, 255) << 24; break;
+    default: it = ImageItem({r.x, r.y, 24 * g.In(1, 4), 24 * g.In(1, 4)}, icon, 24, 24, {0, 0, 24, 24}); break;
+    }
+    it.layer = g.In(0, 2);
+    if (gZoomed)
+    {
+        static const float zooms[] = {0.75f, 0.8f, 0.85f, 1.05f, 1.35f, 1.5f};
+        if (g.In(0, 2)) ZoomItem(it, zooms[g.In(0, 5)], (float)g.In(0, 1280), (float)g.In(0, 720));
+        if (it.kind == UiItem::Image) it.smooth = g.In(0, 1);
+    }
+    return it;
+}
+static void SortLayers(std::vector<UiItem>& items)
+{
+    std::stable_sort(items.begin(), items.end(), [](const UiItem& a, const UiItem& b) { return a.layer < b.layer; });
+}
+
+// The raster's ways are one picture: drawn on one thread or on all of them (in bands), a
+// rectangle drawn again over a raster of other items gives the whole raster's bytes there, a text
+// mask kept or drawn anew the same; and the window's cache (LayerCache), item changes after item
+// changes, holds exactly what a whole raster of each layer gives.
+static void raster_ways(bool zoomed)
+{
+    gZoomed = zoomed;
+    Rng g;
+    if (zoomed) g.v ^= 0x9E3779B97F4A7C15ull;
+    std::vector<u32> pic(256 * 192), icon(24 * 24);
+    for (size_t i = 0; i < pic.size(); i++) pic[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    for (size_t i = 0; i < icon.size(); i++) icon[i] = i % 5 == 0 ? 0 : g.Next();
+    const float scales[] = {1, 1.5f, 2, 2.5f, 2.6667f, 3};
+    for (int set = 0; set < 60; set++)
+    {
+        ChipLook look;
+        look.face = (Face)g.In(0, 3);
+        if (look.face == Face::Keyboard) for (int b = 0; b < kButtonCount; b++) look.glyph[b] = b % 3 ? "Esc" : "W";
+        SetChipLook(look);
+        std::vector<UiItem> items;
+        for (int k = g.In(1, 12); k > 0; k--) items.push_back(RandomItem(g, pic.data(), icon.data()));
+        SortLayers(items);
+        const float s = scales[set % 6];
+        const int w = 700, h = 500;
+        std::vector<u32> one(w * h), many(w * h), part(w * h, 0x12345678u), fresh(w * h);
+        SetRasterThreads(1);
+        Rasterise(items, s * 0.5f, one.data(), w, h, -3, -2);
+        SetRasterThreads(0);
+        Rasterise(items, s * 0.5f, many.data(), w, h, -3, -2);
+        CHECK(one == many);
+        // A rectangle drawn over the raster of other items: the whole raster's bytes inside it,
+        // the other raster's outside.
+        std::vector<UiItem> other = items;
+        other.push_back(RandomItem(g, pic.data(), icon.data()));
+        SortLayers(other);
+        Rasterise(other, s * 0.5f, part.data(), w, h, -3, -2);
+        const std::vector<u32> before = part;
+        const Rect clip {g.In(0, 300), g.In(0, 200), g.In(1, 400), g.In(1, 300)};
+        Rasterise(items, s * 0.5f, part.data(), w, h, -3, -2, clip);
+        bool inside = true, outside = true;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                const bool in = x >= clip.x && x < clip.x + clip.w && y >= clip.y && y < clip.y + clip.h;
+                const size_t i = (size_t)y * w + x;
+                if (in) inside &= part[i] == one[i];
+                else outside &= part[i] == before[i];
+            }
+        CHECK(inside && outside);
+        ClearTextMasks();
+        Rasterise(items, s * 0.5f, fresh.data(), w, h, -3, -2);
+        CHECK(fresh == one);
+
+        // The cache over a run of changes: one item changed, one added, one gone, two swapped,
+        // nothing at all; each time every layer as a whole raster draws it.
+        LayerCache cache;
+        for (int step = 0; step < 6; step++)
+        {
+            if (step > 0)
+            {
+                const int what = g.In(0, 4);
+                if (what == 0 && !items.empty()) items[g.In(0, (int)items.size() - 1)] = RandomItem(g, pic.data(), icon.data());
+                else if (what == 1) items.push_back(RandomItem(g, pic.data(), icon.data()));
+                else if (what == 2 && items.size() > 1) items.erase(items.begin() + g.In(0, (int)items.size() - 1));
+                else if (what == 3 && items.size() > 1) std::swap(items[0], items[items.size() - 1]);
+                else if (!items.empty())
+                {
+                    // A small move of one item (a focus ring going to its neighbour).
+                    UiItem& it = items[g.In(0, (int)items.size() - 1)];
+                    it.to.x += g.In(-30, 30);
+                    it.to.y += g.In(-20, 20);
+                }
+                SortLayers(items);
+            }
+            const float ox = 0.25f * g.In(0, 3), oy = 0.5f * g.In(0, 1);
+            cache.Update(items, s, ox, oy);
+            const std::vector<LayerAt> layers = LayersAt(items, s, ox, oy);
+            CHECK(cache.entries.size() == layers.size());
+            for (size_t i = 0; i < layers.size() && i < cache.entries.size(); i++)
+            {
+                const LayerAt& l = layers[i];
+                const LayerCache::Entry& e = cache.entries[i];
+                CHECK(e.x == l.x && e.y == l.y && e.w == l.w && e.h == l.h && e.still == l.still && !e.direct);
+                std::vector<u32> whole((size_t)l.w * l.h);
+                Rasterise(l.items, s, whole.data(), l.w, l.h, l.ox, l.oy);
+                CHECK(e.px == whole);
+            }
+        }
+    }
+    SetChipLook({});
+    gZoomed = false;
+    if (zoomed) return;
+    // A focus ring moving inside a big layer: only the old and the new ring's pixels are drawn
+    // again; nothing at all when nothing changed.
+    std::vector<UiItem> menu = {PanelItem({100, 100, 900, 500}), TextItem({140, 140, 500, 60}, "Title", 30)};
+    UiItem ring = PanelItem({200, 300, 120, 60});
+    ring.plain = true;
+    menu.push_back(ring);
+    LayerCache cache;
+    cache.Update(menu, 2, 0, 0);
+    CHECK(cache.entries.size() == 1 && cache.entries[0].changed);
+    cache.Update(menu, 2, 0, 0);
+    CHECK(!cache.entries[0].changed && cache.entries[0].dirty.empty());
+    menu[2].to.x += 300;
+    cache.Update(menu, 2, 0, 0);
+    long long area = 0;
+    for (const Rect& r : cache.entries[0].dirty) area += (long long)r.w * r.h;
+    CHECK(cache.entries[0].changed && area > 0 && area * 4 < (long long)cache.entries[0].w * cache.entries[0].h);
+    // A chip whose `to` is cut shorter than the chip (the shell's Keys page caps a long key's at
+    // 170): the chip still draws whole, and the cache draws it again whole when it changes.
+    for (float s : {1.0f, 2.0f, 3.0f})
+    {
+        std::vector<UiItem> keys = {PanelItem({20, 20, 600, 200})};
+        UiItem key = ChipItemAs(60, 60, Face::Keyboard, "KEYPAD MEMSUBTRACT", "", 24, Weight::ExtraBold);
+        CHECK(key.to.w > 170);
+        key.to.w = 170;
+        keys.push_back(key);
+        UiItem after = TextItem({400, 60, 200, 40}, "Right", 24);
+        keys.push_back(after);
+        LayerCache c;
+        c.Update(keys, s, 0, 0);
+        keys[1] = ChipItemAs(60, 60, Face::Keyboard, "THOUSANDSSEPARATOR", "", 24, Weight::ExtraBold);
+        keys[1].to.w = 170;
+        c.Update(keys, s, 0, 0);
+        const std::vector<LayerAt> l = LayersAt(keys, s, 0, 0);
+        std::vector<u32> whole((size_t)l[0].w * l[0].h);
+        Rasterise(l[0].items, s, whole.data(), l[0].w, l[0].h, l[0].ox, l[0].oy);
+        CHECK(c.entries.size() == 1 && c.entries[0].px == whole);
+    }
+    // A live crop at a whole factor is the GPU's (WholeFactorCrop); at another scale, or with a
+    // transparent pixel, the kit's.
+    const std::vector<UiItem> crop = {ImageItem({10, 10, 60, 40}, pic.data(), 256, 192, {5, 5, 30, 20})};
+    CHECK(WholeFactorCrop(crop[0], LayersAt(crop, 3, 0, 0)[0], 3));
+    CHECK(!WholeFactorCrop(crop[0], LayersAt(crop, 2.25f, 0, 0)[0], 2.25f)); // (4.5x: nearest 4x, then bilinear)
+    std::vector<u32> holed = pic;
+    holed[10 * 256 + 10] = 0;
+    const std::vector<UiItem> crop2 = {ImageItem({10, 10, 60, 40}, holed.data(), 256, 192, {5, 5, 30, 20})};
+    CHECK(!WholeFactorCrop(crop2[0], LayersAt(crop2, 3, 0, 0)[0], 3));
+}
+
+// The UI's size (UiItem::zoom, dx, dy): an item zoomed is that item drawn at a larger or smaller
+// scale (byte for byte the raster of the unzoomed items at scale × zoom), placed and bounded where
+// the zoom puts it, hashed as before at 1; FitZoom keeps a group inside its limit. Smooth pictures:
+// the scaler's picture kept and the same for the same pixels, blended edges where Pixel has two
+// colours, a crop opaque to its corners, the same bytes on any number of threads, never the GPU's.
+static void ui_scale_and_smooth()
+{
+    // Placed, ZoomItem (composed), FitZoom.
+    UiItem p = PanelItem({110, 456, 1060, 250});
+    const u64 h0 = Hash({p});
+    ZoomItem(p, 1, 640, 720);
+    CHECK(Hash({p}) == h0 && Placed(p).x == 110 && Placed(p).w == 1060);
+    ZoomItem(p, 0.75f, 640, 720);
+    const Rect q = Placed(p);
+    CHECK(q.x == 242 && q.x + q.w == 1038 && q.y == 522 && q.y + q.h == 710);
+    CHECK(Hash({p}) != h0);
+    ZoomItem(p, 1 / 0.75f, 640, 720);
+    CHECK(std::abs(p.zoom - 1) < 1e-5f && std::abs(p.dx) < 1e-3f && std::abs(p.dy) < 1e-3f);
+    CHECK(std::abs(FitZoom({110, 426, 1060, 280}, 1.5f, 640, 720, {4, 4, 1272, 712}) - 636.0f / 530) < 1e-4f);
+    CHECK(FitZoom({110, 426, 1060, 280}, 0.75f, 640, 720, {4, 4, 1272, 712}) == 0.75f);
+    CHECK(FitZoom({16, 667, 400, 48}, 1.5f, 16, 691, {0, 665, 1280, 55}) < 1.09f);
+
+    // Zoomed by z about the origin at scale s: the raster of the items as they are at s × z.
+    std::vector<u32> pic(256 * 192);
+    for (size_t i = 0; i < pic.size(); i++) pic[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    std::vector<UiItem> items = {PanelItem({20, 20, 300, 160}), WellItem({40, 60, 120, 80}),
+                                 TextItem({40, 30, 260, 30}, "Crème brûlée, twice", 22), ChipItem(180, 70, Button::A, "Talk", 20),
+                                 ImageItem({190, 110, 60, 45}, pic.data(), 256, 192, {10, 10, 20, 15})};
+    for (float z : {0.75f, 1.5f})
+    {
+        std::vector<UiItem> zoomed = items;
+        for (UiItem& it : zoomed) ZoomItem(it, z, 0, 0);
+        const int w = 520, h = 300;
+        std::vector<u32> a(w * h), b(w * h);
+        Rasterise(zoomed, 1.0f, a.data(), w, h);
+        Rasterise(items, z, b.data(), w, h);
+        CHECK(a == b);
+        const Rect bz = Bounds(zoomed), bi = Bounds(items);
+        CHECK(bz.x <= (int)std::floor(bi.x * z) && bz.x + bz.w >= (int)std::ceil((bi.x + bi.w) * z) - 1);
+    }
+
+    // Smooth: a picture with a diagonal edge, 4x.
+    std::vector<u32> tile(16 * 16);
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++) tile[y * 16 + x] = x > y ? 0xFFF0E0A0u : 0xFF203060u;
+    UiItem px = ImageItem({0, 0, 64, 64}, tile.data(), 16, 16, {0, 0, 16, 16});
+    UiItem sm = px;
+    sm.smooth = true;
+    CHECK(HashImage(px) != HashImage(sm));
+    const auto e1 = Enlarge(sm, 4), e2 = Enlarge(sm, 4);
+    CHECK(e1 && e1 == e2 && e1->w == 64 && e1->h == 64 && Enlarge(sm, 3) != e1 && !Enlarge(sm, 7) && !Enlarge(sm, 1));
+    std::vector<u32> a(64 * 64), b(64 * 64), c(64 * 64);
+    Rasterise({px}, 1, a.data(), 64, 64);
+    SetRasterThreads(1);
+    Rasterise({sm}, 1, b.data(), 64, 64);
+    SetRasterThreads(0);
+    Rasterise({sm}, 1, c.data(), 64, 64);
+    CHECK(b == c);
+    auto colours = [](const std::vector<u32>& v) {
+        std::vector<u32> u(v);
+        std::sort(u.begin(), u.end());
+        return (int)(std::unique(u.begin(), u.end()) - u.begin());
+    };
+    CHECK(colours(a) == 2 && colours(b) > 2);
+    bool opaque = true;
+    for (u32 v : b) opaque &= (v >> 24) == 0xFF;
+    CHECK(opaque); // (the crop's edges repeated: no corner rounded off into transparency)
+    CHECK(!WholeFactorCrop(sm, LayersAt({sm}, 1, 0, 0)[0], 1) && WholeFactorCrop(px, LayersAt({px}, 1, 0, 0)[0], 1));
+    UiItem zc = px;
+    ZoomItem(zc, 0.5f, 0, 0);
+    CHECK(!WholeFactorCrop(zc, LayersAt({zc}, 2, 0, 0)[0], 2));
+    // Drawn at its own size or smaller: no scaler (Pixel's bytes).
+    UiItem small = sm;
+    small.to = {0, 0, 16, 16};
+    UiItem smallPx = px;
+    smallPx.to = small.to;
+    std::vector<u32> d(16 * 16), e(16 * 16);
+    Rasterise({small}, 1, d.data(), 16, 16);
+    Rasterise({smallPx}, 1, e.data(), 16, 16);
+    CHECK(d == e);
+    // ImageItem follows SetGamePictures.
+    SetGamePictures(true);
+    CHECK(ImageItem({0, 0, 8, 8}, tile.data(), 16, 16, {0, 0, 8, 8}).smooth);
+    SetGamePictures(false);
+    CHECK(!ImageItem({0, 0, 8, 8}, tile.data(), 16, 16, {0, 0, 8, 8}).smooth);
+    ClearEnlarged();
+    CHECK(Enlarge(sm, 4) != e1 && *Enlarge(sm, 4)->px.data() == *e1->px.data());
+    // A live crop of a DS screen (a 256 x 192 picture): made again each time, not kept, the same
+    // pixels all the same.
+    std::vector<u32> screen(256 * 192);
+    for (size_t i = 0; i < screen.size(); i++) screen[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    UiItem live = ImageItem({0, 0, 64, 64}, screen.data(), 256, 192, {40, 30, 16, 16});
+    live.smooth = true;
+    const auto l1 = Enlarge(live, 4), l2 = Enlarge(live, 4);
+    CHECK(l1 && l2 && l1 != l2 && l1->px == l2->px);
+    // The icons' cache (64 MB): full, the oldest out first; the newest kept.
+    ClearEnlarged();
+    std::vector<std::vector<u32>> bigs(8, std::vector<u32>(250 * 250));
+    std::vector<std::shared_ptr<const Enlarged>> made;
+    for (size_t n = 0; n < bigs.size(); n++)
+    {
+        for (size_t i = 0; i < bigs[n].size(); i++) bigs[n][i] = 0xFF000000u | (u32)((i + n * 7919) * 2654435761u >> 8);
+        UiItem big = ImageItem({0, 0, 1500, 1500}, bigs[n].data(), 250, 250, {0, 0, 250, 250});
+        big.smooth = true;
+        made.push_back(Enlarge(big, 6)); // (9 MB each: the eighth goes past 64 MB)
+        CHECK(made.back() && Enlarge(big, 6) == made.back());
+    }
+    for (size_t n = bigs.size(); n-- > 0;) // (newest first: a hit changes nothing; the first is out)
+    {
+        UiItem big = ImageItem({0, 0, 1500, 1500}, bigs[n].data(), 250, 250, {0, 0, 250, 250});
+        big.smooth = true;
+        CHECK((Enlarge(big, 6) == made[n]) == (n != 0));
+    }
+    ClearEnlarged();
+}
+
 int main()
 {
     wrap_cases();
@@ -388,6 +683,9 @@ int main()
     image_scaler();
     edges();
     still_layers();
+    raster_ways(false);
+    raster_ways(true);
+    ui_scale_and_smooth();
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("uikit_test: all passed\n");
     return 0;

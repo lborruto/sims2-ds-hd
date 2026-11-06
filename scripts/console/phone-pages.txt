@@ -1,9 +1,12 @@
 # From s7 (the phone, page 0), CONSOLE: Down, A (Phonebook), A (Call Friend: the contacts), A
 # (the contact: their answer), A (Exit: back to the contacts, the highlight moved down to it by
-# the game's own Down), B (the phone's X: the panel).
+# the game's own Down), B (back one level: the phonebook, by its Exit), B (the menu), B (the menu has
+# none above: the phone's X, the panel).
 20 2 pad down
 50 2 pad a
 110 2 pad a
 170 2 pad a
 230 2 pad a
 300 2 pad b
+380 2 pad b
+450 2 pad b

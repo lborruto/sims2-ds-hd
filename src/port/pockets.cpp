@@ -1,4 +1,5 @@
 #include "port/pockets.h"
+#include "port/ownwords.h"
 
 #include <algorithm>
 
@@ -64,7 +65,7 @@ static void AddSpriteIcon(Composition& c, IconCache* icons, SpriteRef ref, int f
     if (!icons) return;
     if (const SpriteFrame* f = icons->Scaled(ref, frame, scale))
     {
-        UiItem a = ImageItem({box.x + (box.w - f->w) / 2, box.y + (box.h - f->h) / 2, f->w, f->h}, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h});
+        UiItem a = icons->Image(ref, frame, *f, {box.x + (box.w - f->w) / 2, box.y + (box.h - f->h) / 2, f->w, f->h});
         a.fill = opacity;
         c.ui.push_back(a);
     }
@@ -176,6 +177,8 @@ void AddPocketsView(MenuView& v, const InventoryState& inv, const PocketsSel& se
     v.items[k0].next[2] = lastIn(0);
     v.items[k0 + 1].next[2] = lastIn(1) >= 0 ? lastIn(1) : lastIn(0);
     v.items[k0 + 2].next[2] = first + kSlots + kKeys + kCounted - 1;
+    // Right from a key item: nothing (the column's end; the phone is Up from the top row).
+    for (int k = 0; k < kKeys; k++) v.items[k0 + k].next[3] = kNoMove;
     // The first focus: the game's own selection, else the first item.
     if (sel.slot >= 0 && sel.slot < (int)inv.slots.size()) v.initial = first + sel.slot;
     else if (sel.key >= 0 && sel.key < kKeys) v.initial = first + kSlots + sel.key;
@@ -348,6 +351,14 @@ BlockMeasure MeasurePockets(const RomData& rom)
     line(kStrTrash, MenuWords(rom, kStrTrash), 26, 18, kPkBinBtn.w - 92);
     line(kStrGive, MenuWords(rom, kStrGive), 30, 20, kGiftBow.w - 120);
     for (int id : {kStrUse, kStrTrash, kStrGive}) line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, 240);
+    {
+        // The armed bin's X hint ("Again: throw it away", the port's word, 9000 + its id) in the
+        // room BuildPanelMenu leaves it: the hints' band less B "Close" and A "Use".
+        const int bw = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold).w;
+        const int aw = ChipRect(0, 0, Button::A, MenuWords(rom, kStrUse), kPmHintSize, 0, Weight::ExtraBold).w;
+        const int room = kPmHints.w - 8 - bw - 28 - aw - 28 - 60;
+        line(9000 + (int)OwnWordId::TrashAgain, OwnWord(&rom, OwnWordId::TrashAgain), kPmHintSize, kPmHintSize, room);
+    }
     for (int id = kSimNameUnknown; id <= kSimNameLast; id++)
     {
         if ((id > kSimNameUnknown && id < kSimNameBase) || unused(id)) continue;

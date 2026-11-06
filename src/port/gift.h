@@ -43,7 +43,7 @@ constexpr Rect kGiftBow {kGiftInfo.x + 16, kGiftInfo.y + kGiftInfo.h - 112, kGif
 constexpr Rect kGiftBowIcon {kGiftBow.x + 16, kGiftBow.y + 16, 64, 64}; // the bow's sprite 2x
 constexpr Rect kGiftDesc {kGiftInfo.x + 20, kGiftInfo.y + 60, kGiftInfo.w - 40, kGiftBow.y - 12 - (kGiftInfo.y + 60)};
 
-constexpr u32 kGiftSlotId = kModGift + 0x300;
+constexpr u32 kGiftSlotId = kModGift + 0x300, kGiftBowId = kModGift + 0x380;
 
 // The view (valid when RAM's gift and inventory read and the game's strings are there).
 MenuView GiftMenuView(ScreenState s, const GameState* game, const RomData* rom);

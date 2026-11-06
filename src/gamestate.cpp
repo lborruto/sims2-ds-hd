@@ -144,7 +144,7 @@ struct EUTable
         // Super Drencher
         u32 dwPump, dwTarget, dwType, dwPumping, dwFiring, dwTargetMode, dwHelp, dwHelpText, dwWater, dwPressure;   // water and pressure from G
         // Crime
-        u32 crHelp, crDrag, crPhase, crAngle, crScare, crArmed, crSubdue, crScareDown, crSubdueDown, crHit;
+        u32 crHelp, crDrag, crPhase, crAngle, crScare, crArmed, crSubdue, crScareDown, crSubdueDown, crHit, crHelpText;
         // Music Mixer and its save menu
         u32 mxMode, mxPhase, mxTracks, mxKeys, mxOctave, mxInst, mxSustain, mxSliderA, mxSliderB, mxTempo, mxVariation, mxSong, mxCtl, mxNotes, mxFlags, mxMic, mxUnlocked, mxUnlockedN;
         u32 msMode, msSlot, msName, msContext, msSongs, msSongStride, msRingtones, msRingStride;   // msSongs / msRingtones from G; byte 15 of each entry = used
@@ -153,6 +153,7 @@ struct EUTable
         // Keelhaulin' Cards (u16 total and deck; the hands' slots {+0 flags, +4 card pointer, ...}; u8 flags; the name's bytes)
         u32 cdTotal, cdDeck, cdHand, cdOpponent, cdSlotStride, cdCardFrom, cdCardTo, cdBox, cdMessage, cdQuitAsk, cdName, cdNameMax, cdSize;
         u32 cdScore, cdOppScore, cdTreasure, cdScoreMax;   // s32 each
+        u32 cdPhase, cdTurn;   // u8: the turn's step (the top screen's line), whose turn (0 the player, 1 the opponent)
         // The vacuum (u8 clog; the earnings are the stat panel's hotel.stVacuum, from G)
         u32 vcClog, vcSize;
     } mg;
@@ -291,12 +292,13 @@ constexpr EUTable kEU = {
         0x138, 0x28, 0x18, 0x1C, 0x21, 0x22, 0x23,
         0xE0, 0x10, 0xC8, 0xCC, 0xD0, 0xD8, 0xDC, 0xDE, 0xE4, 0x24, 0xC, 0xA4, 0x98,
         0x24, 0x28, 0x2C, 0x34, 0x35, 0x70, 0x78, 0x79, 0x18, 0x1C,
-        0x4C, 0x52, 0x58, 0x5A, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, 0x61,
+        0x4C, 0x52, 0x58, 0x5A, 0x5C, 0x5D, 0x5E, 0x5F, 0x60, 0x61, 0x4D,
         8, 0xA55, 0x8E2, 0x8E3, 0x8E6, 0x8E7, 0x8E9, 0x8EA, 0x8EB, 0x8EC, 0x8ED, 0xA5C, 0xA4C, 0xA4E, 0xA52, 0xA6C, 0xA63, 0xA6B,
         8, 0x28, 0x88, 0xC, 0x46AC, 16, 0x46DC, 64,
         0x2C, 0x30, 0x34, 0x38, 0x3C, 0x40, 0x650, 0xC68, 0xC60, 0xC64,
         0x4C, 0x4E, 0xC0, 0x188, 0x14, 0x200, 0x300, 0x306, 0x2F7, 0x307, 0x308, 8, 1000,
         0x2CC, 0x2D0, 0x2E4, 9999,
+        0x2F0, 0x2F1,
         0x158, 0x194,
     },
     {
@@ -907,8 +909,12 @@ GiftState ReadGift(const Reader& m, u32 S)
     u32 G, actor, k, count, id;
     if (!m.R32(kEU.gameBlock, G) || !Ptr(m, S + q.giftActor, 0x14, actor) || !m.R16(actor + q.recActor, k) || k >= t.maxSims) return v;
     if (!m.R32(G + t.invCount, count) || count > t.maxSlots) return v;
-    const int slot = m.S32(S + q.giftSlot);
-    if (slot < -1 || slot >= (int)count) return v;
+    int slot = m.S32(S + q.giftSlot);
+    if (slot < -1) return v;
+    // The slot just given (the screen closing: the pockets one item shorter, the selection not yet
+    // moved, about 19 frames): no selection, the part still read.
+    if (slot >= (int)count && slot < (int)t.maxSlots) slot = -1;
+    if (slot >= (int)count) return v;
     if (!m.R16(G + kEU.simRecords + kEU.simRecordSize * k + kEU.simRecordName, id) || id >= t.maxSims) return v;
     for (u32 i = 0; i < count; i++)
     {
@@ -1453,14 +1459,14 @@ CrimeState ReadCrime(const Reader& m, u32 S)
 {
     const auto& q = kEU.mg;
     CrimeState v;
-    u32 help, drag, phase, scare, armed, subdue, sd, bd, hit;
-    if (!m.In(S, 0x64) || !m.R8(S + q.crHelp, help) || help > 1 || !m.R8(S + q.crDrag, drag) || drag > 1 || !m.R8(S + q.crPhase, phase) || phase > 3 ||
+    u32 help, text, drag, phase, scare, armed, subdue, sd, bd, hit;
+    if (!m.In(S, 0x64) || !m.R8(S + q.crHelp, help) || help > 1 || !m.R8(S + q.crHelpText, text) || text > 1 || !m.R8(S + q.crDrag, drag) || drag > 1 || !m.R8(S + q.crPhase, phase) || phase > 3 ||
         !m.R8(S + q.crScare, scare) || scare > 1 || !m.R8(S + q.crArmed, armed) || armed > 1 || !m.R8(S + q.crSubdue, subdue) || subdue > 1 ||
         !m.R8(S + q.crScareDown, sd) || sd > 1 || !m.R8(S + q.crSubdueDown, bd) || bd > 1 || !m.R8(S + q.crHit, hit))
         return v;
     const int angle = (int)(short)m.S16(S + q.crAngle);
     if (angle < -90 || angle > 90) return CrimeState{};
-    v.help = help == 1; v.dragging = drag == 1; v.phase = (int)phase; v.angle = angle; v.canScare = scare == 1; v.armed = armed == 1; v.canSubdue = subdue == 1;
+    v.help = help == 1; v.helpText = text == 1; v.dragging = drag == 1; v.phase = (int)phase; v.angle = angle; v.canScare = scare == 1; v.armed = armed == 1; v.canSubdue = subdue == 1;
     v.scarePressed = sd == 1; v.subduePressed = bd == 1;
     v.hit = hit == 1;   // 0x10 before the first throw: unset
     v.valid = true;
@@ -1588,6 +1594,9 @@ CardsState ReadCards(const Reader& m, u32 S)
     const int score = m.S32(S + q.cdScore), opp = m.S32(S + q.cdOppScore), chest = m.S32(S + q.cdTreasure), lim = (int)q.cdScoreMax;
     if (score < -lim || score > lim || opp < -lim || opp > lim || chest < 0 || chest > lim) return CardsState{};
     v.score = score; v.opponentScore = opp; v.treasure = chest;
+    u32 phase, turn;
+    if (!m.R8(S + q.cdPhase, phase) || phase > 15 || !m.R8(S + q.cdTurn, turn) || turn > 1) return CardsState{};
+    v.phase = (int)phase; v.turn = (int)turn;
     v.total = (int)total; v.deck = (int)deck; v.box = box == 1; v.message = msg == 1; v.quitAsk = ask == 1;
     v.valid = true;
     return v;
@@ -1744,7 +1753,8 @@ CasState ReadCas(const Reader& m, u32 S)
     CasState c;
     u32 page, gender, N, vt, G;
     if (!m.In(S, f.casSize) || !m.R16(S + f.casPage, page) || page > f.casMaxPage || !m.R16(S + f.casGender, gender) || gender > 1 || !m.R32(S + f.casObj, N)) return c;
-    if (N != 0 && !m.R32(N, vt)) return c;
+    // (A page object that does not read: as a page change in flight, the page and no fields.)
+    if (N != 0 && !m.R32(N, vt)) vt = 0;
     static const int kObjOfPage[8] = {0, 1, 2, 3, 4, 5, 1, 3};   // the in-game pages 6 / 7 reuse the Hair and Clothes pages
     const int idx = kObjOfPage[page];
     // The page and its object disagree (or there is none) for the 2-4 frames a page change is in
@@ -1799,17 +1809,19 @@ CasState ReadCas(const Reader& m, u32 S)
         break;
     }
     case 1:
-        if (!m.R16(N + f.hairSel, a) || a > f.maxHairStyle || !m.R16(N + f.hairScroll, b) || b > f.maxHairScroll) return CasState{};
-        if (!m.R16(N + f.hairPos, d) || d > f.maxHairStyle) return CasState{};
+        // A field out of its range (the page object still being filled): the page without its
+        // fields (hairKnown false), as the Name page without its buffer; the rest valid.
+        if (!m.R16(N + f.hairSel, a) || a > f.maxHairStyle || !m.R16(N + f.hairScroll, b) || b > f.maxHairScroll) break;
+        if (!m.R16(N + f.hairPos, d) || d > f.maxHairStyle) break;
         c.hairStyle = (int)a; c.hairScroll = (int)b; c.hairPos = (int)d; c.hairKnown = true;
         arrows(f.hairArrowL, f.hairArrowR);
         break;
     case 2:
-        if (!m.R16(N + f.face, a) || a > f.maxFace) return CasState{};
+        if (!m.R16(N + f.face, a) || a > f.maxFace) break;   // (face -1: no fields)
         c.face = (int)a;
         break;
     case 3:
-        if (!m.R16(N + f.thCat, a) || a > f.maxCat || !m.R16(N + f.thPage, b) || b > f.maxThPage || !m.R16(N + f.thItem, d) || d > f.maxThItem) return CasState{};
+        if (!m.R16(N + f.thCat, a) || a > f.maxCat || !m.R16(N + f.thPage, b) || b > f.maxThPage || !m.R16(N + f.thItem, d) || d > f.maxThItem) break;
         c.category = (int)a; c.clothesPage = (int)b; c.item = (int)d; c.clothesKnown = true;
         arrows(f.thArrowL, f.thArrowR);
         {   // The game's ring: on the chosen item's cell when this page shows it.
@@ -1824,7 +1836,7 @@ CasState ReadCas(const Reader& m, u32 S)
         }
         break;
     case 4:
-        if (!m.R8(N + f.cfAsp, a) || a > 3 || !m.R8(N + f.cfAnswer, b) || b > 2) return CasState{};
+        if (!m.R8(N + f.cfAsp, a) || a > 3 || !m.R8(N + f.cfAnswer, b) || b > 2) break;
         c.aspiration = (int)a; c.answer = (int)b; c.keepKnown = true;
         break;
     default: break;
@@ -1939,6 +1951,10 @@ GameState ReadGameState(RamView ram)
     // Settings, Load-a-Sim and DS Wireless (the front end's bottom objects, port/frontmenus.h): the
     // front end's GScreen, as the title and the main menu (CONSOLE's screen from RAM there).
     if (g.screen == GScreen::Unknown && (g.front.settings.valid || g.front.load.valid)) g.screen = GScreen::FrontEnd;
+    // Create-a-Sim's bottom object and its page object both read (two vtables that agree: never an
+    // overlay's colliding one) while the overlay number still lags behind the swap: Create-a-Sim,
+    // as the RAM says, never None for a frame.
+    if (g.screen == GScreen::Unknown && g.front.cas.valid && !g.front.cas.switching) g.screen = GScreen::CreateASim;
 
     switch (g.screen)
     {
@@ -2045,14 +2061,14 @@ std::string MinigameLine(const GameState& g)
         const DrencherState& v = a.drencher;
         if (!v.valid) return "";
         snprintf(b, sizeof b, "drencher pump=%d target=%d/%d pumping=%d firing=%d targetmode=%d help=%d%d water=%d pressure=%d", v.pump, v.target, v.targetType, v.pumping, v.firing, v.targetMode, v.help, v.helpText, v.water, v.pressure);
-        return b;
+        return v.helpId >= 0 ? std::string(b) + " helpid=" + n(v.helpId) : std::string(b);
     }
     case GScreen::Crime:
     {
         const CrimeState& v = a.crime;
         if (!v.valid) return "";
-        snprintf(b, sizeof b, "crime help=%d drag=%d phase=%d angle=%d scare=%d armed=%d subdue=%d down=%d%d hit=%d", v.help, v.dragging, v.phase, v.angle, v.canScare, v.armed, v.canSubdue, v.scarePressed, v.subduePressed, v.hit);
-        return b;
+        snprintf(b, sizeof b, "crime help=%d text=%d drag=%d phase=%d angle=%d scare=%d armed=%d subdue=%d down=%d%d hit=%d", v.help, v.helpText, v.dragging, v.phase, v.angle, v.canScare, v.armed, v.canSubdue, v.scarePressed, v.subduePressed, v.hit);
+        return v.helpId >= 0 ? std::string(b) + " helpid=" + n(v.helpId) : std::string(b);
     }
     case GScreen::Mixer:
     {
@@ -2062,7 +2078,7 @@ std::string MinigameLine(const GameState& g)
         for (int s : v.unlocked) u.push_back(n(s));
         snprintf(b, sizeof b, "mixer mode=%d phase=%d tracks=0x%02x keys=%d,%d,%d octave=%d instrument=%d sustain=%d sliders=%d,%d tempo=%d variation=%d song=%d events=%d/%d prep=%d preview=%d micfull=%d unlocked=%s", v.mode, v.phase, v.tracks,
                  v.keys[0], v.keys[1], v.keys[2], v.octave, v.instrument, v.sustain, v.sliderA, v.sliderB, v.tempo, v.variation, v.song, v.controlEvents, v.noteEvents, v.prep, v.previewing, v.micFull, join(u).c_str());
-        return b;
+        return v.helpId >= 0 ? std::string(b) + " helpid=" + n(v.helpId) : std::string(b);
     }
     case GScreen::MixerSave:
     {
@@ -2077,7 +2093,7 @@ std::string MinigameLine(const GameState& g)
     {
         const CardsState& v = a.cards;
         if (!v.valid) return "";
-        snprintf(b, sizeof b, "cards deck=%d/%d hand=%d opponent=%d score=%d,%d treasure=%d box=%d message=%d quit=%d name=\"%s\"", v.deck, v.total, v.hand, v.opponent, v.score, v.opponentScore, v.treasure, v.box, v.message, v.quitAsk, TextEsc(v.name).c_str());
+        snprintf(b, sizeof b, "cards deck=%d/%d hand=%d opponent=%d score=%d,%d treasure=%d box=%d message=%d quit=%d phase=%d turn=%d name=\"%s\"", v.deck, v.total, v.hand, v.opponent, v.score, v.opponentScore, v.treasure, v.box, v.message, v.quitAsk, v.phase, v.turn, TextEsc(v.name).c_str());
         return b;
     }
     case GScreen::Vacuum:

@@ -1,0 +1,5 @@
+# From F-copt-concept-80 (Settings > Concept Art, picture 4 unlocked, the focus on it), CONSOLE: A
+# (the art, shown big), B (the big picture closed: still Settings), B (the game's X: the title).
+10 2 pad a
+100 2 pad b
+160 2 pad b

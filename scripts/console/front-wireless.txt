@@ -1,5 +1,5 @@
-# From s2, CONSOLE: Down x3, A → DS Wireless (its first page: out of scope beyond it); B (the
-# game's own) → the title at phase 0.
+# From s2, CONSOLE: Down x3 onto DS Wireless (greyed: a second DS; its note in the hints), A →
+# nothing (still the main menu); B (the game reads no key there) → nothing.
 10 2 pad down
 16 2 pad down
 22 2 pad down

@@ -1,0 +1,2 @@
+# From G-A-md-walk, CONSOLE: B powers the detector off (the panel; never milestone 1's rail on the way).
+20 2 pad b

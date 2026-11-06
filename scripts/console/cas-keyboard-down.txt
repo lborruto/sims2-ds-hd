@@ -1,0 +1,11 @@
+# From s3 (the Name page, the focus on the keyboard's first key), CONSOLE: X, X (the 123! page),
+# Down (its second row), Right x3 ("#"), Down: the short last row's last key ")", not the backspace;
+# A types it.
+10 2 pad x
+40 2 pad x
+70 2 pad down
+80 2 pad right
+90 2 pad right
+100 2 pad right
+110 2 pad down
+130 2 pad a

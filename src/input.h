@@ -13,8 +13,8 @@
 #include "navigator.h"
 #include "pads.h"
 #include "script.h"
+#include "shell.h"
 #include "touchscript.h"
-#include "ui.h"
 #include "video.h"
 
 namespace sims2wide
@@ -68,11 +68,37 @@ struct Input
     // What the keys and buttons asked for this frame (one frame each; main.cpp acts on them).
     bool wantMenu = false, wantSave = false, wantLoad = false, wantShot = false, wantFullscreen = false;
     int wantLayout = -1; // a Layout, or -1
-    // While the menu is open: what it understands, from the keyboard, the mouse and the controller.
-    MenuInput nav;
-    // While the menu captures a binding: the first key or controller input pressed.
+    // While the menu is open: what it understands, from the keyboard, the mouse (output pixels: the
+    // host takes them to the shell's canvas) and the controller (a held direction repeats).
+    shell::Input nav;
+    int navHeld[4] = {};
+    // While the menu captures a binding: the first key, or the controller button released first
+    // (Start and Back pressed together: cancelled, as Esc), Backspace no key.
     bool capturing = false, captureCancel = false;
     int newKey = Controls::kDefault, newPad = -1; // kDefault: nothing yet; kNone: cleared
+    int captureFirst = -1;
+    unsigned captureSeen = 0;
+    void StartCapture() { capturing = true; captureFirst = -1; captureSeen = 0; newKey = Controls::kDefault; newPad = -1; captureCancel = false; }
+    // The window was asked to close (the shell asks first); a file was dropped on it.
+    bool wantQuit = false;
+    std::string droppedFile;
+    // The window is in front (keyboard focus, not minimised; Poll reads it from the window's flags):
+    // off, the game pauses unless it runs in the background.
+    SDL_Window* window = nullptr;
+    bool focused = true;
+    Uint32 mouseMovedAt = 0;      // SDL ticks of the mouse's last move or click (the pointer's auto-hide)
+    // Create-a-Sim's name typed on the keyboard (port/cas.h, CasTypeAction): the characters still to
+    // type ("\b" the backspace), one at a time through the game's own keyboard; the frames to wait
+    // before the next (the game reads a tap within a few), and the tries at its page.
+    std::vector<std::string> typed;
+    int typeWait = 0, typeTries = 0;
+    // The Name page of Create-a-Sim is up in CONSOLE: Enter is the navigator's A there (enterA),
+    // Backspace erases, and while the focus is on the game's keyboard (its keys, its page labels,
+    // its backspace: TypingKeys) printable keys type, their bindings resting; arrows and Esc stay
+    // what they are.
+    static bool TypingName(const App& app);
+    bool TypingKeys(const App& app) const;
+    bool enterA = false;
 
     // An input script's window events for this turn of the loop (script.h), pushed as SDL events.
     void PushScript(const std::vector<InputEvent>& script, long iter, const Video& video) const;
@@ -94,6 +120,13 @@ struct Input
     // and App::consoleMenu / consoleFocus follow it (unless pinned by --console-menu or
     // --console-focus). CONSOLE left: the navigator lets go of everything (Navigator::Leave).
     void Steer(App& app, const PadState& p, u32& keys);
+    // After the frame ran (the game's new screen known), when the screen changed or a popup came
+    // or went: App::consoleFocus as an index of the view CONSOLE now draws, by the focused item's
+    // id (the navigator ran on the frame before's view: the old index would show for one frame,
+    // on the wrong item). Within one view (a list scrolled) the index stays as the navigator left it.
+    void FocusForDrawing(App& app, bool screenChanged);
+    // One typed character's taps when the game can take them (Steer, after the navigator).
+    void TypeName(App& app);
     // The touch script's touch this frame, over any other while it owns the stylus.
     void ScriptTouch(bool& touching, int& tx, int& ty);
     // A pointing minigame's stylus at its pointer (the navigator's; CONSOLE), before ScriptTouch.

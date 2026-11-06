@@ -44,7 +44,7 @@ enum class OwnWordId : int
     ScratchHold, ScratchRub, ScratchQuitAgain, ScratchTopPrize, ScratchOpened,
     // The music mixer and its save page.
     MixerTouch, MixerPoint, MixerOctave, MixerSustain, MixerStop, MixerVox, MixerVoxStop, MixerChoose, MixerBack,
-    MixerDpad, MixerSong, MixerInstrument, MixerReady, MixerPlaying, MixerRecording, MixerHelp,
+    MixerSong, MixerInstrument, MixerReady, MixerPlaying, MixerRecording, MixerHelp,
     SaveType, SaveHere, SaveOverwrite, SaveErase, SaveSlot,
     // The wireless lobby.
     TradingNote,
@@ -56,6 +56,44 @@ enum class OwnWordId : int
     PadConnected,
     // The pause menu, beside Start + Back's chips (the cursor's hint).
     Pause,
+    // The painting's next palette page; a minigame's help ("?"): what a button does, leaving it;
+    // the stick cursor (the cursor's hint).
+    ArtNextPalette, HelpWhat, HelpLeave, Cursor,
+    // The menus: a shop cell's A (it selects; Pay buys), the bin armed (X again throws the item
+    // away), an empty Goals / Interact tab.
+    Select, TrashAgain, NoGoals, NoActions,
+    // MooGoo's line for a bet (the game's says "Touch a Monkey!").
+    MooGooBetLine,
+    // The HD shell (shell.*): the pause menu, its pages and questions, the settings' rows and
+    // values, the controls card, the bindings, the save states, the toasts, the launch panel.
+    ShellPaused, ShellResume, ShellSettings, ShellControls, ShellStates, ShellQuit, ShellBack, ShellChange, ShellOpen,
+    ShellYes, ShellNo, ShellOk, ShellOn, ShellOff, ShellPauseMenu,
+    SetLayout, SetFullscreen, SetScaling, SetRes3D, SetWide, SetFps60, SetVolume, SetFastSound, SetStickCursor, SetDeadZone,
+    SetTrigger, SetRumble, SetMic, SetLanguage, MicBlowKey, LangAuto, LangNote,
+    LayoutConsole, LayoutAuto, LayoutFocus, LayoutSide, LayoutStacked,
+    CtlWalk, CtlTouch, CtlBack, CtlZoom, CtlCamera, CtlFast, CtlKeys, CtlBlow,
+    ActRight, ActLeft, ActUp, ActDown, ActSwap, ActSaveState, ActLoadState, ActBlow, ActTouch,
+    KeysPress, KeysCancel, KeysClear, KeysAll, KeysReset, KeysKeyboard, KeysController,
+    StEmpty, StSave, StLoad, StLoadAsk, StOverwriteAsk, StUndo, StSaved, StLoaded, StUndone, StFailed, StNoFolder,
+    QuitAsk, QuitNote,
+    ToastStateSaved, ToastStateLoaded, ToastNoState, ToastShot, ToastBackup, ToastCapture, ToastNotSaving, NotEU,
+    LaunchContinue, LaunchWhere, LaunchChoose, LaunchRecent, LaunchDrop, LaunchWrong, LaunchUnreadable, LaunchStart, LaunchTitle,
+    WirelessNote,
+    // The review's round: change game, open the saves' folder, a stale place, a state from another
+    // file, a place that did not load.
+    ShellChangeGame, ShellOpenFolder, LaunchSaveNewer, StOtherRom, LaunchContinueFailed, QuickOtherRom,
+    // Platform (task 5): the settings' new rows and values, their notes, the save moved to the
+    // settings folder (the pause menu's banner), a window screenshot's toast.
+    SetBattery, SetMute, SetBackground, SetFastSpeed, FastMax, SetFastKey, FastHold, FastPress, SetFastBoot, SetHidePointer,
+    SetCursorSpeed, SetLeftHanded, ScaleSharp, ScaleSmooth, ScaleNearest,
+    BatteryNote, BackgroundNote, FastBootNote, ScalingNote, SaveElsewhere, ToastShotAt,
+    // The save back beside the ROM (its folder writable again) from the settings folder's copy.
+    SaveMovedBack,
+    // The interface's size and the game's pictures (task 10): the rows, Auto, their notes.
+    SetUiSize, UiAuto, UiSizeNote, SetPictures, PicturesNote,
+    // The world's prompt (port/prompt.*): A held shows the other actions, Up / Down choose one
+    // while it is held, Left / Right switch to the next target near the hero.
+    PromptMore, PromptChoose, PromptOther,
     Count
 };
 

@@ -112,8 +112,11 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp"
         "-DFILES=${SIMS2WIDE_FONT_FILES}" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake"
     DEPENDS cmake/embed.cmake assets/fonts/Nunito-Bold.ttf assets/fonts/Nunito-ExtraBold.ttf
     COMMENT "Embedding the UI's font" VERBATIM)
-add_library(uikit STATIC src/ui/kit.cpp src/ui/font.cpp "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp")
+add_library(uikit STATIC src/ui/kit.cpp src/ui/font.cpp src/thirdparty/xbrz/xbrz.cpp "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp")
 target_include_directories(uikit PUBLIC melonDS/src src PRIVATE src/thirdparty)
+# (The raster draws in bands on a few threads: ui/kit.cpp.)
+find_package(Threads REQUIRED)
+target_link_libraries(uikit PUBLIC Threads::Threads)
 
 # The controllers (src/pads.*) and their mappings: SDL_GameControllerDB (assets/controllers,
 # zlib licence, LICENSE.txt beside it), this platform's lines only, embedded like the font.
@@ -141,12 +144,16 @@ target_link_libraries(pads PUBLIC uikit SDL2::SDL2-static)
 
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
-    src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
-    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
-    src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
+    src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/consolehold.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
+    src/looks.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/prompt.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
+    src/settings.cpp src/shell.cpp src/shellhost.cpp src/shots.cpp src/slots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
 target_link_libraries(sims2wide PRIVATE core pads)
+if(APPLE)
+    # (The display's physical size for the UI's Auto size: CGDisplayScreenSize, video.cpp.)
+    target_link_libraries(sims2wide PRIVATE "-framework ApplicationServices")
+endif()
 target_compile_definitions(sims2wide PRIVATE SIMS2WIDE_VERSION="${PROJECT_VERSION}")
 
 # macOS: an app to double-click (the release builds it, for Apple silicon and Intel at once with
@@ -173,6 +180,11 @@ endif()
 # no DLL beside it. The file picker uses comdlg32 and ole32.
 if(WIN32)
     target_sources(sims2wide PRIVATE packaging/sims2wide.rc)
+    # The manifest is the .rc's (packaging/sims2wide.manifest): MSVC's linker must not add its own.
+    if(MSVC)
+        target_link_options(sims2wide PRIVATE /MANIFEST:NO)
+    endif()
+    set_property(SOURCE packaging/sims2wide.rc APPEND PROPERTY OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/sims2wide.manifest")
     set_target_properties(sims2wide PROPERTIES WIN32_EXECUTABLE TRUE)
     if(TARGET SDL2::SDL2main)
         target_link_libraries(sims2wide PRIVATE SDL2::SDL2main)
@@ -185,10 +197,18 @@ endif()
 
 # Checks of the layouts' touch mapping (not built by default): ninja -C build layout_test && ./build/layout_test
 add_executable(layout_test EXCLUDE_FROM_ALL tests/layout_test.cpp src/layout.cpp src/activities.cpp src/compose.cpp src/console.cpp src/hotspots.cpp src/screens.cpp
-    src/touchscript.cpp src/ui.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp
+    src/touchscript.cpp src/ui.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/prompt.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp
     src/port/statusbar.cpp src/romdata.cpp)
 target_include_directories(layout_test PRIVATE melonDS/src src)
 target_link_libraries(layout_test PRIVATE uikit)
+
+# What a press costs on the HD panel menu at the window's scale (a measure, not a check; not built
+# by default): ninja -C build ui_bench && ./build/ui_bench [scale]
+add_executable(ui_bench EXCLUDE_FROM_ALL tests/ui_bench.cpp src/layout.cpp src/activities.cpp src/compose.cpp src/console.cpp src/hotspots.cpp src/screens.cpp
+    src/touchscript.cpp src/ui.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp
+    src/port/statusbar.cpp src/romdata.cpp)
+target_include_directories(ui_bench PRIVATE melonDS/src src)
+target_link_libraries(ui_bench PRIVATE uikit)
 
 # Checks of the synthesised touches (not built by default): ninja -C build touchscript_test && ./build/touchscript_test
 add_executable(touchscript_test EXCLUDE_FROM_ALL tests/touchscript_test.cpp src/touchscript.cpp)
@@ -223,9 +243,15 @@ add_executable(gamestate_test EXCLUDE_FROM_ALL tests/gamestate_test.cpp src/game
 target_include_directories(gamestate_test PRIVATE melonDS/src src)
 
 # Checks of the ROM's archive, string tables, compression, sprites and the icon cache on synthetic data (not built by default): ninja -C build romdata_test && ./build/romdata_test
-add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp src/port/icons.cpp src/port/statusbar.cpp)
+add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp src/port/icons.cpp src/port/statusbar.cpp src/compose.cpp src/ui.cpp src/layout.cpp)
 target_include_directories(romdata_test PRIVATE melonDS/src src)
 target_link_libraries(romdata_test PRIVATE uikit)
+
+# Checks of the HD shell: the pause menu, the launch panel, the save states' files (not built by
+# default): ninja -C build shell_test && ./build/shell_test
+add_executable(shell_test EXCLUDE_FROM_ALL tests/shell_test.cpp src/shell.cpp src/slots.cpp src/settings.cpp src/controls.cpp src/layout.cpp src/port/ownwords.cpp src/romdata.cpp)
+target_include_directories(shell_test PRIVATE melonDS/src src)
+target_link_libraries(shell_test PRIVATE uikit SDL2::SDL2-static)
 
 # Checks of the UI kit (wrap, the raster's pixels and determinism; not built by default): ninja -C build uikit_test && ./build/uikit_test
 add_executable(uikit_test EXCLUDE_FROM_ALL tests/uikit_test.cpp)

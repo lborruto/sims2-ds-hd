@@ -1,11 +1,12 @@
 # From G-X-music: RB records, the stick brings the pointer to the D key (73,176), A plays it, RB stops
-# (the game's "save your song?"), A Yes: the save page; A types A, Right, A types B, Right along the
+# (the game's "save your song?"), Right and A Yes (it opens on No): the save page; A types A, Right, A types B, Right along the
 # top row to the second slot, A saves "AB" there: back to the mixer.
 10 2 pad rb
 40 11 pad lx-
 60 16 pad ly+
 90 10 pad a
 120 2 pad rb
+170 2 pad right
 180 2 pad a
 260 2 pad a
 280 2 pad right

@@ -1,0 +1,3 @@
+# From act-vacuum (the vacuum just switched on in the lobby), CONSOLE: B taps the bowl's X (the
+# game's only way out): the vacuum put away, the panel.
+20 2 pad b
