@@ -29,6 +29,26 @@ enum class Align { Left, Centre, Right };
 // DPadL / DPadU / DPadR / DPadD: one arm lit (that direction alone). LStick / RStick: the sticks
 // (a round chip with a ring, "L" / "R"). LT: the left trigger (a pill, as LB).
 enum class Button { A, B, X, Y, LB, RB, Start, DPad, DPadV, DPadH, DPadL, DPadU, DPadR, DPadD, LStick, RStick, LT };
+constexpr int kButtonCount = (int)Button::LT + 1;
+
+// How the chips are printed: the device the player used last (input.cpp sets it every frame;
+// ChipItem / ChipRect copy the current look into the item, so the raster stays a function of
+// the items). Xbox: A / B / X / Y in green / red / blue / yellow, LB, LT, START (the look the
+// kit always had); PlayStation: the cross, circle, square and triangle drawn, L1 / L2, OPTIONS;
+// Nintendo: A / B / X / Y in the SNES colours, L / ZL, +; Keyboard: a keycap with the key's name.
+enum class Face : u8 { Xbox, PlayStation, Nintendo, Keyboard };
+struct ChipLook
+{
+    Face face = Face::Xbox;
+    // Per Button, what is printed on it. A controller: the SDL input its action is bound to,
+    // by its settings name ("a", "b", "x", "y", "lb", "rb", "lt", "rt", "start", "back", "guide",
+    // "ls", "rs", "up", "down", "left", "right"), drawn in the face's own way; the keyboard: the
+    // key's name. Empty: the button's own (A's "a", LB's "lb"…; the D-pad and the sticks keep
+    // their drawing on every face).
+    std::string glyph[kButtonCount];
+};
+void SetChipLook(const ChipLook& look);
+const ChipLook& CurrentChipLook();
 
 struct UiItem
 {
@@ -61,6 +81,8 @@ struct UiItem
     // Chip: the button's chip, `size` its text size (the chip is as tall as a line), then the
     // label in `text` (none: the chip alone). `to` from ChipItem (grows with the label).
     Button button = Button::A;
+    Face face = Face::Xbox; // and its glyph (ChipLook::glyph; "" the button's own): from the current ChipLook
+    std::string glyph;
     float labelAt = 0;   // where the label starts, from to.x (0: right after the chip): a column of hints
 
     // Image: a rectangle of an ARGB picture (not copied: it must outlive the raster; a live crop
@@ -77,7 +99,8 @@ struct UiItem
 UiItem PanelItem(Rect to, const Theme& t = GameTheme());          // the light panel (fill, frame)
 UiItem WellItem(Rect to, const Theme& t = GameTheme());           // a darker inset box inside a panel
 UiItem TextItem(Rect to, const std::string& utf8, float size, Align align = Align::Left, Weight w = Weight::Bold);
-// A chip at (x, y) with its label; its rectangle is the chip and the label together.
+// A chip at (x, y) with its label, printed as the current ChipLook says; its rectangle is the
+// chip and the label together.
 // labelAt: the label's start from x (a column of hints lines its labels up), 0: after the chip.
 // w: the label's weight.
 UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, float labelAt = 0, Weight w = Weight::Bold);

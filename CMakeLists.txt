@@ -51,10 +51,53 @@ include(FetchContent)
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
 set(SDL_TEST OFF CACHE BOOL "" FORCE)
+# Controllers: every joystick backend SDL has, kept on by name so that no default can trim them
+# from the static build. Windows: XInput, RawInput and Windows.Gaming.Input (SDL_XINPUT, from
+# MinGW's headers), DirectInput (SDL_DIRECTX's dinput.h), HIDAPI (PlayStation, Switch, 8BitDo
+# and the like, natively); a Mac: IOKit, GameController.framework (MFi) and HIDAPI; Linux: evdev,
+# HIDAPI through hidraw (libudev's headers at build time, the library loaded at run time).
+# Haptics (rumble on DirectInput pads) too.
+foreach(opt SDL_JOYSTICK SDL_HAPTIC SDL_HIDAPI SDL_HIDAPI_JOYSTICK SDL_VIRTUAL_JOYSTICK SDL_LIBUDEV)
+    set(${opt} ON CACHE BOOL "" FORCE)
+endforeach()
+if(WIN32)
+    set(SDL_XINPUT ON CACHE BOOL "" FORCE)
+    set(SDL_DIRECTX ON CACHE BOOL "" FORCE)
+endif()
 FetchContent_Declare(sdl2
     URL https://github.com/libsdl-org/SDL/releases/download/release-2.30.9/SDL2-2.30.9.tar.gz
     URL_HASH SHA256=24b574f71c87a763f50704bbb630cbe38298d544a1f890f099a4696b1d6beba4)
 FetchContent_MakeAvailable(sdl2)
+# What SDL's configure found: its config header lists the joystick drivers compiled in. Said at
+# configure time; a Windows or Mac build without its main backends stops here.
+file(GLOB_RECURSE SIMS2WIDE_SDL_CONFIG "${sdl2_BINARY_DIR}/include-config-*/SDL2/SDL_config.h")
+if(SIMS2WIDE_SDL_CONFIG)
+    list(GET SIMS2WIDE_SDL_CONFIG 0 SIMS2WIDE_SDL_CONFIG)
+    file(STRINGS "${SIMS2WIDE_SDL_CONFIG}" sdl_drivers REGEX "^#define SDL_(JOYSTICK|HAPTIC)_[A-Z0-9_]+ 1")
+    string(REGEX REPLACE "#define SDL_([A-Z0-9_]+) 1" "\\1" sdl_drivers "${sdl_drivers}")
+    message(STATUS "SDL controllers: ${sdl_drivers}")
+    if(WIN32)
+        set(want JOYSTICK_XINPUT JOYSTICK_RAWINPUT JOYSTICK_DINPUT JOYSTICK_HIDAPI)
+    elseif(APPLE)
+        set(want JOYSTICK_IOKIT JOYSTICK_MFI JOYSTICK_HIDAPI)
+    else()
+        set(want JOYSTICK_LINUX JOYSTICK_HIDAPI)
+    endif()
+    foreach(w IN LISTS want)
+        if(NOT w IN_LIST sdl_drivers)
+            message(FATAL_ERROR "SDL was configured without ${w}: controllers would be missing (see CONTRIBUTING.md, Set up)")
+        endif()
+    endforeach()
+    if(NOT WIN32 AND NOT APPLE)
+        file(STRINGS "${SIMS2WIDE_SDL_CONFIG}" sdl_udev REGEX "^#define SDL_USE_LIBUDEV 1")
+        if(NOT sdl_udev)
+            message(WARNING "SDL without libudev (install libudev-dev): HIDAPI pads and hot-plug are poorer on Linux")
+        endif()
+    endif()
+    if(WIN32 AND NOT JOYSTICK_WGI IN_LIST sdl_drivers)
+        message(WARNING "SDL without Windows.Gaming.Input: Xbox pads' triggers share an axis while the window is behind another")
+    endif()
+endif()
 
 # The UI kit (src/ui): the HD interface's panels, text and chips, rasterised in software. Its
 # font (assets/fonts, Nunito, SIL OFL 1.1) is embedded as byte arrays generated at build time
@@ -69,14 +112,38 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp"
 add_library(uikit STATIC src/ui/kit.cpp src/ui/font.cpp "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp")
 target_include_directories(uikit PUBLIC melonDS/src src PRIVATE src/thirdparty)
 
+# The controllers (src/pads.*) and their mappings: SDL_GameControllerDB (assets/controllers,
+# zlib licence, LICENSE.txt beside it), this platform's lines only, embedded like the font.
+if(WIN32)
+    set(SIMS2WIDE_DB_PLATFORM "Windows")
+elseif(APPLE)
+    set(SIMS2WIDE_DB_PLATFORM "Mac OS X")
+else()
+    set(SIMS2WIDE_DB_PLATFORM "Linux")
+endif()
+set(SIMS2WIDE_DB "${CMAKE_CURRENT_SOURCE_DIR}/assets/controllers/gamecontrollerdb.txt")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${SIMS2WIDE_DB}")
+file(STRINGS "${SIMS2WIDE_DB}" db_lines REGEX "platform:${SIMS2WIDE_DB_PLATFORM},")
+list(JOIN db_lines "\n" db_lines)
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt.new" "${db_lines}\n")
+file(COPY_FILE "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt.new" "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt" ONLY_IF_DIFFERENT)
+add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb_embedded.cpp"
+    COMMAND "${CMAKE_COMMAND}" "-DOUT=${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb_embedded.cpp" "-DNAMES=gamecontrollerdb"
+        "-DFILES=${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake"
+    DEPENDS cmake/embed.cmake "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt"
+    COMMENT "Embedding the controller mappings" VERBATIM)
+add_library(pads STATIC src/pads.cpp src/controls.cpp "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb_embedded.cpp")
+target_include_directories(pads PUBLIC melonDS/src src)
+target_link_libraries(pads PUBLIC uikit SDL2::SDL2-static)
+
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
-    src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/controls.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
+    src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
     src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
-target_link_libraries(sims2wide PRIVATE core uikit SDL2::SDL2-static)
+target_link_libraries(sims2wide PRIVATE core pads)
 target_compile_definitions(sims2wide PRIVATE SIMS2WIDE_VERSION="${PROJECT_VERSION}")
 
 # macOS: an app to double-click (the release builds it, for Apple silicon and Intel at once with
@@ -141,6 +208,12 @@ target_include_directories(navigator_test PRIVATE melonDS/src src)
 add_executable(controls_test EXCLUDE_FROM_ALL tests/controls_test.cpp src/controls.cpp src/settings.cpp src/layout.cpp)
 target_include_directories(controls_test PRIVATE melonDS/src src)
 target_link_libraries(controls_test PRIVATE SDL2::SDL2-static)
+
+# Checks of the controllers on SDL's virtual joysticks (not built by default): hot-plug, several
+# pads, triggers, dead zones, the chips' look, Steam's virtual pad, the mappings' order:
+# ninja -C build pads_test && SDL_VIDEODRIVER=dummy ./build/pads_test
+add_executable(pads_test EXCLUDE_FROM_ALL tests/pads_test.cpp)
+target_link_libraries(pads_test PRIVATE pads)
 
 # Checks of the screen manager reader on a synthetic RAM (not built by default): ninja -C build gamestate_test && ./build/gamestate_test
 add_executable(gamestate_test EXCLUDE_FROM_ALL tests/gamestate_test.cpp src/gamestate.cpp src/screens.cpp src/romdata.cpp)

@@ -145,7 +145,7 @@ jobs:
             # systems it compiles in.
             sudo apt-get install -y -q ninja-build libx11-dev libxext-dev libxrandr-dev \
               libxcursor-dev libxi-dev libxss-dev libxkbcommon-dev libwayland-dev \
-              wayland-protocols libasound2-dev libpulse-dev
+              wayland-protocols libasound2-dev libpulse-dev libudev-dev
           else
             brew install ninja
           fi
@@ -164,7 +164,7 @@ jobs:
         env:
           SDL_VIDEODRIVER: dummy
         run: |
-          tests="layout_test touchscript_test hotspots_test screens_test navigator_test controls_test gamestate_test romdata_test uikit_test"
+          tests="layout_test touchscript_test hotspots_test screens_test navigator_test controls_test gamestate_test romdata_test uikit_test pads_test"
           # shellcheck disable=SC2086
           ninja -C build $tests
           for t in $tests; do
@@ -228,7 +228,15 @@ jobs:
             echo "::error::the program needs a DLL that is not part of Windows"
             exit 1
           fi
-
+      # The controllers on Windows' own SDL build (XInput, RawInput, DirectInput, HIDAPI; checked
+      # at configure time): hot-plug, two pads, Steam's virtual pad, the mappings' order, on SDL's
+      # virtual joysticks.
+      - name: Controllers test
+        env:
+          SDL_VIDEODRIVER: dummy
+        run: |
+          ninja -C build pads_test
+          build/pads_test.exe
   # The one check to require: green when every job passed or was skipped as docs-only.
   result:
     name: CI result

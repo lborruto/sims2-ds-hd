@@ -570,13 +570,19 @@ int main(int argc, char** argv)
     Backups backups;
     if (!headless)
     {
-        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
+        // Controllers: SDL's hints first (pads.h), then the joystick and game controller parts
+        // (SDL_GAMECONTROLLERCONFIG, which Steam sets for a non-Steam game, is read here).
+        Pads::Hints();
+        if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER) != 0) { fprintf(stderr, "SDL: %s\n", SDL_GetError()); return 1; }
+        // Haptics (DirectInput pads' rumble) only if the system has them: never a reason not to start.
+        if (SDL_InitSubSystem(SDL_INIT_HAPTIC) != 0) fprintf(stderr, "SDL haptic: %s\n", SDL_GetError());
+        Pads::LoadMappings(Pads::UserMappingsPath());
         // The keymap is known now: the keys asked by position have their values, so the swap
         // can move them out of the way of a key the settings file gave another action.
         app.settings.controls.ResolveKeys();
         if (!video.Open(app.settings)) return 1;
         audio.Open();
-        input.OpenPads();
+        input.OpenPads(app.settings);
         backups.Start(Host::SavePath);
     }
 

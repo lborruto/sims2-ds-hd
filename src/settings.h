@@ -31,6 +31,9 @@ struct Settings
     int volume = 100;           // 0 to 100
     bool fastSound = false;     // sound during fast forward (at normal pitch, skipping); off: muted
     bool stickCursor = true;    // a controller's right stick moves a cursor on the touch screen
+    int stickDeadZone = 25;     // percent of a stick's travel read as centred (5 to 60)
+    int triggerThreshold = 50;  // percent of a trigger's travel past which it is pressed (10 to 90)
+    bool rumble = true;         // a short buzz when a controller connects (pads with a motor)
     Controls::Bindings controls;
 
     // settings.ini in SDL's per-user folder ("" when SDL has none).

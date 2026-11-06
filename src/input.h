@@ -11,6 +11,7 @@
 
 #include "app.h"
 #include "navigator.h"
+#include "pads.h"
 #include "script.h"
 #include "touchscript.h"
 #include "ui.h"
@@ -18,23 +19,19 @@
 
 namespace sims2wide
 {
-// The controllers' inputs as read (the navigator's PadState is the actions they make).
-struct PadRaw
-{
-    bool btn[Controls::IN_COUNT] = {};
-    float lx = 0, ly = 0, rx = 0, ry = 0;
-};
-
 struct Input
 {
     // The keyboard: which actions' keys are down.
     bool held[Controls::COUNT] = {};
     bool fastPrev = false; // (App::fast follows the key only when it changes: --fast holds until then)
-    // Controllers (any number: each button pressed on any of them counts).
-    std::vector<SDL_GameController*> pads;
+    // Controllers (pads.h: any number, hot-plugged; the last one used drives, Steam Input's
+    // virtual pad over its physical twin).
+    Pads pads;
     PadRaw pad, prevPad;
-    bool prevCombo = false;       // START and BACK together (the menu, like GUIDE)
-    int padStyle = Controls::XBOX; // the last controller's labels, for the menu
+    bool prevCombo = false;       // START and BACK together (the pause menu, like Esc)
+    int padStyle = Controls::XBOX; // the driving controller's labels, for the menu
+    // The keyboard was used last (the HD chips show its keys), else a controller (its buttons).
+    bool lastKeyboard = false;
 
     bool mouseDown = false, rightDown = false;
     // The left button went down on the touch screen: until it is released the stylus stays on
@@ -79,9 +76,11 @@ struct Input
 
     // An input script's window events for this turn of the loop (script.h), pushed as SDL events.
     void PushScript(const std::vector<InputEvent>& script, long iter, const Video& video) const;
-    // After SDL_Init(SDL_INIT_GAMECONTROLLER): opens the controllers already connected.
-    void OpenPads();
+    // After SDL_Init(SDL_INIT_GAMECONTROLLER) and Pads::LoadMappings: opens the controllers
+    // already connected (the others come as they are plugged in).
+    void OpenPads(const Settings& s);
     void ClosePads();
+    static PadOptions PadOptionsOf(const Settings& s);
     void HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool menuOpen);
     // Once a frame, before Frame or the menu: reads the controllers, turns presses into
     // requests (or the menu's input while it is open).
@@ -105,6 +104,5 @@ struct Input
 private:
     bool PadOn(const Settings& s, int action) const;
     bool PadPressed(const Settings& s, int action) const;
-    void OpenPad(int index);
 };
 }
