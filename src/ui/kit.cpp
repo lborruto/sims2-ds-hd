@@ -265,12 +265,20 @@ void DrawImage(Layer& L, const UiItem& it, float s, float ox, float oy)
             const int i = (int)u;
             const float fx = u - i;
             const u32 a = Texel(it, k, i, j), b = Texel(it, k, i + 1, j), c = Texel(it, k, i, j + 1), d = Texel(it, k, i + 1, j + 1);
+            // The picture's own alpha (an icon's transparent pixels) weighs each texel's colour
+            // (premultiplied), so an edge takes no colour from what is transparent beside it.
+            // All four opaque (a live crop of a DS screen), the weights are exactly 1: the
+            // pixel is what it was before alpha was looked at.
+            const bool opaque = ((a & b & c & d) >> 24) == 0xFF;
+            const float wa = (a >> 24) / 255.0f, wb = (b >> 24) / 255.0f, wc = (c >> 24) / 255.0f, wd = (d >> 24) / 255.0f;
+            const float cover = opaque ? 1.0f : (wa * (1 - fx) + wb * fx) * (1 - fy) + (wc * (1 - fx) + wd * fx) * fy;
+            if (cover <= 0) continue;
             auto mix = [&](int sh) {
-                const float top = ((a >> sh) & 0xFF) * (1 - fx) + ((b >> sh) & 0xFF) * fx;
-                const float bot = ((c >> sh) & 0xFF) * (1 - fx) + ((d >> sh) & 0xFF) * fx;
-                return (u32)std::lround(top * (1 - fy) + bot * fy);
+                const float top = ((a >> sh) & 0xFF) * wa * (1 - fx) + ((b >> sh) & 0xFF) * wb * fx;
+                const float bot = ((c >> sh) & 0xFF) * wc * (1 - fx) + ((d >> sh) & 0xFF) * wd * fx;
+                return (u32)std::lround(std::clamp((top * (1 - fy) + bot * fy) / cover, 0.0f, 255.0f));
             };
-            L.Over(x, y, 0xFF000000 | mix(16) << 16 | mix(8) << 8 | mix(0), alpha);
+            L.Over(x, y, 0xFF000000 | mix(16) << 16 | mix(8) << 8 | mix(0), alpha * cover);
         }
     }
 }

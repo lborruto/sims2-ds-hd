@@ -72,7 +72,7 @@ target_include_directories(uikit PUBLIC melonDS/src src PRIVATE src/thirdparty)
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
     src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/controls.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
-    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
+    src/looks.cpp src/menu.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
 target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
@@ -145,8 +145,8 @@ target_link_libraries(controls_test PRIVATE SDL2::SDL2-static)
 add_executable(gamestate_test EXCLUDE_FROM_ALL tests/gamestate_test.cpp src/gamestate.cpp src/screens.cpp)
 target_include_directories(gamestate_test PRIVATE melonDS/src src)
 
-# Checks of the ROM's archive and string tables on a synthetic ROM (not built by default): ninja -C build romdata_test && ./build/romdata_test
-add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp src/port/statusbar.cpp)
+# Checks of the ROM's archive, string tables, compression, sprites and the icon cache on synthetic data (not built by default): ninja -C build romdata_test && ./build/romdata_test
+add_executable(romdata_test EXCLUDE_FROM_ALL tests/romdata_test.cpp src/romdata.cpp src/port/icons.cpp src/port/statusbar.cpp)
 target_include_directories(romdata_test PRIVATE melonDS/src src)
 target_link_libraries(romdata_test PRIVATE uikit)
 

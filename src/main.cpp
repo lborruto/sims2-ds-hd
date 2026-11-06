@@ -82,6 +82,8 @@ static void Usage()
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --strings-count               print how many strings the game's text table has, and stop\n"
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
+        "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
+        "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load), and stop\n"
         "  --language N                  the text's language for those and the HD interface's words: 0 Japanese (the\n"
@@ -131,6 +133,8 @@ int main(int argc, char** argv)
     bool wide = false, interp = false;
     int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
     bool stringsCount = false, noRomData = false;
+    int dumpResource = -1, dumpSprite = -1, dumpFrame = -1; // the archive's data (--dump-resource, --dump-sprite)
+    std::string dumpFile;
     std::string measure; // --measure-string ID|all
     int dialogueString = -1; // (a check) the HD conversation shows this string instead of the page's
     for (int i = 1; i < argc; i++)
@@ -179,6 +183,20 @@ int main(int argc, char** argv)
         }
         else if (a == "--strings-count") stringsCount = true;
         else if (a == "--no-romdata") noRomData = true;
+        // The archive's data to a file (tests/romdata_check.sh): whole numbers, else the usage.
+        else if (a == "--dump-resource" || a == "--dump-sprite")
+        {
+            auto number = [&](long max) {
+                const std::string v = next();
+                char* rest = nullptr;
+                const long n = strtol(v.c_str(), &rest, 10);
+                if (v.empty() || *rest || n < 0 || n > max) { Usage(); exit(1); }
+                return (int)n;
+            };
+            if (a == "--dump-resource") dumpResource = number(1000000);
+            else { dumpSprite = number(1000000); dumpFrame = number(255); }
+            dumpFile = next();
+        }
         // For checks only (not in --help): the HD conversation shows string ID on every page (the
         // longest strings' pictures, tests/console_check.sh).
         else if (a == "--dialogue-string")
@@ -303,17 +321,50 @@ int main(int argc, char** argv)
         }
         return 0;
     }
+    // A resource of the game's archive, its compression undone, or a sprite's frame as a PNG
+    // (--dump-resource, --dump-sprite; tests/romdata_check.sh): write it, say what it is, stop.
+    if (dumpResource >= 0 || dumpSprite >= 0)
+    {
+        RomData data;
+        if (!data.Open(rom)) { fprintf(stderr, "no rom.bin archive in this ROM\n"); return 1; }
+        if (dumpResource >= 0)
+        {
+            if (dumpResource >= data.ResourceCount()) { fprintf(stderr, "no resource %d (the archive holds %d)\n", dumpResource, data.ResourceCount()); return 1; }
+            const std::vector<u8> raw = data.Resource(dumpResource);
+            std::vector<u8> out;
+            const bool packed = Decompress(raw.data(), raw.size(), out);
+            if (!packed) out = raw;
+            FILE* f = fopen(dumpFile.c_str(), "wb");
+            if (!f || (!out.empty() && fwrite(out.data(), 1, out.size(), f) != out.size())) { fprintf(stderr, "cannot write %s\n", dumpFile.c_str()); if (f) fclose(f); return 1; }
+            fclose(f);
+            if (packed) fprintf(stderr, "resource %d: kind %d, %zu bytes unpacked to %zu\n", dumpResource, (raw[0] >> 4) & 7, raw.size(), out.size());
+            else fprintf(stderr, "resource %d: %zu bytes, not compressed\n", dumpResource, raw.size());
+            return 0;
+        }
+        const int frames = data.SpriteFrames(dumpSprite);
+        if (frames == 0) { fprintf(stderr, "resource %d is not a sprite descriptor\n", dumpSprite); return 1; }
+        SpriteFrame f;
+        if (dumpFrame >= frames || !data.Sprite(dumpSprite - 1, dumpSprite, dumpSprite + 1, dumpFrame, f))
+        {
+            fprintf(stderr, "sprite %d: %d frames; frame %d does not read\n", dumpSprite, frames, dumpFrame);
+            return 1;
+        }
+        WriteRgba(dumpFile, f.argb.data(), f.w, f.h);
+        fprintf(stderr, "sprite %d: %d frames; frame %d: %d x %d, %d pieces\n", dumpSprite, frames, dumpFrame, f.w, f.h, f.pieces);
+        return 0;
+    }
     // The game's words for the HD status bar and conversations, once, in the game's language
     // (--language: another, a layout check only): a ROM whose data does not read keeps
-    // milestone 1's CONSOLE (the game's own HUD in the world, its own dialogue box).
+    // milestone 1's CONSOLE (the game's own HUD in the world, its own dialogue box). The
+    // archive stays open: the HD menus' icons are decoded from it as they are needed.
     if (!noRomData)
     {
         auto data = std::make_unique<RomData>();
         if (data->Open(rom) && data->LoadStrings(language >= 0 ? language : GameLanguage(nds)))
         {
             app.hudStrings = HudStringsFrom(data.get());
-            data->DropArchive(); // only the strings are kept
             app.rom = std::move(data);
+            app.icons = std::make_unique<IconCache>(app.rom.get());
         }
     }
     if (!app.hudStrings.ok) fprintf(stderr, "no status bar text in this ROM: CONSOLE shows the game's own\n");

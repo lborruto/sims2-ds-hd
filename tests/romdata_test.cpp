@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include "port/icons.h"
 #include "port/statusbar.h"
 #include "romdata.h"
 
@@ -96,7 +97,7 @@ struct Rom
     size_t fnt = 0, fat = 0, archive = 0;
     u32 fntSize = 0, fatSize = 16;
 };
-static Rom MakeRom(const Bytes& stringFile, u32 entries = 124, u32 id = 123)
+static Rom MakeRomFrom(const std::vector<Bytes>& resources)
 {
     Rom r;
     r.b.assign(0x50, 0);
@@ -114,8 +115,10 @@ static Rom MakeRom(const Bytes& stringFile, u32 entries = 124, u32 id = 123)
     r.b.insert(r.b.end(), fnt.begin(), fnt.end());
     while (r.b.size() % 4) r.b.push_back(0);
     Bytes arch;
-    for (u32 i = 0; i < entries; i++) Put32(arch, 4 * entries + (i > id ? (u32)stringFile.size() : 0));
-    arch.insert(arch.end(), stringFile.begin(), stringFile.end());
+    const u32 entries = (u32)resources.size();
+    u32 at = 4 * entries;
+    for (const Bytes& res : resources) { Put32(arch, at); at += (u32)res.size(); }
+    for (const Bytes& res : resources) arch.insert(arch.end(), res.begin(), res.end());
     r.fat = r.b.size();
     const u32 start = (u32)(r.fat + r.fatSize);
     Put32(r.b, start); Put32(r.b, start);                        // a.bin, empty
@@ -125,9 +128,443 @@ static Rom MakeRom(const Bytes& stringFile, u32 entries = 124, u32 id = 123)
     W32(r.b, 0x40, (u32)r.fnt); W32(r.b, 0x44, r.fntSize); W32(r.b, 0x48, (u32)r.fat); W32(r.b, 0x4C, r.fatSize);
     return r;
 }
+static Rom MakeRom(const Bytes& stringFile, u32 entries = 124, u32 id = 123)
+{
+    std::vector<Bytes> resources(entries);
+    resources[id] = stringFile;
+    return MakeRomFrom(resources);
+}
 
 static bool Opens(const Bytes& rom) { RomData d; return d.Open(rom); }
 static bool Loads(const Bytes& stringFile) { RomData d; return d.Open(MakeRom(stringFile).b) && d.LoadStrings(1); }
+
+// A stream in the game's own compression (kind 6), written as its decoder reads it: 32-bit
+// little-endian words, each word's bits from the top; the codes as romdata.cpp describes
+// them. `plain` is what the stream must decode to.
+struct Game6
+{
+    u32 b3, k, b2, k0;
+    Bytes table;
+    Bytes words, plain;
+    u32 cur = 0;
+    int nbits = 0;
+
+    Game6(u32 b3, u32 k, u32 b2, Bytes table) : b3(b3), k(k), b2(b2), k0(k), table(std::move(table)) {}
+    void Bit(u32 b)
+    {
+        cur = (cur << 1) | (b & 1);
+        if (++nbits == 32) Flush();
+    }
+    void Flush()
+    {
+        if (!nbits) return;
+        Put32(words, cur << (32 - nbits));
+        cur = 0;
+        nbits = 0;
+    }
+    void Bits(u32 v, u32 n) { for (int i = (int)n - 1; i >= 0; i--) Bit(v >> i); }
+    // The number code: n ones (a zero after them under 7), then n bits.
+    void Number(u32 v)
+    {
+        u32 n = 0;
+        while ((2u << n) <= v) n++;
+        for (u32 i = 0; i < n; i++) Bit(1);
+        if (n < 7) Bit(0);
+        Bits(v & ((1u << n) - 1), n);
+    }
+    void Prefix() { Bits(k, b3); }
+    u32 Top(u8 b) const { return b >> (8 - b3); }
+    // A literal whose top bits are not the prefix.
+    void Literal(u8 b) { Bits(b, 8); plain.push_back(b); }
+    // A literal whose top bits are the prefix, and the prefix after it.
+    void Escape(u8 b, u32 newK)
+    {
+        Prefix(); Number(1); Bit(1); Bit(0);
+        Bits(newK, b3);
+        Bits(b & ((1u << (8 - b3)) - 1), 8 - b3);
+        k = newK;
+        plain.push_back(b);
+    }
+    void Put(u8 b) { if (Top(b) == k) Escape(b, k); else Literal(b); }
+    // (A copy from before the start, written to be refused, copies zeros here.)
+    void Copied(u32 dist, u32 len) { for (u32 i = 0; i < len; i++) plain.push_back(dist <= plain.size() ? plain[plain.size() - dist] : 0); }
+    void Short(u32 dist) { Prefix(); Number(1); Bit(0); Bits(dist - 1, 8); Copied(dist, 2); }
+    void Copy(u32 dist, u32 len) // len 3 to 256
+    {
+        Prefix(); Number(len - 1);
+        const u32 off = dist - 1, high = off >> 8;
+        Number((high >> b2) + 1);
+        if (b2) Bits(high & ((1u << b2) - 1), b2);
+        Bits(off & 0xFF, 8);
+        Copied(dist, len);
+    }
+    void Run(u8 b, u32 count, int tableIndex) // count 2 to 65280; tableIndex -1: the byte spelt out
+    {
+        Prefix(); Number(1); Bit(1); Bit(1);
+        const u32 c = count - 1;
+        if (c < 128) Number(c);
+        else { Number(128 + ((c & 0xFF) >> 1)); Bit(c & 1); Number((c >> 8) + 1); }
+        if (tableIndex >= 0) Number((u32)tableIndex + 1);
+        else { Number(32 + (b >> 3)); Bits(b & 7, 3); }
+        plain.insert(plain.end(), count, b);
+    }
+    void End() { Prefix(); Number(2); Number(255); }
+    // The resource: the 4-byte header (size: the plain bytes', or `size`), the stream's word,
+    // the table, the words.
+    Bytes Stream(bool delta = false, long size = -1)
+    {
+        Flush();
+        Bytes s;
+        Put32(s, (u32)(size < 0 ? plain.size() : (size_t)size) << 8 | 0x60 | (delta ? 0x80 : 0));
+        Put32(s, (u32)table.size() | k0 << 8 | b2 << 16 | b3 << 24);
+        s.insert(s.end(), table.begin(), table.end());
+        s.insert(s.end(), words.begin(), words.end());
+        return s;
+    }
+};
+
+static bool Unpacks(const Bytes& s, Bytes& out) { return Decompress(s.data(), s.size(), out); }
+static bool Refused(const Bytes& s) { Bytes out; const bool ok = Decompress(s.data(), s.size(), out); return !ok && out.empty(); }
+
+static void compression()
+{
+    // The game's own kind on every code: literals, escaped literals (the prefix kept, then
+    // changed), runs from the table and spelt out, short and long (odd and even, overlapping
+    // and not), copies near and far, with and without extra offset bits.
+    {
+        Game6 g(3, 4, 0, {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB, 0xCC});
+        for (u8 b : Bytes {0x01, 0x7F, 0xFF, 0x00, 0x9F, 0x80}) g.Put(b); // 0x9F, 0x80 take the escape (top bits 100 = 4)
+        g.Escape(0x85, 7);                                               // the prefix becomes 7 (0xE0 to 0xFF)
+        g.Put(0x9F);                                                     // a plain literal now
+        g.Put(0xE5);                                                     // escaped
+        g.Run(0x33, 2, 2);
+        g.Run(0x11, 127, 0);
+        g.Run(0x5A, 128, -1);
+        g.Run(0xCC, 129, 11);
+        g.Run(0x07, 300, -1);
+        g.Run(0xFE, 1000, -1);
+        g.Short(1);
+        g.Short(2);
+        g.Short(256);
+        g.Copy(1, 3);
+        g.Copy(2, 5);
+        g.Copy(3, 256);
+        g.Copy(7, 4);
+        g.Copy(1000, 6);
+        g.Copy((u32)g.plain.size(), 9);
+        g.Put(0x42);
+        g.Short(1);
+        g.End();
+        const Bytes s = g.Stream();
+        Bytes out;
+        CHECK(Unpacks(s, out) && out == g.plain);
+        CHECK(out.size() > 1800 && out[0] == 0x01 && out[4] == 0x9F && out[6] == 0x85 && out[7] == 0x9F && out[8] == 0xE5);
+        // A delta stream of the same: the halfwords are summed after decoding.
+        Game6 d(3, 4, 0, g.table);
+        Bytes want = {0x10, 0x20, 0x35, 0x21, 0x40, 0x22, 0xFF, 0xFF, 0x05, 0x00, 0x07};
+        u32 prev = 0;
+        for (size_t i = 0; i + 1 < want.size(); i += 2)
+        {
+            const u32 v = want[i] | want[i + 1] << 8, diff = (v - prev) & 0xFFFF;
+            prev = v;
+            d.Put((u8)diff);
+            d.Put((u8)(diff >> 8));
+        }
+        d.Put(want.back()); // an odd byte, left as it is
+        d.End();
+        CHECK(Unpacks(d.Stream(true), out) && out == want);
+        // Every truncation of the stream is refused or gives the same bytes, never a crash;
+        // cutting a whole word off the end, or more, is refused (the end code is gone).
+        for (size_t n = 0; n < s.size(); n++)
+        {
+            Bytes cut(s.begin(), s.begin() + n);
+            CHECK(!Unpacks(cut, out) || out == g.plain);
+            if (n <= s.size() - 4) CHECK(Refused(cut));
+        }
+        // The header's size lying either way.
+        CHECK(Refused(g.Stream(false, (long)g.plain.size() + 1)));
+        CHECK(Refused(g.Stream(false, (long)g.plain.size() - 1)));
+        CHECK(Refused(g.Stream(false, 0)));
+        // The stream's word lying: no table, too big a table, one not a multiple of 4, a prefix
+        // wider than a byte, a prefix out of its width, too many offset bits.
+        auto word = [&](u32 v) { Bytes b = s; W32(b, 4, v); return b; };
+        const u32 w = (u32)g.table.size() | 4 << 8 | 3 << 24;
+        CHECK(!Refused(word(w)));
+        CHECK(Refused(word(w & ~0xFFu)));
+        CHECK(Refused(word((w & ~0xFFu) | 36)));
+        CHECK(Refused(word((w & ~0xFFu) | 6)));
+        CHECK(Refused(word((w & 0xFFFFFF) | 9u << 24)));
+        CHECK(Refused(word((w & ~0xFF00u) | 8 << 8)));
+        CHECK(Refused(word(w | 17 << 16)));
+        // Another kind, the low nibble set, a size over the limit.
+        auto header = [&](u32 v) { Bytes b = s; W32(b, 0, v); return b; };
+        const u32 h = (u32)g.plain.size() << 8 | 0x60;
+        for (u32 kind : {2u, 3u, 4u, 5u, 7u}) CHECK(Refused(header((h & ~0x70u) | kind << 4)));
+        CHECK(Refused(header(h | 1)));
+        CHECK(Refused(header((u32)(kMaxUnpacked + 1) << 8 | 0x60)));
+        CHECK(Refused(Bytes {0x60, 0x10, 0x00}));
+        CHECK(Refused(Bytes {}));
+    }
+    // The widths at their ends: no prefix bits (every literal escaped), eight (no low bits),
+    // with extra offset bits, a run from a 4-byte table and a copy of the longest kind.
+    {
+        Game6 g(0, 0, 2, {0xAB, 0xCD, 0xEF, 0x01});
+        for (u8 b : Bytes {0x00, 0xFF, 0x80, 0x7F}) g.Put(b);
+        g.Run(0xEF, 65280, 2);
+        g.Copy(65000, 256);
+        g.Copy(1, 256);
+        g.Run(0x01, 2, 3);
+        g.End();
+        Bytes out;
+        CHECK(Unpacks(g.Stream(), out) && out == g.plain && out.size() == 4 + 65280 + 512 + 2);
+        Game6 e(8, 0x42, 0, {1, 2, 3, 4});
+        for (u8 b : Bytes {0x42, 0x41, 0x42, 0x00}) e.Put(b);
+        e.Escape(0x42, 0x00);
+        e.Put(0x00);
+        e.Put(0x42);
+        e.End();
+        CHECK(Unpacks(e.Stream(), out) && out == e.plain && out.size() == 7);
+    }
+    // Copies and runs that cannot be: from before the start, past the size, a run byte past
+    // the table, no end code at the size.
+    {
+        Game6 g(3, 4, 0, {1, 2, 3, 4});
+        g.Short(1);
+        g.End();
+        CHECK(Refused(g.Stream()));
+        Game6 c(3, 4, 0, {1, 2, 3, 4});
+        c.Put(0x10);
+        c.Copy(2, 3);
+        c.End();
+        CHECK(Refused(c.Stream()));
+        Game6 t(3, 4, 0, {1, 2, 3, 4});
+        t.Run(0x05, 3, 4); // index 5 of a table of 4
+        t.End();
+        CHECK(Refused(t.Stream()));
+        Game6 n(3, 4, 0, {1, 2, 3, 4});
+        n.Put(0x10);
+        n.Put(0x11);
+        CHECK(Refused(n.Stream(false, 2)));
+        CHECK(Refused(n.Stream(false, 1)));
+        // A stream of nothing: the end code alone gives 0 bytes.
+        Game6 z(3, 4, 0, {1, 2, 3, 4});
+        z.End();
+        Bytes out = {1};
+        CHECK(Unpacks(z.Stream(), out) && out.empty());
+    }
+    // Stored (kind 0): the bytes after the header, the size's worth, never more than there are.
+    {
+        Bytes s = {0x00, 0x05, 0x00, 0x00, 'a', 'b', 'c', 'd', 'e', 'f'};
+        Bytes out;
+        CHECK((Unpacks(s, out) && out == Bytes {'a', 'b', 'c', 'd', 'e'}));
+        W32(s, 0, 7 << 8);
+        CHECK(Refused(s));
+        W32(s, 0, 6 << 8);
+        CHECK(Unpacks(s, out) && out.size() == 6);
+        W32(s, 0, 6 << 8 | 0x80); // the delta: (0x6261, 0x6463 + 0x6261, 0x6665 + that)
+        CHECK((Unpacks(s, out) && out == Bytes {'a', 'b', 0xC4, 0xC6, 0x29, 0x2D}));
+        W32(s, 0, 5 << 8 | 0x80); // an odd byte left alone
+        CHECK((Unpacks(s, out) && out == Bytes {'a', 'b', 0xC4, 0xC6, 'e'}));
+    }
+    // LZ10 (kind 1): literals, a copy, an overlapping one, a copy cut at the size; cut
+    // streams and a copy from before the start refused.
+    {
+        Bytes s;
+        Put32(s, 12 << 8 | 0x10);
+        s.push_back(0x08);                                  // 0 0 0 0 1 0 0 0: 4 literals, a copy, 3 literals
+        s.insert(s.end(), {'a', 'b', 'c', 'd'});
+        s.push_back(0x10); s.push_back(0x03);               // length 4, distance 4: abcd again
+        s.insert(s.end(), {'x', 'y', 'z'});
+        s.push_back(0x80);                                  // a copy: length 3, distance 1: zzz, cut at 12 (one z)
+        s.push_back(0x00); s.push_back(0x00);
+        Bytes out;
+        CHECK((Unpacks(s, out) && out == Bytes {'a', 'b', 'c', 'd', 'a', 'b', 'c', 'd', 'x', 'y', 'z', 'z'}));
+        for (size_t n = 4; n < s.size(); n++) CHECK(Refused(Bytes(s.begin(), s.begin() + n)));
+        Bytes far = s;
+        far[10] = 0x04; // distance 5 at 4 bytes written
+        CHECK(Refused(far));
+        Bytes back = {0x10, 0x03, 0x00, 0x00, 0x80, 0x00, 0x00};
+        CHECK(Refused(back));
+    }
+}
+
+// A sprite: its descriptor, its tiles resource (each frame's 4bpp tiles stored, kind 0, at
+// its byte offset) and a 16-colour palette, as the game lays them out.
+struct Sprite
+{
+    struct Piece { int x, y, shape, size, tile; };
+    struct Frame { int w, h, x, y; std::vector<Piece> pieces; Bytes tiles; };
+    int w = 16, h = 16;
+    std::vector<Frame> frames;
+
+    Bytes Descriptor() const
+    {
+        Bytes d;
+        d.push_back((u8)w); d.push_back((u8)h);
+        Put16(d, 0); Put16(d, 0); Put16(d, (u32)frames.size()); Put32(d, 0);
+        std::vector<size_t> at;
+        Bytes body;
+        u32 gfx = 0;
+        for (const Frame& f : frames)
+        {
+            at.push_back(body.size());
+            Put16(body, (u32)f.pieces.size());
+            body.push_back((u8)f.w); body.push_back((u8)f.h);
+            Put16(body, gfx);
+            Put16(body, (u32)(u16)(s16)f.x); Put16(body, (u32)(u16)(s16)f.y);
+            for (const Piece& p : f.pieces)
+            {
+                Put16(body, (u32)(p.x & 0x1FF) | (u32)(p.y & 0x7F) << 9);
+                Put16(body, (u32)p.size << 2 | (u32)p.shape << 4 | (u32)p.tile << 6);
+            }
+            gfx += 4 + (u32)f.tiles.size();
+        }
+        for (size_t a : at) Put16(d, (u32)(2 * frames.size() + a));
+        d.insert(d.end(), body.begin(), body.end());
+        return d;
+    }
+    Bytes Tiles() const
+    {
+        Bytes t;
+        for (const Frame& f : frames)
+        {
+            Put32(t, (u32)f.tiles.size() << 8);
+            t.insert(t.end(), f.tiles.begin(), f.tiles.end());
+        }
+        return t;
+    }
+    static Bytes Palette()
+    {
+        Bytes p;
+        for (u32 i = 0; i < 16; i++) Put16(p, i | (31 - i) << 5 | (i * 2) << 10); // colour i: red i, green 31 - i, blue 2i
+        return p;
+    }
+    static u32 Colour(u32 i) { return i ? Bgr555ToArgb((u16)(i | (31 - i) << 5 | (i * 2) << 10)) : 0; }
+    // One 8 x 8 tile whose pixel (x, y) is colour c(x, y).
+    template <class F> static Bytes Tile(F c)
+    {
+        Bytes t(32, 0);
+        for (int y = 0; y < 8; y++)
+            for (int x = 0; x < 8; x++) t[y * 4 + x / 2] |= (u8)(c(x, y) << (x % 2 ? 4 : 0));
+        return t;
+    }
+};
+
+static void sprites()
+{
+    // Frame 0: an 8 x 8 piece at the frame's origin (pixel (x, y) in colour (x + y) % 16).
+    // Frame 1: a 16 x 8 piece (two tiles) at the top left and an 8 x 8 one at (8, 8), both
+    // placed from a frame origin of (-4, -4), in a 12 x 12 frame: the second is clipped.
+    // Frame 2: a piece at the most negative positions (x -256, y -64) in a frame there.
+    Sprite sp;
+    const Bytes tileA = Sprite::Tile([](int x, int y) { return (x + y) % 16; });
+    const Bytes tileB = Sprite::Tile([](int, int) { return 5; });
+    const Bytes tileC = Sprite::Tile([](int x, int) { return x == 0 ? 0 : 9; });
+    sp.frames.push_back({8, 8, 0, 0, {{0, 0, 0, 0, 0}}, tileA});
+    Bytes two = tileB;
+    two.insert(two.end(), tileC.begin(), tileC.end());
+    two.insert(two.end(), tileA.begin(), tileA.end());
+    sp.frames.push_back({12, 12, -4, -4, {{-4, -4, 1, 0, 0}, {4, 4, 0, 0, 2}}, two});
+    sp.frames.push_back({8, 8, -256, -64, {{-256, -64, 0, 0, 0}}, tileB});
+    const Bytes desc = sp.Descriptor(), tiles = sp.Tiles(), pal = Sprite::Palette();
+    CHECK(SpriteFrames(desc) == 3);
+    SpriteFrame f;
+    CHECK(DecodeSpriteFrame(tiles, desc, pal, 0, f) && f.w == 8 && f.h == 8 && f.pieces == 1 && f.argb.size() == 64);
+    for (int y = 0; y < 8; y++)
+        for (int x = 0; x < 8; x++) CHECK(f.argb[y * 8 + x] == Sprite::Colour((x + y) % 16));
+    CHECK(f.argb[0] == 0 && (f.argb[1] >> 24) == 0xFF);
+    CHECK(DecodeSpriteFrame(tiles, desc, pal, 1, f) && f.w == 12 && f.h == 12 && f.pieces == 2);
+    for (int y = 0; y < 12; y++)
+        for (int x = 0; x < 12; x++)
+        {
+            u32 want = 0;
+            if (y < 8 && x < 8) want = Sprite::Colour(5);
+            else if (y < 8) want = x == 8 ? 0 : Sprite::Colour(9);
+            else if (x >= 8) want = Sprite::Colour((x - 8 + y - 8) % 16);
+            CHECK(f.argb[y * 12 + x] == want);
+        }
+    CHECK(DecodeSpriteFrame(tiles, desc, pal, 2, f) && f.w == 8 && f.argb[0] == Sprite::Colour(5) && f.argb[63] == Sprite::Colour(5));
+    CHECK(!DecodeSpriteFrame(tiles, desc, pal, 3, f) && f.w == 0 && f.argb.empty());
+    CHECK(!DecodeSpriteFrame(tiles, desc, pal, -1, f));
+    // The palette's colours as melonDS shows them: 5 bits spread to 8.
+    CHECK(Bgr555ToArgb(0x7FFF) == 0xFFFBFBFB && Bgr555ToArgb(0) == 0xFF000000 && Bgr555ToArgb(0x001F) == 0xFFFB0000 && Bgr555ToArgb(0x8000) == 0xFF000000);
+    CHECK(Bgr555ToArgb(12 | 14 << 5 | 22 << 10) == 0xFF6171B2); // the game's frame colour
+    std::vector<u32> colours;
+    CHECK(ReadPalette(pal, colours) && colours.size() == 16 && colours[3] == Sprite::Colour(3));
+    CHECK(ReadPalette(Bytes(512, 0), colours) && colours.size() == 256);
+    CHECK(!ReadPalette(Bytes(30, 0), colours) && colours.empty());
+    CHECK(!ReadPalette(Bytes(), colours));
+
+    // Broken descriptors, tiles and palettes: refused, never a crash.
+    auto refused = [&](const Bytes& d, const Bytes& t, const Bytes& p, int frame = 0) { SpriteFrame o; return !DecodeSpriteFrame(t, d, p, frame, o) && o.w == 0; };
+    CHECK(!refused(desc, tiles, pal));
+    CHECK(SpriteFrames(Bytes()) == 0 && SpriteFrames(Bytes(11, 1)) == 0);
+    auto broken = [&](size_t at, u32 v, int bytes = 2) { Bytes d = desc; if (bytes == 2) W16(d, at, v); else d[at] = (u8)v; return d; };
+    CHECK(SpriteFrames(broken(0, 0, 1)) == 0 && SpriteFrames(broken(1, 0, 1)) == 0); // no size
+    CHECK(SpriteFrames(broken(2, 1)) == 0);                                        // the zero not zero
+    CHECK(SpriteFrames(broken(6, 0)) == 0 && SpriteFrames(broken(6, 256)) == 0);     // no frame, too many
+    CHECK(SpriteFrames(broken(6, 200)) == 0);                                      // a table past the end
+    CHECK(refused(broken(12, 5000), tiles, pal));                                  // frame 0 past the end
+    CHECK(refused(broken(12, (u32)desc.size() - 12 - 5), tiles, pal));             // its header cut
+    const size_t f0 = 12 + 2 * 3;
+    CHECK(refused(broken(f0, 0), tiles, pal) && refused(broken(f0, 65), tiles, pal));            // no piece, too many
+    CHECK(refused(broken(f0, 2), tiles, pal));                                                   // a second piece read from the next frame's bytes: tiles past its chunk
+    CHECK(refused(broken(f0 + 2, 0, 1), tiles, pal) && refused(broken(f0 + 3, 0, 1), tiles, pal)); // an empty frame
+    CHECK(refused(broken(f0 + 4, (u32)tiles.size()), tiles, pal));                               // tiles past the resource
+    CHECK(refused(broken(f0 + 4, 2), tiles, pal));                                               // tiles inside a header
+    CHECK(refused(broken(f0 + 12, 3 << 4), tiles, pal));                                         // shape 3
+    CHECK(refused(broken(f0 + 12, 1 << 2), tiles, pal));                                         // a 16 x 16 piece: more tiles than the frame's
+    CHECK(refused(broken(f0 + 12, 1 << 6), tiles, pal));                                         // tile 1 of one
+    CHECK(refused(broken(f0 + 12, 1023 << 6), tiles, pal));
+    CHECK(refused(desc, Bytes(), pal) && refused(desc, Bytes(tiles.begin(), tiles.begin() + 20), pal));
+    CHECK(refused(desc, tiles, Bytes(31, 0)) && refused(desc, tiles, Bytes(512, 0)) && refused(desc, tiles, Bytes()));
+    {
+        Bytes t = tiles;
+        W32(t, 0, 31 << 8); // frame 0's chunk one byte short of its piece
+        CHECK(refused(desc, t, pal));
+        Bytes big = desc;
+        big[0] = 0; // the descriptor's own size 0
+        CHECK(SpriteFrames(big) == 0 && refused(big, tiles, pal));
+    }
+
+    // The same through the archive and the icon cache: frames decoded once and kept, scaled
+    // copies through the kit's scaler (a whole factor: every pixel a block, the alpha kept),
+    // a sprite that does not read remembered as such, nothing from a dropped archive.
+    {
+        std::vector<Bytes> resources(8);
+        resources[4] = tiles; resources[5] = desc; resources[6] = pal;
+        resources[7] = Bytes(30, 0); // not a palette
+        RomData rom;
+        CHECK(rom.Open(MakeRomFrom(resources).b) && rom.ResourceCount() == 8);
+        CHECK(rom.SpriteFrames(5) == 3 && rom.SpriteFrames(4) == 0 && rom.SpriteFrames(9) == 0 && rom.SpriteFrames(-1) == 0);
+        CHECK(rom.Sprite(4, 5, 6, 1, f) && f.w == 12 && f.pieces == 2);
+        CHECK(!rom.Sprite(4, 5, 7, 1, f) && f.w == 0);
+        CHECK(!rom.Sprite(5, 5, 6, 1, f) && !rom.Sprite(4, 6, 6, 1, f) && !rom.Sprite(4, 5, 6, 3, f));
+        IconCache cache(&rom);
+        const SpriteRef s = SpriteRef::Of(5);
+        CHECK(s.tiles == 4 && s.desc == 5 && s.pal == 6);
+        CHECK(cache.Frames(s) == 3 && cache.Frames(SpriteRef::Of(4)) == 0);
+        const SpriteFrame* a = cache.Frame(s, 0);
+        CHECK(a && a->w == 8 && a->argb[9] == Sprite::Colour(2));
+        CHECK(cache.Frame(s, 0) == a);
+        CHECK(!cache.Frame(s, 3) && !cache.Frame(s, -1) && !cache.Frame(SpriteRef::Of(4), 0) && !cache.Frame(SpriteRef::Of(4), 0));
+        const SpriteFrame* big = cache.Scaled(s, 0, 3);
+        CHECK(big && big->w == 24 && big->h == 24 && big->argb.size() == 576);
+        for (int y = 0; y < 24 && big; y++)
+            for (int x = 0; x < 24; x++) CHECK(big->argb[y * 24 + x] == a->argb[(y / 3) * 8 + x / 3]);
+        CHECK(cache.Scaled(s, 0, 24, 24) == big && cache.Scaled(s, 0, 3) == big);
+        const SpriteFrame* odd = cache.Scaled(s, 1, 30, 18); // not a whole factor: the size asked, nothing outside, the corners' alpha kept
+        CHECK(odd && odd->w == 30 && odd->h == 18 && odd->argb.size() == 540 && odd->argb[0] == Sprite::Colour(5) && (odd->argb[17 * 30 + 29] >> 24) == 0xFF);
+        CHECK(!cache.Scaled(s, 0, 0, 8) && !cache.Scaled(s, 0, 8, -1) && !cache.Scaled(s, 0, 0) && !cache.Scaled(s, 3, 2) && !cache.Scaled(SpriteRef::Of(9), 0, 2));
+        IconCache none(nullptr);
+        CHECK(none.Frames(s) == 0 && !none.Frame(s, 0) && !none.Scaled(s, 0, 2));
+        rom.DropArchive();
+        CHECK(rom.SpriteFrames(5) == 0 && !rom.Sprite(4, 5, 6, 0, f));
+        IconCache dropped(&rom);
+        CHECK(!dropped.Frame(s, 0));
+        CHECK(cache.Frame(s, 0) == a); // what was decoded stays
+    }
+}
 
 int main()
 {
@@ -293,6 +730,9 @@ int main()
         RomData closed;
         CHECK(!HudStringsFrom(&closed).ok);
     }
+
+    compression();
+    sprites();
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("romdata_test: ok\n");

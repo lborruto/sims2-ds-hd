@@ -271,4 +271,299 @@ std::string RomData::String(int id) const
     if (id < 0 || id >= StringCount()) return "";
     return strings[id];
 }
+
+// --- Compression ---------------------------------------------------------------------------
+namespace
+{
+// The bits as the game's own decoder (kind 6) reads them: 32-bit words, little-endian, each
+// word's bits from its most significant one. `bad` once the stream has run out (every read
+// then gives 0, and the caller refuses the result). A last word short of 4 bytes is padded
+// with zeros: the stream's bits end inside it.
+struct BitReader
+{
+    const u8* p;
+    size_t len;
+    size_t pos = 0;        // the next word's first byte
+    u32 buf = 0x80000000;  // the bits left of the word being read, then a 1 (the decoder's sentinel)
+    bool bad = false;
+    u32 Bit()
+    {
+        u32 bit = buf >> 31;
+        buf <<= 1;
+        if (buf == 0)
+        {
+            if (pos >= len) { bad = true; return 0; }
+            u32 w = 0;
+            for (int i = 0; i < 4; i++) if (pos + i < len) w |= (u32)p[pos + i] << (8 * i);
+            pos += 4;
+            bit = w >> 31;
+            buf = (w << 1) | 1;
+        }
+        return bit;
+    }
+    u32 Bits(u32 n) { u32 v = 0; for (u32 i = 0; i < n; i++) v = (v << 1) | Bit(); return v; }
+    // The decoder's number code: n ones (7 at most) and, under 7 of them, a zero, then n
+    // bits: (1 << n) | bits, 1 to 255.
+    u32 Number() { u32 n = 0; while (n < 7 && Bit()) n++; return (1u << n) | Bits(n); }
+};
+
+// Kind 6, the game's own, ported from the routine the game keeps at 0x01FF8000 (ITCM; read
+// in its disassembly, checked against its output under an emulator on every compressed
+// resource of the European game). The stream's first word: byte 0 the size N of a table of
+// run bytes (4 to 32, a multiple of 4), byte 1 the prefix K, byte 2 the extra offset bits
+// B2 (0 in the game's data), byte 3 the prefix's width B3 (1 to 4 in the game's data); then
+// the table; then codes. A code starts with B3 bits: not K, they are the top of a literal
+// byte whose other 8 - B3 bits follow. K, then a number G: G >= 2 is a copy of G + 1 bytes
+// from a distance of 1 + the offset, a number G2 (255: the end of the stream) less 1, B2
+// bits below it, a byte below those; G == 1 then two bits: 0 → a copy of 2 bytes from a
+// distance of 1 + a byte; 1, 0 → a literal whose top B3 bits are the old K, the new K read
+// (B3 bits) before its low 8 - B3 bits; 1, 1 → a run: a number C (C >= 128: one more bit
+// makes the count's low byte (2C + bit) & 0xFF and a number less 1 its high byte, else C
+// the low byte), the count being the low byte + 1 + (high << 8), of the byte at number I
+// (I < 32: table[I - 1], else (I << 3 | 3 bits) & 0xFF). The game writes halfwords and keeps
+// an odd byte pending; the bytes come out the same, so this writes bytes.
+bool DecodeGame(const u8* d, size_t len, size_t size, std::vector<u8>& out)
+{
+    if (len < 4) return false;
+    const u32 h = Rd32(d);
+    const u32 n = h & 0xFF, b2 = (h >> 16) & 0xFF, b3 = h >> 24;
+    u32 k = (h >> 8) & 0xFF;
+    if (n == 0 || n > 32 || n % 4 || b3 > 8 || b2 > 16 || k >= (1u << b3)) return false;
+    if (len < 4 + n) return false;
+    const u8* table = d + 4;
+    const u32 low = 8 - b3;
+    BitReader r {d + 4 + n, len - 4 - n};
+    out.clear();
+    out.reserve(size);
+    auto put = [&](u8 b) { if (out.size() >= size) return false; out.push_back(b); return true; };
+    auto copy = [&](size_t dist, size_t count) {
+        if (dist == 0 || dist > out.size() || count > size - out.size()) return false;
+        for (size_t i = 0; i < count; i++) { const u8 b = out[out.size() - dist]; out.push_back(b); }
+        return true;
+    };
+    for (;;)
+    {
+        if (r.bad) return false;
+        const u32 v = r.Bits(b3);
+        if (v != k)
+        {
+            if (!put((u8)((v << low) | r.Bits(low)))) return false;
+            continue;
+        }
+        const u32 g = r.Number();
+        if (g >= 2)
+        {
+            const u32 g2 = r.Number();
+            if (g2 == 255) break;
+            u32 off = g2 - 1;
+            if (b2) off = (off << b2) | r.Bits(b2);
+            off = (off << 8) | r.Bits(8);
+            if (r.bad || !copy((size_t)off + 1, (size_t)g + 1)) return false;
+        }
+        else if (!r.Bit())
+        {
+            const u32 off = r.Bits(8);
+            if (r.bad || !copy((size_t)off + 1, 2)) return false;
+        }
+        else if (!r.Bit())
+        {
+            const u32 next = r.Bits(b3);
+            const u8 b = (u8)((k << low) | r.Bits(low));
+            k = next;
+            if (r.bad || !put(b)) return false;
+        }
+        else
+        {
+            const u32 c = r.Number();
+            u32 lo = c, hi = 0;
+            if (c >= 128) { lo = (2 * c + r.Bit()) & 0xFF; hi = r.Number() - 1; }
+            const size_t count = (size_t)lo + 1 + ((size_t)hi << 8);
+            const u32 i = r.Number();
+            u8 b;
+            if (i < 32) { if (i - 1 >= n) return false; b = table[i - 1]; }
+            else b = (u8)((i << 3) | r.Bits(3));
+            if (r.bad || count > size - out.size()) return false;
+            out.insert(out.end(), count, b);
+        }
+    }
+    return !r.bad && out.size() == size;
+}
+
+// Kind 1, the DS BIOS's LZ10: a flag byte, then 8 units, from its top bit: set, two bytes
+// (a length of 3 + the top nibble, a distance of 1 + the other 12 bits); clear, a literal.
+// Stops at the size (a copy over it is cut there).
+bool DecodeLz10(const u8* d, size_t len, size_t size, std::vector<u8>& out)
+{
+    out.clear();
+    out.reserve(size);
+    size_t pos = 0;
+    while (out.size() < size)
+    {
+        if (pos >= len) return false;
+        const u8 flags = d[pos++];
+        for (int b = 0; b < 8 && out.size() < size; b++)
+        {
+            if (flags & (0x80 >> b))
+            {
+                if (pos + 2 > len) return false;
+                const u32 x = ((u32)d[pos] << 8) | d[pos + 1];
+                pos += 2;
+                const size_t count = (x >> 12) + 3, dist = (x & 0xFFF) + 1;
+                if (dist > out.size()) return false;
+                for (size_t i = 0; i < count && out.size() < size; i++) { const u8 c = out[out.size() - dist]; out.push_back(c); }
+            }
+            else
+            {
+                if (pos >= len) return false;
+                out.push_back(d[pos++]);
+            }
+        }
+    }
+    return true;
+}
+}
+
+bool Decompress(const u8* data, size_t len, std::vector<u8>& out)
+{
+    out.clear();
+    if (!data || len < 4) return false;
+    const u32 h = Rd32(data);
+    const u32 kind = (h >> 4) & 7;
+    const size_t size = h >> 8;
+    if ((h & 0x0F) || size > kMaxUnpacked) return false;
+    bool ok = false;
+    switch (kind)
+    {
+    case 0: ok = size <= len - 4; if (ok) out.assign(data + 4, data + 4 + size); break;
+    case 1: ok = DecodeLz10(data + 4, len - 4, size, out); break;
+    case 6: ok = DecodeGame(data + 4, len - 4, size, out); break;
+    default: break;
+    }
+    if (!ok || out.size() != size) { out.clear(); return false; }
+    // The 16-bit delta: each halfword is the sum of the one before it and itself.
+    if (h & 0x80)
+        for (size_t i = 2; i + 1 < out.size(); i += 2)
+        {
+            const u16 v = (u16)(Rd16(&out[i]) + Rd16(&out[i - 2]));
+            out[i] = (u8)v;
+            out[i + 1] = (u8)(v >> 8);
+        }
+    return true;
+}
+
+bool Decompress(const std::vector<u8>& data, size_t offset, std::vector<u8>& out)
+{
+    if (offset >= data.size()) { out.clear(); return false; }
+    return Decompress(data.data() + offset, data.size() - offset, out);
+}
+
+// --- Palettes and sprites ------------------------------------------------------------------
+u32 Bgr555ToArgb(u16 bgr)
+{
+    auto c = [](u32 v) { v &= 31; return (v << 3) | (v >> 3); };
+    return 0xFF000000 | c(bgr) << 16 | c(bgr >> 5) << 8 | c(bgr >> 10);
+}
+
+bool ReadPalette(const std::vector<u8>& res, std::vector<u32>& argb)
+{
+    argb.clear();
+    if (res.size() != 32 && res.size() != 512) return false;
+    argb.reserve(res.size() / 2);
+    for (size_t i = 0; i + 1 < res.size(); i += 2) argb.push_back(Bgr555ToArgb(Rd16(&res[i])));
+    return true;
+}
+
+namespace
+{
+// The DS's OBJ sizes: [shape][size], shapes square, wide, tall.
+constexpr int kObjW[3][4] = {{8, 16, 32, 64}, {16, 32, 32, 64}, {8, 8, 16, 32}};
+constexpr int kObjH[3][4] = {{8, 16, 32, 64}, {8, 8, 16, 32}, {16, 32, 32, 64}};
+
+struct FrameHeader
+{
+    int pieces, w, h, x, y;
+    size_t gfx;      // the frame's compressed tiles: a byte offset in the tiles resource
+    size_t piecesAt; // its pieces' first byte in the descriptor
+};
+bool FrameAt(const std::vector<u8>& desc, int frame, FrameHeader& f)
+{
+    const int n = SpriteFrames(desc);
+    if (frame < 0 || frame >= n) return false;
+    const size_t p = 12 + Rd16(&desc[12 + 2 * (size_t)frame]);
+    if (p + 10 > desc.size()) return false;
+    f.pieces = Rd16(&desc[p]);
+    f.w = desc[p + 2];
+    f.h = desc[p + 3];
+    f.gfx = Rd16(&desc[p + 4]);
+    f.x = (s16)Rd16(&desc[p + 6]);
+    f.y = (s16)Rd16(&desc[p + 8]);
+    f.piecesAt = p + 10;
+    return f.pieces >= 1 && f.pieces <= 64 && f.w > 0 && f.h > 0 && 4 * (size_t)f.pieces <= desc.size() - f.piecesAt;
+}
+}
+
+int SpriteFrames(const std::vector<u8>& desc)
+{
+    if (desc.size() < 12) return 0;
+    const int w = desc[0], h = desc[1], n = Rd16(&desc[6]);
+    if (w == 0 || h == 0 || Rd16(&desc[2]) != 0 || n < 1 || n > 255 || 2 * (size_t)n > desc.size() - 12) return 0;
+    return n;
+}
+
+bool DecodeSpriteFrame(const std::vector<u8>& tiles, const std::vector<u8>& desc, const std::vector<u8>& pal, int frame, SpriteFrame& out)
+{
+    out = SpriteFrame {};
+    FrameHeader f;
+    if (!FrameAt(desc, frame, f)) return false;
+    std::vector<u32> colours;
+    if (!ReadPalette(pal, colours) || colours.size() != 16) return false;
+    std::vector<u8> px;
+    if (!Decompress(tiles, f.gfx, px)) return false;
+    std::vector<u32> argb((size_t)f.w * f.h, 0);
+    for (int i = 0; i < f.pieces; i++)
+    {
+        const u32 pos = Rd16(&desc[f.piecesAt + 4 * (size_t)i]), attr = Rd16(&desc[f.piecesAt + 4 * (size_t)i + 2]);
+        int x = pos & 0x1FF, y = (pos >> 9) & 0x7F;
+        if (x & 0x100) x -= 0x200;
+        if (y & 0x40) y -= 0x80;
+        const u32 shape = (attr >> 4) & 3, size = (attr >> 2) & 3;
+        if (shape == 3) return false;
+        const int pw = kObjW[shape][size], ph = kObjH[shape][size];
+        // The piece's tiles follow each other from its first (32 bytes each, 1D mapping).
+        const size_t base = (size_t)(attr >> 6) * 32, need = (size_t)(pw / 8) * (ph / 8) * 32;
+        if (base > px.size() || need > px.size() - base) return false;
+        size_t o = base;
+        for (int ty = 0; ty < ph / 8; ty++)
+            for (int tx = 0; tx < pw / 8; tx++, o += 32)
+                for (int yy = 0; yy < 8; yy++)
+                {
+                    const int Y = y - f.y + ty * 8 + yy;
+                    if (Y < 0 || Y >= f.h) continue;
+                    for (int xx = 0; xx < 4; xx++)
+                    {
+                        const u8 b = px[o + yy * 4 + xx];
+                        for (int half = 0; half < 2; half++)
+                        {
+                            const u32 c = half ? b >> 4 : b & 15;
+                            const int X = x - f.x + tx * 8 + xx * 2 + half;
+                            if (c && X >= 0 && X < f.w) argb[(size_t)Y * f.w + X] = colours[c];
+                        }
+                    }
+                }
+    }
+    out.w = f.w;
+    out.h = f.h;
+    out.pieces = f.pieces;
+    out.argb = std::move(argb);
+    return true;
+}
+
+int RomData::SpriteFrames(int desc) const { return sims2wide::SpriteFrames(Resource(desc)); }
+
+bool RomData::Sprite(int tiles, int desc, int pal, int frame, SpriteFrame& out) const
+{
+    out = SpriteFrame {};
+    if (!IsOpen()) return false;
+    return DecodeSpriteFrame(Resource(tiles), Resource(desc), Resource(pal), frame, out);
+}
 }
