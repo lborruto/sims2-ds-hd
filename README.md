@@ -60,7 +60,8 @@
   remappable; a controller's right stick moves a cursor on the touch screen.
 - **A pause menu, and a place to start.** Start + Back (or Esc) pauses: Settings, the Controls
   card and your keys and buttons, four save states with their picture and date (loading one asks
-  first, and can be undone), Quit (asked first: next time *Continue* picks up right there). Before
+  first, and can be undone), Change game, the saves folder, Quit (asked first: next time
+  *Continue* picks up right there, unless the game saved since). Before
   the game, a launch panel: Continue, choose a file (or drop a `.nds` on the window), your recent
   ROMs, the language. All of it in five languages, with the buttons of the controller you hold.
 - **Sound that keeps up.** When the computer falls behind, the music stretches instead of

@@ -1,6 +1,7 @@
 #include "state.h"
 
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <vector>
@@ -15,10 +16,20 @@ bool SaveState(melonDS::NDS& nds, const std::string& path)
     melonDS::Savestate st;
     if (st.Error || !nds.DoSavestate(&st)) return false;
     st.Finish();
-    FILE* f = fopen(path.c_str(), "wb");
+    // Written beside it first, checked, then put in its place: a full disk or a cut never leaves
+    // a broken state where a good one was.
+    const std::string tmp = path + ".tmp";
+    FILE* f = fopen(tmp.c_str(), "wb");
     if (!f) return false;
-    fwrite(st.Buffer(), 1, st.Length(), f);
-    fclose(f);
+    bool ok = fwrite(st.Buffer(), 1, st.Length(), f) == st.Length();
+    ok = (fclose(f) == 0) && ok;
+    std::error_code ec;
+    if (ok) std::filesystem::rename(tmp, path, ec);
+    if (!ok || ec)
+    {
+        std::filesystem::remove(tmp, ec);
+        return false;
+    }
     return true;
 }
 

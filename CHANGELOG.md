@@ -23,7 +23,7 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   controller you hold. Settings as one list (Left / Right change a row), the Controls card, Keys
   and buttons (A to change one, X to clear it, Y to set them all in turn; Esc or Start + Back
   keeps a binding), four save states with their picture and date (loading one asks first, and
-  can be undone), and Quit asks first. The quick save state (F5 / F7) moved from beside the ROM to
+  can be undone), Change game, the saves folder, and Quit asks first. The quick save state (F5 / F7) moved from beside the ROM to
   the settings folder.
 - DS Wireless is greyed on the main menu: it needs a second DS.
 

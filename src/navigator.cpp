@@ -265,7 +265,10 @@ bool Navigator::Returning() const
 {
     // (Still on the Save slots or the phone too: the frame the game leaves them is drawn before the
     // navigator sees it; CONSOLE veils only the panel, Unknown and Loading, never an HD screen.)
-    return returnFrames_ > 0 ||
+    // Both clauses capped at kReturnVeilFrames once the HD screen is left: a veil never hides an
+    // Unknown cursor screen or the world-only fallback for long.
+    const bool onHd = screen_.screen == Screen::SaveSlots || screen_.screen == Screen::Phone;
+    return (returnFrames_ > 0 && (onHd || veilFrames_ > 0)) ||
            (menuOpen_ && returnFocus_ > kReturnFocusFrames - kReturnVeilFrames && screen_.tab != returnTab_);
 }
 
@@ -356,6 +359,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         else if (s.screen != Screen::Panel && s.screen != Screen::SaveSlots && s.screen != Screen::Phone && s.screen != Screen::Popup &&
                  s.screen != Screen::Unknown && s.screen != Screen::Loading)
             returnFrames_ = returnFocus_ = 0, returnTap_ = false;
+        // (Leaving the Save slots or the phone on the way back: the veil's frames start.)
+        if ((screen_.screen == Screen::SaveSlots || screen_.screen == Screen::Phone) && s.screen != Screen::SaveSlots && s.screen != Screen::Phone && returnFrames_ > 0)
+            veilFrames_ = kReturnVeilFrames;
         focus_ = -1;
         closing_ = 0;
         screen_ = s;
@@ -458,6 +464,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     const bool canTap = !touch.Owns() && closing_ == 0;
     // Back from the Save slots or the phone: the tab it came from, tapped once the panel is settled.
     if (returnFrames_ > 0) returnFrames_--;
+    if (veilFrames_ > 0) veilFrames_--;
     if (leftFrames_ > 0) leftFrames_--;
     if (returnFocus_ > 0) returnFocus_--;
     if (returnTap_ && s.screen == Screen::Panel && settled && canTap && running_.empty())
@@ -733,7 +740,7 @@ void Navigator::Leave(TouchScript& touch)
     pageKeptId_ = 0;
     pageKeptIndex_ = -1;
     pictureOpen_ = false;
-    returnFrames_ = returnFocus_ = leftFrames_ = 0;
+    returnFrames_ = returnFocus_ = leftFrames_ = veilFrames_ = 0;
     returnTap_ = false;
     ClearQueue();
     armed_ = 0;

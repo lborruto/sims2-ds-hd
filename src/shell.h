@@ -55,6 +55,8 @@ enum class Act
     OpenRecent,    // launch: arg the index in Model::recents
     ChooseFile,    // launch: the file picker
     Exit,          // launch: stop the program
+    ChangeGame,    // back to the launch panel (the suspend state written first, as Quit)
+    OpenFolder,    // the saves' folder in the system's file browser
 };
 struct Result
 {
@@ -81,6 +83,8 @@ struct Model
     Thumb slots[kStateSlots];         // w == 0: empty
     bool used[kStateSlots] = {};
     bool canUndo = false;
+    std::string otherRom[kStateSlots]; // a slot made with another ROM file: its name (the load asks so)
+    bool canOpenFolder = false;       // the window, with a folder: "Open the saves folder"
     // The launch panel: the recent ROMs' file names (the first is Continue's), its suspend state.
     std::vector<std::string> recents;
     bool hasSuspend = false;
@@ -133,4 +137,11 @@ struct LaunchEntry { LaunchItem kind; int arg; };
 std::vector<LaunchEntry> LaunchEntries(const Model& m);
 // An action's name in the bindings page.
 std::string ActionLabel(int action, int language);
+// The pause menu's main page, in order (the saves' folder only with Model::canOpenFolder).
+enum class MainItem { Resume, Settings, Controls, States, ChangeGame, OpenFolder, Quit };
+std::vector<MainItem> MainEntries(const Model& m);
+// A shell press on a pad (now / before: PadRaw::btn): the action's own input, or the controller's
+// own button (fallback: Controls::IN_A south, IN_B east) when the action has none, so a cleared A
+// or B never locks the menu.
+bool PadPress(const Controls::Bindings& b, int action, int fallback, const bool* now, const bool* before);
 }

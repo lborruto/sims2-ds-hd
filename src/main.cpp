@@ -375,17 +375,13 @@ int main(int argc, char** argv)
         host.model.message = message;
         std::vector<std::string> paths = host.data.Recents();
         for (const std::string& p : paths) host.model.recents.push_back(BaseName(p));
-        if (!paths.empty())
-        {
-            std::string code, rom;
-            ClassifyRom(paths[0], &code);
-            {
-                std::ifstream f(host.data.SuspendRom(code));
-                std::getline(f, rom);
-            }
-            host.model.hasSuspend = rom == paths[0] && FileExists(host.data.Suspend(code)) && ReadThumb(host.data.SuspendThumb(code), host.model.suspend);
-        }
+        std::string firstCode;
+        StateMeta suspendMeta;
+        if (!paths.empty() && ClassifyRom(paths[0], &firstCode) != RomKind::Unreadable)
+            host.model.hasSuspend = ReadMeta(host.data.SuspendMeta(firstCode), suspendMeta) && suspendMeta.rom == paths[0] &&
+                                    FileExists(host.data.Suspend(firstCode)) && ReadThumb(host.data.SuspendThumb(firstCode), host.model.suspend);
         PadState prev;
+        if (launchFrames > 0) ScriptPad(script, launchFrames - 1, prev); // (Change game: a button still held is no press)
         for (long iter = 0;; iter++)
         {
             shell::Input in;
@@ -415,7 +411,26 @@ int main(int argc, char** argv)
             if (printShell && r.act != shell::Act::None) fprintf(stderr, "frame %ld: shell launch act %d %d\n", launchFrames, (int)r.act, r.arg);
             switch (r.act)
             {
-            case shell::Act::Continue: tryPath = paths[0]; continueSuspend = host.model.hasSuspend; break;
+            case shell::Act::Continue:
+                tryPath = paths[0];
+                continueSuspend = host.model.hasSuspend;
+                if (continueSuspend)
+                {
+                    // The game saved since the place was kept (its save is not the one the place
+                    // left): loading the place would put the older save back. Said, and the place dropped.
+                    const std::string sav = savePath.empty() ? paths[0].substr(0, paths[0].rfind('.')) + ".sav" : savePath;
+                    if (suspendMeta.save != HashFile(sav))
+                    {
+                        std::error_code ec;
+                        for (const std::string& f : {host.data.Suspend(firstCode), host.data.SuspendThumb(firstCode), host.data.SuspendMeta(firstCode)})
+                            std::filesystem::remove(f, ec);
+                        host.model.hasSuspend = continueSuspend = false;
+                        host.model.message = OwnWordIn(host.model.language, OwnWordId::LaunchSaveNewer);
+                        if (printShell) fprintf(stderr, "frame %ld: shell launch refused continue: saved since\n", launchFrames);
+                        tryPath.clear();
+                    }
+                }
+                break;
             case shell::Act::OpenRecent: tryPath = paths[r.arg]; break;
             case shell::Act::ChooseFile: if (window) tryPath = PickRom(); break;
             case shell::Act::Exit: return false;
@@ -467,8 +482,10 @@ int main(int argc, char** argv)
             launchFrames++;
         }
     };
+    bool relaunching = false; // Change game: the launch panel again, after the game before
+relaunch:
     std::string launchMessage;
-    if (window && !romPath.empty())
+    if (window && !romPath.empty() && !relaunching)
     {
         // A ROM on the command line that is not The Sims 2: said on the launch panel.
         const RomKind k = ClassifyRom(romPath);
@@ -477,8 +494,9 @@ int main(int argc, char** argv)
         else if (k == RomKind::NotSims2) launchMessage = OwnWordIn(lang, OwnWordId::LaunchWrong);
         if (size_t at = launchMessage.find("@1"); at != std::string::npos) launchMessage.replace(at, 2, BaseName(romPath));
     }
-    if ((window && (romPath.empty() || launchFlag || !launchMessage.empty())) || (headless && launchFlag))
+    if ((window && (romPath.empty() || launchFlag || !launchMessage.empty())) || (headless && launchFlag) || relaunching)
     {
+        continueSuspend = false;
         if (!launchMessage.empty()) romPath.clear();
         if (!launch(launchMessage))
         {
@@ -495,6 +513,7 @@ int main(int argc, char** argv)
         host.romPath = ec ? romPath : whole.lexically_normal().string();
     }
     host.data.PushRecent(host.romPath);
+    host.romHeader = 0;
     // The game's save and the screenshot go beside the ROM: a program started from the Finder or
     // Explorer has no useful current folder.
     const std::string romBase = romPath.substr(0, romPath.rfind('.'));
@@ -521,6 +540,7 @@ int main(int argc, char** argv)
     auto cart = melonDS::NDSCart::ParseROM(rom.data(), (u32)rom.size(), nullptr, std::move(cartArgs));
     if (!cart) { Tell(dialogs, "Not a Nintendo DS ROM: " + romPath); return 1; }
     app.shotFile = shotFile;
+    host.romHeader = HashBytes(rom.data(), std::min<size_t>(rom.size(), 0x200)); // (StateMeta: the cartridge's header)
     if (headless)
     {
         // Settings default to CONSOLE's looks; headless never loads them, so it starts with the
@@ -783,25 +803,42 @@ int main(int argc, char** argv)
         }
     }
     host.code = app.romCode;
+    host.canUndo = FileExists(host.data.Undo(app.romCode)); // (a load from an earlier run can be undone too)
+    host.Refresh(app, input); // (the toasts in the game's language before the menu is ever opened)
     // The quick save state (F5 / F7) in the settings folder with the slots, not beside the ROM.
     if (host.data.Ok()) quickState = host.data.GameDir(app.romCode) + "quick.st";
-    // Continue: the place kept on quitting, once (then the game's own save leads again).
-    if (continueSuspend)
-    {
-        const bool ok = LoadState(nds, host.data.Suspend(app.romCode));
-        fprintf(stderr, "suspend state: %s\n", ok ? "loaded" : "cannot load");
-        if (ok)
-        {
-            std::error_code ec;
-            for (const std::string& f : {host.data.Suspend(app.romCode), host.data.SuspendThumb(app.romCode), host.data.SuspendRom(app.romCode)})
-                std::filesystem::remove(f, ec);
-        }
-    }
     Backups backups;
     if (window)
     {
-        audio.Open();
+        static bool audioOpen = false; // (once: Change game comes back here)
+        if (!audioOpen) audio.Open();
+        audioOpen = true;
         backups.Start(Host::SavePath);
+    }
+    // Every state load copies the game's save first (melonDS writes the cartridge's memory to disk
+    // on a load): the backups' copy, which skips a copy equal to the newest.
+    host.beforeLoad = [&backups]() { backups.Copy(); };
+    // Continue: the place kept on quitting, once (then the game's own save leads again). Any other
+    // start of the same ROM (the command line, a file chosen, a recent, a drop) drops its place:
+    // the game's save leads from then on, and an older place never comes back over it.
+    {
+        StateMeta meta;
+        const bool same = ReadMeta(host.data.SuspendMeta(app.romCode), meta) && meta.rom == host.romPath;
+        bool drop = same && !continueSuspend;
+        if (continueSuspend)
+        {
+            const bool ok = host.Load(app, host.data.Suspend(app.romCode));
+            fprintf(stderr, "suspend state: %s\n", ok ? "loaded" : "cannot load");
+            if (!ok) host.Say(video, OwnWord(app.rom.get(), OwnWordId::LaunchContinueFailed));
+            drop = true;
+        }
+        if (drop)
+        {
+            std::error_code ec;
+            for (const std::string& f : {host.data.Suspend(app.romCode), host.data.SuspendThumb(app.romCode), host.data.SuspendMeta(app.romCode)})
+                std::filesystem::remove(f, ec);
+            if (printShell && !continueSuspend) fprintf(stderr, "suspend state: dropped (a new start)\n");
+        }
     }
 
     // frame counts the game's frames (shots, scripts); iter every turn of the loop, paused too.
@@ -958,7 +995,7 @@ int main(int argc, char** argv)
             }
             const int lang = host.model.language;
             if (input.wantSave) host.Say(video, OwnWordIn(lang, SaveState(nds, quickState) ? OwnWordId::ToastStateSaved : OwnWordId::StFailed));
-            if (input.wantLoad) host.Say(video, OwnWordIn(lang, LoadState(nds, quickState) ? OwnWordId::ToastStateLoaded : OwnWordId::ToastNoState));
+            if (input.wantLoad) host.Say(video, OwnWordIn(lang, host.Load(app, quickState) ? OwnWordId::ToastStateLoaded : OwnWordId::ToastNoState));
             if (input.wantShot) { WriteShot(shotFile, app.Top(), app.Bottom()); host.Say(video, OwnWordIn(lang, OwnWordId::ToastShot)); }
             if (input.wantLayout >= 0) app.settings.layout = app.layout = (Layout)input.wantLayout;
             if (input.wantFullscreen)
@@ -1440,6 +1477,32 @@ int main(int argc, char** argv)
         fprintf(stderr, "clock: %04d-%02d-%02d %02d:%02d:%02d (held %ld times, at most %ld s ahead of the computer, "
                 "a minute ahead on %ld frames)  mic: %ld samples read by the game\n",
                 t.year, t.month, t.day, t.hour, t.minute, t.second, cs.writes, cs.maxAhead, cs.minuteAhead, mic::SamplesRead());
+    }
+    // Change game: everything of this game let go, then the launch panel again.
+    if (host.relaunch)
+    {
+        host.relaunch = false;
+        host.shell.Close();
+        relaunching = true;
+        launchFrames = frame;
+        stateLoad.clear();
+        shellPage = -1;
+        if (window) video.RememberSize(app.settings);
+        app.nds.reset();
+        app.rom.reset();
+        app.icons.reset();
+        app.hudStrings = HudStrings();
+        app.game = GameState();
+        app.topBig.clear();
+        app.topBigW = app.topBigH = 0;
+        app.screens = ScreenTracker();
+        app.autoLayout = AutoLayout();
+        app.consoleMenu = consoleMenu;
+        app.consoleFocus = consoleFocus;
+        app.quit = app.fast = app.micBlow = app.micForce = false;
+        input.navigator = Navigator();
+        input.touchScript = TouchScript();
+        goto relaunch;
     }
     if (window)
     {

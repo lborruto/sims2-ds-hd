@@ -4,6 +4,7 @@
 // suspend state on quitting) and says what happened in a toast. The window and headless runs
 // (driven by an input script's "pad" events: tests/console_check.sh) share it.
 #pragma once
+#include <functional>
 #include <string>
 
 #include "NDS.h"
@@ -26,7 +27,12 @@ struct ShellHost
     bool headless = false;
     bool print = false;        // --print-shell: what it does, on stderr
     bool messageOnly = false;  // opened for a message alone: closes with it
-    bool canUndo = false;
+    bool canUndo = false;      // before-load.st exists (a load this session or an earlier one): read on start and after a write
+    bool relaunch = false;     // Change game: back to the launch panel once the frame loop ends
+    u64 romHeader = 0;         // the ROM's header hash (StateMeta: a state made with another file asks first)
+    // Called before every state load (main.cpp: a copy of the game's save, as the backups make:
+    // melonDS writes the cartridge's memory to disk on a load).
+    std::function<void()> beforeLoad;
     unsigned captureUntil = 0; // SDL ticks
     long frame = 0;            // (for the log)
     int autoLanguage = 1;      // the words without the game's strings (the launch panel): the computer's
@@ -45,6 +51,8 @@ struct ShellHost
     void CloseAsked(App& app, Video& video, Input& input);
     // A short message: a toast in the window, a line on stderr headless.
     void Say(Video& video, const std::string& text) const;
+    // A state load with the save's copy first (beforeLoad).
+    bool Load(App& app, const std::string& path);
     // The suspend state, its picture and its ROM (quitting).
     bool WriteSuspend(App& app, const Video& video);
     // The composed picture of now, made small.

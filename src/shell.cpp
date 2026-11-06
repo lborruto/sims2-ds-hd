@@ -274,6 +274,20 @@ std::string ActionLabel(int a, int lang)
     }
 }
 
+std::vector<MainItem> MainEntries(const Model& m)
+{
+    std::vector<MainItem> e {MainItem::Resume, MainItem::Settings, MainItem::Controls, MainItem::States, MainItem::ChangeGame};
+    if (m.canOpenFolder) e.push_back(MainItem::OpenFolder);
+    e.push_back(MainItem::Quit);
+    return e;
+}
+
+bool PadPress(const Controls::Bindings& b, int action, int fallback, const bool* now, const bool* before)
+{
+    const int in = b.Pad(action) >= 0 ? b.Pad(action) : fallback;
+    return in >= 0 && in < Controls::IN_COUNT && now[in] && !before[in];
+}
+
 std::vector<LaunchEntry> LaunchEntries(const Model& m)
 {
     std::vector<LaunchEntry> e;
@@ -291,7 +305,7 @@ int Shell::Count(const Model& m) const
 {
     switch (page)
     {
-    case Page::Main: return 5;
+    case Page::Main: return (int)MainEntries(m).size();
     case Page::Settings: return kRows;
     case Page::Controls: return 1;
     case Page::Keys: return Controls::COUNT + 1;
@@ -416,11 +430,17 @@ Result Shell::Update(const Input& in0, Model& m)
         if (in.b) res.act = Act::Resume;
         else if (in.a)
         {
-            if (focus == 0) res.act = Act::Resume;
-            else if (focus == 1) Go(Page::Settings, 0);
-            else if (focus == 2) Go(Page::Controls, 0);
-            else if (focus == 3) Go(Page::States, 0);
-            else AskQuit();
+            const std::vector<MainItem> e = MainEntries(m);
+            switch (e[std::clamp(focus, 0, (int)e.size() - 1)])
+            {
+            case MainItem::Resume: res.act = Act::Resume; break;
+            case MainItem::Settings: Go(Page::Settings, 0); break;
+            case MainItem::Controls: Go(Page::Controls, 0); break;
+            case MainItem::States: Go(Page::States, 0); break;
+            case MainItem::ChangeGame: res.act = Act::ChangeGame; break;
+            case MainItem::OpenFolder: res.act = Act::OpenFolder; break;
+            case MainItem::Quit: AskQuit(); break;
+            }
         }
         break;
     case Page::Settings:
@@ -654,14 +674,16 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         {
         case Page::Main:
         {
-            static const W words[] = {W::ShellResume, W::ShellSettings, W::ShellControls, W::ShellStates, W::ShellQuit};
-            for (int i = 0; i < 5; i++)
+            static const W words[] = {W::ShellResume, W::ShellSettings, W::ShellControls, W::ShellStates, W::ShellChangeGame, W::ShellOpenFolder, W::ShellQuit};
+            const std::vector<MainItem> e = MainEntries(m);
+            const int n = (int)e.size(), step = 64, top = c.y + (c.h - (n * step - 8)) / 2;
+            for (int i = 0; i < n; i++)
             {
-                const Rect r {c.x + 120, c.y + 14 + i * 88, c.w - 240, 72};
+                const Rect r {c.x + 120, top + i * step, c.w - 240, step - 8};
                 const bool f = !asking && focus == i;
                 if (f) it.Add(1, Ring(r, 24));
                 it.Add(1, Button(r, f));
-                it.Add(1, Line({r.x + 24, r.y, r.w - 48, r.h}, Wd(lang, words[i]), 32, 22, Align::Centre, Weight::ExtraBold));
+                it.Add(1, Line({r.x + 24, r.y, r.w - 48, r.h}, Wd(lang, words[(int)e[i]]), 30, 20, Align::Centre, Weight::ExtraBold));
                 rects_[i] = r;
             }
             right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, W::Select));
@@ -854,8 +876,12 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             note = std::string(Wd(lang, W::KeysCancel)) + "  (" + std::to_string(m.captureLeft) + ")";
         }
         else if (!m.message.empty()) text = m.message;
-        else if (ask == Ask::Quit) { text = Wd(lang, W::QuitAsk); note = Wd(lang, W::QuitNote); }
-        else if (ask == Ask::Load) text = Fill(Wd(lang, W::StLoadAsk), std::to_string(askSlot + 1));
+        else if (ask == Ask::Quit) { text = Wd(lang, W::QuitAsk); if (m.statesOk) note = Wd(lang, W::QuitNote); } // (no folder: nothing is kept)
+        else if (ask == Ask::Load)
+        {
+            text = Fill(Wd(lang, W::StLoadAsk), std::to_string(askSlot + 1));
+            if (askSlot >= 0 && askSlot < kStateSlots && !m.otherRom[askSlot].empty()) note = Fill(Wd(lang, W::StOtherRom), m.otherRom[askSlot]);
+        }
         else if (ask == Ask::Overwrite) text = Fill(Wd(lang, W::StOverwriteAsk), std::to_string(askSlot + 1));
         // The words, as large as the well holds them (30 down to 20).
         float size = 30;

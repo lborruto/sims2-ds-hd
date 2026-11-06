@@ -173,6 +173,11 @@ endif()
 # no DLL beside it. The file picker uses comdlg32 and ole32.
 if(WIN32)
     target_sources(sims2wide PRIVATE packaging/sims2wide.rc)
+    # The manifest is the .rc's (packaging/sims2wide.manifest): MSVC's linker must not add its own.
+    if(MSVC)
+        target_link_options(sims2wide PRIVATE /MANIFEST:NO)
+    endif()
+    set_property(SOURCE packaging/sims2wide.rc APPEND PROPERTY OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/sims2wide.manifest")
     set_target_properties(sims2wide PROPERTIES WIN32_EXECUTABLE TRUE)
     if(TARGET SDL2::SDL2main)
         target_link_libraries(sims2wide PRIVATE SDL2::SDL2main)

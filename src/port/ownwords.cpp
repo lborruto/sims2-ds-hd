@@ -289,6 +289,24 @@ constexpr const char* kWords[][5] = {
     // DS Wireless on the main menu
     {"Needs a second DS: not in this port.", "Demande une deuxième DS : absent de ce portage.", "Braucht eine zweite DS: nicht in dieser Portierung.",
      "Serve un secondo DS: non in questo port.", "Necesita otra DS: no está en esta versión."},
+    // Change game, the saves' folder
+    {"Change game", "Changer de jeu", "Spiel wechseln", "Cambia gioco", "Cambiar de juego"},
+    {"Open the saves folder", "Ouvrir le dossier des sauvegardes", "Speicherordner öffnen", "Apri la cartella dei salvataggi",
+     "Abrir la carpeta de partidas"},
+    // Continue refused: the game saved after the place was kept
+    {"The game was saved after this place was kept: it starts from its own save.",
+     "Le jeu a été sauvegardé après ce point : il reprend depuis sa propre sauvegarde.",
+     "Das Spiel wurde danach gespeichert: es startet vom eigenen Spielstand.",
+     "Il gioco è stato salvato dopo questo punto: riparte dal suo salvataggio.",
+     "El juego se guardó después de este punto: empieza desde su propia partida."},
+    // A state made with another file
+    {"Made with another file (@1): its save would go into this one.", "Fait avec un autre fichier (@1) : sa sauvegarde irait dans celui-ci.",
+     "Mit einer anderen Datei gemacht (@1): ihr Spielstand käme in diese.", "Fatto con un altro file (@1): il suo salvataggio finirebbe in questo.",
+     "Hecho con otro archivo (@1): su partida iría a este."},
+    // Continue failed
+    {"Your place could not be loaded: the game starts from its own save.", "Votre partie n'a pas pu être chargée : le jeu reprend depuis sa sauvegarde.",
+     "Dein Stand ließ sich nicht laden: das Spiel startet vom eigenen Spielstand.", "Impossibile caricare il punto: il gioco riparte dal suo salvataggio.",
+     "No se pudo cargar tu sitio: el juego empieza desde su propia partida."},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

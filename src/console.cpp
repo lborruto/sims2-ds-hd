@@ -287,7 +287,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         SortUi(c.ui); // (the bar's layer after the screen's, a popup's after it, the images last)
         return c;     // (the focus is the view's: no ring from HotspotsFor)
     }
-    else if (veiled && !menuOpen && (s.screen == Screen::Panel || s.screen == Screen::Unknown || s.screen == Screen::Loading))
+    else if (veiled && !menuOpen && (s.screen == Screen::Panel || s.screen == Screen::Unknown))
     {
         // The panel's menu coming back (B from the Save slots or the phone opened from it): the
         // dimmed world it will open over, never the town's flash while the game passes Interact.

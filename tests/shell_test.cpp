@@ -122,8 +122,26 @@ static void main_page()
     sh.Update(Press("b"), f.m);
     CHECK(sh.page == Page::Main && sh.focus == 1);
     CHECK(sh.Update(Press("b"), f.m).act == Act::Resume);
-    // Quit: asked, No first; B is No; A on No closes; Right then A quits.
+    // Change game: at once (the host keeps the place first); Open the saves folder only with one
+    // (the window); Quit last.
+    std::vector<MainItem> e = MainEntries(f.m);
+    CHECK(e.size() == 6 && e[4] == MainItem::ChangeGame && e.back() == MainItem::Quit);
     sh.focus = 4;
+    CHECK(sh.Update(Press("a"), f.m).act == Act::ChangeGame);
+    f.m.canOpenFolder = true;
+    e = MainEntries(f.m);
+    CHECK(e.size() == 7 && e[5] == MainItem::OpenFolder);
+    sh.focus = 5;
+    CHECK(sh.Update(Press("a"), f.m).act == Act::OpenFolder);
+    CheckReach(sh, f.m, "main with the folder");
+    for (int lang = 1; lang <= 5; lang++)
+    {
+        f.m.language = lang;
+        CheckBuild(sh, f.m, "main with the folder");
+    }
+    f.m.language = 1;
+    // Quit: asked, No first; B is No; A on No closes; Right then A quits.
+    sh.focus = (int)e.size() - 1;
     CHECK(sh.Update(Press("a"), f.m).act == Act::None && sh.ask == Ask::Quit && sh.askFocus == 0);
     CHECK(sh.Update(Press("a"), f.m).act == Act::None && sh.ask == Ask::None);
     sh.Update(Press("a"), f.m);
@@ -340,6 +358,51 @@ static void launch_panel()
     CheckBuild(sh, f.m, "launch without a suspend state");
 }
 
+// A cleared or moved A / B never locks the menu: the pad's own south / east then.
+static void pad_fallback()
+{
+    using namespace Controls;
+    Bindings b;
+    bool now[IN_COUNT] = {}, before[IN_COUNT] = {};
+    now[IN_A] = true;
+    CHECK(PadPress(b, A, IN_A, now, before));          // the default: A on south
+    before[IN_A] = true;
+    CHECK(!PadPress(b, A, IN_A, now, before));         // held: no press
+    b.pad[A] = kNone;                                  // cleared
+    before[IN_A] = false;
+    CHECK(PadPress(b, A, IN_A, now, before));          // south still accepts
+    b.pad[B] = kNone;
+    now[IN_A] = false;
+    now[IN_B] = true;
+    CHECK(PadPress(b, B, IN_B, now, before));          // east still goes back
+    b.SetPad(A, IN_X);                                 // moved to X: X accepts (as its chip says)
+    now[IN_B] = false;
+    now[IN_X] = true;
+    CHECK(PadPress(b, A, IN_A, now, before) && !PadPress(b, A, IN_A, before, before));
+}
+
+// A state made with another ROM file: the load question says so.
+static void other_rom()
+{
+    Fixture f;
+    Shell sh;
+    sh.Open(Page::States);
+    f.m.used[1] = true;
+    f.m.otherRom[1] = "other.nds";
+    sh.focus = 1;
+    sh.Update(Press("a"), f.m);
+    CHECK(sh.ask == Ask::Load && sh.askFocus == 0);
+    bool said = false;
+    for (const ui::UiItem& it : sh.Build(f.m))
+        if (it.text.find("other.nds") != std::string::npos) said = true;
+    CHECK(said);
+    // (No folder: the quit question promises nothing.)
+    f.m.statesOk = false;
+    sh.Open(Page::Main);
+    sh.AskQuit();
+    for (const ui::UiItem& it : sh.Build(f.m)) CHECK(it.text != OwnWordIn(1, OwnWordId::QuitNote));
+}
+
 static void mouse()
 {
     Fixture f;
@@ -386,7 +449,8 @@ static void files()
     const fs::path dir = fs::temp_directory_path() / "sims2wide-shell-test";
     fs::remove_all(dir);
     fs::create_directories(dir);
-    DataDir d {dir.string() + "/"};
+    DataDir d;
+    d.root = dir.string() + "/";
     // The thumbnail: the picture made small, its time, back from its file.
     std::vector<u8> rgb(1280 * 720 * 3, 0);
     for (size_t i = 0; i < rgb.size(); i += 3) rgb[i] = 200;
@@ -422,6 +486,13 @@ static void files()
     CHECK(ClassifyHeader(h, 8) == RomKind::Unreadable);
     CHECK(ClassifyRom(a) == RomKind::Unreadable);
     CHECK(!DataDir().Ok() && DataDir().Slot("ASJP", 0).empty() && DataDir().Recents().empty());
+    // No code (an unreadable file): no path, no folder made.
+    CHECK(d.Slot("", 0).empty() && d.SuspendMeta("").empty() && !fs::exists(dir / "states" / "unknown"));
+    // A state's maker, back from its file; the save's hash.
+    StateMeta m {"/x/sims2.nds", 0x1234567890ABCDEFull, 42}, back2;
+    CHECK(WriteMeta(d.SlotMeta("ASJP", 0), m) && ReadMeta(d.SlotMeta("ASJP", 0), back2) && back2.rom == m.rom && back2.header == m.header && back2.save == 42);
+    CHECK(!ReadMeta(d.SlotMeta("ASJP", 3), back2) && back2.rom.empty());
+    CHECK(HashFile(a) == HashBytes(nullptr, 0) && HashFile((dir / "none").string()) == 0);
     fs::remove_all(dir);
 }
 
@@ -433,6 +504,8 @@ int main(int, char**)
     states_page();
     launch_panel();
     mouse();
+    pad_fallback();
+    other_rom();
     files();
     if (failures) { fprintf(stderr, "shell_test: %d failure(s)\n", failures); return 1; }
     printf("shell_test: ok\n");

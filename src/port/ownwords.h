@@ -79,6 +79,9 @@ enum class OwnWordId : int
     ToastStateSaved, ToastStateLoaded, ToastNoState, ToastShot, ToastBackup, ToastCapture, ToastNotSaving, NotEU,
     LaunchContinue, LaunchWhere, LaunchChoose, LaunchRecent, LaunchDrop, LaunchWrong, LaunchUnreadable, LaunchStart, LaunchTitle,
     WirelessNote,
+    // The review's round: change game, open the saves' folder, a stale place, a state from another
+    // file, a place that did not load.
+    ShellChangeGame, ShellOpenFolder, LaunchSaveNewer, StOtherRom, LaunchContinueFailed,
     Count
 };
 

@@ -421,6 +421,8 @@ static void minigame_frame()
                     if (it.kind == ui::UiItem::Chip && r.y >= kMgPrompt.y) chips++;
                 }
                 CHECK(prompt > 0);
+                // The playfield and the top screen alone, unless an HD box adds its buttons' pieces.
+                CHECK(c.pieces.size() == 2 || box);
                 // The clog lights the blow's hint; the cards' question has two chips (Yes, No), the message one.
                 const bool litNow = (sc == Screen::Vacuum && variant == 2) || (sc == Screen::Autopsy && variant > 0) || (sc == Screen::Detector && variant == 2) ||
                                     (sc == Screen::Drencher && variant == 1) || (sc == Screen::Crime && variant == 2) ||

@@ -282,8 +282,9 @@ void Input::Poll(const App& app, bool menuOpen)
         nav.down |= rep(stickDown(pad), stickDown(prevPad), navHeld[1]);
         nav.left |= rep(stickLeft(pad), stickLeft(prevPad), navHeld[2]);
         nav.right |= rep(stickRight(pad), stickRight(prevPad), navHeld[3]);
-        nav.a |= PadPressed(s, A);
-        nav.b |= PadPressed(s, B);
+        // (A cleared or moved A / B never locks the menu: without a pad input, the pad's own south / east.)
+        nav.a |= shell::PadPress(s.controls, A, IN_A, pad.btn, prevPad.btn);
+        nav.b |= shell::PadPress(s.controls, B, IN_B, pad.btn, prevPad.btn);
         nav.x |= PadPressed(s, X);
         nav.y |= PadPressed(s, Y);
         return;

@@ -5,11 +5,13 @@
 #include <algorithm>
 #include <cstdio>
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 
 #include "pads.h"
 #include "port/ownwords.h"
 #include "port/statusbar.h"
+#include "host.h"
 #include "romdata.h"
 #include "shots.h"
 #include "state.h"
@@ -92,7 +94,8 @@ void ShellHost::Refresh(const App& app, const Input& input)
     if (model.capturing >= 0 && !headless)
         model.captureLeft = (int)std::max<long>(0, ((long)captureUntil - (long)SDL_GetTicks() + 999) / 1000);
     model.statesOk = data.Ok();
-    model.canUndo = canUndo && FileExists(data.Undo(code));
+    model.canUndo = canUndo; // (no file look-up a frame: kept as the writes leave it)
+    model.canOpenFolder = !headless && data.Ok();
 }
 
 void ShellHost::LoadSlots()
@@ -101,6 +104,10 @@ void ShellHost::LoadSlots()
     {
         model.used[i] = data.Ok() && FileExists(data.Slot(code, i));
         if (!model.used[i] || !ReadThumb(data.SlotThumb(code, i), model.slots[i])) model.slots[i] = Thumb();
+        // Made with another ROM file (another path, or another header): the load says so.
+        StateMeta meta;
+        model.otherRom[i].clear();
+        if (model.used[i] && ReadMeta(data.SlotMeta(code, i), meta) && (meta.rom != romPath || meta.header != romHeader)) model.otherRom[i] = BaseName(meta.rom);
     }
 }
 
@@ -112,11 +119,21 @@ Thumb ShellHost::ThumbNow(const App& app, const Video& video) const
     return MakeThumb(RenderCompose(c, top, tw, th, app.Bottom(), 1), c.cw, c.ch, (long long)time(nullptr));
 }
 
+bool ShellHost::Load(App& app, const std::string& path)
+{
+    if (beforeLoad) beforeLoad();
+    return LoadState(*app.nds, path);
+}
+
 bool ShellHost::WriteSuspend(App& app, const Video& video)
 {
     if (!data.Ok() || !app.nds) return false;
     const bool ok = SaveState(*app.nds, data.Suspend(code)) && WriteThumb(data.SuspendThumb(code), ThumbNow(app, video));
-    std::ofstream(data.SuspendRom(code)) << romPath << "\n";
+    // Its maker only after a good write (else nothing is offered as Continue); the save's hash as
+    // it is now: a save written later makes the place stale.
+    std::error_code ec;
+    if (ok) WriteMeta(data.SuspendMeta(code), {romPath, romHeader, HashFile(Host::SavePath)});
+    else std::filesystem::remove(data.SuspendMeta(code), ec);
     if (print || headless) fprintf(stderr, "frame %ld: shell suspend %s\n", frame, ok ? "written" : "failed");
     return ok;
 }
@@ -169,9 +186,29 @@ void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
         app.quit = true;
         shell.Close();
         break;
+    case Act::ChangeGame:
+        // As Quit (the place kept), then the launch panel (main.cpp starts again from it).
+        WriteSuspend(app, video);
+        app.quit = true;
+        relaunch = true;
+        log("change", 0, true);
+        shell.Close();
+        break;
+    case Act::OpenFolder:
+    {
+        // A file URL of the folder (forward slashes; a Windows drive after a third slash).
+        std::string p = data.root;
+        std::replace(p.begin(), p.end(), '\\', '/');
+        const std::string url = "file://" + std::string(p.empty() || p[0] != '/' ? "/" : "") + p;
+        const bool ok = SDL_OpenURL(url.c_str()) == 0;
+        log("folder", 0, ok);
+        if (!ok) Say(video, OwnWordIn(lang, W::StFailed));
+        break;
+    }
     case Act::SaveSlot:
     {
-        const bool ok = data.Ok() && SaveState(*app.nds, data.Slot(code, r.arg)) && WriteThumb(data.SlotThumb(code, r.arg), ThumbNow(app, video));
+        const bool ok = data.Ok() && SaveState(*app.nds, data.Slot(code, r.arg)) && WriteThumb(data.SlotThumb(code, r.arg), ThumbNow(app, video)) &&
+                        WriteMeta(data.SlotMeta(code, r.arg), {romPath, romHeader, 0});
         log("save", r.arg + 1, ok);
         LoadSlots();
         Say(video, ok ? Fill(OwnWordIn(lang, W::StSaved), std::to_string(r.arg + 1)) : OwnWordIn(lang, W::StFailed));
@@ -179,10 +216,12 @@ void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
     }
     case Act::LoadSlot:
     {
-        // The state of now first: the load's undo.
+        // The state of now first: the load's undo. A load that fails puts it straight back (a
+        // half-read state is never played on) and leaves Undo as it was.
         const bool kept = SaveState(*app.nds, data.Undo(code));
-        const bool ok = LoadState(*app.nds, data.Slot(code, r.arg));
-        canUndo = kept && ok;
+        const bool ok = Load(app, data.Slot(code, r.arg));
+        if (ok) canUndo = kept;
+        else if (kept || canUndo) { const bool back = LoadState(*app.nds, data.Undo(code)); log("restore", 0, back); }
         input.lastMoney_ = -1;
         log("load", r.arg + 1, ok);
         Say(video, ok ? Fill(OwnWordIn(lang, W::StLoaded), std::to_string(r.arg + 1)) : OwnWordIn(lang, W::StFailed));
@@ -191,8 +230,8 @@ void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
     }
     case Act::Undo:
     {
-        const bool ok = canUndo && LoadState(*app.nds, data.Undo(code));
-        canUndo = false;
+        const bool ok = canUndo && Load(app, data.Undo(code));
+        canUndo = !ok && canUndo;
         input.lastMoney_ = -1;
         log("undo", 0, ok);
         Say(video, ok ? OwnWordIn(lang, W::StUndone) : OwnWordIn(lang, W::StFailed));
@@ -270,6 +309,8 @@ void ShellHost::Frame(App& app, Video& video, Input& input, const shell::Input& 
 
 void ShellHost::CloseAsked(App& app, Video& video, Input& input)
 {
+    messageOnly = false;
+    shell.sequence = false;
     if (!shell.open)
     {
         OpenMenu(app, input);

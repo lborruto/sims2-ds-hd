@@ -1,0 +1,5 @@
+# The launch panel (--launch) after a quit whose save changed since: A on Continue is refused (the
+# message, the place dropped), A closes the message, A on Continue starts the game from its own save.
+5 2 pad a
+15 2 pad a
+25 2 pad a

@@ -209,6 +209,7 @@ private:
     Tab returnTab_ = Tab::None;
     u32 returnId_ = 0;
     int returnFrames_ = 0, returnFocus_ = 0;
+    int veilFrames_ = 0; // (the HD screen left on the way back: frames the veil may still last, Returning)
     Tab leftTab_ = Tab::None; // (the menu's tab and item when it was last left for another screen)
     u32 leftId_ = 0;
     int leftFrames_ = 0;

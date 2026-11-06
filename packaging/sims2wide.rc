@@ -1,2 +1,3 @@
-// Windows resources: the program's icon.
+// Windows resources: the program's icon and its manifest (UTF-8 as the code page: sims2wide.manifest).
 1 ICON "icon.ico"
+1 24 "sims2wide.manifest"

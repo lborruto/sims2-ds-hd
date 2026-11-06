@@ -6,6 +6,8 @@
 #include <ctime>
 #include <filesystem>
 #include <fstream>
+#include <iterator>
+#include <cstdlib>
 
 namespace sims2wide
 {
@@ -98,19 +100,70 @@ std::string DataDir::GameDir(const std::string& code) const
     std::string c;
     for (char ch : code)
         if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) c += ch;
-    if (c.empty()) c = "unknown";
+    if (c.empty()) return "";
     const std::string dir = root + "states/" + c + "/";
-    std::error_code ec;
-    fs::create_directories(fs::path(dir), ec);
+    if (std::find(made_.begin(), made_.end(), dir) == made_.end())
+    {
+        std::error_code ec;
+        fs::create_directories(fs::path(dir), ec);
+        made_.push_back(dir);
+    }
     return dir;
 }
 
-std::string DataDir::Slot(const std::string& code, int i) const { return root.empty() ? "" : GameDir(code) + "slot" + std::to_string(i + 1) + ".st"; }
-std::string DataDir::SlotThumb(const std::string& code, int i) const { return root.empty() ? "" : GameDir(code) + "slot" + std::to_string(i + 1) + ".thumb"; }
-std::string DataDir::Undo(const std::string& code) const { return root.empty() ? "" : GameDir(code) + "before-load.st"; }
-std::string DataDir::Suspend(const std::string& code) const { return root.empty() ? "" : GameDir(code) + "suspend.st"; }
-std::string DataDir::SuspendThumb(const std::string& code) const { return root.empty() ? "" : GameDir(code) + "suspend.thumb"; }
-std::string DataDir::SuspendRom(const std::string& code) const { return root.empty() ? "" : GameDir(code) + "suspend-rom.txt"; }
+// (A file in the game's folder; "" without one.)
+static std::string In(const std::string& dir, const std::string& name) { return dir.empty() ? "" : dir + name; }
+std::string DataDir::Slot(const std::string& code, int i) const { return In(GameDir(code), "slot" + std::to_string(i + 1) + ".st"); }
+std::string DataDir::SlotThumb(const std::string& code, int i) const { return In(GameDir(code), "slot" + std::to_string(i + 1) + ".thumb"); }
+std::string DataDir::SlotMeta(const std::string& code, int i) const { return In(GameDir(code), "slot" + std::to_string(i + 1) + ".meta"); }
+std::string DataDir::Undo(const std::string& code) const { return In(GameDir(code), "before-load.st"); }
+std::string DataDir::Suspend(const std::string& code) const { return In(GameDir(code), "suspend.st"); }
+std::string DataDir::SuspendThumb(const std::string& code) const { return In(GameDir(code), "suspend.thumb"); }
+std::string DataDir::SuspendMeta(const std::string& code) const { return In(GameDir(code), "suspend.meta"); }
+
+u64 HashBytes(const u8* p, size_t n)
+{
+    u64 h = 0xCBF29CE484222325ull;
+    for (size_t i = 0; i < n; i++) h = (h ^ p[i]) * 0x100000001B3ull;
+    return h;
+}
+
+u64 HashFile(const std::string& path)
+{
+    if (path.empty()) return 0;
+    std::ifstream in(fs::path(path), std::ios::binary);
+    if (!in) return 0;
+    std::vector<char> d((std::istreambuf_iterator<char>(in)), {});
+    return HashBytes((const u8*)d.data(), d.size());
+}
+
+bool WriteMeta(const std::string& path, const StateMeta& m)
+{
+    if (path.empty()) return false;
+    std::ofstream out {fs::path(path)};
+    out << "rom=" << m.rom << "\nheader=" << m.header << "\nsave=" << m.save << "\n";
+    return out.good();
+}
+
+bool ReadMeta(const std::string& path, StateMeta& m)
+{
+    m = StateMeta();
+    if (path.empty()) return false;
+    std::ifstream in {fs::path(path)};
+    if (!in) return false;
+    std::string line;
+    while (std::getline(in, line))
+    {
+        while (!line.empty() && line.back() == '\r') line.pop_back();
+        const size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        const std::string k = line.substr(0, eq), v = line.substr(eq + 1);
+        if (k == "rom") m.rom = v;
+        else if (k == "header") m.header = strtoull(v.c_str(), nullptr, 10);
+        else if (k == "save") m.save = strtoull(v.c_str(), nullptr, 10);
+    }
+    return !m.rom.empty();
+}
 
 bool FileExists(const std::string& path)
 {

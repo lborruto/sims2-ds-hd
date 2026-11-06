@@ -2440,19 +2440,28 @@ fx_phone_menu() {
 }
 fx_return_veil() {
     in_order fx-return-veil 'game Phone' 'game Panel' 'console menu open, focus 4' || return 1
-    local from to
+    local from to phone
     from=$(awk '/game Phone/{p=1} p && /game Panel/{sub(":","",$2); print $2; exit}' "$tmp/fx-return-veil.log")
     to=$(awk -v F="$from" '$1=="frame" && ($2+0)>=F && /console menu open/{sub(":","",$2); print $2; exit}' "$tmp/fx-return-veil.log")
-    "$python" -I - "$tmp/fx-return-veil" "$from" "$to" <<'PYEOF'
+    # (the phone's last frames and the Unknown ones before the panel: from the last "game Phone" line)
+    phone=$(awk -v F="$from" '$1=="frame" && ($2+0)<F && /game Phone/{sub(":","",$2); p=$2} END{print p}' "$tmp/fx-return-veil.log")
+    "$python" -I - "$tmp/fx-return-veil" "$from" "$to" "$phone" <<'PYEOF'
 import sys
-from PIL import Image, ImageStat
-d, a, b = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
+from PIL import Image, ImageChops, ImageStat
+d, a, b, p = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+def frame(n):
+    return Image.open(f"{d}/f{n:06d}.png").convert("L").crop((0, 0, 1280, 600))
 def mean(n):
-    return ImageStat.Stat(Image.open(f"{d}/f{n:06d}.png").convert("L").crop((0, 0, 1280, 600))).mean[0]
+    return ImageStat.Stat(frame(n)).mean[0]
 town = mean(10)   # (the town, the menu not yet opened)
 bad = [n for n in range(a, b) if mean(n) > 0.6 * town]
 if bad: print(f"  fx-return-veil: the town shown undimmed at frames {bad[:5]} (town {town:.1f})")
-sys.exit(1 if bad else 0)
+# From the phone's last frames to the panel (Phone, Unknown): never the town itself (the HD phone
+# is brighter than the town, so the picture is compared with the town's, not its brightness).
+t = frame(10)
+flash = [n for n in range(p, a) if ImageStat.Stat(ImageChops.difference(frame(n), t)).mean[0] < 5]
+if flash: print(f"  fx-return-veil: the town flashes between the phone and the panel at frames {flash[:5]}")
+sys.exit(1 if bad or flash else 0)
 PYEOF
 }
 check_pad fx-phone-menu fx_phone_menu
@@ -2484,6 +2493,47 @@ shell_continue() {
 }
 check_pad shell-states shell_states
 check_pad shell-continue shell_continue
+# The review's round (scripts/shell/): Change game keeps the place and comes back to the launch
+# panel, whose Continue puts it back (no press left over from the menu's A); a broken slot's load
+# fails, the state before it is put back (the phone still there) and the menu says so; a slot that
+# cannot be written says so; a place the game saved after is refused by Continue (the .sav
+# changed) and dropped; a new start of the same ROM drops its place.
+mkdir -p "$tmp/shell-change-data" "$tmp/shell-bad-data/states/ASJP/slot1.st" "$tmp/shell-stale-data"
+head -c 5000 /dev/urandom > "$tmp/shell-bad-data/states/ASJP/slot2.st"
+shell_run() {
+    local name=$1 frames=$2 data=$3 script=$4; shift 4
+    "$bin" "$rom" --headless --frames "$frames" --save "$tmp/$name.sav" --data-dir "$tmp/$data" "${town[@]}" --print-shell --print-game \
+        --input "$repo/scripts/shell/$script.txt" "$@" > "$tmp/$name.log" 2>&1 && grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+shell_run shell-change 300 shell-change-data change --state-load "$shots/s7.st" &
+shell_run shell-badload 200 shell-bad-data badload --state-load "$shots/s7.st" &
+( shell_run shell-stale-quit 100 shell-stale-data quit --state-load "$shots/s7.st" && printf 'x' >> "$tmp/shell-stale-quit.sav" &&
+  cp "$tmp/shell-stale-quit.sav" "$tmp/shell-stale.sav" && shell_run shell-stale 60 shell-stale-data stale --launch &&
+  cp "$tmp/shell-stale.sav" "$tmp/shell-newstart-quit.sav" && shell_run shell-newstart-quit 100 shell-stale-data quit --state-load "$shots/s7.st" &&
+  cp "$tmp/shell-newstart-quit.sav" "$tmp/shell-newstart.sav" && shell_run shell-newstart 5 shell-stale-data quit ) &
+wait
+shell_change() {
+    in_order shell-change 'shell suspend written' 'shell change 0 ok' '^frame 80: shell launch .*\(continue\)' 'suspend state: loaded' 'game Phone' || return 1
+    ! grep -q -E '^frame (5[1-9]|[67][0-9]): shell launch' "$tmp/shell-change.log" || { echo "  shell-change: the menu's A chose on the panel"; return 1; }
+}
+shell_badload() {
+    in_order shell-badload 'ask=load \(yes\)' 'shell restore 0 ok' 'shell load 2 failed' 'shell says That did not work' 'shell save 1 failed' 'shell says That did not work' || return 1
+    ! grep -q -E 'game Panel' "$tmp/shell-badload.log" || { echo "  shell-badload: the game moved"; return 1; }
+}
+shell_stale() {
+    in_order shell-stale-quit 'shell suspend written' || return 1
+    in_order shell-stale 'shell launch refused continue: saved since' '^frame 25: shell launch sims2' || return 1
+    ! grep -q 'suspend state: loaded' "$tmp/shell-stale.log" || { echo "  shell-stale: the old place loaded"; return 1; }
+}
+shell_newstart() {
+    in_order shell-newstart-quit 'shell suspend written' || return 1
+    in_order shell-newstart 'suspend state: dropped' || return 1
+    [ ! -f "$tmp/shell-stale-data/states/ASJP/suspend.st" ] || { echo "  shell-newstart: the place kept"; return 1; }
+}
+check_pad shell-change shell_change
+check_pad shell-badload shell_badload
+check_pad shell-stale shell_stale
+check_pad shell-newstart shell_newstart
 for page in main settings controls keys states quit; do
     "$bin" "$rom" --headless --frames 64 --state-load "$shots/s7.st" --save "$tmp/shell-$page.sav" --compose \
         --shell "$page" --shell-at 60 --shot-at 59,62 --shot-dir "$tmp/shell-$page" "${town[@]}" > "$tmp/shell-$page.log" 2>&1 &
