@@ -103,6 +103,9 @@ MenuView PopupViewOf(ScreenState s, const GameState& game, const RomData* rom)
 MenuView ConsoleView(ScreenState s, const GameState* game, const RomData* rom)
 {
     if (MenuView v = PopupView(s, game, rom); v.valid) return v;
+    // The game's own popup is up over a screen but its HD view does not read (no strings, a box that
+    // does not fit): not the screen's view (milestone 1's picture, the popup in it).
+    if (game && PopupOver(s, *game)) return {};
     return ScreenView(s, game, rom);
 }
 

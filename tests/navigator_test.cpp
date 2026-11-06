@@ -1281,6 +1281,62 @@ static void view_item_x_asks()
     CHECK(r.nav.Armed() == 0);
 }
 
+// A tab change disarms the asking X: arm in Pockets, R to Goals, L back to Pockets, one X arms
+// again and taps no bin. MENU is B on a screen of its own (the phone, Give Gift, the Save slots,
+// a note), but not on a popup (its question is B's).
+static void view_tab_change_disarms_and_menu_is_b()
+{
+    const ScreenState pockets {Screen::Panel, Tab::Pockets};
+    MenuView v = ListView(4, -1);
+    v.items[0].xAsks = true;
+    v.items[0].xArm = {TapStep(60, 89)};
+    v.items[0].buttonX = {TapStep(60, 89), TapStep(67, 167)};
+    Rig r;
+    r.view = &v;
+    r.Frame(pockets);
+    r.Press(pockets, &PadState::menu);
+    r.Press(pockets, &PadState::x);
+    CHECK(r.nav.Armed() == v.items[0].id);
+    r.Drain();
+    for (int i = 0; i < 4; i++) r.Frame(pockets);
+    r.Press(pockets, &PadState::rb);
+    r.Drain();
+    r.Frame(kGoals);
+    CHECK(r.nav.Armed() == 0);
+    r.Frame(pockets);
+    CHECK(r.nav.Armed() == 0);
+    r.Frame(pockets);
+    r.Press(pockets, &PadState::x); // arms: the slot only, no bin
+    int x = -1, y = -1;
+    CHECK(r.nav.Armed() == v.items[0].id);
+    CHECK(r.Touched(x, y) && x == 60 && y == 89);
+    r.Drain();
+    for (int i = 0; i < 6 && !r.touch.Owns(); i++) r.Frame(pockets);
+    CHECK(!r.touch.Owns());
+
+    for (ScreenState s : {kPhone, kSaveSlots, ScreenState {Screen::Gift, Tab::None}, kUnknown})
+    {
+        MenuView o = ListView(3, -1);
+        o.own = true;
+        o.back = {TapStep(235, 19)};
+        Rig q;
+        q.view = &o;
+        q.Frame(s);
+        q.Press(s, &PadState::menu);
+        for (int i = 0; i < 3 && !q.touch.Owns(); i++) q.Frame(s);
+        CHECK(q.Touched(x, y) && x == 235 && y == 19);
+        // A popup: MENU does nothing.
+        MenuView p = o;
+        p.popup = true;
+        Rig z;
+        z.view = &p;
+        z.Frame(s);
+        z.Press(s, &PadState::menu);
+        for (int i = 0; i < 3; i++) z.Frame(s);
+        CHECK(!z.touch.Owns());
+    }
+}
+
 // A selection the game owns with no arrow above it (its first entry): Up goes to the phone and
 // the focus stays there; Down from the phone comes back to the selection. A view that does not
 // replay (the Save slots): a press held while unsettled is dropped once it settles.
@@ -1480,6 +1536,7 @@ int main()
     view_item_left_right();
     view_item_x_and_gift();
     view_item_x_asks();
+    view_tab_change_disarms_and_menu_is_b();
     view_popup_resume_and_phone();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");

@@ -38,7 +38,7 @@ constexpr Rect kRelMood {710, 206, 370, 76};
 constexpr Rect kRelLevel {710, 292, 370, 76};
 constexpr Rect kRelDescWell {710, 378, 370, 200};
 constexpr Rect kRelDesc {kRelDescWell.x + 18, kRelDescWell.y + 12, kRelDescWell.w - 36, kRelDescWell.h - 24};
-constexpr u32 kRelId = 0x500;   // + the Sim's id
+constexpr u32 kRelId = kModRelations + 0x500;   // + the Sim's id
 
 // Relationships' items appended to v: the rows the game shows, its selection held, Up / Down its
 // arrows. rom (null: no words): the title.

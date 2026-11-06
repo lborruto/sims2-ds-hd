@@ -40,6 +40,12 @@ MenuStep DragStep(int x0, int y0, int x1, int y1);
 MenuStep KeysStep(u32 keys, int frames);
 MenuStep WaitStep(int frames);
 
+// Each view module's ids start at its own tag in the top bits, so an id never repeats across tabs
+// or screens (the navigator's armed X and the focus's resume are kept by id).
+constexpr u32 kModInteract = 1u << 24, kModPockets = 2u << 24, kModGift = 3u << 24, kModGoals = 4u << 24,
+              kModRelations = 5u << 24, kModPhone = 6u << 24, kModOptions = 7u << 24, kModPopup = 8u << 24,
+              kModNote = 9u << 24;
+
 struct ViewItem
 {
     Rect rect {};          // canvas pixels: what the focus frames, and the geometry of focus moves

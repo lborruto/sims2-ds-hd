@@ -26,7 +26,7 @@ constexpr int kSprNoteX = 7683;
 constexpr Rect kNotePanel {250, 40, 780, 600};
 constexpr Rect kNoteText {kNotePanel.x + 70, kNotePanel.y + 60, kNotePanel.w - 140, kNotePanel.h - 160};
 constexpr Rect kNoteX {kNotePanel.x + kNotePanel.w - 88, kNotePanel.y + kNotePanel.h - 88, 64, 64};
-constexpr u32 kNoteCloseId = 0x900;
+constexpr u32 kNoteCloseId = kModNote + 0x900;
 
 // Whether the game shows a note (its object read: GameState::town.note).
 bool NoteUp(const GameState& game);

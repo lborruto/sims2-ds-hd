@@ -61,7 +61,7 @@ constexpr int kPhContactsGrace = 8;
 constexpr Rect kPhX {kPhPanel.x + kPhPanel.w - 84, kPhPanel.y + 18, 56, 56};
 constexpr Rect kPhTitle {kPhPanel.x + 40, kPhPanel.y + 18, kPhPanel.w - 140, 56};
 constexpr Rect kPhUp {400, 522, 120, 84}, kPhOk {586, 528, 108, 72}, kPhDown {760, 522, 120, 84};
-constexpr u32 kPhRowId = 0x800;
+constexpr u32 kPhRowId = kModPhone + 0x800;
 // The header's date and clock have a still layer of their own (a minute turning rasters it alone, not the phone).
 constexpr int kPhClockLayer = 3;
 

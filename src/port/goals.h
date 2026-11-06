@@ -40,7 +40,7 @@ constexpr Rect kGoalsListFooter {344, 206, 736, 312};        // with it
 constexpr Rect kGoalsFooter {344, 530, 736, 48};
 constexpr int kGoalsPad = 14, kGoalsGap = 8, kGoalsMark = 30;   // inside the well; between goals; the mark's column
 constexpr float kGoalsSize = 26, kGoalsMin = 20;
-constexpr u32 kGoalsId = 0x400;                               // + 0x100 for a request, + the goal's id
+constexpr u32 kGoalsId = kModGoals + 0x400;                               // + 0x100 for a request, + the goal's id
 
 // A goal's text as the game shows it: a mission's 1627 + id; a request's own string with its
 // Sim's name (@1) and place (@2), its other placeholders dropped.

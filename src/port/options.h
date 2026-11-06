@@ -46,7 +46,7 @@ constexpr int kOptTrackX = 268, kOptTrackW = 744;   // a slider's track (0 % .. 
 // The Save slots' panel.
 constexpr Rect kSlotTitle {200, 44, 880, 64};
 constexpr int kSlotY0 = 124, kSlotH = 142, kSlotGap = 14;
-constexpr u32 kOptSaveId = 0x600, kOptQuitId = 0x601, kOptMusicId = 0x602, kOptSfxId = 0x603, kSlotId = 0x610;
+constexpr u32 kOptSaveId = kModOptions + 0x600, kOptQuitId = kModOptions + 0x601, kOptMusicId = kModOptions + 0x602, kOptSfxId = kModOptions + 0x603, kSlotId = kModOptions + 0x610;
 
 // A volume (0..4096) as the game's tenth (0..10).
 int VolumeNotch(int volume);

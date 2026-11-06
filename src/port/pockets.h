@@ -60,7 +60,7 @@ constexpr Rect kPkDesc {kPkInfo.x + 20, kPkInfo.y + 60, kPkInfo.w - 40, kPkHandB
 constexpr float kPkNameSize = 30, kPkDescSize = 24, kPkDescMin = 18;
 
 // Item ids (stable across rebuilds).
-constexpr u32 kPkSlotId = 0x200, kPkKeyId = 0x210, kPkCountId = 0x220;
+constexpr u32 kPkSlotId = kModPockets + 0x200, kPkKeyId = kModPockets + 0x210, kPkCountId = kModPockets + 0x220;
 
 // Pockets' items appended to v: the six slots (empty ones disabled), the three key items, the four
 // counted items, in that order. rom (null: no words): the A words and the title.

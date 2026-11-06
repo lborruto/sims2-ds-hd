@@ -38,7 +38,7 @@ constexpr Rect kInteractPortrait {200, 206, 236, 292};
 constexpr int kInteractRowX = 460, kInteractRowW = 620, kInteractRowY = 210, kInteractRowH = 62, kInteractRowGap = 14;
 constexpr Rect kInteractStrip {200, 514, 880, 64};
 // Item ids (stable across rebuilds): a row's from its code and place.
-constexpr u32 kInteractRowId = 0x100;
+constexpr u32 kInteractRowId = kModInteract + 0x100;
 
 // Interact's items appended to v (the rows: one per action the game lists, greyed ones disabled)
 // and its Left / Right (the strip's previous / next target, when there is one).

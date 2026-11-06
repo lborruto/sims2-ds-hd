@@ -115,6 +115,7 @@ bool Navigator::WouldTap(ScreenState s, bool PadState::*b) const
         const int f = MenuFocusable(v, focus_) ? focus_ : MenuFirst(v);
         if (b == &PadState::a) return f >= 0 && !v.items[f].action.empty();
         if (b == &PadState::b) return !v.back.empty();
+        if (b == &PadState::menu) return v.own && !v.popup && !v.back.empty(); // (an own screen's MENU is B)
         if (b == &PadState::x) return !XAction(v, f).empty();
         if (b == &PadState::y) return !v.buttons[(int)MenuButton::Y].empty();
         return s.screen == Screen::Panel && (b == &PadState::lb || b == &PadState::rb); // (the panel's tabs)
@@ -278,6 +279,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         running_.clear(); // (and an action running)
         pendingDir_ = -1;
         viewHash_ = 0;
+        armed_ = 0; // (an armed X belongs to the screen or tab it was pressed on)
     }
     else if (closing_ > 0) closing_--;
     if (!popupNow && popupUp_) closing_ = 0; // (the popup went: its closing wait is over)
@@ -406,7 +408,9 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             if (s.screen == Screen::Panel && pressed(&PadState::rb)) tap(kTabIcon[(t + 1) % 5]);
             else if (s.screen == Screen::Panel && pressed(&PadState::lb)) tap(kTabIcon[t < 0 ? 4 : (t + 4) % 5]);
             const bool back = pressed(&PadState::b), menu = pressed(&PadState::menu);
-            if (back && !v.back.empty()) { if (Run(v.back, touch) && v.backCloses) closing_ = kClosingFrames; }
+            // MENU does what B does on a screen of its own (not a popup: its question is B's)
+            const bool backKey = back || (menu && v.own && !v.popup);
+            if (backKey && !v.back.empty()) { if (Run(v.back, touch) && v.backCloses) closing_ = kClosingFrames; }
             else if ((back || menu) && !v.own) menuOpen_ = false;
             // DS buttons the view passes on (Game Paused's Start).
             if (v.passKeys) dsKeys |= DsKeys(pad, true) & v.passKeys;

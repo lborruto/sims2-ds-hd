@@ -1185,6 +1185,18 @@ int main()
                     CHECK(PopupViewOf(on, off).valid == (kind == 3));
                     CHECK(!PopupView(on, &h, &rom).valid); // (no strings: milestone 1's)
                 }
+            // A popup the game shows over Save slots, Give Gift or the phone whose HD view does not
+            // read (a box without its place): no view at all, not the screen's (milestone 1's picture
+            // holds the game's own popup). (This rom has no strings: the guard itself is PopupOver's.)
+            for (ScreenState on : {ScreenState {Screen::SaveSlots, Tab::None}, ScreenState {Screen::Gift, Tab::None}, ScreenState {Screen::Phone, Tab::None}})
+            {
+                GameState h;
+                h.valid = true;
+                h.screen = on.screen == Screen::Gift ? GScreen::ItemHand : GScreen::Phone;
+                h.town.popup = {true, 2, 0, "Text", "Title", -1, false, 56, 0, 6}; // (boxW 0: no buttons)
+                CHECK(PopupOver(on, h) && !PopupView(on, &h, &rom).valid);
+                CHECK(!ConsoleView(on, &h, &rom).valid);
+            }
             // The phone: every page as rows the game counts, the selection the game's, Up / Down its
             // DS keys (as many presses as rows between), A the keys then OK; B its X.
             auto phone = [&](int page, int row, int scroll, int rows) {

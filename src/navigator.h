@@ -13,15 +13,17 @@
 //     focused item's own X (Pockets' bin) or the view's, B runs the view's back action or closes
 //     the menu.
 //   Phone: in HD (port/phone.h) whenever its view is valid: the game's own Up / Down / A on its
-//     rows, B its X; else the focus as in the menu; B or MENU tap the phone's X (back to the
+//     rows, B or MENU its X; else the focus as in the menu; B or MENU tap the phone's X (back to the
 //     panel, menu closed).
 //   A popup over the panel or an HD screen, a note: in HD (port/popup.h, port/note.h) whenever its
 //     view is valid (MenuView::own). A popup over the open menu wins the focus and keeps the menu
 //     open beneath; when it goes and the screen is back, the focus returns to the item it was on
 //     (the resume).
-//   Gift: in HD (port/gift.h) whenever its view is valid, as the HD menu (B its back: the X; no
-//     tabs); else, like Catalogue and Build: the focus as in the menu; B taps the screen's X
+//   Gift: in HD (port/gift.h) whenever its view is valid, as the HD menu (B or MENU its back: the X;
+//     no tabs); else, like Catalogue and Build: the focus as in the menu; B taps the screen's X
 //     when it has one.
+//   On every HD screen of its own (phone, Give Gift, the Save slots, a note) MENU does what B does
+//     (a popup's MENU does nothing: its question is B's).
 //   Social, Cards, Vacuum: the activity's own buttons (activities.h); the cards' focus moves as
 //     in the menu, the vacuum's hand is the stick cursor.
 //   Popup (a goal, tips, Game Paused) without its HD view: A or B tap its X; Start stays the DS's
