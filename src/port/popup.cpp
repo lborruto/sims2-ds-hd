@@ -2,6 +2,12 @@
 
 #include <algorithm>
 
+#include "port/build.h"
+#include "port/checkin.h"
+#include "port/roominfo.h"
+#include "port/music.h"
+#include "port/statpanel.h"
+#include "port/catalogue.h"
 #include "port/gift.h"
 #include "port/note.h"
 #include "port/options.h"
@@ -53,7 +59,8 @@ bool PopupOver(ScreenState s, const GameState& game)
     const PopupState& p = game.town.popup;
     if (!game.valid || !p.valid || p.state < 1 || p.state > 3) return false;
     if (game.screen == GScreen::Popup) return s.screen == Screen::Popup || s.screen == Screen::Unknown; // (Options > Quit: Unknown)
-    return s.screen == Screen::Gift || s.screen == Screen::SaveSlots || s.screen == Screen::Phone || (s.screen == Screen::Unknown && NoteUp(game));
+    return s.screen == Screen::Gift || s.screen == Screen::SaveSlots || s.screen == Screen::Phone || s.screen == Screen::Catalogue || s.screen == Screen::Build ||
+           (s.screen == Screen::Unknown && (NoteUp(game) || game.checkIn.valid || game.roomInfo.valid || game.music.valid || game.stat.valid));
 }
 
 MenuView PopupView(ScreenState s, const GameState* game, const RomData* rom)
@@ -117,7 +124,15 @@ MenuView ScreenView(ScreenState s, const GameState* game, const RomData* rom)
     case Screen::Gift: return GiftMenuView(s, game, rom);
     case Screen::SaveSlots: return SaveSlotsView(s, game, rom);
     case Screen::Phone: return PhoneView(s, game, rom);
-    case Screen::Unknown: return NoteView(s, game, rom);
+    case Screen::Catalogue: return CatalogueView(s, game, rom);
+    case Screen::Build: return BuildRoomsView(s, game, rom);
+    case Screen::Unknown:
+        // The hotel's Registry, room info, music and stat panel (no GScreen of their own), else a note.
+        if (game && game->checkIn.valid) return CheckInView(s, game, rom);
+        if (game && game->roomInfo.valid) return RoomInfoView(s, game, rom);
+        if (game && game->music.valid) return MusicView(s, game, rom);
+        if (game && game->stat.valid) return StatPanelView(s, game, rom);
+        return NoteView(s, game, rom);
     default: return {};
     }
 }
@@ -128,12 +143,15 @@ ScreenState UnderScreen(ScreenState s, const GameState& game)
     return s;
 }
 
-void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& game, const RomData& rom)
+namespace
+{
+// The popups' look over what c holds: what is beneath takes no click, its pictures under the box
+// go (they would be drawn over it) and the others are dimmed with the rest; the veil, the box,
+// the title on its plate (none when empty), the text in its well (`buttons`: the well leaves
+// their row free). Everything on kPopLayer.
+void BoxBase(Composition& c, const std::string& title, const std::string& text, bool buttons)
 {
     const Theme& th = GameTheme();
-    const PopupState& p = game.town.popup;
-    // What is beneath takes no click, and its pictures under the box go (they would be drawn
-    // over it); the others are dimmed with the rest.
     for (Piece& q : c.pieces) q.touch = false;
     std::vector<UiItem> kept;
     for (const UiItem& u0 : c.ui)
@@ -157,9 +175,6 @@ void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& gam
     UiItem box = PanelItem(kPopBox);
     box.radius = 26;
     add(box);
-    std::string title, text;
-    PopupWords(p, title, text);
-    const bool buttons = p.kind != 3;
     const Rect well = buttons ? kPopWell : kPopWellTall;
     UiItem w = WellItem(well);
     w.radius = 16;
@@ -183,36 +198,54 @@ void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& gam
     UiItem tt = TextItem(tb, b.text, b.size, Align::Centre, Weight::ExtraBold);
     tt.middle = true;
     add(tt);
+}
 
+// A box's button: its fill (pressed: the game's green), the focus's halo, its chips centred, the
+// mouse's piece onto the game's DS rectangle `from` (none when empty).
+void BoxButton(Composition& c, Rect r, bool pressed, bool focused, const std::vector<std::pair<Button, std::string>>& chips, Rect from)
+{
+    const Theme& th = GameTheme();
+    auto add = [&](UiItem u) { u.layer = kPopLayer; c.ui.push_back(u); };
+    if (focused)
+    {
+        AddFocusRing(c, r, r.h / 2.0f);
+        c.ui.back().layer = kPopLayer;
+    }
+    UiItem bt = PanelItem(r);
+    bt.fill = pressed ? kBtnPressed : focused ? kBtnFocusFill : kBtnFill;
+    bt.borderArgb = th.frame;
+    bt.border = 3;
+    bt.radius = r.h / 2.0f;
+    add(bt);
+    int total = 0;
+    std::vector<Rect> rs;
+    for (auto& [ch, word] : chips)
+    {
+        rs.push_back(ChipRect(0, 0, ch, word, 28, 0, Weight::ExtraBold));
+        total += rs.back().w;
+    }
+    total += 12 * ((int)chips.size() - 1);
+    int x = r.x + (r.w - total) / 2;
+    for (size_t i = 0; i < chips.size(); i++)
+    {
+        add(ChipItem(x, r.y + (r.h - rs[i].h) / 2, chips[i].first, chips[i].second, 28, 0, Weight::ExtraBold));
+        x += rs[i].w + 12;
+    }
+    if (from.w > 0) AddMousePiece(c, from, r);
+}
+}
+
+void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& game, const RomData& rom)
+{
+    const PopupState& p = game.town.popup;
+    std::string title, text;
+    PopupWords(p, title, text);
+    BoxBase(c, title, text, p.kind != 3);
     // The buttons: the game's held one green (P+0xD8C, its index P+0xD88), the focus's halo.
     auto button = [&](Rect r, int index, bool focused, std::vector<std::pair<Button, std::string>> chips) {
-        if (focused)
-        {
-            AddFocusRing(c, r, r.h / 2.0f);
-            c.ui.back().layer = kPopLayer;
-        }
-        UiItem bt = PanelItem(r);
-        bt.fill = p.pressing && p.pressed == index ? kBtnPressed : focused ? kBtnFocusFill : kBtnFill;
-        bt.borderArgb = th.frame;
-        bt.border = 3;
-        bt.radius = r.h / 2.0f;
-        add(bt);
-        int total = 0;
-        std::vector<Rect> rs;
-        for (auto& [ch, word] : chips)
-        {
-            rs.push_back(ChipRect(0, 0, ch, word, 28, 0, Weight::ExtraBold));
-            total += rs.back().w;
-        }
-        total += 12 * ((int)chips.size() - 1);
-        int x = r.x + (r.w - total) / 2;
-        for (size_t i = 0; i < chips.size(); i++)
-        {
-            add(ChipItem(x, r.y + (r.h - rs[i].h) / 2, chips[i].first, chips[i].second, 28, 0, Weight::ExtraBold));
-            x += rs[i].w + 12;
-        }
         int bx, by;
-        if (PopupButton(p, index, bx, by)) AddMousePiece(c, {bx - 12, by - 12, 24, 24}, r);
+        const Rect from = PopupButton(p, index, bx, by) ? Rect {bx - 12, by - 12, 24, 24} : Rect {};
+        BoxButton(c, r, p.pressing && p.pressed == index, focused, chips, from);
     };
     if (p.kind == 0)
         button(kPopClose, 0, focus == 0, {{Button::A, ""}, {Button::B, MenuWords(rom, kStrPopClose)}});
@@ -221,6 +254,12 @@ void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& gam
         button(kPopNo, 0, false, {{Button::B, MenuWords(rom, kStrPopNo)}});
         button(kPopYes, 1, focus == 0, {{Button::A, MenuWords(rom, kStrPopYes)}});
     }
+}
+
+void BuildHintBox(Composition& c, int focus, const std::string& title, const std::string& text, const RomData& rom, Rect from)
+{
+    BoxBase(c, title, text, true);
+    BoxButton(c, kPopClose, false, focus == 0, {{Button::A, ""}, {Button::B, MenuWords(rom, kStrPopClose)}}, from);
 }
 
 void MeasurePopups(const RomData& rom, BlockMeasure& m)

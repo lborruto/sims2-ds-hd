@@ -30,8 +30,17 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   Up, OK and Down; a page the HD phone cannot read shows the game's own screen in it. Everything
   is read from the game's memory and your ROM at run time; with another version of the game the
   old pictures stay.
+- The shops and the hotel in HD, played with a controller: the shop's catalogue (buy and sell, with
+  the price, the game's scroll and the places you own), the City Hall clerk's Build Rooms (a room's
+  permit and the money left, then the game's question), the concierge's Registry and a guest's
+  check-in, a room's page (who stays, their mood, the check-out date, what the room costs a day,
+  each line's hint), the hotel's music panel and the stat panel (the four pages). Everything is
+  the game's own taps and rules, read from its memory; a spend asks first and never repeats, and
+  its question opens on No. The furniture editor stays the game's picture with the stick
+  cursor, now with a hint box that says how to use it, as on the title.
 - Checks and tools: `--print-town`, `--measure-menu`, `--dump-resource`, `--dump-sprite`; the
-  checks now fail on a character the font lacks.
+  checks now fail on a character the font lacks. `--print-hotel` prints the hotel and the
+  shops' screens read from RAM.
 - The status bar in HD: in CONSOLE the clock, money and Sanity meter are redrawn sharp in the
   game's own style and language, read from the game's memory; the town keeps its sides in the
   widescreen world, with the bar in a strip below it.

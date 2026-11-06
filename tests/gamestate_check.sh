@@ -237,4 +237,53 @@ town_want m-C-cas-msg1-dn4 phone 'page=3 row=4 scroll=3 ' "menus: the phone's sc
 town_want m-C-cas-pb1 phone 'page=7 .* contacts=22/2 .* list=2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23$' "menus: the contact list, 22 rows, Sim 2, the list worked out agreeing"
 town_want m-C-s7-msgs phone 'page=2 .* inbox=- date=' "menus: no messages"
 town_want m-A-gift2-slot2 gift '^gift recipient=22 name=345 slot=1 refused=000000$' "menus: Give Gift to Jebediah, slot 2"
+# The hotel and the shops (--print-hotel): the hotel block on any screen, the registry, room info,
+# the music panel, Build Rooms, the placement editor, the catalogue and the stat panel, from held-out
+# states (copies of the research's M-*, BD-*, BY-*, SP-* and h-catalogue-* in shots/): the early
+# hotel (clock 14:00), the complete save (late clock, a copy of the save), the town (town clock).
+hotel_run() { # NAME STATE CLASS(hotel|late|town)
+    local name=$1 file=$shots/$2.st opts
+    if [ ! -f "$file" ]; then echo "no save state $2.st" > "$tmp/$name.hot"; return; fi
+    case $3 in
+        late) cp "$complete_save" "$tmp/$name.sav"; opts=("${late[@]}");;
+        hotel) opts=("${hotel[@]}");;
+        *) opts=("${town[@]}");;
+    esac
+    "$bin" "$rom" --headless --frames 30 --state-load "$file" --save "$tmp/$name.sav" --print-hotel "${opts[@]}" > "$tmp/$name.hotlog" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.hotlog" && touch "$tmp/$name.hotok"
+    grep -E '^frame [0-9]+: (hotel|checkin|roominfo|music|build|placement|catalogue|stat) ' "$tmp/$name.hotlog" | sed 's/^frame [0-9]*: //' > "$tmp/$name.hot"
+}
+hotel_want() { # NAME KIND PATTERN LABEL: the first line of that kind matches (the state's own frame 0)
+    if [ -f "$tmp/$1.hotok" ] && grep "^$2 " "$tmp/$1.hot" | head -n 1 | grep -q -E "$3"; then echo "ok   $4"
+    else echo "FAIL $4: got '$(grep "^$2 " "$tmp/$1.hot" 2>/dev/null | head -n 1 | cut -c1-300)'"; fail=1; fi
+}
+hotel_run h-early M-ci-early hotel; hotel_run h-guest M-ci-g-base hotel; hotel_run h-occ M-ci-occ-reg2 hotel; hotel_run h-info M-ci-e-btn1 hotel
+hotel_run h-oinfo M-ci-occ-info hotel; hotel_run h-music M-music late; hotel_run h-mdown M-mu-down3 late; hotel_run h-mrow2 M-mu-row2 late
+hotel_run h-bd BD-list town; hotel_run h-bd3 BD-down3 town; hotel_run h-bdrow2 BD-row2 town; hotel_run h-bdcas BD-cas town; hotel_run h-bdbuy BD-row2-tick town
+hotel_run h-place BD-place-lobby town; hotel_run h-cat h-catalogue-base town; hotel_run h-cat5 BY-sel5 town; hotel_run h-cat4 BY-dn4 town
+hotel_run h-own BY-own4-pay town; hotel_run h-stat SP-stat-base late; hotel_run h-statp SP-skills late; hotel_run h-town s7 town
+hotel_want h-early hotel '^hotel built=0x6b086c6c unlocked=0x942d950f building=0x0 score=0 stayed=0 money=2000 earned=0 spent=0 place=13 slots=33:63:0,' "hotel: the early hotel, one room built of the buildable, no guests"
+hotel_want h-early checkin '^checkin mode=1 guest=-1 score=0 rows=29:ba:-1,8:--:-1,15:--:-1,18:--:-1,20:--:-1$' "hotel: the registry, only the Small Guest Room usable"
+hotel_want h-guest checkin '^checkin mode=0 guest=45 ' "hotel: guest check-in mode, the concierge as the guest"
+hotel_want h-occ checkin 'rows=29:b-:45,8:--:-1' "hotel: the Small Guest Room occupied by Sim 45"
+hotel_want h-info roominfo '^roominfo place=29 occupant=45 occupied=0 mood=-1 checkout=0/0/0 days=0 base=400 service=2 bonus=0 total=422 hint=0$' "hotel: room info vacant, 400 + 2 + 0 = 422"
+hotel_want h-oinfo roominfo '^roominfo place=29 occupant=45 occupied=1 mood=2086 checkout=1/1/3 days=2 base=400 service=2 bonus=0 total=422 ' "hotel: room info occupied, out 1/3 in 2 days"
+hotel_want h-music hotel 'built=0x1ff3fffff .* score=100 stayed=12 money=14843 earned=73194 spent=62367 place=4 ' "hotel: the complete save, 100 %, 12 guests, §73,194 earned"
+hotel_want h-music music '^music scroll=0 playing=2 place=4 roomsong=42 list=3:1:101,4:3:103,5:4:104,.*,22:36:1775,25:23:102$' "hotel: 21 songs, Strange Day playing"
+hotel_want h-mdown music '^music scroll=3 playing=2 ' "hotel: music scrolled by 3"
+hotel_want h-mrow2 music 'playing=1 place=4 roomsong=3 ' "hotel: the song chosen is the room's"
+hotel_want h-bd build '^build scroll=0 page=0 chosen=-1 money=2000 places=0:2000:70,1:1000:69,8:1500:94,12:2500:69:poor,15:1000:94,16:1500:69,18:1000:94,21:3500:70:poor,26:1000:69,28:2000:70,31:2500:69:poor$' "hotel: Build Rooms lists 11 rooms, three too dear"
+hotel_want h-bd3 build '^build scroll=3 ' "hotel: Build Rooms scrolled"
+hotel_want h-bdrow2 build '^build scroll=0 page=1 chosen=1 ' "hotel: the buy page, the Art Gallery chosen"
+hotel_want h-bdcas build 'places=4:1500:69$' "hotel: the casino alone"
+hotel_want h-bdbuy build '^build scroll=0 page=0 chosen=-1 money=1000 places=0:2000:70:poor,8:' "hotel: after a purchase, 10 rooms, money 1000"
+hotel_want h-place placement '^placement mode=1 room=5 phase=1 slot=0 object=1 rot=3 objects=86:5:14:0,114:71:58:0,133:49:27:0,185:6:73:1,209:2:77:0$' "hotel: the placement editor, five objects"
+hotel_want h-cat catalogue '^catalogue shop=51 vendor=0 sel=0 sell=0 scroll=0 pay=1 up=0 down=1 ring=0 money=2000 items=106:569:1991:160,132:595:2276:150,191:654:7251:130,215:678:7914:24,238:701:7420:100,84:547:3509:350,105:568:8844:3000,155:618:2861:500,227:690:7979:250,103:566:2100:5000,92:555:3606:700,99:562:2483:400 owned=-$' "hotel: the General Store's twelve items and prices"
+hotel_want h-cat5 catalogue 'sel=4 sell=0 .* ring=1 ' "hotel: the fifth item selected"
+hotel_want h-cat4 catalogue 'sel=9 sell=0 scroll=9 pay=0 up=1 down=0 ' "hotel: scrolled to the end, pay disabled (too dear)"
+hotel_want h-own catalogue 'sel=3 sell=1 .* money=1120 .* owned=106:569:1991:80,106:569:1991:80,106:569:1991:80,106:569:1991:80,106:569:1991:80$' "hotel: five owned beds at §80, one selected for sale"
+hotel_want h-stat stat '^stat page=0 transition=0 aspiration=0 level=2 points=29 gauge=19 skills=2,2,1,1,6 score=100 stayed=12 earned=73194 spent=62367 aliens=22 goons=12 vacuum=359 metal=2020$' "hotel: the stat panel's values"
+hotel_want h-statp stat '^stat page=3 ' "hotel: the Skills page"
+hotel_want h-town hotel '^hotel built=' "hotel: the block reads in the town too"
+hotel_want h-town checkin '^checkin none$' "hotel: no registry on the town's screen"
 exit $fail

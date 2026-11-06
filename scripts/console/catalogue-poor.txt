@@ -1,0 +1,7 @@
+# From BY-dn2 (the catalogue scrolled to 6, the XAM Satellite Stereo selected: §3,000 against
+# §2,000, the game's pay button disabled), CONSOLE: Right three times (Pay, greyed), A: nothing
+# is bought, the money stays.
+20 2 pad right
+40 2 pad right
+60 2 pad right
+80 2 pad a

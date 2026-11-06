@@ -1502,8 +1502,259 @@ static void view_popup_resume_and_phone()
     CHECK(!q.nav.Running());
 }
 
+// The HD catalogue's shape (port/catalogue.h): a screen of its own on the Catalogue screen (no
+// menu to open); A on a cell taps it; Pay with no action (the game would not pay) taps nothing; a
+// press held while unsettled is dropped, never replayed (a spend); B taps the X and then waits;
+// Down past the grid's last row the game's arrow.
+static void view_catalogue_spends_once()
+{
+    const ScreenState cat {Screen::Catalogue, Tab::None};
+    MenuView v;
+    v.valid = v.own = true;
+    v.replay = false;
+    v.backCloses = true;
+    for (int c = 0; c < 2; c++)
+    {
+        ViewItem it;
+        it.rect = {200 + 106 * c, 176, 96, 96};
+        it.action = {TapStep(22 + 39 * c, 88)};
+        it.group = 1;
+        it.id = 0x100 + (u32)c;
+        it.next[0] = it.next[1] = kNoMove;
+        v.items.push_back(it);
+    }
+    ViewItem pay;
+    pay.rect = {540, 466, 306, 96};
+    pay.id = 0x300; // (no action: the game would not pay)
+    v.items.push_back(pay);
+    v.scrollGroup = 1;
+    v.scrollDown = {TapStep(77, 168)};
+    v.back = {TapStep(235, 19)};
+    Rig r;
+    r.view = &v;
+    r.Frame(cat);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(cat, &PadState::a);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 22 && y == 88);
+    r.touch = TouchScript {};
+    r.Press(cat, &PadState::right);
+    r.Press(cat, &PadState::right);
+    CHECK(r.nav.Focus() == 2);
+    r.Press(cat, &PadState::a);
+    CHECK(!r.touch.Owns()); // (greyed Pay: nothing)
+    r.Press(cat, &PadState::left);
+    r.Press(cat, &PadState::down); // past the last row: the game's arrow
+    CHECK(r.Touched(x, y) && x == 77 && y == 168);
+    r.touch = TouchScript {};
+    PadState pa;
+    pa.a = true;
+    r.Frame(cat, pa, false); // unsettled: held...
+    r.Frame(cat, {}, false);
+    r.Frame(cat, {}, true);  // ...and dropped
+    r.Frame(cat, {}, true);
+    CHECK(!r.touch.Owns());
+    r.Press(cat, &PadState::b);
+    CHECK(r.Touched(x, y) && x == 235 && y == 19);
+}
+
+// Two screen modules on one screen state (the Registry and its room info, both Unknown): when the
+// other module's view comes the focus starts on its first item (not the old index), and when the
+// first module's view is back the focus is on the item it was on, by id; a view gap between them
+// (the game between its overlays) changes nothing of that. Another view of the same module keeps
+// the focus by id as ever.
+static void view_modules_on_one_screen()
+{
+    const ScreenState un {Screen::Unknown, Tab::None};
+    auto list = [](u32 tag, int n, int initial) {
+        MenuView v;
+        v.valid = v.own = true;
+        for (int i = 0; i < n; i++)
+        {
+            ViewItem it;
+            it.rect = {200, 140 + 80 * i, 500, 70};
+            it.action = {TapStep(20, 39 + 33 * i)};
+            it.id = (tag << 24) + 0x100 + (u32)i;
+            v.items.push_back(it);
+        }
+        v.initial = initial;
+        return v;
+    };
+    const MenuView reg = list(12, 5, 0), info = list(13, 6, 1), none;
+    Rig r;
+    r.view = &reg;
+    r.Frame(un);
+    r.Press(un, &PadState::down);
+    r.Press(un, &PadState::down);
+    r.Press(un, &PadState::down);
+    CHECK(r.nav.Focus() == 3);
+    r.view = &info; // (straight over)
+    r.Frame(un);
+    CHECK(r.nav.Focus() == 1);
+    r.Press(un, &PadState::down);
+    CHECK(r.nav.Focus() == 2);
+    r.view = &none; // (a gap)
+    r.Frame(un);
+    r.view = &reg;
+    r.Frame(un);
+    CHECK(r.nav.Focus() == 3);
+    r.view = &info;
+    r.Frame(un);
+    CHECK(r.nav.Focus() == 2); // (room info's own last item)
+    MenuView fewer = list(13, 6, 1);
+    fewer.items.erase(fewer.items.begin()); // (the same module, a row gone: the focus by id)
+    r.view = &fewer;
+    r.Frame(un);
+    CHECK(r.nav.Focus() == 1);
+}
+
+// A game popup over the Registry (Unknown, an own view of module 12; the popup reads as its own
+// screen, or on the same one): it wins the focus, and when it goes the Registry is back on the row
+// the focus was on, by id, in both cases; room info's view in between (module 13) starts at its
+// own first item, and the Registry's row is restored after it too.
+static void view_popup_over_the_registry()
+{
+    const ScreenState un {Screen::Unknown, Tab::None};
+    MenuView reg;
+    reg.valid = reg.own = true;
+    for (int i = 0; i < 5; i++)
+    {
+        ViewItem it;
+        it.rect = {200, 140 + 80 * i, 500, 70};
+        it.action = {TapStep(20, 39 + 33 * i)};
+        it.id = (12u << 24) + 0x100 + (u32)i;
+        reg.items.push_back(it);
+    }
+    MenuView pop;
+    pop.valid = pop.own = pop.popup = true;
+    ViewItem close;
+    close.rect = {490, 420, 300, 80};
+    close.action = {TapStep(132, 132)};
+    close.closes = true;
+    close.id = 0x700;
+    pop.items.push_back(close);
+    pop.back = close.action;
+    pop.backCloses = true;
+    for (bool own : {false, true})
+    {
+        const ScreenState during = own ? kPopup : un;   // (the popup as a screen of its own, or over the same one)
+        Rig r;
+        r.view = &reg;
+        r.Frame(un);
+        r.Press(un, &PadState::down);
+        r.Press(un, &PadState::down);
+        CHECK(r.nav.Focus() == 2);
+        r.view = &pop;
+        r.Frame(during);
+        CHECK(r.nav.Focus() == 0 && r.nav.ViewFocus());
+        r.Press(during, &PadState::a);
+        int x = -1, y = -1;
+        CHECK(r.Touched(x, y) && x == 132 && y == 132);
+        r.Drain();
+        r.view = &reg;
+        r.Frame(un);
+        CHECK(r.nav.Focus() == 2);
+        r.Press(un, &PadState::down);
+        CHECK(r.nav.Focus() == 3);
+    }
+}
+
+// A screen's page changing (Build Rooms' list, then its question): a question's focus starts on its
+// initial item, whatever index it had on the old page (it never opens on Yes because the focus was
+// on the list's second row), stays where the player moves it, and the list comes back on its room.
+static void view_page_change_restarts_the_focus()
+{
+    MenuView list;
+    list.valid = list.own = true;
+    for (int i = 0; i < 3; i++)
+    {
+        ViewItem it;
+        it.rect = {200, 140 + 80 * i, 500, 70};
+        it.action = {TapStep(48, 68 + 35 * i)};
+        it.id = (11u << 24) + 0x100 + (u32)i;
+        list.items.push_back(it);
+    }
+    MenuView ask;
+    ask.valid = ask.own = true;
+    ask.page = 1;
+    ask.question = true;
+    for (int i = 0; i < 2; i++)
+    {
+        ViewItem it;
+        it.rect = {380 + 300 * i, 448, 220, 96};
+        it.action = {TapStep(96 + 62 * i, 130)};
+        it.id = (11u << 24) + 0x200 + (u32)i;
+        it.next[0] = it.next[1] = kNoMove;
+        ask.items.push_back(it);
+    }
+    ask.initial = 0;
+    Rig r;
+    r.view = &list;
+    r.Frame(kUnknown);
+    r.Press(kUnknown, &PadState::down);
+    r.Press(kUnknown, &PadState::down);
+    CHECK(r.nav.Focus() == 2);
+    r.view = &ask;
+    r.Frame(kUnknown);
+    CHECK(r.nav.Focus() == 0);
+    r.Press(kUnknown, &PadState::right);
+    CHECK(r.nav.Focus() == 1);
+    r.Frame(kUnknown);
+    CHECK(r.nav.Focus() == 1); // (the same page: kept)
+    r.view = &list;
+    r.Frame(kUnknown);
+    CHECK(r.nav.Focus() == 2); // (back on the room the question was about)
+    r.view = &ask;
+    r.Frame(kUnknown);
+    CHECK(r.nav.Focus() == 0); // (a question always opens on its initial item, never on the last answer)
+}
+
+// A screen's own pages (the stat panel: Unknown, an own view): LB / RB run the view's LB / RB
+// actions (multi-step: a tap, a wait, a tap), held while unsettled and replayed; on the panel
+// they stay its tabs.
+static void view_lb_rb_pages()
+{
+    const ScreenState us {Screen::Unknown, Tab::None};
+    MenuView v;
+    v.valid = v.own = true;
+    ViewItem it;
+    it.rect = {508, 42, 88, 88};
+    it.id = 0x0F100001;
+    v.items.push_back(it);
+    v.buttons[(int)MenuButton::RB] = {TapStep(228, 25), WaitStep(3), TapStep(176, 50)};
+    v.buttons[(int)MenuButton::LB] = {TapStep(228, 25)};
+    Rig r;
+    r.view = &v;
+    r.Frame(us);
+    r.Press(us, &PadState::rb);
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == 228 && y == 25);
+    r.Drain();
+    for (int i = 0; i < 12 && !r.touch.Owns(); i++) r.Frame(us);
+    CHECK(r.Touched(x, y) && x == 176 && y == 50);
+    r.Drain();
+    r.Frame(us);
+    PadState lb;
+    lb.lb = true;
+    r.Frame(us, lb, false); // unsettled: held
+    r.Frame(us, {}, false);
+    CHECK(!r.touch.Owns());
+    r.Frame(us, {}, true);
+    CHECK(r.Touched(x, y) && x == 228 && y == 25);
+    // Without the view's LB / RB: nothing.
+    MenuView w = v;
+    w.buttons[(int)MenuButton::RB].clear();
+    Rig q;
+    q.view = &w;
+    q.Frame(us);
+    q.Press(us, &PadState::rb);
+    CHECK(!q.touch.Owns());
+}
+
 int main()
 {
+    view_modules_on_one_screen();
+    view_catalogue_spends_once();
     menu_opens_and_closes();
     view_save_slots_and_slider();
     view_selection_phone_and_no_replay();
@@ -1538,6 +1789,9 @@ int main()
     view_item_x_asks();
     view_tab_change_disarms_and_menu_is_b();
     view_popup_resume_and_phone();
+    view_popup_over_the_registry();
+    view_page_change_restarts_the_focus();
+    view_lb_rb_pages();
     if (failures) { fprintf(stderr, "navigator_test: %d failure(s)\n", failures); return 1; }
     printf("navigator_test: ok\n");
     return 0;

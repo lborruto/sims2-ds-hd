@@ -24,13 +24,13 @@
   portrait; A turns the page); popups and the games get a big, clear picture of their own. Everything is played on the buttons, no mouse needed.
 - **The whole town is HD, and played with a controller.** The status bar, the conversations,
   the menu's five tabs (Interact, Pockets, Goals, Relationships, Options), Give Gift, the save
-  slots, the popups, the phone and the notes are redrawn sharp, in the game's own style, with
+  slots, the popups, the phone, the notes, the shop's catalogue, Build Rooms, the hotel's Registry and room pages, its music panel and the stat panel are redrawn sharp, in the game's own style, with
   its own icons and in the game's language (the words come from your copy of the game; with
   another version of it, the old pictures stay). Each has a focus the D-pad moves and buttons
   that say what A, X and B do: do an action, use or throw away an item, give a gift, read your
-  goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend. The
-  games (cards, vacuum, the social reactions) and the shop's catalogue are still the game's own
-  picture, laid out big. No mouse needed, though it works.
+  goals and who likes you, turn the volume, save into a slot, answer a popup, call a friend, buy
+  and sell, build a hotel room, check a guest in, pick the hotel's music, read your stats. The games (cards, vacuum, the social reactions) are still the game's own picture,
+  laid out big. No mouse needed, though it works.
 - **It follows the game.** CONSOLE asks the game itself what it is showing (town, a shop, a
   social game, the vacuum, the cards, the menus, Create-a-Sim), so the picture changes with
   nothing to set, and it never falls back to the bare two-screen layout. Title, menus and
@@ -63,6 +63,11 @@ It is an early version: see [Good to know](#good-to-know).
 <p align="center">
   <img src="docs/screenshots/console-phone.webp" alt="CONSOLE: the phone in HD over the dimmed town: the game's green LCD, its Up, OK and Down buttons, the hints below" width="440">
   <img src="docs/screenshots/console-dialogue.webp" alt="CONSOLE: a conversation in HD, the speaker's name on a plate, the words in large type, their portrait" width="440">
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/console-shop.webp" alt="CONSOLE: the General Store's catalogue in HD: the items to buy in a grid with their icons, the chosen one's name, price and words, the buy button, the places you own at the right" width="440">
+  <img src="docs/screenshots/console-registry.webp" alt="CONSOLE: the hotel's Registry in HD: the five rooms with their guests, the hotel score above, the concierge's portrait and the room's details at the right" width="440">
 </p>
 
 <p align="center">
@@ -121,7 +126,7 @@ letter, so an AZERTY or QWERTZ keyboard has them in the same places as QWERTY.
 | F5 / F7 | | save state / load state (beside the ROM, `.quick.st`) |
 | F11 / F12 | | fullscreen / screenshot of both screens (beside the ROM, `-shot.png`) |
 | 0 to 4 | | layout: AUTO / FOCUS / SIDE / STACKED / CONSOLE |
-| Mouse | right stick + LT (the cursor; A too on the title, menus and Create-a-Sim) | the touch screen, wherever it is shown |
+| Mouse | right stick + LT (the cursor; A too wherever the cursor is the way to touch: the title, menus, Create-a-Sim, the furniture editor) | the touch screen, wherever it is shown |
 | Mouse wheel / right button drag, over the world | | zoom / turn the camera |
 
 Every row but the last few can be changed in the pause menu (SETTINGS > CONTROLS > KEYS AND
@@ -136,6 +141,16 @@ the bin turns green; moving away cancels). In Give Gift, A gives the highlighted
 Relationships, Up / Down move the game's own selection; in Options, Left / Right turn a volume
 up or down a notch, and A on Save opens the save slots (A saves into the highlighted one: an
 empty slot at once, a used one after the game asks, A yes, B no; B closes).
+In the shop, A on an item picks it (a shop item to buy, one of yours to sell, with its price),
+A on the simoleon button buys or sells it (greyed when the game would not), Up / Down past the
+list scroll it, B closes. In Build Rooms, A on a room asks the game's question (its permit and
+the money left shown first; the focus starts on No, so a stray double press never spends), Right
+and A buy it, A on No or B goes back (B on the list closes). In the hotel's
+Registry, A on a room shows its page (who stays, their mood, when they leave, what the room earns
+a day; A on a line explains it), and when a guest checks in, A on a free room gives it to them;
+B goes back. On a music panel, A plays the highlighted song (the room keeps it), Up / Down past
+the list scroll it, B closes. On the stat panel, A opens a page, LB / RB (or Left / Right on a
+page) go to the previous / next one, B goes back to the first page, then closes.
 The phone's Up / Down / A are the phone's own buttons (A on a row goes there and presses OK); B
 hangs up. **A conversation** goes on with A. **Popups** (tips, goals, Game Paused) answer to A or
 B; a question (Quit?) takes A for yes and B for no; when a popup opens over the menu, the menu
@@ -220,9 +235,12 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
 
 ## Good to know
 
-- **An early version.** Town, conversations, Create-a-Sim, the shop, the social games, the
-  hotel's lobby and basement, the vacuum and the casino's card game are checked; not everything
-  the game has is yet.
+- **An early version.** Town, conversations, Create-a-Sim, the shop, Build Rooms, the hotel's
+  lobby, basement, Registry and music, the social games, the vacuum and the casino's card game are
+  checked; not everything the game has is yet.
+- **A few screens are still the game's own picture.** The furniture editor of a hotel room, and
+  any screen CONSOLE has no HD page for, are drawn big with the stick as a cursor (the right
+  stick moves it, A touches), and a hint box says so.
 - **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
   world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it. (CONSOLE has no such strip.)
 - **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).

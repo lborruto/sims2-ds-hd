@@ -1,0 +1,8 @@
+# From M-ci-g-base (a guest's check-in, the research's patch: the concierge waiting as Sim 45),
+# CONSOLE: Down (the Deluxe Guest Room, not built), A (nothing: the game refuses it), Up (the
+# Small Guest Room), A (the game's row: the guest checked in, slot 0 {29, 45, days}, the guests
+# stayed + 1, then the guest's speech).
+20 2 pad down
+40 2 pad a
+80 2 pad up
+100 2 pad a

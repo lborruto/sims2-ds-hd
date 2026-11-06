@@ -1,0 +1,9 @@
+# From M-ci-early (the Registry, the early hotel), CONSOLE: A (the Small Guest Room: its room
+# info, vacant), Down (Room Base Value), A (the game's hint 2597 in HD), A (closed: the focus
+# back on the line), B (the X: the Registry), B (its X: the panel).
+20 2 pad a
+80 2 pad down
+100 2 pad a
+150 2 pad a
+190 2 pad b
+250 2 pad b

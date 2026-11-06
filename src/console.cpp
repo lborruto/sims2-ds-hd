@@ -5,6 +5,12 @@
 
 #include "activities.h"
 #include "hotspots.h"
+#include "port/build.h"
+#include "port/checkin.h"
+#include "port/roominfo.h"
+#include "port/music.h"
+#include "port/statpanel.h"
+#include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
 #include "port/note.h"
@@ -102,6 +108,19 @@ void AddHints(Composition& c, const std::vector<Hint>& hints)
     c.overlays[box].to.h = std::min(y - kHintGap + kHintPad - kHintBox.y, kHintBox.h);
 }
 
+// The cursor's hint box at y: the text with its shadow (TextRect) and, on each side, the padding
+// and the box's 4-pixel border; centred, or (right) at the canvas's right edge, clear of the HD
+// status bar under the touch screen. Kept on the canvas.
+static void AddCursorHint(Composition& c, int y, bool right = false)
+{
+    constexpr int border = 4;
+    const Rect t = TextRect(0, 0, kFrontHint, 3);
+    const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset, bx = right ? kConsoleW - bw - 24 : (kConsoleW - bw) / 2;
+    y = std::min(y, kConsoleH - bh - 4);
+    c.overlays.push_back({{bx, y, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
+    c.overlays.push_back(Text(bx + inset, y + inset, kFrontHint, 3));
+}
+
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
                          const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed)
 {
@@ -124,13 +143,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.overlays.push_back(FrameAround(kFrontBottomTo, 0));
         c.pieces.push_back({Src::Top, {0, 0, topW, topH}, topTo});
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kFrontBottomTo));
-        // The hint's box: the text with its shadow (TextRect) and, on each side, the padding and
-        // the box's 4-pixel border, centred.
-        constexpr int border = 4;
-        const Rect t = TextRect(0, 0, kFrontHint, 3);
-        const int inset = border + kFrontHintPad, bw = t.w + 2 * inset, bh = t.h + 2 * inset, bx = (kConsoleW - bw) / 2;
-        c.overlays.push_back({{bx, kFrontHintY, bw, bh}, kFrameArgb, 16, border, kOutlineArgb});
-        c.overlays.push_back(Text(bx + inset, kFrontHintY + inset, kFrontHint, 3));
+        AddCursorHint(c, kFrontHintY);
     }
     else if (MenuView v = ConsoleView(s, game, rom); v.valid && (v.own || (s.screen == Screen::Panel && menuOpen)))
     {
@@ -146,10 +159,16 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             if (at.screen == Screen::Panel) BuildPanelMenu(c, at, view, f, *game, *rom, icons, bottom);
             else if (at.screen == Screen::Gift) BuildGiftMenu(c, view, f, *game, *rom, icons, bottom);
             else if (at.screen == Screen::SaveSlots) BuildSaveSlots(c, view, f, *game, *rom);
+            else if (at.screen == Screen::Catalogue) BuildCatalogue(c, view, f, *game, *rom, icons);
+            else if (at.screen == Screen::Build) BuildBuildRooms(c, view, f, *game, *rom, icons);
             else if (at.screen == Screen::Phone) BuildPhone(c, view, f, *game, *rom, icons, bottom, strings);
+            else if (game->checkIn.valid) BuildCheckIn(c, view, f, *game, *rom, icons, bottom);
+            else if (game->roomInfo.valid) BuildRoomInfo(c, view, f, *game, *rom, icons, bottom);
+            else if (game->music.valid) BuildMusic(c, view, f, *game, *rom, icons);
+            else if (game->stat.valid) BuildStatPanel(c, view, f, *game, *rom, icons);
             else BuildNote(c, view, f, *game, *rom, icons);
         };
-        if (v.popup)
+        if (v.popup && PopupOver(s, *game))
         {
             // What the popup is over: its HD screen (the panel's menu while it was open) without a
             // focus, or the dimmed world.
@@ -162,6 +181,8 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         {
             screen(s, v, focus);
             if (bar) AddStatusBar(c, *hud, *strings);
+            // Room info's own hint box (a popup of the screen's: port/roominfo.h), over the bar too.
+            if (s.screen == Screen::Unknown && RoomHintUp(*game)) BuildRoomHint(c, v, focus, *game, *rom);
         }
         SortUi(c.ui); // (the bar's layer after the screen's, a popup's after it, the images last)
         return c;     // (the focus is the view's: no ring from HotspotsFor)
@@ -174,7 +195,11 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         world.touch = false;
         c.pieces.push_back(world);
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
-        if (cursorScreen) c.overlays.push_back(FrameAround(kMenuTo, 1));
+        if (cursorScreen)
+        {
+            c.overlays.push_back(FrameAround(kMenuTo, 1));
+            AddCursorHint(c, kMenuTo.y + kMenuTo.h + 10, true);   // (a controller player: how to leave, as on the title)
+        }
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
         // Not dimmed: the game keeps its status bar up while the touch screen is used.
         if (bar) AddStatusBar(c, *hud, *strings);

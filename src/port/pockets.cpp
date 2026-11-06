@@ -59,15 +59,26 @@ void AddItemCell(Composition& c, Rect r, bool focused, bool selected, bool empty
     c.ui.push_back(cell);
 }
 
-void AddSpriteIcon(Composition& c, IconCache* icons, int desc, int frame, int scale, Rect box, u32 opacity)
+static void AddSpriteIcon(Composition& c, IconCache* icons, SpriteRef ref, int frame, int scale, Rect box, u32 opacity)
 {
-    if (!icons || desc < 0) return;
-    if (const SpriteFrame* f = icons->Scaled(SpriteRef::Of(desc), frame, scale))
+    if (!icons) return;
+    if (const SpriteFrame* f = icons->Scaled(ref, frame, scale))
     {
         UiItem a = ImageItem({box.x + (box.w - f->w) / 2, box.y + (box.h - f->h) / 2, f->w, f->h}, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h});
         a.fill = opacity;
         c.ui.push_back(a);
     }
+}
+
+void AddSpriteIcon(Composition& c, IconCache* icons, int desc, int frame, int scale, Rect box, u32 opacity)
+{
+    if (desc >= 0) AddSpriteIcon(c, icons, SpriteRef::Of(desc), frame, scale, box, opacity);
+}
+
+void AddSpriteIcon(Composition& c, IconCache* icons, const ItemRec& item, int scale, Rect box, u32 opacity)
+{
+    if (item.iconRes < 0) return;
+    AddSpriteIcon(c, icons, item.tilesRes >= 0 && item.palRes >= 0 ? SpriteRef {item.tilesRes, item.iconRes, item.palRes} : SpriteRef::Of(item.iconRes), 0, scale, box, opacity);
 }
 
 bool PocketsItemText(const InventoryState& inv, int item, int& nameId, int& descId)
@@ -267,7 +278,7 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
     AddMousePiece(c, hs[10].area, kPkBinBtn);
 
     // Images: the items, the tools, the counted items (live), the hand and the bin.
-    for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++) AddSpriteIcon(c, icons, inv.slots[i].iconRes, 0, 3, SlotRect(i));
+    for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++) AddSpriteIcon(c, icons, inv.slots[i], 3, SlotRect(i));
     for (int k = 0; k < kKeys; k++) AddSpriteIcon(c, icons, kSprTool[k], inv.keys[k].count > 0 ? 1 : 0, 3, KeyRect(k));
     if (bottom)
         for (int i = 0; i < kCounted; i++)

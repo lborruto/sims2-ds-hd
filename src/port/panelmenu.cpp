@@ -195,7 +195,7 @@ MenuView PanelMenuViewOf(ScreenState s, const GameState& game, const RomData* ro
     // explicitly: the geometry alone puts it at the edge of the 60° cone from the rows.
     const int tabFirst = MenuFirst(v), phoneAt = (int)v.items.size();
     for (int i = 0; i < phoneAt; i++)
-        if (v.items[i].enabled && v.items[i].next[0] < 0 && MenuNeighbour(v, i, 0, -1) == i) v.items[i].next[0] = phoneAt;
+        if (v.items[i].enabled && v.items[i].next[0] == -1 && MenuNeighbour(v, i, 0, -1) == i) v.items[i].next[0] = phoneAt;
     ViewItem phone;
     phone.rect = kPmPhoneWell;
     phone.action = {TapStep(kPhoneIcon.x, kPhoneIcon.y)};
@@ -314,5 +314,34 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     // The still items in ascending layers (the tab's wells on layer 0 come after the frame's
     // layer 1 items above), each layer in the order given; the images after them.
     SortUi(c.ui, first);
+}
+
+void PanelText(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour)
+{
+    const FittedText f = FitLine(s, size, minSize, r.w, w);
+    ui::UiItem t = ui::TextItem(r, f.text, f.size, a, w);
+    t.wrap = false;
+    t.middle = true;
+    if (colour) t.colour = colour;
+    t.layer = 1;
+    c.ui.push_back(t);
+}
+
+void Measurer::Note(int id, bool shrunk, bool fits, int lines) const
+{
+    m.checked++;
+    if (shrunk) m.shrunk++;
+    if (lines > m.tallestLines) { m.tallestLines = lines; m.tallestId = id; }
+    if (!fits && std::find(m.cutIds.begin(), m.cutIds.end(), id) == m.cutIds.end()) { m.cut++; m.cutIds.push_back(id); }
+}
+void Measurer::Line(int id, const std::string& text, float size, float minSize, int width, ui::Weight w) const
+{
+    const FittedText f = FitLine(text, size, minSize, width, w);
+    Note(id, f.size < size, f.fits);
+}
+void Measurer::Block(int id, const std::string& text, float size, float minSize, Rect box) const
+{
+    const FittedBlock f = FitBlock(text, size, minSize, box);
+    Note(id, f.size < size, f.fits, f.lines);
 }
 }

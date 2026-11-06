@@ -68,6 +68,7 @@ struct ItemRec
     int nameId = -1, descId = -1;
     int iconRes = -1;                 // slot items: the sprite descriptor resource (RecordRow::descRes); -1 for the others
     int count = 0;
+    int tilesRes = -1, palRes = -1;   // slot items: the record's own tiles and palette (the Large Plant's palette is not the descriptor's neighbour)
     bool operator==(const ItemRec&) const = default;
 };
 
@@ -279,6 +280,180 @@ struct TownState
     bool operator==(const TownState&) const = default;
 };
 
+// ---- The hotel and the shops (milestone 4). The hotel block is readable on any screen; each menu's
+// part is read only on its own screen (vtable and overlay checked), apart from the others.
+constexpr int kPlaces = 33;           // place ids 0..32 name the rooms (string 0x43 + place)
+constexpr int kNoPlace = 0x21;        // a guest slot's room when it holds none
+constexpr int kNoSim = 0x3F;
+constexpr int kSongNone = 0x2A;       // a room's song code when none is set
+struct RoomRow
+{
+    int permit = 0;                   // the build permit's price (0: not a buildable room)
+    int weight = 0;                   // its share of the hotel score, percent
+    int parent = 0;                   // the place it is built in (0x21: none)
+    bool operator==(const RoomRow&) const = default;
+};
+struct GuestSlot
+{
+    int place = kNoPlace;             // the room the guest holds
+    int sim = kNoSim;                 // Sim record index
+    int days = 0;                     // days booked
+    bool operator==(const GuestSlot&) const = default;
+};
+struct HotelState
+{
+    bool valid = false;
+    u64 built = 0, unlocked = 0;      // bit = place id: the room is built / its permit can be bought
+    u64 building = 0;                 // bit = place id: its permit bought, its building not finished (G+0x4418 + 4 place >= the clock)
+    RoomRow rooms[kPlaces];           // the static room table
+    int score = 0;                    // the hotel score in percent: the weights of the built rooms
+    GuestSlot slots[5];
+    int guestsStayed = 0;
+    int money = 0, earned = 0, spent = 0;   // the simoleons, and the stat panel's totals (0..999999)
+    int songs[kPlaces] = {};          // the song code each room plays (kSongNone: the default)
+    int place = -1;                   // the place the hero is in, -1 when it does not read
+    bool operator==(const HotelState&) const = default;
+};
+
+// The Registry (mode 1) and the guest check-in (mode 0), overlay 4.
+struct RegistryRow
+{
+    int place = -1;                   // name = string 0x43 + place
+    bool built = false;
+    int occupant = -1;                // the Sim in the room, -1 vacant
+    bool available = false;           // built and vacant (the Penthouse also needs game flag 0x15): the row can be used
+    bool infoOk = false;              // built (the Penthouse also needs game flag 0x15): the Registry opens its room info
+    bool operator==(const RegistryRow&) const = default;
+};
+struct CheckInState
+{
+    bool valid = false;
+    int mode = -1;                    // 1 Registry, 0 a guest checking in
+    int guest = -1;                   // mode 0: the guest's Sim record index (the title is its name, 323 + guest)
+    RegistryRow rows[5];
+    int score = 0;                    // the hotel score (mode 1 shows it)
+    bool operator==(const CheckInState&) const = default;
+};
+
+// The room's page (overlay 12): the strings 2458..2467 with their values.
+struct RoomInfoState
+{
+    bool valid = false;
+    int place = -1;                   // the room, name 0x43 + place
+    bool occupied = false;
+    int occupant = -1;                // the Sim in it, or the Concierge (45) when vacant (his portrait fills the vacant page)
+    int moodId = -1;                  // string 2086 + the guest's mood; -1 vacant
+    bool checkOutKnown = false;       // false for the Penthouse while the mission runs ("?/? (? days)")
+    int days = 0, month = 0, day = 0; // the check out date and the days left; the date counts a 365-day year
+    int baseValue = 0, serviceCharge = 0, scoreBonus = 0, total = 0;   // simoleons per day (total: the daily cost)
+    bool hint = false;                // a hint box is up (the next tap closes it)
+    // The hint's string (2594..2603), or -1: which line was tapped is not in RAM, so the frame loop
+    // (main.cpp) fills it from the stylus's last point when `hint` rises (RoomInfoHintAt,
+    // port/roominfo.h) and keeps it while the box is up; ReadGameState leaves it -1.
+    int hintId = -1;
+    bool operator==(const RoomInfoState&) const = default;
+};
+
+// The hotel's music panel (overlay 5).
+constexpr int kMaxSongs = 27;
+struct SongRow
+{
+    int index = -1;                   // the song table's index
+    int code = -1;                    // the code G's per-room song byte holds
+    int nameId = -1;                  // string id; -1 for a custom (recorded) song
+    int custom = -1;                  // 0..2 for a recorded song, -1 otherwise
+    std::string customName;           // a recorded song's name, the game's raw text (GameTextToUtf8)
+    bool operator==(const SongRow&) const = default;
+};
+struct MusicState
+{
+    bool valid = false;
+    std::vector<SongRow> list;        // the songs listed, in order (at most 27)
+    int scroll = 0;                   // the first row shown (5 are)
+    int playing = -1;                 // list index of the song playing, -1 none
+    int place = -1, roomSong = kSongNone;   // the room and the song code its slot holds
+    bool operator==(const MusicState&) const = default;
+};
+
+// Build Rooms (overlay 1), the City Hall clerk's list.
+struct BuildEntry
+{
+    int place = -1;                   // name 0x43 + place
+    int price = 0;                    // the permit
+    int parentNameId = -1;            // string of the place it is built in
+    bool affordable = false;          // price <= the money
+    bool operator==(const BuildEntry&) const = default;
+};
+struct BuildState
+{
+    bool valid = false;
+    std::vector<BuildEntry> places;   // the list the menu shows (at most 33)
+    int scroll = 0;                   // the first of the 3 rows
+    int page = 0;                     // 0 the list, 1 "Are you sure you want to buy this room?"
+    int chosen = -1;                  // the entry on page 1, -1 on page 0
+    int money = 0;
+    bool operator==(const BuildState&) const = default;
+};
+
+// The furniture editor of a hotel room (module 0x14, no overlay), stylus only: what its objects are.
+struct PlaceObject
+{
+    int id = -1;                      // item id, name 463 + id
+    int x = 0, y = 0, rotation = 0;
+    bool operator==(const PlaceObject&) const = default;
+};
+struct PlacementState
+{
+    bool valid = false;
+    int mode = -1;                    // S+8: 1 a pocket item, 2 moving a placed one
+    int room = -1;                    // index in the guest rooms table
+    int phase = -1;                   // 0 fade-in, 1 interactive, 2 closing, 3 fade-out
+    int pocketSlot = -1, object = -1; // chosen pocket slot / room object
+    int rotation = 0;                 // of the carried object, 0..3
+    std::vector<PlaceObject> objects; // the room's furniture (at most 14)
+    bool operator==(const PlacementState&) const = default;
+};
+
+// The shop catalogue (overlay 2): the General Store's six cells and the owned places beside them.
+struct ShopItem
+{
+    int row = -1;                     // the record row (id + 0x3B)
+    int id = -1;                      // item id: name 463 + id, description 822 + id
+    int nameId = -1, descId = -1;
+    int iconRes = -1;                 // the sprite descriptor resource (RecordRow::descRes)
+    int buyPrice = 0, sellPrice = 0;  // two times the record's price, once
+    int tilesRes = -1, palRes = -1;   // the record's tiles and palette (not always the descriptor's neighbours: the Large Plant's palette is not 2484)
+    bool operator==(const ShopItem&) const = default;
+};
+struct CatalogueState
+{
+    bool valid = false;
+    int shop = -1;                    // the keeper's record index (0x33 the General Store, 0x29 / 0x2E / 0x2F / 0x30 food vendors)
+    bool vendor = false;              // layout 1: a 2 x 3 grid, no arrows, no owned places
+    std::vector<ShopItem> items;      // the list (12 in the store, 6 for a vendor)
+    std::vector<ShopItem> owned;      // the pockets, as sell prices
+    int selected = -1;                // into items (buy) or owned (sell)
+    bool sell = false;                // an owned item is selected
+    int scroll = 0;                   // the list index of grid cell 0 (0, 3, 6, 9)
+    bool payEnabled = false, upEnabled = false, downEnabled = false;
+    bool ring = false;                // the selection ring is shown
+    int money = 0;
+    bool operator==(const CatalogueState&) const = default;
+};
+
+// The Stat Panel (overlay 14): the page and what each page shows, read from G.
+struct StatState
+{
+    bool valid = false;
+    int page = 0;                     // 0 Main, 1 Aspirations, 2 Hotel Info, 3 Skills, 4 Game Stats
+    int transition = 0;               // 0 settled, 1 fading out, 2 fading in
+    int aspiration = 0, level = 0, points = 0, gaugeFrame = 0;   // Fortune 0, Romance 1, Popularity 2, Party 3; the gauge 0..20
+    int skills[5] = {};               // Creativity, Business, Body, Charisma, Mechanical: 0..10
+    int score = 0, guestsStayed = 0, earned = 0, spent = 0;
+    int aliens = 0, goons = 0, vacuum = 0, metal = 0;
+    bool operator==(const StatState&) const = default;
+};
+
 struct GameState
 {
     bool valid = false;            // the manager pointer chain read cleanly
@@ -297,6 +472,15 @@ struct GameState
     HudState hud;                  // the status bar's values (any screen with the world's G block valid)
     DialogueState dialogue;        // filled only when screen == Dialogue
     TownState town;                // inventory, popup, options, save slots (any screen); logged apart (--print-town)
+    // The hotel and the shops (logged apart: --print-hotel). hotel: any screen; the others only on their own.
+    HotelState hotel;
+    CheckInState checkIn;
+    RoomInfoState roomInfo;
+    MusicState music;
+    BuildState build;
+    PlacementState placement;
+    CatalogueState catalogue;
+    StatState stat;
     // Screen identity only: hud and dialogue change every minute / page and are logged apart
     // (--print-hud), so --print-game stays one line per screen change.
     bool operator==(const GameState& o) const

@@ -742,8 +742,206 @@ static void menus_random()
     }
 }
 
+
+// ---- The hotel and the shops: made-up RAM with the research's layouts.
+static Ram hotel_ram(u32 vt, int ov)
+{
+    Ram r = menus_ram(vt, ov, 0);
+    for (u32 k = 0; k < 33; k++) { r.W16(0x0211F9EC + 4 * k, 0); r.W8(0x0211F9EC + 4 * k + 2, 0); r.W8(0x0211F9EC + 4 * k + 3, 0x21); }
+    r.W16(0x0211F9EC + 4 * 4, 1500); r.W8(0x0211F9EC + 4 * 4 + 2, 6); r.W8(0x0211F9EC + 4 * 4 + 3, 2);     // casino
+    r.W16(0x0211F9EC + 4 * 15, 1000); r.W8(0x0211F9EC + 4 * 15 + 2, 8); r.W8(0x0211F9EC + 4 * 15 + 3, 27);  // Jungle
+    r.W32(kGb + 0x4410, (1u << 29) | (1u << 4)); r.W32(kGb + 0x4414, 0);
+    for (u32 j = 0; j < 5; j++) { r.W32(kGb + 0x2BC0 + 8 * j, 0x21); r.W8(kGb + 0x2BC4 + 8 * j, 0x3F); }
+    r.W32(kGb + 0x2F60, 2000); r.W32(kGb + 0x84, 3); r.W32(kGb + 0x2F64, 500); r.W32(kGb + 0x2F68, 300);
+    return r;
+}
+static void hotel_block()
+{
+    Ram r = hotel_ram(0x0213203C, -1);
+    r.W32(kGb + 0x2BC0, 29); r.W8(kGb + 0x2BC4, 45); r.W8(kGb + 0x2BC5, 2);
+    r.W8(kGb + 0x449C + 4, 3);
+    r.W32(0x0213E580, 0x021A1000); r.W32(0x021A1000 + 0xF4, 13);
+    HotelState h = ReadGameState(r.View()).hotel;
+    CHECK(h.valid && h.built == ((1u << 29) | (1u << 4)) && h.score == 6 && h.rooms[15].permit == 1000 && h.rooms[15].parent == 27 && h.slots[0].place == 29 && h.slots[0].sim == 45 && h.slots[0].days == 2);
+    CHECK(h.guestsStayed == 3 && h.money == 2000 && h.earned == 500 && h.spent == 300 && h.songs[4] == 3 && h.songs[5] == 0 && h.place == 13);
+    // Rooms being built: their completion time (G+0x4418 + 4 place) not yet past the clock (G+0x480C); never set 0x80000000.
+    r.W32(kGb + 0x480C, 100000);
+    for (u32 k = 0; k < 33; k++) r.W32(kGb + 0x4418 + 4 * k, k == 15 ? 100000 + 0x7080 : k == 4 ? 99999 : 0x80000000u);
+    CHECK(ReadGameState(r.View()).hotel.building == (1ull << 15));
+    r.W32(kGb + 0x4418 + 4 * 32, 100000); CHECK(ReadGameState(r.View()).hotel.building == ((1ull << 15) | (1ull << 32)));
+    r.W32(kGb + 0x4414, 2); CHECK(!ReadGameState(r.View()).hotel.valid);   // a bit past place 32
+    r.W32(kGb + 0x4414, 1); CHECK(ReadGameState(r.View()).hotel.valid);
+    r.W32(kGb + 0x4414, 0); r.W8(0x0211F9EC + 4 * 4 + 2, 101); CHECK(!ReadGameState(r.View()).hotel.valid);   // a weight over 100
+    r.W8(0x0211F9EC + 4 * 4 + 2, 6); r.W32(kGb + 0x2BC0, 0x22); CHECK(!ReadGameState(r.View()).hotel.valid);
+    r.W32(kGb + 0x2BC0, 29); r.W32(kGb + 0x2F68, 1000000); CHECK(!ReadGameState(r.View()).hotel.valid);
+    // the hotel block reads on its own and the screens' parts stay empty on the panel
+    GameState g = ReadGameState(hotel_ram(0x0213203C, -1).View());
+    CHECK(g.hotel.valid && !g.checkIn.valid && !g.roomInfo.valid && !g.music.valid && !g.build.valid && !g.catalogue.valid && !g.stat.valid && !g.placement.valid);
+}
+static const u32 kGuestRooms[6] = {8, 29, 17, 15, 18, 20};   // the furniture records' place ids
+static const u32 kSongCodes[4] = {0x2B, 1, 3, 0x2A};
+
+static void registry_and_room()
+{
+    Ram r = hotel_ram(0x0214A804, 4);
+    const u8 rooms[5] = {0x1D, 0x08, 0x0F, 0x12, 0x14};
+    for (int i = 0; i < 5; i++) r.W8(0x0214A7A0 + i, rooms[i]);
+    r.W8(kS + 0x26, 1);
+    r.W32(kGb + 0x4410, (1u << 29) | (1u << 15) | (1u << 20));
+    r.W32(kGb + 0x2BC0, 15); r.W8(kGb + 0x2BC4, 7);
+    CheckInState c = ReadGameState(r.View()).checkIn;
+    CHECK(c.valid && c.mode == 1 && c.rows[0].place == 29 && c.rows[0].built && c.rows[0].available && c.rows[1].place == 8 && !c.rows[1].built && !c.rows[1].available);
+    CHECK(c.rows[2].built && c.rows[2].occupant == 7 && !c.rows[2].available && c.rows[4].built && !c.rows[4].available);   // Penthouse: flag 0x15 clear
+    CHECK(c.rows[0].infoOk && !c.rows[1].infoOk && c.rows[2].infoOk && !c.rows[4].infoOk);   // room info: built (an occupied room too), the Penthouse's flag
+    r.W32(kGb + 0x4814 + 0, 1u << 21); CHECK(ReadGameState(r.View()).checkIn.rows[4].available && ReadGameState(r.View()).checkIn.rows[4].infoOk);
+    r.W8(kS + 0x26, 0); r.W8(kS + 0x25, 45);
+    c = ReadGameState(r.View()).checkIn; CHECK(c.valid && c.mode == 0 && c.guest == 45);
+    r.W8(kS + 0x25, 46); CHECK(!ReadGameState(r.View()).checkIn.valid);
+    r.W8(kS + 0x26, 2); CHECK(!ReadGameState(r.View()).checkIn.valid);
+    r.W8(kS + 0x26, 1); r.W8(0x0214A7A0, 40); CHECK(!ReadGameState(r.View()).checkIn.valid);
+    Ram w = hotel_ram(0x0214A804, 5); w.W8(kS + 0x26, 1); CHECK(!ReadGameState(w.View()).checkIn.valid);   // another overlay
+
+    // Room info: Small Guest Room (29) occupied by Sim 45 until day 3 of a made-up date, furniture 557 -> 2
+    Ram q = hotel_ram(0x0214A9BC, 12);
+    for (u32 i = 0; i < 6; i++) q.W32(0x0211F9D4 + 4 * i, kGuestRooms[i]);
+    const u32 room1 = kGb + 0x41F8 + 0x58 * 1;
+    q.W32(room1 + 0x54, 2); q.W8(room1, 86); q.W8(room1 + 4, 114);
+    const u32 p86 = 0x02122A00 + 0x12 * (86 + 0x3B), p114 = 0x02122A00 + 0x12 * (114 + 0x3B);
+    q.W16(p86 + 0xE, 500); q.W16(p114 + 0xE, 57);
+    q.W16(kS + 0x30, 29); q.W16(kS + 0x32, 45); q.W8(kS + 0x25, 1);
+    q.W32(kGb + 0x68, 1);   // not Fortune: no x 1.05
+    q.W32(kGb + 0x21DC + 0x2C * 45 + 0x20, 0x1000 + 86400 + 1000); q.W8(kGb + 0x21DC + 0x2C * 45 + 0x1A, 2);
+    q.W32(kGb + 0x480C, 0x1000); q.W32(kGb + 0x47F4, 1); q.W32(kGb + 0x47F8, 31);
+    RoomInfoState v = ReadGameState(q.View()).roomInfo;
+    CHECK(v.valid && v.place == 29 && v.occupied && v.occupant == 45 && v.moodId == 2088 && v.checkOutKnown && v.days == 2 && v.month == 2 && v.day == 2);
+    CHECK(v.baseValue == 400 && v.serviceCharge == 2 && v.scoreBonus == 12 && v.total == 414);   // the casino is built: score 6
+    q.W32(kGb + 0x68, 0); CHECK(ReadGameState(q.View()).roomInfo.total == 434);
+    for (u32 k = 0; k < 4; k++) q.W8(kS + 0x34 + k, 1);   // a hint box up: which one is not in RAM (the frame loop's, -1 here)
+    v = ReadGameState(q.View()).roomInfo; CHECK(v.valid && v.hint && v.hintId == -1);
+    for (u32 k = 0; k < 4; k++) q.W8(kS + 0x34 + k, 0);
+    q.W8(kS + 0x25, 0); q.W16(kS + 0x32, 45);
+    v = ReadGameState(q.View()).roomInfo; CHECK(v.valid && !v.occupied && !v.checkOutKnown && v.moodId == -1);
+    q.W16(kS + 0x30, 8); q.W32(0x0211F9D4, 9); CHECK(!ReadGameState(q.View()).roomInfo.valid);   // not a guest room
+    q.W32(0x0211F9D4, 8); q.W16(kS + 0x30, 33); CHECK(!ReadGameState(q.View()).roomInfo.valid);
+    q.W16(kS + 0x30, 29); q.W16(kS + 0x32, 46); CHECK(!ReadGameState(q.View()).roomInfo.valid);
+}
+static void music_build_placement()
+{
+    Ram r = hotel_ram(0x0214ABA8, 5);
+    for (u32 i = 0; i < 4; i++) { r.W8(0x0214ABBC + 4 * i, kSongCodes[i]); r.W16(0x0214ABBC + 4 * i + 2, 100 + i); }
+    r.W32(kS + 0x6C, 3); r.W32(kS + 0x74, 3); r.W32(kS + 0x28, 0); r.W32(kS + 0x70, 2);
+    r.W8(kS + 0x2C, 0); r.W8(kS + 0x2D, 1); r.W8(kS + 0x2E, 2);
+    r.W32(0x0213E580, 0x021A1000); r.W32(0x021A1000 + 0xF4, 4); r.W8(kGb + 0x449C + 4, 3);
+    MusicState m = ReadGameState(r.View()).music;
+    CHECK(m.valid && m.list.size() == 3 && m.list[0].custom == 0 && m.list[0].nameId == -1 && m.list[1].nameId == 101 && m.playing == 2 && m.place == 4 && m.roomSong == 3);
+    CHECK(m.list[0].customName.empty() && m.list[1].customName.empty());
+    // A recorded song's name: the mixer's char[16] in G, up to its NUL, never past 16 bytes.
+    for (u32 k = 0; k < 16; k++) r.W8(kGb + 0x46AC + k, k < 5 ? (u32)"Tune1"[k] : 0);
+    CHECK(ReadGameState(r.View()).music.list[0].customName == "Tune1");
+    for (u32 k = 0; k < 17; k++) r.W8(kGb + 0x46AC + k, 'A');
+    CHECK(ReadGameState(r.View()).music.list[0].customName == std::string(16, 'A'));
+    r.W32(kS + 0x70, 0xFF); CHECK(ReadGameState(r.View()).music.playing == -1);
+    r.W32(kS + 0x70, 3); CHECK(!ReadGameState(r.View()).music.valid);
+    r.W32(kS + 0x70, 2); r.W8(kS + 0x2E, 3); CHECK(!ReadGameState(r.View()).music.valid);   // the table's end marker
+    r.W8(kS + 0x2E, 2); r.W32(kS + 0x6C, 28); CHECK(!ReadGameState(r.View()).music.valid);
+
+    Ram b = hotel_ram(0x0214B1D0, 1);
+    b.W32(kGb + 0x2F60, 1200); b.W32(kS + 0x40, 2); b.W32(kS + 0x4C, 4); b.W32(kS + 0x50, 15); b.W32(kS + 0x3C, 0); b.W32(kS + 0x48, 0); b.W32(kS + 0x44, 1);
+    BuildState v = ReadGameState(b.View()).build;
+    CHECK(v.valid && v.places.size() == 2 && v.places[0].place == 4 && v.places[0].price == 1500 && !v.places[0].affordable && v.places[1].affordable && v.places[1].parentNameId == 0x43 + 27 && v.chosen == -1 && v.money == 1200);
+    b.W32(kS + 0x48, 1); CHECK(ReadGameState(b.View()).build.chosen == 1);
+    b.W32(kS + 0x44, 2); CHECK(!ReadGameState(b.View()).build.valid);
+    b.W32(kS + 0x44, 1); b.W32(kS + 0x3C, 1); CHECK(!ReadGameState(b.View()).build.valid);   // scroll past the end
+    b.W32(kS + 0x3C, 0);
+    b.W32(kS + 0x4C, 33); CHECK(!ReadGameState(b.View()).build.valid);
+    b.W32(kS + 0x4C, 4); b.W32(kS + 0x40, 34); CHECK(!ReadGameState(b.View()).build.valid);
+    b.W32(kS + 0x40, 2); b.W16(0x0211F9EC + 4 * 4, 0); CHECK(!ReadGameState(b.View()).build.valid);   // a listed room always has a permit
+    b.W16(0x0211F9EC + 4 * 4, 1500); CHECK(ReadGameState(b.View()).build.valid);
+
+    Ram p = hotel_ram(0x021351A8, -1);
+    p.W32(kS + 8, 1); p.W32(kS + 0x24, 1); p.W32(kS + 0x5C, 1); p.W8(kS + 0x59, 0); p.W8(kS + 0x5A, 1); p.W32(kS + 0x6C, 3);
+    const u32 rec = kGb + 0x41F8 + 0x58;
+    p.W32(rec + 0x54, 2); p.W8(rec, 86); p.W8(rec + 1, 5); p.W8(rec + 2, 14); p.W8(rec + 3, 0); p.W8(rec + 4, 114); p.W8(rec + 5, 71); p.W8(rec + 6, 58); p.W8(rec + 7, 1);
+    PlacementState pl = ReadGameState(p.View()).placement;
+    CHECK(pl.valid && pl.mode == 1 && pl.room == 1 && pl.phase == 1 && pl.object == 1 && pl.rotation == 3 && pl.objects.size() == 2 && pl.objects[1].x == 71 && pl.objects[1].rotation == 1);
+    p.W32(rec + 0x54, 15); CHECK(!ReadGameState(p.View()).placement.valid);
+    p.W32(rec + 0x54, 2); p.W32(kS + 0x24, 6); CHECK(!ReadGameState(p.View()).placement.valid);
+    Ram o = hotel_ram(0x021351A8, 3); o.W32(kS + 8, 1); CHECK(!ReadGameState(o.View()).placement.valid);   // an overlay is loaded: not this screen
+}
+static void catalogue_and_stat()
+{
+    Ram r = hotel_ram(0x0214C194, 2);
+    put_item_row(r, 106, 1991); put_item_row(r, 132, 2276);
+    // put_item_row names the row's item 463 + id; the rows hold id + 0x3B
+    r.W32(kS + 0x260, 0x33); r.W8(kS + 0x26C, 0); r.W8(kS + 0x264, 2);
+    r.W32(kS + 0x3C, 106 + 0x3B); r.W32(kS + 0x40, 132 + 0x3B);
+    r.W32(kS + 0x254, 1); r.W32(kS + 0x258, 1); r.W32(kS + 0x268, 0); r.W8(kS + 0x25D, 1); r.W8(kS + 0x26D, 0); r.W8(kS + 0x26E, 1);
+    r.W32(kGb + 0x215C, 1); r.W16(kGb + 0x28, 106);
+    r.W32(kS + 0x214, kS + 0x400); r.W8(kS + 0x404, 1);
+    CatalogueState c = ReadGameState(r.View()).catalogue;
+    CHECK(c.valid && c.shop == 0x33 && !c.vendor && c.items.size() == 2 && c.items[0].id == 106 && c.items[0].nameId == 569 && c.selected == 1 && !c.sell && c.payEnabled && !c.upEnabled && c.downEnabled && c.ring);
+    CHECK(c.owned.size() == 1 && c.owned[0].sellPrice == c.items[0].sellPrice && c.items[0].buyPrice == 2 * c.items[0].sellPrice && c.money == 2000);
+    r.W32(kS + 0x258, 2); r.W32(kS + 0x254, 0); c = ReadGameState(r.View()).catalogue; CHECK(c.valid && c.sell && c.selected == 0);
+    r.W32(kS + 0x254, 1); c = ReadGameState(r.View()).catalogue; CHECK(c.valid && c.selected == -1);   // past the owned list after a sale
+    r.W32(kS + 0x258, 3); CHECK(!ReadGameState(r.View()).catalogue.valid);
+    r.W32(kS + 0x258, 1); r.W32(kS + 0x40, 5 + 0x3B); CHECK(!ReadGameState(r.View()).catalogue.valid);   // the row names another item
+    r.W32(kS + 0x40, 132 + 0x3B); r.W8(kS + 0x264, 13); CHECK(!ReadGameState(r.View()).catalogue.valid);
+    r.W8(kS + 0x264, 2); r.W8(kS + 0x25D, 2); CHECK(!ReadGameState(r.View()).catalogue.valid);
+    r.W8(kS + 0x25D, 1);
+    // The keeper's record index: Sim record rows 0..56 (0x260 = 57 is past them).
+    r.W32(kS + 0x260, 56); CHECK(ReadGameState(r.View()).catalogue.valid);
+    r.W32(kS + 0x260, 57); CHECK(!ReadGameState(r.View()).catalogue.valid);
+    // A vendor: layout 1, six fixed items.
+    r.W32(kS + 0x260, 0x30); r.W8(kS + 0x26C, 1); r.W8(kS + 0x264, 6);
+    for (u32 i = 0; i < 6; i++) r.W32(kS + 0x3C + 4 * i, (i % 2 ? 132 : 106) + 0x3B);
+    c = ReadGameState(r.View()).catalogue;
+    CHECK(c.valid && c.vendor && c.shop == 0x30 && c.items.size() == 6 && c.items[5].id == 132);
+    r.W8(kS + 0x26C, 2); CHECK(!ReadGameState(r.View()).catalogue.valid);
+    // A negative record price (s16, as the game reads it): never ~131,000.
+    r.W8(kS + 0x26C, 1); r.W16(kRec + 0x12 * (132 + 0x3B) + 0xE, 0xFFF6);
+    c = ReadGameState(r.View()).catalogue;
+    CHECK(c.valid && c.items[1].sellPrice == -10 && c.items[1].buyPrice == -20);
+    CHECK(ReadItemRow(r.View(), 132).price == -10);
+
+    Ram s = hotel_ram(0x0214B5A4, 14);
+    s.W32(kS + 0x38, 2); s.W32(kS + 0x3C, 0);
+    s.W32(kGb + 0x68, 0); s.W32(kGb + 0x6C, 2); s.W32(kGb + 0x70, 29); s.W32(0x02121DD8 + 8, 30);
+    for (u32 i = 0; i < 5; i++) s.W8(kGb + 0x5B + i, 1 + i);
+    s.W32(kGb + 0x74, 22); s.W32(kGb + 0x78, 12); s.W32(kGb + 0x7C, 359); s.W32(kGb + 0x80, 2020);
+    StatState v = ReadGameState(s.View()).stat;
+    CHECK(v.valid && v.page == 2 && v.level == 2 && v.points == 29 && v.gaugeFrame == 19 && v.skills[4] == 5 && v.aliens == 22 && v.metal == 2020 && v.earned == 500 && v.spent == 300 && v.guestsStayed == 3);
+    s.W32(kGb + 0x6C, 3); CHECK(ReadGameState(s.View()).stat.gaugeFrame == 20);
+    s.W32(kS + 0x38, 5); CHECK(!ReadGameState(s.View()).stat.valid);
+    s.W32(kS + 0x38, 4); s.W8(kGb + 0x5B, 11); CHECK(!ReadGameState(s.View()).stat.valid);
+    s.W8(kGb + 0x5B, 1); s.W32(kGb + 0x68, 4); CHECK(!ReadGameState(s.View()).stat.valid);
+}
+static void hotel_random()
+{
+    std::mt19937 rng(23);
+    struct Kind { u32 vt; int ov; };
+    const Kind kinds[] = {{0x0214A804, 4}, {0x0214A9BC, 12}, {0x0214ABA8, 5}, {0x0214B1D0, 1}, {0x021351A8, -1}, {0x0214C194, 2}, {0x0214B5A4, 14}};
+    for (int round = 0; round < 1400; round++)
+    {
+        const Kind k = kinds[round % 7];
+        Ram r = hotel_ram(k.vt, k.ov);
+        for (u32 i = 0; i < 6; i++) r.W32(0x0211F9D4 + 4 * i, kGuestRooms[i]);
+        for (int i = 0; i < 300; i++)
+        {
+            const u32 areas[] = {kS, kS + 0x200, kGb + 0x41F8, kGb + 0x2BC0, kGb + 0x4400, kGb, kGb + 0x21DC, 0x0211F9EC, 0x0214ABBC, 0x0214A7A0};
+            r.W8(areas[rng() % 10] + rng() % 0x300, (u32)rng());
+        }
+        const GameState g = ReadGameState(r.View());   // no crash, no overrun; lists stay capped
+        CHECK(g.music.list.size() <= 27 && g.build.places.size() <= 33 && g.catalogue.items.size() <= 12 && g.catalogue.owned.size() <= 6 && g.placement.objects.size() <= 14);
+    }
+}
+
 int main()
 {
+    hotel_block();
+    registry_and_room();
+    music_build_placement();
+    catalogue_and_stat();
+    hotel_random();
     records();
     inventory();
     options();

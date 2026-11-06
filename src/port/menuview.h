@@ -44,7 +44,11 @@ MenuStep WaitStep(int frames);
 // or screens (the navigator's armed X and the focus's resume are kept by id).
 constexpr u32 kModInteract = 1u << 24, kModPockets = 2u << 24, kModGift = 3u << 24, kModGoals = 4u << 24,
               kModRelations = 5u << 24, kModPhone = 6u << 24, kModOptions = 7u << 24, kModPopup = 8u << 24,
-              kModNote = 9u << 24;
+              kModNote = 9u << 24, kModCatalogue = 10u << 24, kModBuild = 11u << 24,
+              kModCheckIn = 12u << 24, kModRoomInfo = 13u << 24, kModMusic = 14u << 24, kModStat = 15u << 24;
+
+// ViewItem::next's "no move that way".
+constexpr int kNoMove = -2;
 
 struct ViewItem
 {
@@ -68,7 +72,8 @@ struct ViewItem
     MenuAction xArm;
     // Explicit focus moves, item indices for Up, Down, Left, Right (-1: the nearest by geometry,
     // MenuNeighbour): a link the geometry would leave to chance (the panel's phone button above
-    // the tab's first row and back).
+    // the tab's first row and back). kNoMove: none that way (the focus stays: past a list's
+    // edge, the list's own scroll).
     int next[4] = {-1, -1, -1, -1};
     // The word A's hint shows while it has the focus (the game's own, e.g. the row's verb); empty:
     // the chip alone.
@@ -78,15 +83,17 @@ struct ViewItem
     bool closes = false;
 };
 
-// Screen-wide buttons (not the focused item's).
-enum class MenuButton { Left, Right, X, Y, Count };
+// Screen-wide buttons (not the focused item's). LB / RB: a screen's own pages (the stat panel's);
+// on the panel they stay its tabs.
+enum class MenuButton { Left, Right, X, Y, LB, RB, Count };
 
 struct MenuView
 {
     bool valid = false;               // false: the screen keeps milestone 1's composition and HotspotsFor
     std::vector<ViewItem> items;
-    // Left / Right, X, Y: performed whatever the focus (Interact: Left / Right the previous / next
-    // target); an empty Left / Right moves the focus instead.
+    // Left / Right, X, Y, LB / RB: performed whatever the focus (Interact: Left / Right the previous
+    // / next target; the stat panel: LB / RB its pages); an empty Left / Right moves the focus
+    // instead.
     MenuAction buttons[(int)MenuButton::Count];
     // B: empty closes the panel's menu (no tap), as before.
     MenuAction back;
@@ -95,6 +102,12 @@ struct MenuView
     int scrollGroup = 0;
     // The item focused when the screen opens (an index; -1: the first enabled one).
     int initial = -1;
+    // The screen's page (Build Rooms' list / its question). When it changes, a `question` page's
+    // focus starts on `initial` (never on the old index: a question must not open on Yes because
+    // the list's second row was focused), and any other page's goes back to the item it was left
+    // on (by id: the room the question was about), else `initial`.
+    int page = 0;
+    bool question = false;
     // A selection the game owns (Relationships' Sim, the phone's row): when >= 0 and enabled, the
     // focus is held on that item while it is in the list (scrollGroup), and every Up / Down there
     // performs scrollUp / scrollDown (the game's own buttons move its selection; the rebuilt view
@@ -132,7 +145,8 @@ int MenuFirst(const MenuView& v);
 // degrees of it, nearest first (greyed rows are skipped as if absent); `from` when none.
 int MenuNeighbour(const MenuView& v, int from, int dx, int dy);
 // The focused item after a Up (0), Down (1), Left (2) or Right (3) press: the item's explicit
-// `next` when it is focusable, else MenuNeighbour; `from` when nothing lies that way.
+// `next` when it is focusable (kNoMove: `from`), else MenuNeighbour; `from` when nothing lies
+// that way.
 int MenuMove(const MenuView& v, int from, int dir);
 // The focus after a rebuild: the enabled item with `id` when there is one; else, `old` clamped
 // to the list, the enabled item at that index (the one that took a removed item's place), else

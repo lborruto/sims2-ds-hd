@@ -1,0 +1,2 @@
+# BD-list: the down arrow (the list moves by a room)
+10 6 touch 145 172

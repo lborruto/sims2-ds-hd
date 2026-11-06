@@ -80,6 +80,8 @@ void AddItemCell(Composition& c, Rect r, bool focused, bool selected, bool empty
 // A game sprite (descriptor desc, its frame) scale times, centred in box (an image item);
 // opacity: ImageItem's fill (0 opaque).
 void AddSpriteIcon(Composition& c, IconCache* icons, int desc, int frame, int scale, Rect box, u32 opacity = 0);
+// The same from a slot item's own tiles / descriptor / palette (the Large Plant's palette is not 2484).
+void AddSpriteIcon(Composition& c, IconCache* icons, const ItemRec& item, int scale, Rect box, u32 opacity = 0);
 
 // An item's description fitted to a box: the size shrunk from kPkDescSize to kPkDescMin until
 // its lines fit the height. fits: they did at kPkDescMin.

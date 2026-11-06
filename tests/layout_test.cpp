@@ -7,6 +7,7 @@
 #include <tuple>
 #include <cstdio>
 #include <cstdlib>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -15,6 +16,12 @@
 #include "console.h"
 #include "hotspots.h"
 #include "layout.h"
+#include "port/build.h"
+#include "port/checkin.h"
+#include "port/roominfo.h"
+#include "port/music.h"
+#include "port/statpanel.h"
+#include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/gift.h"
 #include "port/goals.h"
@@ -437,7 +444,10 @@ int main()
     {
         const Composition m = BuildConsole({sc, Tab::None}, false, -1, SW, SH);
         CHECK(m.pieces.size() == 2 && !m.pieces[0].touch && m.pieces[1].src == Src::Bottom && m.pieces[1].to.x == kMenuTo.x && m.pieces[1].to.y == kMenuTo.y && m.pieces[1].to.w == SW * 3);
-        CHECK(m.overlays.size() == 2 && m.overlays[0].argb == kDimArgb && m.overlays[1].argb == kFrameArgb && m.overlays[1].to.x == kMenuTo.x - 6);
+        // (and the cursor's hint box under it, at the right clear of the HD status bar: how to leave)
+        CHECK(m.overlays.size() == 4 && m.overlays[0].argb == kDimArgb && m.overlays[1].argb == kFrameArgb && m.overlays[1].to.x == kMenuTo.x - 6);
+        const Rect hb = m.overlays[2].to;
+        CHECK(hb.x >= 720 && hb.x + hb.w <= kConsoleW && hb.y >= kMenuTo.y + kMenuTo.h && hb.y + hb.h <= kConsoleH);
     }
     // The menu: the dimmed world swallows clicks and the camera; the touch screen 3x is the stylus.
     for (ScreenState s : {ScreenState {Screen::Panel, Tab::Goals}, ScreenState {Screen::Popup, Tab::None}, ScreenState {Screen::Gift, Tab::None}})
@@ -917,6 +927,680 @@ int main()
             CHECK(!GiftMenuViewOf(gs, bad).valid && PanelMenuViewOf(pk, bad).valid);
             CHECK(!GiftMenuView(gs, &bad, &rom).valid); // no strings: milestone 1's
         }
+        // The shop's catalogue (port/catalogue.h) on made-up lists: the store's twelve items at
+        // every scroll, 0-6 owned, Buy or Sell or nothing selected, money enough or not; a
+        // vendor's six. Cells past the list and empty places disabled; Pay always focusable, its
+        // tap only when the game would pay (the money, the pockets' room, the quest items, a
+        // vendor's sale); every enabled item reachable; the game's arrows as the list's scroll;
+        // A on a cell / place its own tap, B the X, never replayed. Every item inside the panel,
+        // layers ascending, the mouse pieces round trip and land on the game's own hit boxes.
+        auto shop = [](bool vendor, int count, int scroll, int owned, bool sell, int sel, int money) {
+            GameState h;
+            h.valid = true;
+            h.screen = GScreen::Catalogue;
+            CatalogueState& ca = h.catalogue;
+            ca.valid = true;
+            ca.shop = vendor ? 0x30 : kCaStore;
+            ca.vendor = vendor;
+            for (int i = 0; i < count; i++) ca.items.push_back({100 + i + 0x3B, 100 + i, 563 + i, 922 + i, 1991, 2 * (50 + 10 * i), 50 + 10 * i});
+            for (int i = 0; i < owned; i++) ca.owned.push_back({i == 1 ? 0x22 + 0x3B : 106 + 0x3B, i == 1 ? 0x22 : 106, 569, 928, 1991, 160, 80});
+            ca.scroll = scroll;
+            ca.sell = sell;
+            ca.selected = sel;
+            ca.money = money;
+            ca.payEnabled = true;
+            ca.upEnabled = !vendor && scroll > 0;
+            ca.downEnabled = !vendor && scroll < count - 3;
+            return h;
+        };
+        const ScreenState cs {Screen::Catalogue, Tab::None};
+        for (bool vendor : {false, true})
+            for (int scroll : {0, 3, 6, 9})
+                for (int owned : {0, 2, 6})
+                    for (int mode : {0, 1, 2}) // nothing selected, Buy, Sell
+                        for (int money : {0, 5000})
+                        {
+                            if (vendor && (scroll > 0 || owned > 0 || mode == 2)) continue;
+                            const int count = vendor ? 6 : 12;
+                            const bool sell = mode == 2;
+                            const int sel = mode == 0 ? -1 : sell ? std::min(1, owned - 1) : scroll + 1;
+                            if (sell && owned == 0) continue;
+                            const GameState h = shop(vendor, count, scroll, owned, sell, sel, money);
+                            const MenuView v = CatalogueViewOf(cs, h);
+                            const size_t n = vendor ? 7 : 13;
+                            CHECK(v.valid && v.own && !v.replay && v.backCloses && v.items.size() == n && AllReachable(v));
+                            for (size_t a = 0; a < v.items.size(); a++)
+                                for (size_t b = a + 1; b < v.items.size(); b++) CHECK(v.items[a].id != v.items[b].id);
+                            CHECK(v.back.size() == 1 && v.back[0].x == kCaCloseX && v.back[0].y == kCaCloseY);
+                            for (int c = 0; c < 6; c++)
+                            {
+                                CHECK(v.items[c].enabled == (scroll + c < count) && v.items[c].group == v.scrollGroup);
+                                if (!v.items[c].enabled) continue;
+                                const int x = vendor ? kCaVendorCellX0 + (c % 2) * kCaVendorCellDx : kCaStoreCellX0 + (c % 3) * kCaStoreCellDx;
+                                const int y = kCaCellY0 + (c / (vendor ? 2 : 3)) * kCaCellDy;
+                                CHECK(v.items[c].action.size() == 1 && v.items[c].action[0].x == x && v.items[c].action[0].y == y);
+                            }
+                            // Pay: focusable always; its tap only when the game would pay.
+                            const ViewItem& pay = v.items[6];
+                            CHECK(pay.enabled && pay.id == kCaPayId);
+                            bool pays = false;
+                            if (mode == 1) pays = money >= h.catalogue.items[sel].buyPrice && owned < 6;
+                            if (mode == 2) pays = sel != 1; // (place 1 holds a quest item: the game will not buy it back)
+                            CHECK(CataloguePays(h.catalogue) == pays && pay.action.empty() == !pays);
+                            if (pays) CHECK(pay.action.size() == 1 && pay.action[0].x == (vendor ? kCaVendorPayX : kCaPayX) && pay.action[0].y == kCaPayY);
+                            for (int i = 0; !vendor && i < 6; i++)
+                            {
+                                CHECK(v.items[7 + i].enabled == (i < owned));
+                                if (i < owned) CHECK(v.items[7 + i].action.size() == 1 && v.items[7 + i].action[0].x == kCaOwnedX0 + (i % 2) * kCaOwnedDx);
+                            }
+                            // The game's arrows: the list's scroll; Right from the grid's last column: Pay.
+                            CHECK(v.scrollUp.empty() == !h.catalogue.upEnabled && v.scrollDown.empty() == !h.catalogue.downEnabled);
+                            if (!v.scrollDown.empty()) CHECK(v.scrollDown[0].x == kCaDownX && v.scrollDown[0].y == kCaArrowY);
+                            if (!v.scrollUp.empty()) CHECK(v.scrollUp[0].x == kCaUpX);
+                            CHECK(MenuMove(v, vendor ? 1 : 2, 3) == 6 && MenuMove(v, 0, 0) == 0 && MenuMove(v, 6, 0) == 6 && MenuMove(v, 6, 1) == 6);
+                            if (v.items[5].enabled) CHECK(MenuMove(v, 5, 1) == 5); // (past the last row: the game's scroll, never Pay)
+                            if (!vendor && owned > 0) CHECK(MenuMove(v, 7, 2) == 6);
+                            if (mode == 1) CHECK(MenuFirst(v) == 1);
+                            if (mode == 2) CHECK(MenuFirst(v) == 7 + sel);
+                            // The drawing, for a few focuses.
+                            for (int focus : {-1, 0, 6, 7})
+                            {
+                                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                                Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                                world.touch = false;
+                                comp.pieces.push_back(world);
+                                BuildCatalogue(comp, v, focus, h, rom, nullptr);
+                                int layer = 0;
+                                for (const ui::UiItem& u : comp.ui)
+                                {
+                                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                                    if (u.kind == ui::UiItem::Image) continue;
+                                    CHECK(u.layer >= layer);
+                                    layer = u.layer;
+                                }
+                                if (focus != 0 || money != 5000 || (owned != 2 && !vendor)) continue;
+                                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                    TestConsoleRoundtrip(cs, false, 256, 192, o.first, o.second, true, &comp);
+                                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                                int tx, ty;
+                                // Every cell, place and Pay lands in the game's hit box around its point.
+                                for (int i = 0; i < (int)v.items.size(); i++)
+                                {
+                                    if (v.items[i].action.empty()) continue;
+                                    const Rect r = v.items[i].rect;
+                                    CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - v.items[i].action[0].x) <= 15 && std::abs(ty - v.items[i].action[0].y) <= 15);
+                                }
+                                const CatalogueGeometry g = CatalogueLayout(vendor);
+                                if (!vendor)
+                                {
+                                    CHECK(TouchFromComposition(comp, fit, g.down.x + g.down.w / 2.0f, g.down.y + g.down.h / 2.0f, tx, ty));
+                                    CHECK(tx >= 62 && tx <= 92 && ty >= 153 && ty <= 183);
+                                    CHECK(TouchFromComposition(comp, fit, g.up.x + g.up.w / 2.0f, g.up.y + g.up.h / 2.0f, tx, ty));
+                                    CHECK(tx >= 30 && tx <= 60 && ty >= 153 && ty <= 183);
+                                }
+                                CHECK(TouchFromComposition(comp, fit, kCaClose.x + kCaClose.w / 2.0f, kCaClose.y + kCaClose.h / 2.0f, tx, ty));
+                                CHECK(tx >= 220 && tx <= 250 && ty >= 4 && ty <= 34);
+                                CHECK(!TouchFromComposition(comp, fit, kCaTitle.x + 10.5f, kCaTitle.y + 10.5f, tx, ty)); // the title: nothing
+                                CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty));                          // the dimmed world: nothing
+                            }
+                        }
+        {
+            // A vendor never buys back; nothing selected (just after a sale): Pay does nothing;
+            // the pockets full: no purchase; no view off its screen, without RAM's part or the strings.
+            GameState h = shop(true, 6, 0, 0, true, 0, 100);
+            h.catalogue.owned.push_back({106 + 0x3B, 106, 569, 928, 1991, 160, 80});
+            CHECK(!CataloguePays(h.catalogue));
+            h = shop(false, 12, 0, 3, true, 3, 100);
+            CHECK(!CataloguePays(h.catalogue) && CatalogueViewOf(cs, h).items[6].action.empty());
+            h = shop(false, 12, 0, 6, false, 0, 99999);
+            CHECK(!CataloguePays(h.catalogue));
+            h = shop(false, 12, 0, 5, false, 0, 99999);
+            CHECK(CataloguePays(h.catalogue));
+            h.catalogue.money = h.catalogue.items[0].buyPrice - 1;
+            CHECK(!CataloguePays(h.catalogue));
+            CHECK(!CatalogueViewOf({Screen::Panel, Tab::Interact}, h).valid);
+            h.catalogue.valid = false;
+            CHECK(!CatalogueViewOf(cs, h).valid);
+            h.catalogue.valid = true;
+            CHECK(!CatalogueView(cs, &h, &rom).valid); // no strings: milestone 1's
+            // Every id distinct, where the first ids met: owned place 0 holding item 1 against Pay,
+            // a cell's row against an owned item id at the same index.
+            {
+                GameState q = shop(false, 12, 0, 2, false, 0, 100);
+                q.catalogue.owned[0].id = 1;
+                q.catalogue.items[0].row = 1 + 1;
+                q.catalogue.items[1].row = q.catalogue.owned[1].id + 1; // (the first ids: 0x100 + 1 + row << 8 == 0x200 + 1 + id << 8)
+                const MenuView w = CatalogueViewOf(cs, q);
+                for (size_t a = 0; a < w.items.size(); a++)
+                    for (size_t b = a + 1; b < w.items.size(); b++) CHECK(w.items[a].id != w.items[b].id);
+                CHECK(w.items[kCaPayIndex].id == kCaPayId && w.items[kCaOwned0].id != kCaPayId);
+            }
+            // A price of 0 (or less) is never paid: the port would spend a sum it does not show.
+            {
+                GameState q = shop(false, 12, 0, 0, false, 0, 100);
+                q.catalogue.items[0].buyPrice = 0;
+                CHECK(!CataloguePays(q.catalogue) && CatalogueViewOf(cs, q).items[kCaPayIndex].action.empty());
+                q.catalogue.items[0].buyPrice = -20;
+                CHECK(!CataloguePays(q.catalogue));
+            }
+            // The cells' A word is the mode their tap sets (none without the strings).
+            CHECK(CatalogueViewOf(cs, shop(false, 12, 0, 1, false, 0, 100)).items[0].word.empty());
+            // The ids: a re-rolled list is other items (the focus does not stay on a new item by its place).
+            GameState k = shop(false, 12, 0, 0, false, 0, 100);
+            const u32 before = CatalogueViewOf(cs, k).items[0].id;
+            k.catalogue.items[0].row += 1;
+            CHECK(CatalogueViewOf(cs, k).items[0].id != before);
+        }
+        // Build Rooms (port/build.h) on made-up lists of 0-11 rooms at every scroll, money enough or
+        // not, and page 1 for each room: the rows the game shows (three from its scroll), each
+        // focusable, A its knob only when the money covers the permit; the game's arrows as the
+        // list's scroll while it can move; B the X (the list) or the cross (page 1), the tick the
+        // first focus there; never replayed. Every item inside the panel, layers ascending, the
+        // mouse pieces round trip and land on the game's own buttons.
+        {
+            auto build = [](int count, int scroll, int page, int chosen, int money) {
+                GameState h;
+                h.valid = true;
+                h.screen = GScreen::Build;
+                BuildState& b = h.build;
+                b.valid = true;
+                const int places[] = {0, 1, 8, 12, 15, 16, 18, 21, 26, 28, 31};
+                const int prices[] = {2000, 1000, 1500, 2500, 1000, 1500, 1000, 3500, 1000, 2000, 2500};
+                for (int i = 0; i < count; i++) b.places.push_back({places[i], prices[i], 0x43 + 2, prices[i] <= money});
+                b.scroll = scroll;
+                b.page = page;
+                b.chosen = chosen;
+                b.money = money;
+                return h;
+            };
+            const ScreenState bs {Screen::Build, Tab::None};
+            for (int count : {0, 1, 2, 3, 4, 11})
+                for (int money : {0, 2000, 999999})
+                    for (int scroll = 0; scroll <= std::max(0, count - 3); scroll++)
+                        for (int chosen = -1; chosen < count; chosen++)
+                        {
+                            const int page = chosen < 0 ? 0 : 1;
+                            if (page == 1 && scroll > 0) continue; // (page 1 does not depend on the scroll)
+                            const GameState h = build(count, scroll, page, chosen, money);
+                            const MenuView v = BuildRoomsViewOf(bs, h);
+                            CHECK(v.valid && v.own && !v.replay && v.back.size() == 1);
+                            if (page == 0)
+                            {
+                                const int shown = std::min(3, count - scroll);
+                                CHECK((int)v.items.size() == shown && v.backCloses && v.back[0].x == kBdCloseX && v.back[0].y == kBdCloseY);
+                                CHECK(AllReachable(v));
+                                for (int i = 0; i < shown; i++)
+                                {
+                                    const BuildEntry& e = h.build.places[scroll + i];
+                                    CHECK(v.items[i].enabled && v.items[i].id == kBdRowId + (u32)e.place && v.items[i].group == v.scrollGroup);
+                                    CHECK(v.items[i].action.empty() == !e.affordable);
+                                    if (e.affordable) CHECK(v.items[i].action.size() == 1 && v.items[i].action[0].x == kBdRowX && v.items[i].action[0].y == kBdRowY0 + i * kBdRowDy);
+                                    CHECK(MenuMove(v, i, 2) == i && MenuMove(v, i, 3) == i);
+                                }
+                                if (shown > 0) CHECK(MenuMove(v, 0, 0) == 0 && MenuMove(v, shown - 1, 1) == shown - 1);
+                                if (shown > 1) CHECK(MenuMove(v, 0, 1) == 1 && MenuMove(v, 1, 0) == 0);
+                                CHECK(v.scrollUp.empty() == (scroll == 0) && v.scrollDown.empty() == (scroll + 3 >= count));
+                                if (!v.scrollUp.empty()) CHECK(v.scrollUp[0].x == kBdUpX && v.scrollUp[0].y == kBdArrowY);
+                                if (!v.scrollDown.empty()) CHECK(v.scrollDown[0].x == kBdDownX && v.scrollDown[0].y == kBdArrowY);
+                            }
+                            else
+                            {
+                                CHECK(v.items.size() == 2 && !v.backCloses && v.initial == 0 && MenuFirst(v) == 0);   // (the cross first: a spend is never one press away)
+                                CHECK(v.items[1].action.size() == 1 && v.items[1].action[0].x == kBdTickX && v.items[1].action[0].y == kBdConfirmY);
+                                CHECK(v.items[0].action[0].x == kBdCrossX && v.back[0].x == kBdCrossX && v.back[0].y == kBdConfirmY);
+                                CHECK(MenuMove(v, 1, 2) == 0 && MenuMove(v, 0, 3) == 1 && MenuMove(v, 1, 0) == 1);
+                            }
+                            for (int focus : {-1, 0, 1, 2})
+                            {
+                                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                                Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                                world.touch = false;
+                                comp.pieces.push_back(world);
+                                BuildBuildRooms(comp, v, focus, h, rom, nullptr);
+                                CHECK(!comp.ui.empty());
+                                int layer = 0;
+                                for (const ui::UiItem& u : comp.ui)
+                                {
+                                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                                    if (u.kind == ui::UiItem::Image) continue;
+                                    CHECK(u.layer >= layer);
+                                    layer = u.layer;
+                                }
+                                if (focus != 0 || money != 2000 || scroll != 0 || (chosen > 1)) continue;
+                                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                    TestConsoleRoundtrip(bs, false, 256, 192, o.first, o.second, true, &comp);
+                                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                                int tx, ty;
+                                // Every row, the cross and the tick land within the game's circle around its point.
+                                for (const ViewItem& it : v.items)
+                                {
+                                    const Rect r = it.rect;
+                                    CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                                    const int px = page == 0 ? kBdRowX : it.id == kBdTickId ? kBdTickX : kBdCrossX;
+                                    const int py = page == 0 ? kBdRowY0 + (r.y - BuildRowRect(0).y) / (BuildRowRect(1).y - BuildRowRect(0).y) * kBdRowDy : kBdConfirmY;
+                                    CHECK(std::abs(tx - px) <= 15 && std::abs(ty - py) <= 15);
+                                }
+                                if (page == 0)
+                                {
+                                    CHECK(TouchFromComposition(comp, fit, kBdUp.x + kBdUp.w / 2.0f, kBdUp.y + kBdUp.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - kBdUpX) <= 15 && std::abs(ty - kBdArrowY) <= 15);
+                                    CHECK(TouchFromComposition(comp, fit, kBdDown.x + kBdDown.w / 2.0f, kBdDown.y + kBdDown.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - kBdDownX) <= 15 && std::abs(ty - kBdArrowY) <= 15);
+                                }
+                                CHECK(TouchFromComposition(comp, fit, kBdClose.x + kBdClose.w / 2.0f, kBdClose.y + kBdClose.h / 2.0f, tx, ty));
+                                CHECK(std::abs(tx - kBdCloseX) <= 15 && std::abs(ty - kBdCloseY) <= 15);
+                                CHECK(!TouchFromComposition(comp, fit, kBdTitle.x + 10.5f, kBdTitle.y + 10.5f, tx, ty)); // the title: nothing
+                                CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty));                          // the dimmed world: nothing
+                            }
+                        }
+            // No view off its screen, without RAM's part or the strings; a row's id follows its room.
+            GameState h = build(4, 0, 0, -1, 2000);
+            CHECK(!BuildRoomsViewOf({Screen::Panel, Tab::Interact}, h).valid);
+            CHECK(!BuildRoomsView(bs, &h, &rom).valid); // no strings: milestone 1's
+            const u32 first = BuildRoomsViewOf(bs, h).items[0].id;
+            h.build.scroll = 1;
+            CHECK(BuildRoomsViewOf(bs, h).items[0].id != first);
+            h.build.valid = false;
+            CHECK(!BuildRoomsViewOf(bs, h).valid);
+        }
+        // The Registry / a guest's check-in and room info (port/checkin.h, port/roominfo.h) on made-up
+        // hotels: the five rooms built or not, vacant or occupied, the Penthouse's flag; both modes.
+        // A on a room only where the game takes it (the Registry: built; a check-in: built and
+        // vacant), its row button; B the X; the check-in never replayed, closing (the speech
+        // follows). Room info: a line per line the game shows (6 vacant, 8 occupied), A its tap,
+        // each tap read back as the hint the game opens there (RoomInfoHintAt); a hint up: one
+        // Close item, A and B a tap away from every line; its string unknown: no view. Every id
+        // distinct (within and across both), every item reachable, inside the panel, layers
+        // ascending, the mouse round trips onto the game's buttons and lines.
+        {
+            static u32 fakeBottom[SW * SH];
+            for (int i = 0; i < SW * SH; i++) fakeBottom[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+            const ScreenState us {Screen::Unknown, Tab::None};
+            const int places[5] = {29, 8, 15, 18, 20};
+            auto hotel = [&](int mode, int mask, int occupiedMask, bool flag) {
+                GameState h;
+                h.valid = true;
+                h.screen = GScreen::Unknown;
+                CheckInState& ci = h.checkIn;
+                ci.valid = true;
+                ci.mode = mode;
+                ci.guest = mode == 0 ? 7 : -1;
+                ci.score = 42;
+                for (int i = 0; i < 5; i++)
+                {
+                    RegistryRow& r = ci.rows[i];
+                    r.place = places[i];
+                    r.built = (mask >> i) & 1;
+                    r.occupant = r.built && ((occupiedMask >> i) & 1) ? 3 + i : -1;
+                    r.infoOk = r.built && (i != 4 || flag);
+                    r.available = r.infoOk && r.occupant < 0;
+                }
+                return h;
+            };
+            std::set<u32> allIds;
+            for (int mode : {0, 1})
+                for (int mask : {0, 1, 0x13, 0x1F})
+                    for (int occ : {0, 1, 0x1E})
+                        for (bool flag : {false, true})
+                        {
+                            const GameState h = hotel(mode, mask, occ, flag);
+                            const MenuView v = CheckInViewOf(us, h);
+                            CHECK(v.valid && v.own && v.items.size() == 5 && v.replay == (mode == 1) && v.backCloses);
+                            CHECK(v.back.size() == 1 && v.back[0].x == kCiCloseX && v.back[0].y == kCiCloseY);
+                            CHECK(AllReachable(v) && MenuFocusable(v, MenuFirst(v)));
+                            std::set<u32> ids;
+                            for (int i = 0; i < 5; i++)
+                            {
+                                const RegistryRow& r = h.checkIn.rows[i];
+                                const ViewItem& it = v.items[i];
+                                ids.insert(it.id);
+                                allIds.insert(it.id);
+                                CHECK(it.enabled && (it.id >> 24) == (kModCheckIn >> 24));
+                                const bool takes = mode == 1 ? r.infoOk : r.available;
+                                CHECK(it.action.empty() == !takes && it.closes == (takes && mode == 0));
+                                if (takes) CHECK(it.action.size() == 1 && it.action[0].x == kCiRowX && it.action[0].y == kCiRowY0 + i * kCiRowDy);
+                                CHECK(MenuMove(v, i, 2) == i && MenuMove(v, i, 3) == i);
+                                if (i > 0) CHECK(MenuMove(v, i, 0) == i - 1);
+                            }
+                            CHECK(ids.size() == 5 && MenuMove(v, 0, 0) == 0 && MenuMove(v, 4, 1) == 4);
+                            if (mask == 0x13 && occ == 1 && flag) CHECK(MenuFirst(v) == (mode == 1 ? 0 : 1)); // (the first room it takes)
+                            for (int focus : {-1, 0, 2, 4})
+                            {
+                                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                                Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                                world.touch = false;
+                                comp.pieces.push_back(world);
+                                BuildCheckIn(comp, v, focus, h, rom, nullptr, fakeBottom);
+                                CHECK(!comp.ui.empty());
+                                int layer = 0, crops = 0;
+                                for (const ui::UiItem& u : comp.ui)
+                                {
+                                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                                    if (u.kind == ui::UiItem::Image) { crops++; continue; }
+                                    CHECK(u.layer >= layer);
+                                    layer = u.layer;
+                                }
+                                // An occupied room's portrait: the game's own row button, live (2x in its row; 3x focused).
+                                int occupied = 0;
+                                for (const RegistryRow& r : h.checkIn.rows) occupied += r.occupant >= 0;
+                                const int f = focus >= 0 ? focus : 0;
+                                CHECK(crops == occupied + (h.checkIn.rows[f].occupant >= 0));
+                                if (focus != 0 || mask != 0x1F || occ != 1 || flag) continue;
+                                for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                    TestConsoleRoundtrip(us, false, 256, 192, o.first, o.second, true, &comp);
+                                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                                int tx, ty;
+                                for (int i = 0; i < 5; i++)
+                                {
+                                    const Rect r = v.items[i].rect;
+                                    CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - kCiRowX) <= 15 && std::abs(ty - (kCiRowY0 + i * kCiRowDy)) <= 15);
+                                }
+                                CHECK(TouchFromComposition(comp, fit, kCiClose.x + kCiClose.w / 2.0f, kCiClose.y + kCiClose.h / 2.0f, tx, ty));
+                                CHECK(std::abs(tx - kCiCloseX) <= 15 && std::abs(ty - kCiCloseY) <= 15);
+                                CHECK(!TouchFromComposition(comp, fit, kCiInfo.x + 10.5f, kCiInfo.y + 200.5f, tx, ty)); // the focused room: nothing
+                                CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty));                    // the dimmed world: nothing
+                            }
+                        }
+            // No view off its screen, without RAM's part, with a mode the game has not, or the strings.
+            GameState h = hotel(1, 1, 0, false);
+            CHECK(!CheckInViewOf({Screen::Panel, Tab::Interact}, h).valid);
+            CHECK(!CheckInView(us, &h, &rom).valid); // no strings: milestone 1's
+            h.checkIn.mode = 2;
+            CHECK(!CheckInViewOf(us, h).valid);
+            h.checkIn.valid = false;
+            CHECK(!CheckInViewOf(us, h).valid);
+
+            // Room info, vacant and occupied, a hint up or not.
+            auto info = [&](bool occupied, bool hint, int hintId) {
+                GameState g;
+                g.valid = true;
+                g.screen = GScreen::Unknown;
+                RoomInfoState& ri = g.roomInfo;
+                ri.valid = true;
+                ri.place = 29;
+                ri.occupied = occupied;
+                ri.occupant = occupied ? 7 : 45;
+                ri.moodId = occupied ? 2087 : -1;
+                ri.checkOutKnown = occupied;
+                ri.month = 1; ri.day = 3; ri.days = 2;
+                ri.baseValue = 400; ri.serviceCharge = 2; ri.scoreBonus = 0; ri.total = 422;
+                ri.hint = hint;
+                ri.hintId = hintId;
+                return g;
+            };
+            for (bool occupied : {false, true})
+            {
+                const GameState g = info(occupied, false, -1);
+                const MenuView v = RoomInfoViewOf(us, g);
+                const int n = occupied ? 8 : 6;
+                CHECK(v.valid && v.own && !v.popup && (int)v.items.size() == n && !v.backCloses && v.back.size() == 1);
+                CHECK(v.back[0].x == kRiCloseX && v.back[0].y == kRiCloseY && RoomInfoHintAt(kRiCloseX, kRiCloseY, occupied) < 0);
+                CHECK(AllReachable(v) && MenuFirst(v) == 1);
+                std::set<int> hints;
+                std::set<u32> ids = allIds; // (the Registry's ids)
+                for (int k = 0; k < n; k++)
+                {
+                    const ViewItem& it = v.items[k];
+                    CHECK(ids.insert(it.id).second); // (distinct from each other and the Registry's)
+                    CHECK(it.enabled && it.action.size() == 1 && it.action[0].x == kRiLineX);
+                    const int hid = RoomInfoHintAt(it.action[0].x, it.action[0].y, occupied);
+                    CHECK(hid >= 2594 && hid <= 2603 && hints.insert(hid).second);
+                    CHECK(MenuMove(v, k, 2) == k && MenuMove(v, k, 3) == k);
+                    if (k > 0) CHECK(MenuMove(v, k, 0) == k - 1);
+                }
+                // (the ids carry the room: another room's line is another item; a vacant room's lines close up)
+                CHECK(v.items[1].id == RoomInfoLineId(29, 1) && v.items[1].id != RoomInfoLineId(8, 1));
+                for (int k = 1; k < n; k++) CHECK(v.items[k].rect.y == v.items[k - 1].rect.y + 62 || k == 1);
+                CHECK(v.items[1].rect.y == RoomInfoLineRect(1).y && (occupied || v.items[2].rect.y == RoomInfoLineRect(1).y + 62));
+                CHECK(hints.count(occupied ? 2595 : 2596) == 1 && hints.count(2601) == (size_t)occupied && hints.count(2600) == 1);
+                CHECK(RoomInfoHintAt(kRiAwayX, kRiAwayY, occupied) < 0 && RoomInfoHintAt(40, 63, false) < 0);
+                for (int focus : {-1, 0, 1, n - 1})
+                {
+                    Composition comp {kConsoleW, kConsoleH, {}, {}};
+                    Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                    world.touch = false;
+                    comp.pieces.push_back(world);
+                    BuildRoomInfo(comp, v, focus, g, rom, nullptr, fakeBottom);
+                    int layer = 0, crops = 0;
+                    for (const ui::UiItem& u : comp.ui)
+                    {
+                        CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                              u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                        if (u.kind == ui::UiItem::Image) { crops++; continue; }
+                        CHECK(u.layer >= layer);
+                        layer = u.layer;
+                    }
+                    CHECK(crops == 1); // (the portrait: the occupant's, or the concierge's when vacant)
+                    if (focus != 1) continue;
+                    for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                        TestConsoleRoundtrip(us, false, 256, 192, o.first, o.second, true, &comp);
+                    const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                    int tx, ty;
+                    for (const ViewItem& it : v.items)
+                    {
+                        const Rect r = it.rect;
+                        CHECK(TouchFromComposition(comp, fit, r.x + r.w / 2.0f, r.y + r.h / 2.0f, tx, ty));
+                        CHECK(RoomInfoHintAt(tx, ty, occupied) == RoomInfoHintAt(it.action[0].x, it.action[0].y, occupied));
+                    }
+                    CHECK(TouchFromComposition(comp, fit, kRiClose.x + kRiClose.w / 2.0f, kRiClose.y + kRiClose.h / 2.0f, tx, ty));
+                    CHECK(std::abs(tx - kRiCloseX) <= 15 && std::abs(ty - kRiCloseY) <= 15);
+                    CHECK(!TouchFromComposition(comp, fit, kRiPortrait.x + 10.5f, kRiPortrait.y + 10.5f, tx, ty)); // the portrait: nothing
+                }
+                // The hint box: one Close, A and B a tap on no line; over the lines (no focus there).
+                const GameState gh = info(occupied, true, occupied ? 2601 : 2596);
+                const MenuView hv = RoomInfoViewOf(us, gh);
+                CHECK(hv.valid && hv.own && hv.popup && hv.items.size() == 1 && hv.items[0].id == kRiHintCloseId && ids.count(kRiHintCloseId) == 0);
+                CHECK(hv.items[0].action.size() == 1 && RoomInfoHintAt(hv.items[0].action[0].x, hv.items[0].action[0].y, occupied) < 0 && hv.back == hv.items[0].action);
+                CHECK(hv.items[0].action[0].x != kRiCloseX && RoomHintUp(gh) && !RoomHintUp(g));
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                BuildRoomInfo(comp, hv, 0, gh, rom, nullptr, fakeBottom);
+                const size_t beneath = comp.ui.size();
+                BuildRoomHint(comp, hv, 0, gh, rom);
+                CHECK(comp.ui.size() > beneath);
+                for (size_t i = beneath; i < comp.ui.size(); i++) CHECK(comp.ui[i].layer >= kPopLayer);
+                for (const ui::UiItem& u : comp.ui) CHECK(u.kind != ui::UiItem::Image || u.to.x + u.to.w <= kPopBox.x); // (the portrait under the box: gone)
+                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                int tx, ty;
+                CHECK(TouchFromComposition(comp, fit, kPopClose.x + kPopClose.w / 2.0f, kPopClose.y + kPopClose.h / 2.0f, tx, ty));
+                CHECK(RoomInfoHintAt(tx, ty, occupied) < 0 && std::abs(tx - kRiAwayX) <= 12 && std::abs(ty - kRiAwayY) <= 12);
+                CHECK(!RoomInfoViewOf(us, info(occupied, true, -1)).valid); // (which hint unknown: milestone 1's)
+            }
+            GameState g = info(true, false, -1);
+            CHECK(!RoomInfoViewOf({Screen::Panel, Tab::Interact}, g).valid);
+            CHECK(!RoomInfoView(us, &g, &rom).valid); // no strings: milestone 1's
+            g.roomInfo.place = 40;
+            CHECK(!RoomInfoViewOf(us, g).valid);
+        }
+        // The music panel and the stat panel (port/music.h, port/statpanel.h) on made-up states.
+        // Music: lists of 0, 1, 5, 21 and 27 songs at every scroll, the song playing in view, out
+        // of it or none: a row per row the game shows, A its play button but on the song playing
+        // (nothing), Up / Down past the rows the game's arrows only while it can scroll, B the X;
+        // ids distinct. The stat panel: every page and transition: Main's four buttons (A their
+        // taps), a page's one item (its tab, Main's button's id for it), the game's way between
+        // pages (StatPageAction: a wait first while the old page fades out; the X, a wait and
+        // the button from a page), B the X (closing from Main only). Both: every item reachable,
+        // inside the panel, layers ascending, the mouse round trips onto the game's buttons.
+        {
+            const ScreenState us {Screen::Unknown, Tab::None};
+            auto inside = [&](const Composition& comp) {
+                int layer = 0;
+                for (const ui::UiItem& u : comp.ui)
+                {
+                    CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
+                          u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
+                    if (u.kind == ui::UiItem::Image) continue;
+                    CHECK(u.layer >= layer);
+                    layer = u.layer;
+                }
+            };
+            auto lands = [&](const Composition& comp, Rect hd, int x, int y, int tol) {
+                const CanvasFit fit = CanvasFit::For(comp.cw, comp.ch, 1280, 720);
+                int tx, ty;
+                CHECK(TouchFromComposition(comp, fit, hd.x + hd.w / 2.0f, hd.y + hd.h / 2.0f, tx, ty));
+                CHECK(std::abs(tx - x) <= tol && std::abs(ty - y) <= tol);
+            };
+            auto world = [&]() {
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                Piece w = ConsoleWorld(256, HudCropRows(192), true);
+                w.touch = false;
+                comp.pieces.push_back(w);
+                return comp;
+            };
+            for (int count : {0, 1, 5, 21, 27})
+            {
+                const int rows = std::min(count, kMuRows);
+                for (int scroll = 0; scroll <= count - rows; scroll += std::max(1, (count - rows) / 3))
+                    for (int playing : {-1, 0, 2, count - 1})
+                    {
+                        if (playing >= count) continue;
+                        GameState g;
+                        g.valid = true;
+                        MusicState& m = g.music;
+                        m.valid = true;
+                        for (int i = 0; i < count; i++) m.list.push_back({i, i + 1, 101 + i, -1});
+                        m.scroll = scroll;
+                        m.playing = playing;
+                        m.place = 4;
+                        const MenuView v = MusicViewOf(us, g);
+                        CHECK(v.valid && v.own && v.backCloses && (int)v.items.size() == rows && AllReachable(v));
+                        CHECK(v.back.size() == 1 && v.back[0].x == kMuCloseX && v.back[0].y == kMuCloseY);
+                        CHECK(v.scrollUp.empty() == (scroll == 0) && v.scrollDown.empty() == (scroll >= count - rows));
+                        if (!v.scrollUp.empty()) CHECK(v.scrollUp[0].x == kMuUpX && v.scrollUp[0].y == kMuUpY);
+                        if (!v.scrollDown.empty()) CHECK(v.scrollDown[0].x == kMuDownX && v.scrollDown[0].y == kMuDownY);
+                        std::set<u32> ids;
+                        for (int i = 0; i < rows; i++)
+                        {
+                            const ViewItem& it = v.items[i];
+                            ids.insert(it.id);
+                            CHECK((it.id >> 24) == (kModMusic >> 24) && it.enabled && it.group == v.scrollGroup);
+                            CHECK(it.action.empty() == (scroll + i == playing));
+                            if (!it.action.empty()) CHECK(it.action.size() == 1 && it.action[0].x == kMuRowX && it.action[0].y == kMuRowY0 + i * kMuRowDy);
+                            CHECK(MenuMove(v, i, 2) == i && MenuMove(v, i, 3) == i);
+                        }
+                        CHECK((int)ids.size() == rows);
+                        if (playing >= scroll && playing < scroll + rows) CHECK(v.initial == playing - scroll);
+                        for (int focus : {-1, 0, rows - 1})
+                        {
+                            Composition comp = world();
+                            BuildMusic(comp, v, focus, g, rom, nullptr);
+                            CHECK(!comp.ui.empty());
+                            inside(comp);
+                            if (focus != 0 || count != 21 || scroll == 0) continue;
+                            for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                                TestConsoleRoundtrip(us, false, 256, 192, o.first, o.second, true, &comp);
+                            for (int i = 0; i < rows; i++) lands(comp, v.items[i].rect, kMuRowX, kMuRowY0 + i * kMuRowDy, 15);
+                            lands(comp, kMuClose, kMuCloseX, kMuCloseY, 15);
+                            lands(comp, kMuUp, kMuUpX, kMuUpY + 10, 15);
+                            lands(comp, kMuDown, kMuDownX, kMuDownY - 10, 15);
+                        }
+                    }
+            }
+            {
+                GameState g;
+                g.valid = true;
+                g.music.valid = true;
+                g.music.list = {{3, 1, 101, -1}};
+                CHECK(MusicViewOf(us, g).valid && !MusicViewOf({Screen::Panel, Tab::Interact}, g).valid);
+                CHECK(!MusicView(us, &g, &rom).valid); // no strings: milestone 1's
+                g.music.scroll = 1;
+                CHECK(!MusicViewOf(us, g).valid);
+                g.music.valid = false;
+                CHECK(!MusicViewOf(us, g).valid);
+            }
+            for (int page = 0; page < kStPages; page++)
+                for (int transition = 0; transition <= 2; transition++)
+                {
+                    GameState g;
+                    g.valid = true;
+                    StatState& st = g.stat;
+                    st.valid = true;
+                    st.page = page;
+                    st.transition = transition;
+                    st.aspiration = page % 4;
+                    st.level = page % 4;
+                    st.gaugeFrame = 7;
+                    for (int i = 0; i < 5; i++) st.skills[i] = 2 * i;
+                    // The game's way to every page.
+                    for (int to = 0; to < kStPages; to++)
+                    {
+                        const MenuAction a = StatPageAction(st, to);
+                        if (to == page) { CHECK(a.empty()); continue; }
+                        size_t k = 0;
+                        if (transition == 1) CHECK(a[k].kind == MenuStep::Wait && a[k++].frames == kStFadeWait);
+                        if (page == 0) CHECK(a.size() == k + 1 && a[k].kind == MenuStep::Tap && a[k].x == kStButtonX[to] && a[k].y == kStButtonY[to]);
+                        else
+                        {
+                            CHECK(a[k].kind == MenuStep::Tap && a[k].x == kStCloseX && a[k].y == kStCloseY);
+                            if (to == 0) CHECK(a.size() == k + 1);
+                            else CHECK(a.size() == k + 3 && a[k + 1].kind == MenuStep::Wait && a[k + 1].frames == kStSwitchWait && a[k + 2].x == kStButtonX[to] && a[k + 2].y == kStButtonY[to]);
+                        }
+                        // Every tap inside the game's own rectangle for it.
+                        for (const MenuStep& s : a)
+                            if (s.kind == MenuStep::Tap)
+                            {
+                                const Rect r = s.x == kStCloseX && s.y == kStCloseY ? kStCloseFrom : kStButtonFrom[to];
+                                CHECK(s.x >= r.x && s.x < r.x + r.w && s.y >= r.y && s.y < r.y + r.h);
+                            }
+                    }
+                    const MenuView v = StatPanelViewOf(us, g);
+                    CHECK(v.valid && v.own && AllReachable(v) && v.backCloses == (page == 0));
+                    CHECK(v.buttons[(int)MenuButton::LB] == StatPageAction(st, (page + 4) % 5) && v.buttons[(int)MenuButton::RB] == StatPageAction(st, (page + 1) % 5));
+                    if (page == 0)
+                    {
+                        CHECK(v.items.size() == 4 && v.buttons[(int)MenuButton::Left].empty() && v.buttons[(int)MenuButton::Right].empty());
+                        std::set<u32> ids;
+                        for (int p = 1; p < kStPages; p++)
+                        {
+                            const ViewItem& it = v.items[p - 1];
+                            ids.insert(it.id);
+                            CHECK(it.id == kStPageId + (u32)p && it.action == StatPageAction(st, p));
+                        }
+                        CHECK(ids.size() == 4 && v.back.back().x == kStCloseX && v.back.back().y == kStCloseY);
+                    }
+                    else
+                    {
+                        CHECK(v.items.size() == 1 && v.items[0].id == kStPageId + (u32)page && v.items[0].action.empty() && v.back == StatPageAction(st, 0));
+                        CHECK(v.buttons[(int)MenuButton::Left] == StatPageAction(st, page - 1) && v.buttons[(int)MenuButton::Right] == StatPageAction(st, (page + 1) % 5));
+                    }
+                    for (int focus : {-1, 0, (int)v.items.size() - 1})
+                    {
+                        Composition comp = world();
+                        BuildStatPanel(comp, v, focus, g, rom, nullptr);
+                        CHECK(!comp.ui.empty());
+                        inside(comp);
+                        if (focus != 0 || transition != 0) continue;
+                        for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
+                            TestConsoleRoundtrip(us, false, 256, 192, o.first, o.second, true, &comp);
+                        lands(comp, kStClose, kStCloseX, kStCloseY, 16);
+                        if (page == 0)
+                            for (int p = 1; p < kStPages; p++)
+                            {
+                                lands(comp, StatButtonRect(p), kStButtonX[p], kStButtonY[p], 30);
+                                lands(comp, StatTabRect(p), kStButtonX[p], kStButtonY[p], 30);
+                            }
+                        else lands(comp, StatTabRect(0), kStCloseX, kStCloseY, 16);
+                    }
+                }
+            {
+                GameState g;
+                g.valid = true;
+                g.stat.valid = true;
+                CHECK(StatPanelViewOf(us, g).valid && !StatPanelViewOf({Screen::Panel, Tab::Interact}, g).valid);
+                CHECK(!StatPanelView(us, &g, &rom).valid); // no strings: milestone 1's
+                g.stat.page = 5;
+                CHECK(!StatPanelViewOf(us, g).valid);
+                g.stat.page = 0;
+                g.stat.valid = false;
+                CHECK(!StatPanelViewOf(us, g).valid);
+            }
+            // Ids: the two modules' tags apart from each other and the others'.
+            CHECK((kMuRowId >> 24) != (kStPageId >> 24) && (kMuRowId >> 24) != (kRiLineId >> 24) && (kStPageId >> 24) != (kCiRowId >> 24));
+        }
         // Goals, Relationships, Options (port/goals.h, relations.h, options.h) and the Save slots
         // on made-up states: the game's selection held (Up / Down its arrows), Options' moves
         // explicit and its sliders' Left / Right the knob's drag by a tenth, the Save slots' A its
@@ -1178,13 +1862,56 @@ int main()
                     off.town.popup.state = 0;
                     CHECK(!PopupViewOf(on, off).valid);
                     off = h;
-                    off.screen = GScreen::Catalogue;
-                    CHECK(!PopupViewOf({Screen::Catalogue, Tab::None}, off).valid);
+                    off.screen = GScreen::Vacuum; // (a screen the port does not redraw: milestone 1's popup)
+                    CHECK(!PopupViewOf({Screen::Vacuum, Tab::None}, off).valid);
+                    off.screen = GScreen::Build; // (over the HD Build Rooms: the HD popup)
+                    CHECK(PopupViewOf({Screen::Build, Tab::None}, off).valid == PopupViewOf(on, h).valid);
+                    off.screen = GScreen::Catalogue; // (over the HD catalogue: the HD popup)
+                    CHECK(PopupViewOf({Screen::Catalogue, Tab::None}, off).valid == PopupViewOf(on, h).valid);
                     off = h;
                     off.town.popup.boxW = 0;
                     CHECK(PopupViewOf(on, off).valid == (kind == 3));
                     CHECK(!PopupView(on, &h, &rom).valid); // (no strings: milestone 1's)
                 }
+            {
+                // A popup over the HD catalogue (port/catalogue.h): the popup's view, the catalogue
+                // drawn beneath it without a focus, its cells taking no click, the popup's X on the game's.
+                GameState h;
+                h.valid = true;
+                h.screen = GScreen::Catalogue;
+                h.town.popup = {true, 2, 0, std::string(80, 'w'), "Title", -1, false, 56, 160, 6};
+                CatalogueState& ca = h.catalogue;
+                ca.valid = true;
+                ca.shop = kCaStore;
+                for (int i = 0; i < 12; i++) ca.items.push_back({100 + i + 0x3B, 100 + i, 563 + i, 922 + i, 1991, 200, 100});
+                ca.selected = 0;
+                ca.money = 1000;
+                ca.downEnabled = true;
+                const ScreenState on {Screen::Catalogue, Tab::None};
+                const MenuView v = PopupViewOf(on, h);
+                CHECK(v.valid && v.popup && v.items.size() == 1);
+                CHECK(UnderScreen(on, h).screen == Screen::Catalogue);
+                const MenuView u = CatalogueViewOf(on, h);
+                CHECK(u.valid);
+                Composition comp {kConsoleW, kConsoleH, {}, {}};
+                Piece world = ConsoleWorld(256, HudCropRows(192), true);
+                world.touch = false;
+                comp.pieces.push_back(world);
+                BuildCatalogue(comp, u, -1, h, rom, nullptr);
+                BuildPopup(comp, v, 0, h, rom);
+                SortUi(comp.ui);
+                int layer = 0;
+                for (const ui::UiItem& it : comp.ui)
+                {
+                    if (it.kind == ui::UiItem::Image) continue;
+                    CHECK(it.layer >= layer);
+                    layer = it.layer;
+                }
+                CHECK(TouchFromComposition(comp, fit, kPopClose.x + kPopClose.w / 2.0f, kPopClose.y + kPopClose.h / 2.0f, tx, ty));
+                CHECK(inside(tx, ty, {120, 104, 24, 24}));
+                const Rect cell = u.items[0].rect;
+                CHECK(!TouchFromComposition(comp, fit, cell.x + cell.w / 2.0f, cell.y + cell.h / 2.0f, tx, ty)); // the catalogue beneath
+            }
             // A popup the game shows over Save slots, Give Gift or the phone whose HD view does not
             // read (a box without its place): no view at all, not the screen's (milestone 1's picture
             // holds the game's own popup). (This rom has no strings: the guard itself is PopupOver's.)

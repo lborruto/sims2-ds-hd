@@ -1,0 +1,6 @@
+# From BD-down3 (the list at 3: the Spa & Gym, §2,500 against §2,000, at the top), CONSOLE: A on
+# it: the game refuses it, nothing happens (the list stays); Down, A (the Jungle Guest Room,
+# §1,000): the question.
+20 2 pad a
+60 2 pad down
+80 2 pad a

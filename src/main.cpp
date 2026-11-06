@@ -38,6 +38,12 @@
 #include "picker.h"
 #include "romdata.h"
 #include "ui/font.h"
+#include "port/build.h"
+#include "port/checkin.h"
+#include "port/roominfo.h"
+#include "port/music.h"
+#include "port/statpanel.h"
+#include "port/catalogue.h"
 #include "port/dialogue.h"
 #include "port/interact.h"
 #include "port/goals.h"
@@ -87,6 +93,7 @@ static void Usage()
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
+        "  --print-hotel                 print the hotel block (rooms, score, guests, songs) and the hotel's and shops' screens (registry, room info, music, build rooms, placement, catalogue, stat panel), read from RAM, when they change\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
         "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
@@ -101,7 +108,7 @@ static void Usage()
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
-        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes) can show fitted to its box, in --language's\n"
+        "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms, the Registry, room info) can show fitted to its box, in --language's\n"
         "                                words: how many shrink, how many need an ellipsis or a character the font lacks (exit 2), and stop\n"
         "  --measure-string ID|all       (checks) string ID laid out in the HD conversation's box (lines, size, fits),\n"
         "                                or all: every page of the game's conversations (needs --state-load; exit 2 on an overflow or a character the font lacks), and stop\n"
@@ -144,7 +151,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
     bool uiDemo = false;
@@ -184,6 +191,7 @@ int main(int argc, char** argv)
         else if (a == "--print-game") printGame = true;
         else if (a == "--print-hud") printHud = true;
         else if (a == "--print-town") printTown = true;
+        else if (a == "--print-hotel") printHotel = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -417,12 +425,47 @@ int main(int argc, char** argv)
         printf("popups: %d words, tallest text %d (%d lines), %d shrunk, %d cut", q.checked, q.tallestId, q.tallestLines, q.shrunk, q.cut);
         for (int id : q.cutIds) printf(" %d", id);
         printf("\n");
+        // The shop's catalogue: every item's name and description, the shops' titles beside the
+        // widest money, the headers, Pay at the widest price.
+        BlockMeasure k;
+        MeasureCatalogue(*app.rom, k);
+        printf("catalogue: %d words, tallest description %d (%d lines), %d shrunk, %d cut, %d names cut", k.checked, k.tallestId, k.tallestLines, k.shrunk, k.cut, k.namesCut);
+        for (int id : k.cutIds) printf(" %d", id);
+        printf("\n");
+        // Build Rooms: every room's name and place in its boxes, the title, the question, the sums.
+        BlockMeasure bd;
+        MeasureBuild(*app.rom, bd);
+        printf("build: %d words, tallest %d (%d lines), %d shrunk, %d cut", bd.checked, bd.tallestId, bd.tallestLines, bd.shrunk, bd.cut);
+        for (int id : bd.cutIds) printf(" %d", id);
+        printf("\n");
         // A neighbour's name beside the plate may end in an ellipsis (the Italian table has a
         // sentence at an object's name, 463); every other box must hold its words.
+        // The Registry and room info: the titles, the rooms, every guest, the lines, the hints.
+        BlockMeasure ci;
+        MeasureCheckIn(*app.rom, ci);
+        printf("checkin: %d words, tallest %d (%d lines), %d shrunk, %d cut", ci.checked, ci.tallestId, ci.tallestLines, ci.shrunk, ci.cut);
+        for (int id : ci.cutIds) printf(" %d", id);
+        printf("\n");
+        BlockMeasure ri;
+        MeasureRoomInfo(*app.rom, ri);
+        printf("roominfo: %d words, tallest %d (%d lines), %d shrunk, %d cut", ri.checked, ri.tallestId, ri.tallestLines, ri.shrunk, ri.cut);
+        for (int id : ri.cutIds) printf(" %d", id);
+        printf("\n");
+        // The hotel's music panel and the stat panel: the titles, every song, the pages' words.
+        BlockMeasure mu, sp;
+        MeasureMusic(*app.rom, mu);
+        printf("music: %d words, tallest %d (%d lines), %d shrunk, %d cut", mu.checked, mu.tallestId, mu.tallestLines, mu.shrunk, mu.cut);
+        for (int id : mu.cutIds) printf(" %d", id);
+        printf("\n");
+        MeasureStatPanel(*app.rom, sp);
+        printf("statpanel: %d words, tallest %d (%d lines), %d shrunk, %d cut", sp.checked, sp.tallestId, sp.tallestLines, sp.shrunk, sp.cut);
+        for (int id : sp.cutIds) printf(" %d", id);
+        printf("\n");
         // Every character of those words must be in the font (else a '?' is drawn).
         const std::vector<u32> lacking = ui::MissingGlyphs();
         for (u32 cp : lacking) printf("the font lacks U+%04X\n", cp);
-        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || !lacking.empty() ? 2 : 0;
+        return m.cut - m.cutIn[4] > 0 || p.cut > 0 || g.cut > 0 || q.cut > 0 || k.cut > 0 || bd.cut > 0 || ci.cut > 0 || ri.cut > 0 || mu.cut > 0 || sp.cut > 0 ||
+                       !lacking.empty() ? 2 : 0;
     }
     if (!stateLoad.empty() && !LoadState(nds, stateLoad)) { fprintf(stderr, "cannot load state %s\n", stateLoad.c_str()); return 1; }
     // (A check) a string, or every page of the conversations, laid out in the HD box: print and stop.
@@ -518,6 +561,8 @@ int main(int argc, char** argv)
     bool lastMenu = app.consoleMenu;
     int lastFocus = app.consoleFocus;
     int disagree = 0; // frames the game's settled screen and the pixels' answer have disagreed
+    int lastTouchX = -1, lastTouchY = -1; // the stylus's last point down (room info's hint: which line)
+    bool wasTouching = false;
     auto keepPace = [&]() {
         if (headless || app.fast) { nextFrameAt = 0; return; }
         double now = SDL_GetPerformanceCounter() / perfFreq;
@@ -591,6 +636,8 @@ int main(int argc, char** argv)
 
         nds.SetKeyMask(~keys & 0xFFF);
         if (touching) nds.TouchScreen((melonDS::u16)tx, (melonDS::u16)ty); else nds.ReleaseScreen();
+        if (touching && !wasTouching) { lastTouchX = tx; lastTouchY = ty; } // (the stylus's last point down: room info's hint)
+        wasTouching = touching;
         looks.Apply(app);
         nds.RunFrame();
         looks.Frame(app);
@@ -608,6 +655,14 @@ int main(int argc, char** argv)
                 PhoneState& ph = app.game.town.phone;
                 if (ph.valid && ph.page == 7 && !ph.contactsKnown && ph.contacts == 0)
                     ph.contactsWait = before.town.phone.valid ? before.town.phone.contactsWait + 1 : 1;
+            }
+            {   // room info's hint: which line the stylus opened it on (not in RAM), kept while it is up
+                RoomInfoState& ri = app.game.roomInfo;
+                // (a touch before the room info rose opened it, or something else: never a line's)
+                if (ri.valid && !before.roomInfo.valid) lastTouchX = lastTouchY = -1;
+                if (ri.valid && ri.hint)
+                    ri.hintId = before.roomInfo.valid && before.roomInfo.hint && before.roomInfo.hintId >= 0 ? before.roomInfo.hintId
+                                : lastTouchX >= 0 ? RoomInfoHintAt(lastTouchX, lastTouchY, ri.occupied) : -1;
             }
             if (dialogueString >= 0 && app.game.dialogue.valid) app.game.dialogue.stringId = dialogueString;
             if (app.portSupported && printHud)
@@ -749,6 +804,101 @@ int main(int argc, char** argv)
                 {
                     if (t.note.valid) fprintf(stderr, "frame %ld: note text=%d playername=%d\n", frame, t.note.textId, t.note.playerName ? 1 : 0);
                     else fprintf(stderr, "frame %ld: note none\n", frame);
+                }
+            }
+            if (app.portSupported && printHotel)
+            {   // the hotel and the shops (gamestate.h), one line per part when it changes
+                const GameState& g = app.game;
+                const GameState& b = before;
+                auto num = [](int n) { return std::to_string(n); };
+                auto join = [](const std::vector<std::string>& v) { std::string r; for (const std::string& x : v) r += (r.empty() ? "" : ",") + x; return r.empty() ? std::string("-") : r; };
+                if (!(g.hotel == b.hotel) || frame == 0)
+                {
+                    const HotelState& v = g.hotel;
+                    if (!v.valid) fprintf(stderr, "frame %ld: hotel none\n", frame);
+                    else
+                    {
+                        std::vector<std::string> sl, so, sg;
+                        for (const GuestSlot& x : v.slots) sl.push_back(num(x.place) + ":" + num(x.sim) + ":" + num(x.days));
+                        for (int k = 0; k < kPlaces; k++) if (v.rooms[k].permit) so.push_back(num(k) + ":" + num(v.rooms[k].permit) + "/" + num(v.rooms[k].weight) + "/" + num(v.rooms[k].parent));
+                        for (int k = 0; k < kPlaces; k++) sg.push_back(num(v.songs[k]));
+                        fprintf(stderr, "frame %ld: hotel built=0x%llx unlocked=0x%llx building=0x%llx score=%d stayed=%d money=%d earned=%d spent=%d place=%d slots=%s rooms=%s songs=%s\n", frame, (unsigned long long)v.built,
+                                (unsigned long long)v.unlocked, (unsigned long long)v.building, v.score, v.guestsStayed, v.money, v.earned, v.spent, v.place, join(sl).c_str(), join(so).c_str(), join(sg).c_str());
+                    }
+                }
+                if (!(g.checkIn == b.checkIn) || frame == 0)
+                {
+                    const CheckInState& v = g.checkIn;
+                    if (!v.valid) fprintf(stderr, "frame %ld: checkin none\n", frame);
+                    else
+                    {
+                        std::vector<std::string> r;
+                        for (const RegistryRow& x : v.rows) r.push_back(num(x.place) + ":" + (x.built ? "b" : "-") + (x.available ? "a" : "-") + ":" + num(x.occupant));
+                        fprintf(stderr, "frame %ld: checkin mode=%d guest=%d score=%d rows=%s\n", frame, v.mode, v.guest, v.score, join(r).c_str());
+                    }
+                }
+                if (!(g.roomInfo == b.roomInfo) || frame == 0)
+                {
+                    const RoomInfoState& v = g.roomInfo;
+                    if (!v.valid) fprintf(stderr, "frame %ld: roominfo none\n", frame);
+                    else
+                        fprintf(stderr, "frame %ld: roominfo place=%d occupant=%d occupied=%d mood=%d checkout=%d/%d/%d days=%d base=%d service=%d bonus=%d total=%d hint=%d%s\n", frame, v.place, v.occupant, v.occupied ? 1 : 0,
+                                v.moodId, v.checkOutKnown ? 1 : 0, v.month, v.day, v.days, v.baseValue, v.serviceCharge, v.scoreBonus, v.total, v.hint ? 1 : 0,
+                                v.hint ? (":" + std::to_string(v.hintId)).c_str() : "");
+                }
+                if (!(g.music == b.music) || frame == 0)
+                {
+                    const MusicState& v = g.music;
+                    if (!v.valid) fprintf(stderr, "frame %ld: music none\n", frame);
+                    else
+                    {
+                        std::vector<std::string> l;
+                        for (const SongRow& x : v.list) l.push_back(num(x.index) + ":" + num(x.code) + ":" + num(x.nameId));
+                        fprintf(stderr, "frame %ld: music scroll=%d playing=%d place=%d roomsong=%d list=%s\n", frame, v.scroll, v.playing, v.place, v.roomSong, join(l).c_str());
+                    }
+                }
+                if (!(g.build == b.build) || frame == 0)
+                {
+                    const BuildState& v = g.build;
+                    if (!v.valid) fprintf(stderr, "frame %ld: build none\n", frame);
+                    else
+                    {
+                        std::vector<std::string> l;
+                        for (const BuildEntry& x : v.places) l.push_back(num(x.place) + ":" + num(x.price) + ":" + num(x.parentNameId) + (x.affordable ? "" : ":poor"));
+                        fprintf(stderr, "frame %ld: build scroll=%d page=%d chosen=%d money=%d places=%s\n", frame, v.scroll, v.page, v.chosen, v.money, join(l).c_str());
+                    }
+                }
+                if (!(g.placement == b.placement) || frame == 0)
+                {
+                    const PlacementState& v = g.placement;
+                    if (!v.valid) fprintf(stderr, "frame %ld: placement none\n", frame);
+                    else
+                    {
+                        std::vector<std::string> l;
+                        for (const PlaceObject& x : v.objects) l.push_back(num(x.id) + ":" + num(x.x) + ":" + num(x.y) + ":" + num(x.rotation));
+                        fprintf(stderr, "frame %ld: placement mode=%d room=%d phase=%d slot=%d object=%d rot=%d objects=%s\n", frame, v.mode, v.room, v.phase, v.pocketSlot, v.object, v.rotation, join(l).c_str());
+                    }
+                }
+                if (!(g.catalogue == b.catalogue) || frame == 0)
+                {
+                    const CatalogueState& v = g.catalogue;
+                    if (!v.valid) fprintf(stderr, "frame %ld: catalogue none\n", frame);
+                    else
+                    {
+                        std::vector<std::string> l, o;
+                        for (const ShopItem& x : v.items) l.push_back(num(x.id) + ":" + num(x.nameId) + ":" + num(x.iconRes) + ":" + num(x.buyPrice));
+                        for (const ShopItem& x : v.owned) o.push_back(num(x.id) + ":" + num(x.nameId) + ":" + num(x.iconRes) + ":" + num(x.sellPrice));
+                        fprintf(stderr, "frame %ld: catalogue shop=%d vendor=%d sel=%d sell=%d scroll=%d pay=%d up=%d down=%d ring=%d money=%d items=%s owned=%s\n", frame, v.shop, v.vendor ? 1 : 0, v.selected, v.sell ? 1 : 0, v.scroll,
+                                v.payEnabled ? 1 : 0, v.upEnabled ? 1 : 0, v.downEnabled ? 1 : 0, v.ring ? 1 : 0, v.money, join(l).c_str(), join(o).c_str());
+                    }
+                }
+                if (!(g.stat == b.stat) || frame == 0)
+                {
+                    const StatState& v = g.stat;
+                    if (!v.valid) fprintf(stderr, "frame %ld: stat none\n", frame);
+                    else
+                        fprintf(stderr, "frame %ld: stat page=%d transition=%d aspiration=%d level=%d points=%d gauge=%d skills=%d,%d,%d,%d,%d score=%d stayed=%d earned=%d spent=%d aliens=%d goons=%d vacuum=%d metal=%d\n", frame, v.page,
+                                v.transition, v.aspiration, v.level, v.points, v.gaugeFrame, v.skills[0], v.skills[1], v.skills[2], v.skills[3], v.skills[4], v.score, v.guestsStayed, v.earned, v.spent, v.aliens, v.goons, v.vacuum, v.metal);
                 }
             }
             if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
