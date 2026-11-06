@@ -161,7 +161,12 @@ void AddThumb(Items& it, std::vector<UiItem>& images, const Thumb& t, Rect r)
     UiItem well = WellItem({r.x - 4, r.y - 4, r.w + 8, r.h + 8});
     well.radius = 8;
     it.Add(1, well);
-    if (t.w > 0) images.push_back(ImageItem(r, t.px.data(), t.w, t.h, {0, 0, t.w, t.h}));
+    if (t.w > 0)
+    {
+        UiItem im = ImageItem(r, t.px.data(), t.w, t.h, {0, 0, t.w, t.h});
+        im.smooth = false; // (a picture of the screen made small: never the pixel-art scaler's)
+        images.push_back(im);
+    }
 }
 }
 
@@ -189,6 +194,7 @@ void ChangeRow(Row r, int dir, Settings& s)
         else if ((d > 0 && s.uiScale >= 150) || (d < 0 && s.uiScale <= 75)) s.uiScale = 0;
         else s.uiScale = std::clamp(s.uiScale + 5 * d, 75, 150);
         break;
+    case Row::Pictures: s.smoothPictures = !s.smoothPictures; break;
     case Row::Res3D: s.resolution3D = std::clamp(s.resolution3D + d, 1, 4); break;
     case Row::Wide: s.widescreen = !s.widescreen; break;
     case Row::Fps60: s.interpolate60 = !s.interpolate60; break;
@@ -223,7 +229,7 @@ void ChangeRow(Row r, int dir, Settings& s)
 
 std::string RowLabel(Row r, int lang)
 {
-    static const W words[kRows] = {W::SetLayout, W::SetFullscreen, W::SetScaling, W::SetUiSize, W::SetRes3D, W::SetWide, W::SetFps60, W::SetBattery,
+    static const W words[kRows] = {W::SetLayout, W::SetFullscreen, W::SetScaling, W::SetUiSize, W::SetPictures, W::SetRes3D, W::SetWide, W::SetFps60, W::SetBattery,
                                    W::SetVolume, W::SetMute, W::SetFastSound, W::SetBackground,
                                    W::SetFastSpeed, W::SetFastKey, W::SetFastBoot,
                                    W::SetHidePointer, W::SetStickCursor, W::SetCursorSpeed, W::SetDeadZone, W::SetLeftHanded, W::SetTrigger, W::SetRumble,
@@ -237,6 +243,7 @@ int RowNote(Row r)
     {
     case Row::Scaling: return (int)W::ScalingNote;
     case Row::UiSize: return (int)W::UiSizeNote;
+    case Row::Pictures: return (int)W::PicturesNote;
     case Row::Battery: return (int)W::BatteryNote;
     case Row::Background: return (int)W::BackgroundNote;
     case Row::FastBoot: return (int)W::FastBootNote;
@@ -260,6 +267,7 @@ std::string RowValue(Row r, const Settings& s, int lang)
     case Row::Fullscreen: return onOff(s.fullscreen);
     case Row::Scaling: return Wd(lang, s.scaling == Scaling::Smooth ? W::ScaleSmooth : s.scaling == Scaling::Nearest ? W::ScaleNearest : W::ScaleSharp);
     case Row::UiSize: return s.uiScale == 0 ? std::string(Wd(lang, W::UiAuto)) : std::to_string(s.uiScale) + " %";
+    case Row::Pictures: return Wd(lang, s.smoothPictures ? W::ScaleSmooth : W::ScaleNearest);
     case Row::Res3D: return std::to_string(s.resolution3D) + "\xC3\x97"; // "2×"
     case Row::Wide: return onOff(s.widescreen);
     case Row::Fps60: return onOff(s.interpolate60);

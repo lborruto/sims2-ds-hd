@@ -112,7 +112,7 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp"
         "-DFILES=${SIMS2WIDE_FONT_FILES}" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake"
     DEPENDS cmake/embed.cmake assets/fonts/Nunito-Bold.ttf assets/fonts/Nunito-ExtraBold.ttf
     COMMENT "Embedding the UI's font" VERBATIM)
-add_library(uikit STATIC src/ui/kit.cpp src/ui/font.cpp "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp")
+add_library(uikit STATIC src/ui/kit.cpp src/ui/font.cpp src/thirdparty/xbrz/xbrz.cpp "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp")
 target_include_directories(uikit PUBLIC melonDS/src src PRIVATE src/thirdparty)
 # (The raster draws in bands on a few threads: ui/kit.cpp.)
 find_package(Threads REQUIRED)

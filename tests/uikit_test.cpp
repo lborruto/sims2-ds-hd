@@ -387,7 +387,7 @@ struct Rng
     u32 Next() { v ^= v << 13; v ^= v >> 7; v ^= v << 17; return (u32)v; }
     int In(int a, int b) { return a + (int)(Next() % (u32)(b - a + 1)); }
 };
-static bool gZoomed = false; // (raster_ways' second pass: items zoomed by the UI's size)
+static bool gZoomed = false; // (raster_ways' second pass: items zoomed by the UI's size, pictures Smooth)
 static UiItem RandomItem(Rng& g, const u32* pic, const u32* icon)
 {
     static const char* words[] = {"Hello", "Crème brûlée", "Talk about the weather", "§1,200", "A", "Pneumonoultramicroscopicsilicovolcanoconiosis and more to wrap"};
@@ -408,6 +408,7 @@ static UiItem RandomItem(Rng& g, const u32* pic, const u32* icon)
     {
         static const float zooms[] = {0.75f, 0.8f, 0.85f, 1.05f, 1.35f, 1.5f};
         if (g.In(0, 2)) ZoomItem(it, zooms[g.In(0, 5)], (float)g.In(0, 1280), (float)g.In(0, 720));
+        if (it.kind == UiItem::Image) it.smooth = g.In(0, 1);
     }
     return it;
 }
@@ -558,9 +559,10 @@ static void raster_ways(bool zoomed)
 
 // The UI's size (UiItem::zoom, dx, dy): an item zoomed is that item drawn at a larger or smaller
 // scale (byte for byte the raster of the unzoomed items at scale × zoom), placed and bounded where
-// the zoom puts it, hashed as before at 1; FitZoom keeps a group inside its limit; a zoomed
-// picture is never the GPU's.
-static void ui_scale()
+// the zoom puts it, hashed as before at 1; FitZoom keeps a group inside its limit. Smooth pictures:
+// the scaler's picture kept and the same for the same pixels, blended edges where Pixel has two
+// colours, a crop opaque to its corners, the same bytes on any number of threads, never the GPU's.
+static void ui_scale_and_smooth()
 {
     // Placed, ZoomItem (composed), FitZoom.
     UiItem p = PanelItem({110, 456, 1060, 250});
@@ -576,13 +578,6 @@ static void ui_scale()
     CHECK(std::abs(FitZoom({110, 426, 1060, 280}, 1.5f, 640, 720, {4, 4, 1272, 712}) - 636.0f / 530) < 1e-4f);
     CHECK(FitZoom({110, 426, 1060, 280}, 0.75f, 640, 720, {4, 4, 1272, 712}) == 0.75f);
     CHECK(FitZoom({16, 667, 400, 48}, 1.5f, 16, 691, {0, 665, 1280, 55}) < 1.09f);
-    {
-        std::vector<u32> px(64 * 64, 0xFF336699u);
-        UiItem crop = ImageItem({0, 0, 64, 64}, px.data(), 64, 64, {0, 0, 32, 32});
-        CHECK(WholeFactorCrop(crop, LayersAt({crop}, 1, 0, 0)[0], 1));
-        ZoomItem(crop, 0.5f, 0, 0);
-        CHECK(!WholeFactorCrop(crop, LayersAt({crop}, 2, 0, 0)[0], 2));
-    }
 
     // Zoomed by z about the origin at scale s: the raster of the items as they are at s × z.
     std::vector<u32> pic(256 * 192);
@@ -602,6 +597,53 @@ static void ui_scale()
         const Rect bz = Bounds(zoomed), bi = Bounds(items);
         CHECK(bz.x <= (int)std::floor(bi.x * z) && bz.x + bz.w >= (int)std::ceil((bi.x + bi.w) * z) - 1);
     }
+
+    // Smooth: a picture with a diagonal edge, 4x.
+    std::vector<u32> tile(16 * 16);
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++) tile[y * 16 + x] = x > y ? 0xFFF0E0A0u : 0xFF203060u;
+    UiItem px = ImageItem({0, 0, 64, 64}, tile.data(), 16, 16, {0, 0, 16, 16});
+    UiItem sm = px;
+    sm.smooth = true;
+    CHECK(HashImage(px) != HashImage(sm));
+    const auto e1 = Enlarge(sm, 4), e2 = Enlarge(sm, 4);
+    CHECK(e1 && e1 == e2 && e1->w == 64 && e1->h == 64 && Enlarge(sm, 3) != e1 && !Enlarge(sm, 7) && !Enlarge(sm, 1));
+    std::vector<u32> a(64 * 64), b(64 * 64), c(64 * 64);
+    Rasterise({px}, 1, a.data(), 64, 64);
+    SetRasterThreads(1);
+    Rasterise({sm}, 1, b.data(), 64, 64);
+    SetRasterThreads(0);
+    Rasterise({sm}, 1, c.data(), 64, 64);
+    CHECK(b == c);
+    auto colours = [](const std::vector<u32>& v) {
+        std::vector<u32> u(v);
+        std::sort(u.begin(), u.end());
+        return (int)(std::unique(u.begin(), u.end()) - u.begin());
+    };
+    CHECK(colours(a) == 2 && colours(b) > 2);
+    bool opaque = true;
+    for (u32 v : b) opaque &= (v >> 24) == 0xFF;
+    CHECK(opaque); // (the crop's edges repeated: no corner rounded off into transparency)
+    CHECK(!WholeFactorCrop(sm, LayersAt({sm}, 1, 0, 0)[0], 1) && WholeFactorCrop(px, LayersAt({px}, 1, 0, 0)[0], 1));
+    UiItem zc = px;
+    ZoomItem(zc, 0.5f, 0, 0);
+    CHECK(!WholeFactorCrop(zc, LayersAt({zc}, 2, 0, 0)[0], 2));
+    // Drawn at its own size or smaller: no scaler (Pixel's bytes).
+    UiItem small = sm;
+    small.to = {0, 0, 16, 16};
+    UiItem smallPx = px;
+    smallPx.to = small.to;
+    std::vector<u32> d(16 * 16), e(16 * 16);
+    Rasterise({small}, 1, d.data(), 16, 16);
+    Rasterise({smallPx}, 1, e.data(), 16, 16);
+    CHECK(d == e);
+    // ImageItem follows SetGamePictures.
+    SetGamePictures(true);
+    CHECK(ImageItem({0, 0, 8, 8}, tile.data(), 16, 16, {0, 0, 8, 8}).smooth);
+    SetGamePictures(false);
+    CHECK(!ImageItem({0, 0, 8, 8}, tile.data(), 16, 16, {0, 0, 8, 8}).smooth);
+    ClearEnlarged();
+    CHECK(Enlarge(sm, 4) != e1 && *Enlarge(sm, 4)->px.data() == *e1->px.data());
 }
 
 int main()
@@ -616,7 +658,7 @@ int main()
     still_layers();
     raster_ways(false);
     raster_ways(true);
-    ui_scale();
+    ui_scale_and_smooth();
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("uikit_test: all passed\n");
     return 0;

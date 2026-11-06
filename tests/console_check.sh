@@ -264,11 +264,16 @@ run cas-hair F-hair-s3-40 "${town[@]}" --console-focus 10 &
 run cas-face F-face-5-40 "${town[@]}" --console-focus 4 &
 run cas-clothes F-thr-6-40 "${town[@]}" --console-focus 11 &
 wait
-# The UI's size (task 10, --ui-scale): the conversation and the panel's menu at 75 % and 150 %.
+# The UI's size (task 10, --ui-scale) and the game's pictures (--game-pictures smooth): the
+# conversation and the panel's menu at 75 % and 150 %, the Pockets' and the catalogue's icons Smooth.
 run s5-hd-75 s5 "${town[@]}" --ui-scale 75 &
 run s5-hd-150 s5 "${town[@]}" --ui-scale 150 &
 run casino-menu-75 sit-casino "${late[@]}" --console-menu --console-focus 1 --print-hud --ui-scale 75 &
 run casino-menu-150 sit-casino "${late[@]}" --console-menu --console-focus 1 --print-hud --ui-scale 150 &
+wait
+run pockets-smooth A-pk-cnt3-slot1 "${late[@]}" --console-menu --console-focus 0 --game-pictures smooth &
+run shop-smooth sit-storebuy "${town[@]}" --console-focus 0 --game-pictures smooth &
+run shop-smooth-2x sit-storebuy "${town[@]}" --console-focus 0 --game-pictures smooth --compose-scale 2 &
 wait
 
 fails=0
@@ -283,7 +288,7 @@ for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-
     shop shop-2x shop-wide shop-sell shop-poor build-list build-list-2x build-list-wide build-ask build-poor build-empty \
     registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint \
     music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats \
-    s5-hd-75 s5-hd-150 casino-menu-75 casino-menu-150; do
+    s5-hd-75 s5-hd-150 casino-menu-75 casino-menu-150 pockets-smooth shop-smooth shop-smooth-2x; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -1195,6 +1200,22 @@ elif case in ("s5-hd-75", "s5-hd-150", "casino-menu-75", "casino-menu-150"):
         a, b = right_end(base), right_end(comp)
         if not (b < a - 20 if case.endswith("-75") else b > a + 10):
             errors.append(f"the status's words end at {b} (at 100 %: {a})")
+elif case in ("pockets-smooth", "shop-smooth", "shop-smooth-2x"):
+    # Smooth game pictures: the still items as with Pixel (the case without "-smooth"), the icons
+    # enlarged by the pixel-art scaler: blended edges (more colours than Pixel's), close to Pixel's.
+    from PIL import ImageStat
+    base_name = case.replace("-smooth", "-menu" if case.startswith("pockets") else "")
+    base = Image.open(comp_path.replace(f"/{case}/", f"/{base_name}/")).convert("RGB")
+    if case.endswith("-2x"): base = base.resize((1280, 720), Image.NEAREST)
+    icon = (215, 215, 290, 290) if case.startswith("pockets") else (318, 190, 395, 262)
+    still = (692, 222, 900, 258) if case.startswith("pockets") else (220, 60, 440, 95)
+    a, b = base.crop(icon), comp.crop(icon)
+    ca, cb = len(a.getcolors(1 << 20)), len(b.getcolors(1 << 20))
+    if cb <= ca: errors.append(f"the icon is not smoothed ({cb} colours, Pixel {ca})")
+    mean = sum(ImageStat.Stat(ImageChops.difference(a, b)).mean) / 3
+    if not 0 < mean < 30: errors.append(f"the smooth icon is not close to Pixel's (mean {mean:.1f})")
+    if ImageChops.difference(base.crop(still), comp.crop(still)).getbbox():
+        errors.append("the still items differ from Pixel's")
 elif case == "social":
     activity(176, skip=16)
 elif case in ("vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",

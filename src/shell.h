@@ -68,7 +68,7 @@ struct Result
 // (Grouped: the picture, the sound, the speed, the mouse and the controller, the game.)
 enum class Row
 {
-    Layout, Fullscreen, Scaling, UiSize, Res3D, Wide, Fps60, Battery,
+    Layout, Fullscreen, Scaling, UiSize, Pictures, Res3D, Wide, Fps60, Battery,
     Volume, Mute, FastSound, Background,
     FastSpeed, FastKey, FastBoot,
     HidePointer, StickCursor, CursorSpeed, DeadZone, LeftHanded, Trigger, Rumble,

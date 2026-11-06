@@ -546,7 +546,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
                 if (const SpriteFrame* f = icons->Scaled(SpriteRef::Of(kSprCasAsp), j, kCasAspIcon, kCasAspIcon))
                 {
                     const Rect r = v.items[j].rect;
-                    UiItem im = ImageItem({r.x + (r.w - f->w) / 2, r.y + (r.h - f->h) / 2, f->w, f->h}, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h});
+                    UiItem im = icons->Image(SpriteRef::Of(kSprCasAsp), j, *f, {r.x + (r.w - f->w) / 2, r.y + (r.h - f->h) / 2, f->w, f->h});
                     im.fill = cs.aspiration == kCasAspOfSlot[j] ? 0 : 0xA0000000;
                     images.push_back(im);
                 }

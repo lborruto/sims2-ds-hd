@@ -33,6 +33,9 @@ struct Settings
     // The HD interface's size: 0 Auto (from the window's physical size, AutoUiScale), else 75 to
     // 150 percent by 5. Headless: 100 % unless --ui-scale (settings are not loaded there).
     int uiScale = 0;
+    // The game's pictures in the HD interface (icons, portraits): Smooth (the pixel-art scaler) or
+    // Pixel (nearest, as the DS's own). Headless: Pixel unless --game-pictures.
+    bool smoothPictures = true;
     bool batterySaver = false;  // the looks at their lightest (3D 1x, 30 fps) without changing their settings
     int windowW = 1280, windowH = 720; // the window's size when it last closed
     bool windowKnown = false;   // (not saved) the file gave window=: else the size comes from the screen

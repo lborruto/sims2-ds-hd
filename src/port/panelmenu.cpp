@@ -301,7 +301,7 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
             if (const SpriteFrame* f = icons->Scaled(ref, i, kPmTabIcon / 24))
             {
                 const Rect to {kPmTabsX + i * kPmTabCell + (kPmTabCell - f->w) / 2, cellY + (kPmTabCell - f->h) / 2, f->w, f->h};
-                c.ui.push_back(ImageItem(to, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h}));
+                c.ui.push_back(icons->Image(ref, i, *f, to));
             }
         }
     // The phone: the game's own button, live from the touch screen, 2x.

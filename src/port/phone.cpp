@@ -92,7 +92,7 @@ void AddSprite(Composition& c, IconCache* icons, int desc, Rect box)
     const double k = std::min((double)box.w / f0->w, (double)box.h / f0->h);
     const int w = (int)(f0->w * k), h = (int)(f0->h * k);
     if (const SpriteFrame* f = icons->Scaled(SpriteRef::Of(desc), 0, w, h))
-        c.ui.push_back(ImageItem({box.x + (box.w - f->w) / 2, box.y + (box.h - f->h) / 2, f->w, f->h}, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h}));
+        c.ui.push_back(icons->Image(SpriteRef::Of(desc), 0, *f, {box.x + (box.w - f->w) / 2, box.y + (box.h - f->h) / 2, f->w, f->h}));
 }
 
 bool ListPage(int page) { return page == 0 || page == 2 || page == 4 || page == 5 || page == 7; }

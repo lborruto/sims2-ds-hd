@@ -202,7 +202,7 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
             if (const SpriteFrame* f = icons->Scaled(ref, 0, kArrowIcon / 24))
             {
                 const Rect r = v.items[i].rect;
-                UiItem a = ImageItem({r.x + r.w - f->w - 10, r.y + (r.h - f->h) / 2, f->w, f->h}, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h});
+                UiItem a = icons->Image(ref, 0, *f, {r.x + r.w - f->w - 10, r.y + (r.h - f->h) / 2, f->w, f->h});
                 if (!v.items[i].enabled) a.fill = 0x50000000; // greyed: faint
                 c.ui.push_back(a);
             }

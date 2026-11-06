@@ -88,6 +88,8 @@ static void Usage()
         "  --compose-scale N             --compose pictures N times the canvas (1 to 4; the UI drawn at that size)\n"
         "  --ui-demo                     (checks) the HD interface kit's demonstration over the picture\n"
         "  --ui-scale N                  the HD interface's size, 75 to 150 percent by 5 (default: the settings', Auto; 100 headless)\n"
+        "  --game-pictures smooth|pixel  the game's icons and portraits in the HD interface: the pixel-art scaler or\n"
+        "                                nearest pixels (default: the settings', smooth; pixel headless)\n"
         "  --res3d N                     3D drawn N times sharper (1 = the DS's own; default 2 in the window, 1 headless)\n"
         "  --wide                        widescreen 16:9 world\n"
         "  --interp                      60 fps in-between frames for the 3D\n"
@@ -179,6 +181,7 @@ int main(int argc, char** argv)
     int consoleFocus = -1;
     int composeScale = 1;
     int uiScaleArg = 0;     // --ui-scale N (75-150): the HD interface's size for this run; 0 the settings' (headless 100)
+    int picturesArg = -1;   // --game-pictures: 1 smooth, 0 pixel; -1 the settings' (headless pixel)
     bool uiDemo = false;
     int res3d = 0;
     bool wide = false, interp = false;
@@ -209,6 +212,12 @@ int main(int argc, char** argv)
             long n = 0;
             if (!WholeNumber(next(), 1000, n) || n < 75 || n > 150 || n % 5) { Usage(); return 1; }
             uiScaleArg = (int)n;
+        }
+        else if (a == "--game-pictures")
+        {
+            const std::string v = next();
+            if (v != "smooth" && v != "pixel") { Usage(); return 1; }
+            picturesArg = v == "smooth";
         }
         else if (a == "--res3d") res3d = std::clamp(atoi(next().c_str()), 1, 8);
         else if (a == "--wide") wide = true;
@@ -321,10 +330,11 @@ int main(int argc, char** argv)
     // The settings file (not headless: those runs stay the same on every machine).
     const std::string settingsPath = headless ? "" : Settings::DefaultPath();
     if (!settingsPath.empty() && app.settings.Load(settingsPath)) fprintf(stderr, "settings: %s\n", settingsPath.c_str());
-    // The HD interface's size (ui/kit.h): headless 100 % unless the flag says (every check's picture
-    // as it was); the window the settings' (Auto from the window's physical size, AutoUiScale), the
-    // flag over them. Set again every frame (applyUi, below).
+    // The HD interface's size and the game's pictures (ui/kit.h): headless 100 % and Pixel unless the
+    // flags say (every check's picture as it was); the window the settings' (Auto from the window's
+    // physical size, AutoUiScale), the flags over them. Set again every frame (applyUi, below).
     ui::SetUiScale(uiScaleArg ? uiScaleArg / 100.0f : 1.0f);
+    ui::SetGamePictures(picturesArg == 1);
 
     // The HD shell (shell.h): its files in the settings folder (--data-dir: a check's; none
     // headless without it).
@@ -344,6 +354,7 @@ int main(int argc, char** argv)
     float lastAuto = 0;
     auto applyUi = [&]() {
         if (!window || !video.win) return;
+        ui::SetGamePictures(picturesArg >= 0 ? picturesArg == 1 : app.settings.smoothPictures);
         float z = uiScaleArg / 100.0f;
         if (!uiScaleArg)
         {

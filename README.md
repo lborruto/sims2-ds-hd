@@ -303,7 +303,9 @@ the built-in database only adds the others.
 
 Start + Back (or Esc) opens the pause menu; its Settings: layout, fullscreen (F11), smooth
 scaling, the interface's size (Auto follows your screen's size and the window's, so the
-conversations and menus are not huge on a big monitor; or 75 to 150 % by hand), 3D resolution, widescreen world, 60 fps, volume, sound during fast forward (muted, or at
+conversations and menus are not huge on a big monitor; or 75 to 150 % by hand), the game's
+pictures in the menus (Smooth: its icons and portraits redrawn with soft edges; Pixels: the DS's
+own), 3D resolution, widescreen world, 60 fps, volume, sound during fast forward (muted, or at
 normal pitch skipping ahead), the stick's cursor, its dead zone, how far a trigger goes down,
 rumble, the microphone (off, the blow key, the real one) and the language of the HD screens.
 Left / Right (or A) change the focused row.
@@ -403,8 +405,9 @@ state.
 ## Licence and credits
 
 GPLv3, see [LICENSE](LICENSE), as melonDS. Built on [melonDS](https://github.com/melonDS-emu/melonDS)
-1.1, [SDL2](https://www.libsdl.org/), [stb_image_write and stb_truetype](https://github.com/nothings/stb) and
-[tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/). The interface's font is
+1.1, [SDL2](https://www.libsdl.org/), [stb_image_write and stb_truetype](https://github.com/nothings/stb),
+[tinyfiledialogs](https://sourceforge.net/projects/tinyfiledialogs/) and
+[xBRZ](https://sourceforge.net/projects/xbrz/) (GPLv3, the game's pictures' Smooth look). The interface's font is
 [Nunito](https://github.com/googlefonts/nunito) (SIL Open Font License 1.1,
 [assets/fonts/OFL.txt](assets/fonts/OFL.txt)). The controller mappings are
 [SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB) (zlib licence,

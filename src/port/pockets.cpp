@@ -65,7 +65,7 @@ static void AddSpriteIcon(Composition& c, IconCache* icons, SpriteRef ref, int f
     if (!icons) return;
     if (const SpriteFrame* f = icons->Scaled(ref, frame, scale))
     {
-        UiItem a = ImageItem({box.x + (box.w - f->w) / 2, box.y + (box.h - f->h) / 2, f->w, f->h}, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h});
+        UiItem a = icons->Image(ref, frame, *f, {box.x + (box.w - f->w) / 2, box.y + (box.h - f->h) / 2, f->w, f->h});
         a.fill = opacity;
         c.ui.push_back(a);
     }

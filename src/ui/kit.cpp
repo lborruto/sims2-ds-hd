@@ -12,6 +12,8 @@
 #include <thread>
 #include <unordered_map>
 
+#include "xbrz/xbrz.h"
+
 namespace sims2wide::ui
 {
 const Theme& GameTheme()
@@ -457,6 +459,7 @@ struct Prepared
 {
     float chipW = 0;
     PlacedMask glyph, label;
+    std::shared_ptr<const Enlarged> big; // an image's, Smooth: the scaler's picture
 };
 
 // An item's own raster transform: its zoom and shift folded into the raster's scale and origin
@@ -470,11 +473,17 @@ inline Xf Eff(const UiItem& it, float s, float ox, float oy)
 }
 bool PsMarkOf(Mark m) { return m == Mark::PsCross || m == Mark::PsCircle || m == Mark::PsSquare || m == Mark::PsTriangle; }
 
+int SmoothFactor(const UiItem& it, float s);
 Prepared Prepare(const UiItem& it, float s0, float ox0, float oy0, int W, int H)
 {
     const Xf e = Eff(it, s0, ox0, oy0);
     const float s = e.s, ox = e.ox, oy = e.oy;
     Prepared p;
+    if (it.kind == UiItem::Image && it.smooth)
+    {
+        if (const int k = SmoothFactor(it, s); k >= 2) p.big = Enlarge(it, k);
+        return p;
+    }
     if (it.kind == UiItem::Text)
     {
         const std::vector<std::string> lines = it.wrap ? Wrap(it.text, it.size, (float)it.to.w, it.weight) : Wrap(it.text, it.size, 1e9f, it.weight);
@@ -682,16 +691,32 @@ u32 Texel(const UiItem& it, int k, int i, int j)
     return it.src[(size_t)Y * it.srcW + X];
 }
 
-void DrawImage(Layer& L, const UiItem& it, float s0, float ox0, float oy0)
+// Smooth: the scaler's factor for an image drawn at s (its own zoom applied): the whole factor at
+// or above its size, 2 to 6; 0 when it is not enlarged (drawn at its size or smaller).
+int SmoothFactor(const UiItem& it, float s)
+{
+    if (!it.src || it.from.w <= 0 || it.from.h <= 0 || it.srcW <= 0 || it.srcH <= 0) return 0;
+    const float f = std::min(it.to.w * s / it.from.w, it.to.h * s / it.from.h);
+    if (!(f > 1.0f + 1e-4f)) return 0;
+    return std::clamp((int)std::ceil(f - 1e-4f), 2, xbrz::SCALE_FACTOR_MAX);
+}
+
+void DrawImage(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const Prepared& p)
 {
     const Xf e = Eff(it, s0, ox0, oy0);
     const float s = e.s, ox = e.ox, oy = e.oy;
     if (!it.src || it.from.w <= 0 || it.from.h <= 0 || it.srcW <= 0 || it.srcH <= 0) return;
     const float x0 = (it.to.x - ox) * s, y0 = (it.to.y - oy) * s, tw = it.to.w * s, th = it.to.h * s;
     if (tw <= 0 || th <= 0) return;
-    // Nearest by the whole factor keeps the pixels square; bilinear covers what is left.
-    const int k = std::max(1, (int)std::floor(std::min(tw / it.from.w, th / it.from.h)));
-    const int nw = it.from.w * k, nh = it.from.h * k;
+    // Pixel: nearest by the whole factor keeps the pixels square; bilinear covers what is left.
+    // Smooth: the scaler's picture (Prepare's) in its place, bilinear from it.
+    const Enlarged* big = it.smooth ? p.big.get() : nullptr;
+    const int k = big ? 1 : std::max(1, (int)std::floor(std::min(tw / it.from.w, th / it.from.h)));
+    const int nw = big ? big->w : it.from.w * k, nh = big ? big->h : it.from.h * k;
+    auto Texel = [&](const UiItem& im, int kk, int i, int j) -> u32 {
+        if (big) return big->px[(size_t)std::clamp(j, 0, nh - 1) * nw + std::clamp(i, 0, nw - 1)];
+        return ui::Texel(im, kk, i, j);
+    };
     const float alpha = it.fill ? (it.fill >> 24) / 255.0f : 1.0f;
     const int X0 = std::max((int)std::lround(x0), L.x0), X1 = std::min((int)std::lround(x0 + tw), L.x1);
     const int Y0 = std::max((int)std::lround(y0), L.y0), Y1 = std::min((int)std::lround(y0 + th), L.y1);
@@ -828,9 +853,12 @@ UiItem ChipItem(int x, int y, Button b, const std::string& label, float size, fl
 namespace
 {
 std::atomic<float> gUiScale {1.0f};
+std::atomic<bool> gSmooth {false};
 }
 void SetUiScale(float scale) { gUiScale.store(scale > 0 ? scale : 1.0f); }
 float UiScale() { return gUiScale.load(); }
+void SetGamePictures(bool smooth) { gSmooth.store(smooth); }
+bool SmoothPictures() { return gSmooth.load(); }
 
 Rect Placed(const UiItem& it)
 {
@@ -863,9 +891,73 @@ float FitZoom(Rect box, float z, float ax, float ay, Rect limit)
     return std::max(fit, 0.0f);
 }
 
+namespace
+{
+struct EnlargedCache
+{
+    std::mutex mu;
+    std::unordered_map<u64, std::shared_ptr<const Enlarged>> map;
+    size_t bytes = 0;
+};
+EnlargedCache& Bigs()
+{
+    static EnlargedCache* c = new EnlargedCache;
+    return *c;
+}
+}
+
+std::shared_ptr<const Enlarged> Enlarge(const UiItem& im, int k)
+{
+    if (k < 2 || k > xbrz::SCALE_FACTOR_MAX || !im.src || im.srcW <= 0 || im.srcH <= 0 || im.from.w <= 0 || im.from.h <= 0) return nullptr;
+    // The picture's pixels (its rectangle clamped to the picture, as the nearest path reads it),
+    // with 2 more on each side repeated from its edge: the scaler looks 2 pixels around each one
+    // and takes what lies outside its input as transparent, which would round a crop's corners.
+    constexpr int kPad = 2;
+    const int fw = im.from.w, fh = im.from.h, pw = fw + 2 * kPad, ph = fh + 2 * kPad;
+    std::vector<u32> in((size_t)pw * ph);
+    u64 h = 0xCBF29CE484222325ull;
+    Mix(h, ((u64)(u32)fw << 32) | (u32)fh);
+    Mix(h, (u64)k);
+    for (int y = 0; y < ph; y++)
+        for (int x = 0; x < pw; x++)
+        {
+            const int X = std::clamp(im.from.x + std::clamp(x - kPad, 0, fw - 1), 0, im.srcW - 1);
+            const int Y = std::clamp(im.from.y + std::clamp(y - kPad, 0, fh - 1), 0, im.srcH - 1);
+            const u32 v = im.src[(size_t)Y * im.srcW + X];
+            in[(size_t)y * pw + x] = v;
+            if (x >= kPad && x < kPad + fw && y >= kPad && y < kPad + fh) Mix(h, v);
+        }
+    EnlargedCache& c = Bigs();
+    {
+        std::lock_guard<std::mutex> g(c.mu);
+        if (auto f = c.map.find(h); f != c.map.end()) return f->second;
+    }
+    std::vector<u32> out((size_t)pw * k * ph * k);
+    xbrz::scale((size_t)k, in.data(), out.data(), pw, ph, xbrz::ColorFormat::ARGB_UNBUFFERED);
+    auto e = std::make_shared<Enlarged>();
+    e->w = fw * k;
+    e->h = fh * k;
+    e->px.resize((size_t)e->w * e->h);
+    for (int y = 0; y < e->h; y++)
+        memcpy(&e->px[(size_t)y * e->w], &out[(size_t)(y + kPad * k) * pw * k + kPad * k], (size_t)e->w * 4);
+    std::lock_guard<std::mutex> g(c.mu);
+    const size_t size = e->px.size() * 4;
+    if (c.bytes + size > (64u << 20)) { c.map.clear(); c.bytes = 0; } // (the next frames make again what they show)
+    c.bytes += size;
+    return c.map.emplace(h, std::move(e)).first->second;
+}
+
+void ClearEnlarged()
+{
+    std::lock_guard<std::mutex> g(Bigs().mu);
+    Bigs().map.clear();
+    Bigs().bytes = 0;
+}
+
 UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from)
 {
     UiItem it;
+    it.smooth = SmoothPictures();
     it.kind = UiItem::Image;
     it.to = to;
     it.src = src;
@@ -946,6 +1038,7 @@ u64 HashImage(const UiItem& it)
     Mix(h, ((u64)(u32)it.from.w << 32) | (u32)it.from.h);
     Mix(h, ((u64)(u32)it.srcW << 32) | (u32)it.srcH);
     Mix(h, it.fill);
+    if (it.smooth) Mix(h, 0x534D4F4F5448ull);
     if (it.zoom != 1 || it.dx != 0 || it.dy != 0)
     {
         Mix(h, 0x5A4F4F4Dull ^ FloatBits(it.zoom));
@@ -1128,7 +1221,7 @@ void Rasterise(const std::vector<UiItem>& items, float scale, u32* argb, int w, 
         {
             const UiItem& it = items[i];
             foot[i] = Footprint(it, scale, ox, oy, w, h);
-            if (it.kind == UiItem::Chip || (it.kind == UiItem::Text && Meets(foot[i], {cx0, cy0, cx1 - cx0, cy1 - cy0})))
+            if (it.kind == UiItem::Chip || ((it.kind == UiItem::Text || (it.kind == UiItem::Image && it.smooth)) && Meets(foot[i], {cx0, cy0, cx1 - cx0, cy1 - cy0})))
                 prep[i] = Prepare(it, scale, ox, oy, w, h);
         }
     // Then the bands, side by side.
@@ -1170,8 +1263,8 @@ void Rasterise(const std::vector<UiItem>& items, float scale, u32* argb, int w, 
                 case UiItem::Chip: DrawChip(L, items[i], scale, ox, oy, prep[i]); break;
                 case UiItem::Image: break;
                 }
-            for (const UiItem& it : items)
-                if (it.kind == UiItem::Image) DrawImage(L, it, scale, ox, oy);
+            for (size_t i = 0; i < items.size(); i++)
+                if (items[i].kind == UiItem::Image) DrawImage(L, items[i], scale, ox, oy, prep[i]);
         }
         // Back to straight alpha.
         // (A pixel equal to the one before it gives what that one gave: a fill's run converts once.)
@@ -1347,8 +1440,8 @@ void LayerCache::Update(const std::vector<UiItem>& items, float scale, float ori
 bool WholeFactorCrop(const UiItem& im, const LayerAt& at, float scale)
 {
     if (im.kind != UiItem::Image || !im.src || im.srcW <= 0 || im.srcH <= 0) return false;
-    // (Zoomed: the kit's raster, whatever the factor.)
-    if (im.zoom != 1 || im.dx != 0 || im.dy != 0) return false;
+    // (Smooth: the scaler's, on the CPU; zoomed: the kit's raster, whatever the factor.)
+    if (im.smooth || im.zoom != 1 || im.dx != 0 || im.dy != 0) return false;
     const Rect f = im.from;
     if (f.w <= 0 || f.h <= 0 || f.x < 0 || f.y < 0 || f.x + f.w > im.srcW || f.y + f.h > im.srcH) return false;
     const float tw = im.to.w * scale, th = im.to.h * scale;

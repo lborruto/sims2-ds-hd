@@ -88,6 +88,7 @@ bool Settings::Load(const std::string& path)
         }
         else if (k == "battery_saver") batterySaver = on;
         else if (k == "ui_scale") uiScale = v == "auto" ? 0 : std::clamp((atoi(v.c_str()) + 2) / 5 * 5, 75, 150);
+        else if (k == "game_pictures") smoothPictures = v != "pixel";
         else if (k == "mute") mute = on;
         else if (k == "run_in_background") runInBackground = on;
         else if (k == "fast_forward_speed") { const int n = atoi(v.c_str()); fastSpeed = n >= 2 ? std::min(n, 4) : 0; }
@@ -157,6 +158,7 @@ bool Settings::Save(const std::string& path) const
         << "scaling=" << ScalingKey(scaling) << "\n"
         << "battery_saver=" << (batterySaver ? 1 : 0) << "\n"
         << "ui_scale=" << (uiScale == 0 ? std::string("auto") : std::to_string(uiScale)) << "\n"
+        << "game_pictures=" << (smoothPictures ? "smooth" : "pixel") << "\n"
         << "window=" << windowW << "x" << windowH << "\n"
         << "window_position=" << windowX << "," << windowY << "\n"
         << "volume=" << volume << "\n"

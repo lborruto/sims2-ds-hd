@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "romdata.h"
+#include "ui/kit.h"
 
 namespace sims2wide
 {
@@ -42,6 +43,10 @@ public:
     // scale x scale block); null as above, or for an empty size or one past kMaxScaled (4096) either way.
     const SpriteFrame* Scaled(SpriteRef s, int frame, int w, int h);
     const SpriteFrame* Scaled(SpriteRef s, int frame, int scale);
+    // The image item that draws frame `frame` of s at `to` from its copy `scaled` (Scaled's, the
+    // size `to` has): Pixel (ui::SmoothPictures false) that copy itself, as always; Smooth the
+    // frame as it is, so the kit enlarges it with the pixel-art scaler at the window's own size.
+    ui::UiItem Image(SpriteRef s, int frame, const SpriteFrame& scaled, Rect to);
 
     const RomData* Rom() const { return rom; }
 

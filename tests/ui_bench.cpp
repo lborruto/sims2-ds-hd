@@ -7,9 +7,9 @@
 // every picture so two builds can be compared pixel for pixel.
 // The window draws the live crops with the GPU (ui::WholeFactorCrop); --images-cpu rasters them
 // as --compose does (the digest of two builds compares then).
-// --threads N: the raster's threads (1: one; default: the machine's). --ui-scale N (percent): the
-// UI's size (task 10; default 100).
-//   ninja -C build ui_bench && ./build/ui_bench [scale] [--images-cpu] [--threads N] [--ui-scale N]
+// --threads N: the raster's threads (1: one; default: the machine's). --ui-scale N (percent) and
+// --game-pictures smooth|pixel: the UI's size and the pictures' look (task 10; default 100, pixel).
+//   ninja -C build ui_bench && ./build/ui_bench [scale] [--images-cpu] [--threads N] [--ui-scale N] [--game-pictures smooth]
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -196,6 +196,7 @@ int main(int argc, char** argv)
         if (!strcmp(argv[i], "--images-cpu")) imagesCpu = true;
         else if (!strcmp(argv[i], "--threads") && i + 1 < argc) ui::SetRasterThreads(atoi(argv[++i]));
         else if (!strcmp(argv[i], "--ui-scale") && i + 1 < argc) ui::SetUiScale(atoi(argv[++i]) / 100.0f);
+        else if (!strcmp(argv[i], "--game-pictures") && i + 1 < argc) ui::SetGamePictures(!strcmp(argv[++i], "smooth"));
         else scale = (float)atof(argv[i]);
     }
     RomData rom;

@@ -80,7 +80,7 @@ void AddIcon(Composition& c, IconCache* icons, const Icon& i)
 {
     if (!icons) return;
     if (const SpriteFrame* f = icons->Scaled(i.ref, i.frame, i.scale))
-        c.ui.push_back(ImageItem({i.box.x + (i.box.w - f->w) / 2, i.box.y + (i.box.h - f->h) / 2, f->w, f->h}, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h}));
+        c.ui.push_back(icons->Image(i.ref, i.frame, *f, {i.box.x + (i.box.w - f->w) / 2, i.box.y + (i.box.h - f->h) / 2, f->w, f->h}));
 }
 void Well(Composition& c, Rect r, u32 fill, float radius)
 {

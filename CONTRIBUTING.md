@@ -110,8 +110,9 @@ issue.
   change nothing (the check below). Another change to it needs an issue first; most belong
   upstream.
 - **No new dependency without discussion.** Today: melonDS, SDL2, stb_image_write,
-  stb_truetype, tinyfiledialogs, the Nunito font (and Pillow
-  for `tools/sheet.py` only).
+  stb_truetype, tinyfiledialogs, xBRZ (`src/thirdparty/xbrz`, 1.8 from its SourceForge release,
+  unchanged: GPLv3 like the program, its licence beside it as `LICENSE.txt`; the release archives'
+  `LICENSE` covers it), the Nunito font (and Pillow for `tools/sheet.py` only).
 - **Measure performance claims**, more than once, on the same save state, with `--headless`.
 - **Playable from the keyboard and mouse alone.**
 

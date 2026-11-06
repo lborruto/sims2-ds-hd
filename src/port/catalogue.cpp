@@ -55,7 +55,7 @@ void AddItemIcon(Composition& c, IconCache* icons, const ShopItem& it, Rect cell
     if (!f || f->w <= 0 || f->h <= 0) return;
     const int scale = std::clamp((cell.w - 16) / std::max(f->w, f->h), 1, 3);
     if (const SpriteFrame* a = icons->Scaled(ref, 0, scale))
-        c.ui.push_back(ImageItem({cell.x + (cell.w - a->w) / 2, cell.y + (cell.h - a->h) / 2, a->w, a->h}, a->argb.data(), a->w, a->h, {0, 0, a->w, a->h}));
+        c.ui.push_back(icons->Image(ref, 0, *a, {cell.x + (cell.w - a->w) / 2, cell.y + (cell.h - a->h) / 2, a->w, a->h}));
 }
 
 // "§1,200" (the game's "$@1", its '$' the simoleon drawn §); a negative price is not shown.

@@ -4,6 +4,7 @@
 // pixels, and the same items always give the same pixels (no clock, no animation here).
 // UI items are drawn after a composition's pieces and overlays and never take the mouse.
 #pragma once
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -96,6 +97,11 @@ struct UiItem
     const u32* src = nullptr;
     int srcW = 0, srcH = 0; // the picture's size (srcW is its stride)
     Rect from {};
+    // Image: Smooth (SetGamePictures, copied by ImageItem): the game's pixel art enlarged by the
+    // pixel-art scaler (xBRZ, src/thirdparty/xbrz) to the whole factor at or above the size it is
+    // drawn at, then bilinear to it; false: nearest by the whole factor, then bilinear (Pixel).
+    bool smooth = false;
+
     // The UI's size (SetUiScale; console.cpp, the shell and the window's marks set it per group of
     // items about the group's anchor): every canvas point p of the item is drawn at
     // zoom * p + (dx, dy), its sizes (text, radius, border, shadows, a chip's) zoom times; the
@@ -120,9 +126,13 @@ UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from);
 
 // The UI's size (the player's setting, Auto or 75-150 %, the window's; 1 headless unless
 // --ui-scale): what the HD screens' builders zoom their groups of items by (console.cpp, the
-// shell, the window's toast and marks).
+// shell, the window's toast and marks). The game's pictures in the HD UI: Smooth (the pixel-art
+// scaler) or Pixel (nearest, the default: every check's picture as it always was); ImageItem
+// copies it into the item, so the raster stays a function of the items.
 void SetUiScale(float scale);
 float UiScale();
+void SetGamePictures(bool smooth);
+bool SmoothPictures();
 // The chips' look now (SetChipLook's): a builder that prints another button for another device
 // (the keyboard's turn keys rather than the right stick).
 const ChipLook& ChipLookNow();
@@ -133,6 +143,13 @@ void ZoomItem(UiItem& it, float z, float ax, float ay);
 // The largest zoom up to z at which `box` zoomed about (ax, ay) does not reach past `limit` on any
 // side it grows towards (z itself when it fits; never below 0).
 float FitZoom(Rect box, float z, float ax, float ay, Rect limit);
+// The pixel-art scaler's picture for an image item (Smooth): its `from` rectangle enlarged k times
+// (2-6), straight alpha, kept in a cache by its pixels and k (64 MB at most): the same pixels give
+// the same picture. Null for k outside 2-6 or a picture that does not read.
+struct Enlarged { std::vector<u32> px; int w = 0, h = 0; };
+std::shared_ptr<const Enlarged> Enlarge(const UiItem& image, int k);
+void ClearEnlarged();
+
 // The items' bounds on the canvas (shadows included), empty when none draws anything.
 Rect Bounds(const std::vector<UiItem>& items);
 // A hash of everything that changes the still items' raster (images are left out: they are

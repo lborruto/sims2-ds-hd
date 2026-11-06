@@ -681,18 +681,19 @@ static void platform()
         Settings e;
         e.Load(path);
         CHECK(e.scaling == Scaling::Sharp && e.fastSpeed == 4 && e.cursorSpeed == 50);
-        // Task 10: the interface's size (auto or 75-150 by 5).
+        // Task 10: the interface's size (auto or 75-150 by 5) and the game's pictures.
         Settings u;
-        CHECK(u.uiScale == 0);
+        CHECK(u.uiScale == 0 && u.smoothPictures);
         u.uiScale = 135;
+        u.smoothPictures = false;
         CHECK(u.Save(path));
         Settings v;
-        CHECK(v.Load(path) && v.uiScale == 135);
-        { std::ofstream(path) << "ui_scale=auto\n"; }
+        CHECK(v.Load(path) && v.uiScale == 135 && !v.smoothPictures);
+        { std::ofstream(path) << "ui_scale=auto\ngame_pictures=smooth\n"; }
         Settings w;
         w.uiScale = 90;
         w.Load(path);
-        CHECK(w.uiScale == 0);
+        CHECK(w.uiScale == 0 && w.smoothPictures);
         { std::ofstream(path) << "ui_scale=500\n"; }
         w.Load(path);
         CHECK(w.uiScale == 150);
