@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/gameplay.webp" alt="The Sims 2 DS in one window: the town at night fills most of it, the phone from the touch screen sits on the right" width="900">
+  <img src="docs/screenshots/gameplay.webp" alt="The Sims 2 DS played like a console game: the casino fills the window, the HD status bar (clock, money, Sanity) and the Menu chip at the bottom" width="900">
 </p>
 
 ## What it does
