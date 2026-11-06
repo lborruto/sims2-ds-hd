@@ -332,6 +332,16 @@ def world_full(rows=192):
     fx = (256 - fw) // 2
     return lambda cx, cy: top(fx + (cx - x0) * fw // rw, cy * rows // 720)
 
+def menu_hint_chip():
+    """The menu hint is a kit panel (the status bar's, the TOUCH MENU's chip in it: headless has no
+    pad and never polls one, so the chip stays the kit's default look, the Xbox one: a BACK pill
+    with a dark body), level with the status bar and ending at the canvas's right edge less 16:
+    its dark outline at x 1263, its frame band (#6171B2) inside it, the panel's fill, the pill."""
+    expect("menu hint chip's outline", C(1263, 684), OUTLINE)
+    expect("menu hint chip's frame band", C(1260, 684), hexrgb("6171B2"))
+    expect("menu hint chip's fill", C(1256, 684), FRAME)
+    expect("menu hint chip's BACK pill", C(1124, 684), (46, 48, 99))
+
 def rail():
     """No rail (the owner: the HD menu, Back / E, replaced it): where it was is the backdrop at 4:3
     (the world ends at 1163); and the menu hint chip, its outline, at the canvas's right edge level
@@ -340,8 +350,7 @@ def rail():
     expect("no rail: backdrop where its frame was", C(1170, 360), BACK)
     expect("no rail: backdrop where its tabs were", C(1200, 300), BACK)
     expect("no rail: backdrop where its phone was", C(1210, 174), BACK)
-    expect("menu hint chip's outline", C(1262, 684), OUTLINE)
-    expect("menu hint chip's frame", C(1260, 684), FRAME)
+    menu_hint_chip()
     # The world without the game's status bar (its last 16 rows): 176 rows 720 high.
     w = world_full(176)
     for cx, cy in ((400, 100), (700, 650), (1000, 300), (900, 715)):
@@ -369,6 +378,13 @@ def status_bar(values=None, left=132):
     expect("status bar band, top", C(x0 + 18, y0 + 2), BAND)
     expect("status bar band, left", C(x0 + 2, 684), BAND)
     band = [x for x in range(x0, 1160) if C(x, 684) == BAND]
+    # (the menu hint chip's panel, right of the bar, has the same band: the scan stops at x 1160,
+    # so it sees the chip's left edge, a run after the bar's own two)
+    runs = [[x] for x in band[:1]]
+    for x in band[1:]:
+        if x - runs[-1][-1] > 1: runs.append([x])
+        else: runs[-1].append(x)
+    if len(runs) >= 3: band = runs[0] + runs[1]
     if not band or band[0] > x0 + 3:
         errors.append("no status bar panel")
         return
@@ -804,7 +820,7 @@ elif case == "cityhall-wide":
         expect(f"wide world at {cx},{cy}", C(cx, cy), big.getpixel((cx * 341 // 1280, cy * 176 // 661)))
     for cx, cy in ((1000, 680), (1270, 715), (700, 700)):
         expect(f"backdrop below the world at {cx},{cy}", C(cx, cy), (16, 18, 24))
-    expect("menu hint chip's outline", C(1262, 684), OUTLINE)
+    menu_hint_chip()
     status_bar(left=16)
 elif case == "s7":
     hd_phone(None)
