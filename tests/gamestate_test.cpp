@@ -63,9 +63,14 @@ static void panel_and_popup()
     r.W32(0x0219E000 + 0xE0, (u32)-1);
     CHECK(ReadGameState(r.View()).selection == -1);
     r.W32(kS + 0x64, 3);
-    r.W16(kS + 0xD0, 0x204);
+    r.W32(kS + 0x40, 0x0219E800);
+    r.W32(0x0219E800, 0x02132580);
+    r.W32(0x0219E800 + 0x24, 3);
+    r.W16(kS + 0xD0, 0x204);   // the big portrait: not the selection
     g = ReadGameState(r.View());
-    CHECK(g.tab == 3 && g.selection == 0x204 && GameStateName(g) == "Panel/Relationships");
+    CHECK(g.tab == 3 && g.selection == 3 && GameStateName(g) == "Panel/Relationships");
+    r.W32(0x0219E800, 0x1234);   // not the tab's vtable
+    CHECK(ReadGameState(r.View()).selection == -1);
 }
 
 // The black loads: the manager reads, its bottom object pointer is null.
@@ -513,6 +518,165 @@ static void town_random()
     }
 }
 
+// ---- The menus' lists on a synthetic RAM: hand-written chains with made-up values.
+constexpr u32 kT = 0x0219E000, kTG = 0x0219E800, kTR = 0x0219F000, kE = 0x021A0000, kActor = 0x021A0100, kIface = 0x021A0200;
+constexpr u32 kGb = 0x021670A4;
+static Ram menus_ram(u32 vt, int ov, u32 tab)
+{
+    Ram r = Make(vt, ov);
+    r.W32(0x0213E434, kGb);
+    r.W32(kS + 0x64, tab);
+    return r;
+}
+static void put_sim_row(Ram& r, int k)
+{
+    const u32 a = kRec + 0x12 * (k + 2);
+    r.W16(a + 8, 323 + k); r.W16(a + 0xA, 1000 + k);
+}
+static void interact_list()
+{
+    Ram r = menus_ram(0x0213203C, -1, 0);
+    r.W32(kS + 0x34, kT); r.W32(kT, 0x021321C4);
+    put_item_row(r, 29, 100); put_sim_row(r, 51);
+    r.W32(kT + 0x300, kE); r.W32(kE, kActor); r.W32(kE + 4, 1);
+    r.W16(kActor + 0xA, 29); r.W16(kActor + 0xC, 0xB); r.W32(kActor + 0x130, kIface);
+    r.W32(kIface + 8, 3); r.W8(kIface + 0x10, 0x62); r.W8(kIface + 0x11, 0x02); r.W8(kIface + 0x12, 0x5D);
+    r.W32(kT + 0x314, 0); r.W32(kT + 0x318, 1);
+    r.W16(kS + 0xD0, 0x1A5A);
+    GameState g = ReadGameState(r.View());
+    const InteractState& v = g.town.interact;
+    CHECK(v.valid && v.target.kind == TargetRef::Object && v.target.nameId == 463 + 29 && v.padMode == 0 && v.highlighted == 1);
+    CHECK(v.actions.size() == 3 && v.actions[0].labelId == 1845 + 0x62 && !v.actions[0].greyed && v.actions[1].greyed && v.bigPortraitRes == 0x1A5A);
+    CHECK(v.prev.kind == TargetRef::None && v.next.kind == TargetRef::None);
+    // a Sim target, an unknown one, and the neighbours
+    r.W16(kActor + 0xA, 51); r.W16(kActor + 0xC, 2); r.W32(kE + 4, 2);
+    CHECK(ReadGameState(r.View()).town.interact.target.nameId == 321);
+    r.W32(kE + 4, 1);
+    CHECK(ReadGameState(r.View()).town.interact.target.nameId == 323 + 51);
+    r.W32(kT + 0x308, kE);
+    CHECK(ReadGameState(r.View()).town.interact.next.index == 51);
+    // garbage: each part invalid on its own
+    r.W32(kT + 0x308, 0);
+    r.W16(kActor + 0xA, 57); CHECK(!ReadGameState(r.View()).town.interact.valid);       // Sim index out of the table
+    r.W16(kActor + 0xA, 51); r.W32(kIface + 8, 5); CHECK(!ReadGameState(r.View()).town.interact.valid);   // too many actions
+    r.W32(kIface + 8, 3); r.W8(kIface + 0x10, 0x70); CHECK(!ReadGameState(r.View()).town.interact.valid);   // label out of the verb list
+    r.W8(kIface + 0x10, 0x62); r.W32(kT + 0x314, 3); CHECK(!ReadGameState(r.View()).town.interact.valid);
+    r.W32(kT + 0x314, 1); r.W32(kT + 0x318, 7); CHECK(ReadGameState(r.View()).town.interact.valid == false);
+    r.W32(kT + 0x318, 0); r.W32(kT, 0x1234); CHECK(!ReadGameState(r.View()).town.interact.valid);   // wrong vtable
+    r.W32(kT, 0x021321C4); r.W32(kT + 0x300, 0); r.W32(kT + 0x308, 0x90000); r.W32(kT + 0x30C, 0x616);   // no target (stale strip pointers): valid, kind None
+    const InteractState n = ReadGameState(r.View()).town.interact;
+    CHECK(n.valid && n.target.kind == TargetRef::None && n.actions.empty());
+    CHECK(ReadGameState(r.View()).town.goals.valid == false);   // read only on its own tab
+}
+static void goals_list()
+{
+    Ram r = menus_ram(0x0213203C, -1, 2);
+    r.W32(kS + 0x3C, kTG); r.W32(kTG, 0x02132480);
+    r.W32(kTG + 0x50C, 2); r.W32(kTG + 0x510, 4);
+    r.W32(kTG + 0x18, 3); r.W32(kTG + 0x1C, 0); r.W32(kTG + 0x20, 1); r.W8(kTG + 0x24, 1);
+    r.W32(kTG + 0x28, 5); r.W32(kTG + 0x2C, 1); r.W32(kTG + 0x30, 3); r.W8(kTG + 0x34, 1);
+    r.W32(kTG + 0x514, 1); r.W32(kTG + 0x518, 0);
+    GameState g = ReadGameState(r.View());
+    const GoalsState& v = g.town.goals;
+    CHECK(v.valid && v.entries.size() == 2 && v.entries[0].textId == 1627 + 3 && v.entries[1].textId == 1627 + 5 && v.entries[1].nLines == 3 && v.selected == 1 && v.lines == 4 && !v.footer);
+    r.W32(kTG + 0x30, 4); CHECK(!ReadGameState(r.View()).town.goals.valid);   // lines past the total
+    r.W32(kTG + 0x30, 3); r.W32(kTG + 0x28, 34); CHECK(!ReadGameState(r.View()).town.goals.valid);   // mission id out of range
+    r.W32(kTG + 0x28, 5); r.W32(kTG + 0x514, 2); CHECK(!ReadGameState(r.View()).town.goals.valid);   // selection past the count
+    r.W32(kTG + 0x514, 1); r.W32(kTG + 0x50C, 45); CHECK(!ReadGameState(r.View()).town.goals.valid);
+    // the footer: game flag 17 set, the score from the weights' table (made-up weights 7)
+    r.W32(kTG + 0x50C, 2);
+    r.W32(kGb + 0x4814, 1u << 17); r.W32(kGb + 0x4410, 0x3);
+    r.W8(0x0211F9EC + 2, 7); r.W8(0x0211F9EC + 6, 9);
+    const GoalsState f = ReadGameState(r.View()).town.goals;
+    CHECK(f.valid && f.footer && f.score == 16 && f.footerId == 1841 && f.scoreId == 1842);
+}
+static void relations_list()
+{
+    Ram r = menus_ram(0x0213203C, -1, 3);
+    r.W32(kS + 0x40, kTR); r.W32(kTR, 0x02132580);
+    put_sim_row(r, 4); put_sim_row(r, 9);
+    const u32 R4 = kGb + 0x21DC + 0x2C * 4, R9 = kGb + 0x21DC + 0x2C * 9;
+    r.W16(R4 + 0x18, 4); r.W32(R4 + 0x14, 1); r.W8(R4 + 0x1A, 2); r.W8(R4 + 0x1B, 5);
+    r.W16(R9 + 0x18, 9); r.W32(R9 + 0x14, 3); r.W8(R9 + 0x1A, 0); r.W8(R9 + 0x1B, 1);
+    r.W32(kTR + 0x1C, 2); r.W32(kTR + 0x2C, R4); r.W32(kTR + 0x30, R9);
+    r.W32(kTR + 0x24, 1); r.W32(kTR + 0x28, 9); r.W32(kTR + 0x20, 0);
+    GameState g = ReadGameState(r.View());
+    const RelState& v = g.town.relations;
+    CHECK(g.selection == 1 && v.valid && v.sims.size() == 2 && v.selected == 1);
+    CHECK(v.sims[0].nameId == 327 && v.sims[0].descId == 393 && v.sims[0].moodId == 186 && v.sims[0].levelId == 192 + 14 + 5 && v.sims[0].portraitRes == 1004);
+    CHECK(v.sims[1].secret && !v.sims[0].secret);
+    r.W32(kTR + 0x28, 4); CHECK(!ReadGameState(r.View()).town.relations.valid);        // the Sim id beside the index disagrees
+    r.W32(kTR + 0x28, 9); r.W32(kTR + 0x30, R9 + 1); CHECK(!ReadGameState(r.View()).town.relations.valid);   // not a record
+    r.W32(kTR + 0x30, kGb + 0x21DC + 0x2C * 30); CHECK(!ReadGameState(r.View()).town.relations.valid);        // beyond the 24 listed
+    r.W32(kTR + 0x30, R9); r.W32(kTR + 0x1C, 25); CHECK(!ReadGameState(r.View()).town.relations.valid);
+    r.W32(kTR + 0x1C, 2); r.W32(R9 + 0x14, 2); CHECK(!ReadGameState(r.View()).town.relations.valid);          // not met
+}
+static void phone_gift_note()
+{
+    Ram r = menus_ram(0x02131F08, -1, 0);
+    r.W8(kS + 0x88, 3); r.W8(kS + 0x89, 4); r.W8(kS + 0x8A, 3); r.W8(kS + 0x56, 1);
+    const u32 E1 = kGb + 0x303C + 0x24;
+    r.W8(E1 + 0x1A, 1); r.W8(E1 + 0x1B, 0); r.W32(E1 + 0x14, 2311); r.W16(E1 + 0x18, 45); r.W32(E1 + 4 * 0, 0);
+    for (int i = 0; i < 4; i++) r.W32(0x0211E99C + 4 * i, 2066 + i);
+    r.W8(kGb + 0x31C5, 2);
+    PhoneState p = ReadGameState(r.View()).town.phone;
+    CHECK(p.valid && p.page == 3 && p.row == 4 && p.scroll == 3 && p.shownSlot == 1 && p.ringtone == 2 && p.menuIds[3] == 2069);
+    CHECK(p.inbox.size() == 1 && p.inbox[0].slot == 1 && p.inbox[0].textId == 2311 && p.inbox[0].senderNameId == 323 + 45 && !p.inbox[0].read);
+    r.W8(kS + 0x56, 0xFF); r.W8(kS + 0x88, 2);   // stale fields off their pages are ignored
+    CHECK(ReadGameState(r.View()).town.phone.valid && ReadGameState(r.View()).town.phone.shownSlot == -1);
+    r.W8(kS + 0x88, 3); CHECK(ReadGameState(r.View()).town.phone.valid);   // -1 after a delete
+    r.W8(kS + 0x56, 10); CHECK(!ReadGameState(r.View()).town.phone.valid);
+    r.W8(kS + 0x56, 1); r.W8(kS + 0x88, 11); CHECK(!ReadGameState(r.View()).town.phone.valid);
+    r.W8(kS + 0x88, 3); r.W8(E1 + 0x1A, 2); CHECK(!ReadGameState(r.View()).town.phone.valid);
+    r.W8(E1 + 0x1A, 1); r.W16(E1 + 0x18, 60); CHECK(!ReadGameState(r.View()).town.phone.valid);   // sender not a Sim
+    r.W16(E1 + 0x18, 45); r.W8(kGb + 0x31C5, 9); CHECK(!ReadGameState(r.View()).town.phone.valid);
+    r.W8(kGb + 0x31C5, 2); r.W8(kS + 0x88, 7); r.W8(kS + 0x86C, 22); r.W32(kS + 0x870, 2);
+    p = ReadGameState(r.View()).town.phone;
+    CHECK(p.valid && p.contacts == 22 && p.contactSim == 2);
+    r.W8(kS + 0x86C, 65); CHECK(!ReadGameState(r.View()).town.phone.valid);
+
+    // Give Gift
+    Ram q = menus_ram(0x0214ABA4, 6, 0);
+    put_item_row(q, 106, 200);
+    q.W32(kGb + 0x215C, 1); q.W16(kGb + 0x28, 106);
+    q.W32(kS + 0x24, kActor); q.W16(kActor + 0xA, 22); q.W16(kGb + 0x21DC + 0x2C * 22 + 0x18, 22);
+    q.W32(kS + 0x4C, 0); q.W32(kS + 0x34, kE); q.W8(kE + 0x94, 1);
+    GiftState gf = ReadGameState(q.View()).town.gift;
+    CHECK(gf.valid && gf.recipient == 22 && gf.recipientNameId == 345 && gf.slot == 0 && gf.refused[0]);
+    q.W32(kS + 0x4C, 1); CHECK(!ReadGameState(q.View()).town.gift.valid);   // slot past the pockets
+    q.W32(kS + 0x4C, 0); q.W16(kActor + 0xA, 46); CHECK(!ReadGameState(q.View()).town.gift.valid);
+    q.W16(kActor + 0xA, 22); q.W8(kE + 0x94, 2); CHECK(!ReadGameState(q.View()).town.gift.valid);
+
+    // Notes: overlay 11
+    Ram n = menus_ram(0x0214A040, 11, 0);
+    n.W16(kS + 0x2C, 0x509);
+    NoteState nt = ReadGameState(n.View()).town.note;
+    CHECK(nt.valid && nt.textId == 0x509 && nt.playerName);
+    n.W16(kS + 0x2C, 3127); CHECK(!ReadGameState(n.View()).town.note.valid);
+    n.W16(kS + 0x2C, 100);
+    CHECK(ReadGameState(n.View()).town.note.valid && !ReadGameState(n.View()).town.note.playerName);
+    Ram w = menus_ram(0x0214A040, 10, 0); w.W16(kS + 0x2C, 100);   // another overlay with that vtable: not a note
+    CHECK(!ReadGameState(w.View()).town.note.valid);
+}
+static void menus_random()
+{
+    std::mt19937 rng(11);
+    const u32 tabs[] = {0, 1, 2, 3};
+    for (int round = 0; round < 400; round++)
+    {
+        Ram r = menus_ram(0x0213203C, -1, tabs[round % 4]);
+        r.W32(kS + 0x34, kT); r.W32(kT, 0x021321C4); r.W32(kS + 0x38, 0x0219E400); r.W32(0x0219E400, 0x0213232C);
+        r.W32(kS + 0x3C, kTG); r.W32(kTG, 0x02132480); r.W32(kS + 0x40, kTR); r.W32(kTR, 0x02132580);
+        for (int i = 0; i < 400; i++)
+        {
+            const u32 areas[] = {kT, kTG, kTR, 0x0219E400, kE, kActor, kIface, kGb + 0x2BE8, kGb + 0x21DC, kGb + 0x303C, kS};
+            r.W8(areas[rng() % 11] + rng() % 0x600, (u32)rng());
+        }
+        const GameState g = ReadGameState(r.View());   // must not crash or run out of bounds; counts stay capped
+        CHECK(g.town.goals.entries.size() <= 44 && g.town.relations.sims.size() <= 24 && g.town.interact.actions.size() <= 4 && g.town.phone.inbox.size() <= 10);
+    }
+}
+
 int main()
 {
     records();
@@ -521,6 +685,11 @@ int main()
     popup();
     saves();
     town_random();
+    interact_list();
+    goals_list();
+    relations_list();
+    phone_gift_note();
+    menus_random();
     hud();
     dialogue();
     between_screens();

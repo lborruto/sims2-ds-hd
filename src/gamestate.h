@@ -118,6 +118,126 @@ struct SaveSlots
     bool operator==(const SaveSlots&) const = default;
 };
 
+// The menus' lists, each read apart from the game's tab / screen objects (heap: re-read every frame,
+// vtable checked) and from the block G. Ids are strings_EN numbering or rom.bin resource ids; the
+// words and pictures come from RomData. -1 = none.
+// An Interact target: a Sim or an object of the shared record table.
+struct TargetRef
+{
+    enum Kind { None, Sim, Object };
+    int kind = None;
+    int index = -1;                   // record index k (Sim k, object id)
+    int nameId = -1;                  // string id of the name (321 "???" for an unknown Sim)
+    int portraitRes = -1;             // the record's +0xA picture
+    bool unknown = false;
+    bool operator==(const TargetRef&) const = default;
+};
+struct InteractAction
+{
+    int code = 0;
+    int labelId = -1;                 // 1845 + code
+    bool greyed = false;              // disabled: the D-pad skips it
+    bool operator==(const InteractAction&) const = default;
+};
+struct InteractState
+{
+    bool valid = false;
+    TargetRef target, prev, next;     // kind None = no target (the title is just "Interact"); prev / next: the strip's neighbours
+    int bigPortraitRes = -1;          // S+0xD0: the big picture (0x1A5A the plumbob, -1 none)
+    std::vector<InteractAction> actions;   // 0..4 rows
+    int padMode = 1;                  // T+0x314: 1 stylus, 0 pad mode (A held), 2 after an action until A is released
+    int highlighted = -1;             // T+0x318 as the game holds it (the first enabled row, 0, outside pad mode); lit only when padMode is 0
+    bool operator==(const InteractState&) const = default;
+};
+
+struct PocketsSel
+{
+    bool valid = false;
+    int slot = -1;                    // Pk+0x74: selected pocket slot, -1 none
+    int key = -1;                     // Pk+0xE0: selected key item 0..2, -1 none
+    int counted = -1;                 // the selected counted item 0..3 (its ring), -1 none
+    bool operator==(const PocketsSel&) const = default;
+};
+
+struct GoalEntry
+{
+    bool mission = false;             // a mission goal (id 0..33) or a hotel request (id 0..9)
+    int id = -1;
+    int textId = -1;                  // mission: 1627 + id; request: the record's own string
+    int nameId = -1, placeId = -1;    // request: @1 / @2 (323 + Sim, 0x43 + place)
+    int firstLine = 0, nLines = 0;    // lines of the 152 px box, 7 fit
+    bool operator==(const GoalEntry&) const = default;
+};
+struct GoalsState
+{
+    bool valid = false;
+    std::vector<GoalEntry> entries;
+    int lines = 0;                    // total text lines
+    int selected = -1, first = 0;     // selected entry, first visible line
+    int portraitRes = -1;             // the mission giver's portrait (-1 when it does not read)
+    bool footer = false;              // the hotel footer is shown (game flag 17)
+    int footerId = -1, scoreId = -1, score = 0;   // 1841 / 1843, 1842 and the hotel score in percent
+    bool operator==(const GoalsState&) const = default;
+};
+
+struct RelEntry
+{
+    int id = -1;                      // Sim id: name 323 + id, description 389 + id
+    int nameId = -1, descId = -1;
+    int moodId = -1, levelId = -1;    // 184 + mood, 192 + 7 * mood + level
+    int portraitRes = -1;
+    bool secret = false;              // the Secret Info button is shown
+    bool operator==(const RelEntry&) const = default;
+};
+struct RelState
+{
+    bool valid = false;
+    std::vector<RelEntry> sims;       // met Sims, in the game's order (at most 24)
+    int first = 0, selected = -1;     // the top of the 4 portraits, the selected entry
+    bool operator==(const RelState&) const = default;
+};
+
+struct InboxMsg
+{
+    int slot = -1;                    // 0..9
+    int textId = -1;
+    int sender = -1, senderNameId = -1;
+    bool read = false;
+    u32 args[4] = {};                 // @1..@4 (0 in @1: the player's name), argNum: 1 = a number
+    int argNum[4] = {};
+    bool operator==(const InboxMsg&) const = default;
+};
+struct PhoneState
+{
+    bool valid = false;
+    int page = -1;                    // 0 menu, 1 incoming, 2 messages, 3 message, 4 options, 5 phonebook, 6..9 replies, 10 leaving
+    int row = -1, scroll = -1;        // highlighted row, first visible row (4 fit)
+    std::vector<InboxMsg> inbox;      // the messages present, in slot order
+    int menuIds[4] = {};              // page 0's rows (the game's table)
+    int shownSlot = -1;               // page 3: the inbox slot shown
+    int ringtone = -1;                // the current one, 0..6
+    int contacts = 0, contactSim = -1;   // page 7: rows and the Sim under the highlight
+    bool operator==(const PhoneState&) const = default;
+};
+
+struct GiftState
+{
+    bool valid = false;
+    int recipient = -1;               // Sim record index
+    int recipientNameId = -1;         // title: string 2422 "Give Item to @1"
+    int slot = -1;                    // selected pocket slot, -1 none
+    bool refused[6] = {};             // slot i cannot be given to this Sim
+    bool operator==(const GiftState&) const = default;
+};
+
+struct NoteState
+{
+    bool valid = false;
+    int textId = -1;
+    bool playerName = false;          // @1 = the player's name
+    bool operator==(const NoteState&) const = default;
+};
+
 // The town's menus' content, each part read apart (garbage in one leaves only that one invalid).
 struct TownState
 {
@@ -125,6 +245,13 @@ struct TownState
     PopupState popup;
     OptionsState options;
     SaveSlots saves;
+    InteractState interact;           // Panel / Interact
+    PocketsSel pockets;               // Panel / Pockets
+    GoalsState goals;                 // Panel / Goals
+    RelState relations;               // Panel / Relationships
+    PhoneState phone;                 // Phone
+    GiftState gift;                   // Give Gift
+    NoteState note;                   // a note or letter (overlay 11)
     bool operator==(const TownState&) const = default;
 };
 
@@ -140,7 +267,7 @@ struct GameState
     u8 popup = 0;                  // P+0x8 (0xFF front end, 0 none, 1 opening, 2 shown, 3 closing)
     bool settled = false;          // P+0xE42 == 3 and popup 0, 2 or 0xFF (none sliding)
     int tab = -1;                  // Panel: S+0x64 (0..4)
-    int selection = -1;            // per screen: catalogue S+0x254, phone S+0x89, cards S+0x2E0, relationships S+0xD0 (Sim id), pockets *(S+0x38)+0xE0
+    int selection = -1;            // per screen: catalogue S+0x254, phone S+0x89, cards S+0x2E0, relationships *(S+0x40)+0x24 (list index), pockets *(S+0x38)+0xE0
     int scroll = -1, list = -1;    // catalogue S+0x268, S+0x258
     int page = -1, speech = -1;    // dialogue page counter S+0x36, speech index S+0x34; phone page S+0x88 in `page`
     HudState hud;                  // the status bar's values (any screen with the world's G block valid)

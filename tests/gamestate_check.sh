@@ -180,7 +180,7 @@ town_run() { # NAME STATE: the last town lines in NAME.town
     if [ ! -f "$file" ]; then echo "no save state $2.st" > "$tmp/$name.town"; return; fi
     "$bin" "$rom" --headless --frames 60 --state-load "$file" --save "$tmp/$name.sav" --print-town "${late[@]}" > "$tmp/$name.townlog" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.townlog" && touch "$tmp/$name.townok"
-    grep -E '^frame [0-9]+: (inventory|options|popup|saves) ' "$tmp/$name.townlog" | sed 's/^frame [0-9]*: //' > "$tmp/$name.town"
+    grep -E '^frame [0-9]+: (inventory|options|popup|saves|interact|pockets|goals|relations|phone|gift|note) ' "$tmp/$name.townlog" | sed 's/^frame [0-9]*: //' > "$tmp/$name.town"
 }
 town_want() { # NAME KIND PATTERN LABEL: the last line of that kind matches (grep -E)
     if [ -f "$tmp/$1.townok" ] && grep "^$2 " "$tmp/$1.town" | tail -n 1 | grep -q -E "$3"; then echo "ok   $4"
@@ -206,4 +206,35 @@ town_text t-pause 23 22 "town: Game Paused's text and title are strings 23 and 2
 town_text t-goal 2448 -1 "town: the goal popup's text is string 2448"
 town_want t-save saves '^saves current=2 0=[^ ]+/3226/3 1=[^ ]+/1055/19 2=[^ ]+/9150/20$' "town: three save slots, the third current"
 town_want t-gift saves '^saves current=-1 0=empty 1=empty 2=empty$' "town: no save slots used"
+# The menus' lists (--print-town: interact, pockets, goals, relations, phone, gift, note), from
+# held-out states (copies in shots/): the store's Buy, the casino's three rows, the concierge, the
+# strip, the pad's hold, Pockets selections, Goals (8 goals; the complete save's 100 % footer; a
+# hotel goal), Relationships (23 Sims; the scroll; one Sim), the phone's pages, Give Gift.
+for st in L-sit-store-none-250 L-sit-casino-none-250 L-sit-cityhall-none-250 D-hotel-down D-cas-right2 D-cas-hold D-cas-hold-down2 \
+          A-pk-slot1-key2 A-pk-town-cnt1 A-pk-cnt3-slot1 B-pg8-goals-l7 B-cas-goals B-hot-goals B-cas-rel-next5 B-st-rel \
+          C-cas-msg1 C-cas-msg1-dn4 C-cas-pb1 C-s7-msgs A-gift2-slot2; do town_run "m-$st" "$st"; done
+town_want m-L-sit-store-none-250 interact '^interact target=sim51:374:4359 prev=- next=- big=4359 pad=1 hl=0 actions=43:1888$' "menus: the store's target (Johnny Smith, Buy)"
+town_want m-L-sit-casino-none-250 interact 'target=obj29:492:6638 .* actions=98:1943,73:1918,93:1938$' "menus: the casino's cards, three actions"
+town_want m-L-sit-cityhall-none-250 interact '^interact target=- prev=- next=- ' "menus: no target"
+town_want m-D-hotel-down interact 'target=sim45:368:2168 .* actions=6:1851,71:1916,4:1849$' "menus: the concierge (Sim 45) and his actions"
+town_want m-D-cas-right2 interact 'target=obj15:478:5744 prev=obj29:492:6638 next=- .* actions=28:1873$' "menus: the strip's previous target"
+town_first() { # NAME KIND PATTERN LABEL: the FIRST line of that kind matches (the state's own frame 0)
+    if [ -f "$tmp/$1.townok" ] && grep "^$2 " "$tmp/$1.town" | head -n 1 | grep -q -E "$3"; then echo "ok   $4"
+    else echo "FAIL $4: got '$(grep "^$2 " "$tmp/$1.town" 2>/dev/null | head -n 1)'"; fail=1; fi
+}
+town_first m-D-cas-hold interact '^interact .* pad=0 hl=0 ' "menus: pad mode (A held), first row lit"
+town_first m-D-cas-hold-down2 interact 'hl=2 ' "menus: the third row lit"
+town_want m-A-pk-slot1-key2 pockets '^pockets slot=-1 key=1 counted=-1$' "menus: Pockets key item 1"
+town_want m-A-pk-town-cnt1 pockets '^pockets slot=-1 key=-1 counted=0$' "menus: Pockets counted item 0"
+town_want m-A-pk-cnt3-slot1 pockets '^pockets slot=0 key=-1 counted=-1$' "menus: Pockets slot 0"
+town_want m-B-pg8-goals-l7 goals '^goals sel=3 first=1 lines=14 portrait=4257 footer=-1/-1/-1 entries=m0:1627:0\+1,m1:1628:1\+3,m2:1629:4\+1,m3:1630:5\+3,m4:1631:8\+1,m5:1632:9\+2,m6:1633:11\+1,m7:1634:12\+2$' "menus: 8 goals, the fourth selected, scrolled"
+town_want m-B-cas-goals goals 'footer=1843/1842/100 entries=-$' "menus: the hotel footer at 100 %"
+town_want m-B-hot-goals goals '^goals sel=0 first=0 lines=3 portrait=2168 .* entries=m1:1628:0\+3$' "menus: the hotel goal and the concierge's portrait"
+town_want m-B-cas-rel-next5 relations '^relations first=2 sel=5 sims=1:324/390/184/195/26,2:' "menus: 23 Sims, the sixth selected, first 2"
+town_want m-B-st-rel relations '^relations first=0 sel=0 sims=22:345/411/184/195/4257$' "menus: one Sim (id 22, Jebediah)"
+town_want m-C-cas-msg1 phone '^phone page=3 row=0 scroll=0 shown=0 .* menu=2066,2068,2069,2070 inbox=0:2311:368:read,1:1182:368:new$' "menus: the phone's message page, two messages, one unread"
+town_want m-C-cas-msg1-dn4 phone 'page=3 row=4 scroll=3 ' "menus: the phone's scrolled message"
+town_want m-C-cas-pb1 phone 'page=7 .* contacts=22/2 ' "menus: the contact list, 22 rows, Sim 2"
+town_want m-C-s7-msgs phone 'page=2 .* inbox=-$' "menus: no messages"
+town_want m-A-gift2-slot2 gift '^gift recipient=22 name=345 slot=1 refused=000000$' "menus: Give Gift to Jebediah, slot 2"
 exit $fail

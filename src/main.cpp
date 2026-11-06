@@ -70,7 +70,7 @@ static void Usage()
         "  --clock \"YYYY-MM-DD HH:MM\"    fix the DS clock's start (tests); default: the computer's time\n"
         "  --print-game                  print what the game says is up, read from RAM, when it changes (frame N: game X)\n"
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
-        "  --print-town                  print the town's inventory, options, popup and save slots, read from RAM, when they change\n"
+        "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
         "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
         "  --record-dir DIR              where unmapped screens are recorded (a state + a picture each; default: the\n"
@@ -558,6 +558,79 @@ int main(int argc, char** argv)
                             s += std::string(" ") + std::to_string(i) + "=" + (t.saves.used[i] ? t.saves.slot[i].simName + "/" + std::to_string(t.saves.slot[i].money) + "/" + std::to_string(t.saves.slot[i].place) : "empty");
                         fprintf(stderr, "frame %ld: saves current=%d%s\n", frame, t.saves.current, s.c_str());
                     }
+                }
+            }
+            if (app.portSupported && printTown)
+            {   // the menus' lists (gamestate.h), one line per part when it changes
+                const TownState& t = app.game.town;
+                const TownState& b = before.town;
+                auto tgt = [](const TargetRef& r) { return r.kind == TargetRef::None ? std::string("-") : std::string(r.kind == TargetRef::Sim ? "sim" : "obj") + std::to_string(r.index) + ":" + std::to_string(r.nameId) + ":" + std::to_string(r.portraitRes); };
+                if (!(t.interact == b.interact) || frame == 0)
+                {
+                    const InteractState& v = t.interact;
+                    if (!v.valid) fprintf(stderr, "frame %ld: interact none\n", frame);
+                    else
+                    {
+                        std::string a;
+                        for (const InteractAction& x : v.actions) a += (a.empty() ? "" : ",") + std::to_string(x.code) + ":" + std::to_string(x.labelId) + (x.greyed ? ":grey" : "");
+                        fprintf(stderr, "frame %ld: interact target=%s prev=%s next=%s big=%d pad=%d hl=%d actions=%s\n", frame, tgt(v.target).c_str(), tgt(v.prev).c_str(), tgt(v.next).c_str(),
+                                v.bigPortraitRes, v.padMode, v.highlighted, a.empty() ? "-" : a.c_str());
+                    }
+                }
+                if (!(t.pockets == b.pockets) || frame == 0)
+                {
+                    if (t.pockets.valid) fprintf(stderr, "frame %ld: pockets slot=%d key=%d counted=%d\n", frame, t.pockets.slot, t.pockets.key, t.pockets.counted);
+                    else fprintf(stderr, "frame %ld: pockets none\n", frame);
+                }
+                if (!(t.goals == b.goals) || frame == 0)
+                {
+                    const GoalsState& v = t.goals;
+                    if (!v.valid) fprintf(stderr, "frame %ld: goals none\n", frame);
+                    else
+                    {
+                        std::string e;
+                        for (const GoalEntry& x : v.entries)
+                            e += (e.empty() ? "" : ",") + std::string(x.mission ? "m" : "h") + std::to_string(x.id) + ":" + std::to_string(x.textId) + ":" + std::to_string(x.firstLine) + "+" + std::to_string(x.nLines) +
+                                 (x.mission ? "" : ":" + std::to_string(x.nameId) + ":" + std::to_string(x.placeId));
+                        fprintf(stderr, "frame %ld: goals sel=%d first=%d lines=%d portrait=%d footer=%d/%d/%d entries=%s\n", frame, v.selected, v.first, v.lines, v.portraitRes,
+                                v.footer ? v.footerId : -1, v.footer ? v.scoreId : -1, v.footer ? v.score : -1, e.empty() ? "-" : e.c_str());
+                    }
+                }
+                if (!(t.relations == b.relations) || frame == 0)
+                {
+                    const RelState& v = t.relations;
+                    if (!v.valid) fprintf(stderr, "frame %ld: relations none\n", frame);
+                    else
+                    {
+                        std::string e;
+                        for (const RelEntry& x : v.sims)
+                            e += (e.empty() ? "" : ",") + std::to_string(x.id) + ":" + std::to_string(x.nameId) + "/" + std::to_string(x.descId) + "/" + std::to_string(x.moodId) + "/" + std::to_string(x.levelId) + "/" + std::to_string(x.portraitRes) + (x.secret ? "/secret" : "");
+                        fprintf(stderr, "frame %ld: relations first=%d sel=%d sims=%s\n", frame, v.first, v.selected, e.empty() ? "-" : e.c_str());
+                    }
+                }
+                if (!(t.phone == b.phone) || frame == 0)
+                {
+                    const PhoneState& v = t.phone;
+                    if (!v.valid) fprintf(stderr, "frame %ld: phone none\n", frame);
+                    else
+                    {
+                        std::string e;
+                        for (const InboxMsg& x : v.inbox)
+                            e += (e.empty() ? "" : ",") + std::to_string(x.slot) + ":" + std::to_string(x.textId) + ":" + std::to_string(x.senderNameId) + (x.read ? ":read" : ":new");
+                        fprintf(stderr, "frame %ld: phone page=%d row=%d scroll=%d shown=%d ring=%d contacts=%d/%d menu=%d,%d,%d,%d inbox=%s\n", frame, v.page, v.row, v.scroll, v.shownSlot, v.ringtone,
+                                v.contacts, v.contactSim, v.menuIds[0], v.menuIds[1], v.menuIds[2], v.menuIds[3], e.empty() ? "-" : e.c_str());
+                    }
+                }
+                if (!(t.gift == b.gift) || frame == 0)
+                {
+                    const GiftState& v = t.gift;
+                    if (!v.valid) fprintf(stderr, "frame %ld: gift none\n", frame);
+                    else fprintf(stderr, "frame %ld: gift recipient=%d name=%d slot=%d refused=%d%d%d%d%d%d\n", frame, v.recipient, v.recipientNameId, v.slot, v.refused[0], v.refused[1], v.refused[2], v.refused[3], v.refused[4], v.refused[5]);
+                }
+                if (!(t.note == b.note) || frame == 0)
+                {
+                    if (t.note.valid) fprintf(stderr, "frame %ld: note text=%d playername=%d\n", frame, t.note.textId, t.note.playerName ? 1 : 0);
+                    else fprintf(stderr, "frame %ld: note none\n", frame);
                 }
             }
             if (app.portSupported && printGame && (!(app.game == before) || frame == 0)) fprintf(stderr, "frame %ld: game %s\n", frame, GameStateName(app.game).c_str());
