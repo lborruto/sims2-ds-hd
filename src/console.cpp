@@ -171,10 +171,19 @@ static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right 
     c.ui.push_back(ui::ChipItem(panel.x + kPad, panel.y + (kH - chip.h) / 2, ui::Button::Pause, word, kSize));
 }
 
+const char* ConsoleBranchName(ConsoleBranch b)
+{
+    static const char* const kNames[] = {"front", "cas", "cas-fade", "backdrop", "front-m1", "screen", "veiled", "world-only", "cursor-m1", "town",
+                                         "dialogue", "dialogue-m1", "minigame", "activity-m1"};
+    return kNames[(int)b];
+}
+
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud, const HudStrings* strings,
                          const GameState* game, const RomData* rom, const u32* bottom, IconCache* icons, u32 armed, const PointerView* pointer,
-                         int payout, bool pictureClosed, bool veiled, int worldOnlyFrames)
+                         int payout, bool pictureClosed, bool veiled, int worldOnlyFrames, ConsoleBranch* branch)
 {
+    ConsoleBranch dummy;
+    ConsoleBranch& b = branch ? *branch : dummy;
     Composition c {kConsoleW, kConsoleH, {}, {}};
     // The HD status bar replaces the game's: the world without its last 16 of 192 rows.
     const bool bar = hud && strings && strings->ok;
@@ -199,6 +208,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
                 SortUi(c.ui);
             }
             else screen(v, focus);
+            b = ConsoleBranch::Front;
             return c;
         }
     // Create-a-Sim in HD (port/cas.h): the whole canvas its.
@@ -216,7 +226,9 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
                 for (int i = 0; i < SW * SH; i += 3)
                     brightest = std::max({brightest, (int)((bottom[i] >> 16) & 0xFF), (int)((bottom[i] >> 8) & 0xFF), (int)(bottom[i] & 0xFF)});
             }
+            b = ConsoleBranch::CasFade;
             if (brightest < kCasFadeBlack) return c;
+            b = ConsoleBranch::Cas;
             BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH);
             if (brightest < kCasFadeWhite)
             {
@@ -231,7 +243,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             return c;
         }
     // A black load (both screens black, RAM between screens): the bare backdrop.
-    if (s.screen == Screen::Loading) return c;
+    if (s.screen == Screen::Loading) { b = ConsoleBranch::Backdrop; return c; }
     const bool cursorScreen = s.screen == Screen::SaveSlots || s.screen == Screen::Unknown;
     if (s.screen == Screen::None || s.screen == Screen::FrontEnd || s.screen == Screen::CreateASim)
     {
@@ -244,6 +256,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back({Src::Top, {0, 0, topW, topH}, topTo});
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kFrontBottomTo));
         AddCursorHint(c, kFrontHintY, rom);
+        b = ConsoleBranch::FrontM1;
     }
     else if (MenuView v = ConsoleView(s, game, rom); v.valid && (v.own || (s.screen == Screen::Panel && menuOpen)))
     {
@@ -285,6 +298,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             if (s.screen == Screen::Unknown && RoomHintUp(*game)) BuildRoomHint(c, v, focus, *game, *rom);
         }
         SortUi(c.ui); // (the bar's layer after the screen's, a popup's after it, the images last)
+        b = ConsoleBranch::Screen;
         return c;     // (the focus is the view's: no ring from HotspotsFor)
     }
     else if (veiled && !menuOpen && (s.screen == Screen::Panel || s.screen == Screen::Unknown))
@@ -297,6 +311,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.overlays.push_back({kCanvas, kDimArgb, 0, 0, 0, 1});
         if (bar) AddStatusBar(c, *hud, *strings);
         SortUi(c.ui);
+        b = ConsoleBranch::Veiled;
         return c;
     }
     else if (s.screen == Screen::Unknown && !menuOpen && game && (game->valid || game->between) && rom && rom->StringCount() > 0 &&
@@ -308,6 +323,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         // that stays so is not a dead end: the stick cursor and its hints).
         c.pieces.push_back(World(topW, worldRows, bar));
         if (bar) AddStatusBar(c, *hud, *strings);
+        b = ConsoleBranch::WorldOnly;
     }
     else if (menuOpen || cursorScreen || s.screen == Screen::Phone || s.screen == Screen::Popup || s.screen == Screen::Gift)
     {
@@ -326,9 +342,11 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(Bottom({0, 0, SW, SH}, kMenuTo));
         // Not dimmed: the game keeps its status bar up while the touch screen is used.
         if (bar) AddStatusBar(c, *hud, *strings);
+        b = ConsoleBranch::CursorM1;
     }
     else if (s.screen == Screen::Panel)
     {
+        b = ConsoleBranch::Town;
         c.pieces.push_back(World(topW, worldRows, bar));
         // (The HD town whenever RAM and the game's strings read: a frame whose tab does not read yet,
         // the panel coming back from a minigame, never flashes milestone 1's rail.)
@@ -366,6 +384,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         // The HD conversation (port/dialogue.h): the game's words, its speaker and portrait (the
         // panel alone while no page is drawn yet: the frames between two speeches).
         BuildDialogue(c, *game, *rom, bottom, topW, topH);
+        b = ConsoleBranch::Dialogue;
     }
     else if (s.screen == Screen::Dialogue)
     {
@@ -377,17 +396,20 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         c.pieces.push_back(Bottom(kDialogueNameFrom, kDialogueNameTo));
         c.pieces.push_back(Bottom(kDialoguePortraitFrom, kDialoguePortraitTo));
         c.pieces.push_back(Bottom(kDialogueArrowFrom, kDialogueArrowTo));
+        b = ConsoleBranch::DialogueM1;
     }
     else if (MinigameFramed(s, game, rom))
     {
         // The HD minigame frame (port/minigame.h): the playfield big, the top screen beside it, the
         // title, the game's values and the hints' chips.
         BuildMinigame(c, s, topW, topH, hud, strings, *game, *rom, bottom, icons, pointer, focus);
+        b = ConsoleBranch::Minigame;
     }
     else
     {
         // Social, Vacuum, Cards, Catalogue, Build; the hints' box for the activities. All but the
         // cards keep the HUD: their small world without it, the HD bar under it.
+        b = ConsoleBranch::ActivityM1;
         const bool hudHere = bar && s.screen != Screen::Cards;
         const int rows = hudHere ? worldRows : topH;
         const int h = (int)std::lround((double)kActivityTopW * rows / topW);

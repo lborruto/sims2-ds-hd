@@ -141,7 +141,7 @@ target_link_libraries(pads PUBLIC uikit SDL2::SDL2-static)
 
 add_executable(sims2wide
     src/main.cpp src/platform.cpp
-    src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
+    src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/consolehold.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
     src/looks.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shell.cpp src/shellhost.cpp src/shots.cpp src/slots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)

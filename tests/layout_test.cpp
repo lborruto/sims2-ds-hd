@@ -2205,8 +2205,8 @@ int main()
                     off.screen = GScreen::Catalogue; // (over the HD catalogue: the HD popup)
                     CHECK(PopupViewOf({Screen::Catalogue, Tab::None}, off).valid == PopupViewOf(on, h).valid);
                     off = h;
-                    off.town.popup.boxW = 0;
-                    CHECK(PopupViewOf(on, off).valid == (kind == 3));
+                    off.town.popup.boxW = 0;   // (its box not placed yet, sliding in: the HD popup, nothing to press)
+                    CHECK(PopupViewOf(on, off).valid && PopupViewOf(on, off).items.empty() && PopupViewOf(on, off).back.empty());
                     CHECK(!PopupView(on, &h, &rom).valid); // (no strings: milestone 1's)
                 }
             {
@@ -3044,6 +3044,19 @@ int main()
             check(g, "switching");
         }
         for (int page = 5; page < 8; page++) CHECK(!CasViewOf(cas, state(page)).valid);
+        // A page whose fields do not read yet (its object being filled): the page's tabs, nothing to press.
+        for (int page = 0; page < 5; page++)
+        {
+            GameState g = state(page);
+            CasState& c = g.front.cas;
+            c.nameKnown = c.hairKnown = c.clothesKnown = c.keepKnown = false;
+            c.face = -1;
+            const MenuView v = CasViewOf(cas, g);
+            CHECK(v.valid && v.items.empty());
+            Composition comp {1280, 720, {}, {}};
+            BuildCas(comp, v, -1, g, rom, nullptr, bottom.data(), 256, 192);
+            CHECK(!comp.ui.empty());
+        }
         {
             GameState g = state(0);
             g.front.cas.valid = false;

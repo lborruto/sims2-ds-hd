@@ -909,8 +909,12 @@ GiftState ReadGift(const Reader& m, u32 S)
     u32 G, actor, k, count, id;
     if (!m.R32(kEU.gameBlock, G) || !Ptr(m, S + q.giftActor, 0x14, actor) || !m.R16(actor + q.recActor, k) || k >= t.maxSims) return v;
     if (!m.R32(G + t.invCount, count) || count > t.maxSlots) return v;
-    const int slot = m.S32(S + q.giftSlot);
-    if (slot < -1 || slot >= (int)count) return v;
+    int slot = m.S32(S + q.giftSlot);
+    if (slot < -1) return v;
+    // The slot just given (the screen closing: the pockets one item shorter, the selection not yet
+    // moved, about 19 frames): no selection, the part still read.
+    if (slot >= (int)count && slot < (int)t.maxSlots) slot = -1;
+    if (slot >= (int)count) return v;
     if (!m.R16(G + kEU.simRecords + kEU.simRecordSize * k + kEU.simRecordName, id) || id >= t.maxSims) return v;
     for (u32 i = 0; i < count; i++)
     {
@@ -1749,7 +1753,8 @@ CasState ReadCas(const Reader& m, u32 S)
     CasState c;
     u32 page, gender, N, vt, G;
     if (!m.In(S, f.casSize) || !m.R16(S + f.casPage, page) || page > f.casMaxPage || !m.R16(S + f.casGender, gender) || gender > 1 || !m.R32(S + f.casObj, N)) return c;
-    if (N != 0 && !m.R32(N, vt)) return c;
+    // (A page object that does not read: as a page change in flight, the page and no fields.)
+    if (N != 0 && !m.R32(N, vt)) vt = 0;
     static const int kObjOfPage[8] = {0, 1, 2, 3, 4, 5, 1, 3};   // the in-game pages 6 / 7 reuse the Hair and Clothes pages
     const int idx = kObjOfPage[page];
     // The page and its object disagree (or there is none) for the 2-4 frames a page change is in
@@ -1804,17 +1809,19 @@ CasState ReadCas(const Reader& m, u32 S)
         break;
     }
     case 1:
-        if (!m.R16(N + f.hairSel, a) || a > f.maxHairStyle || !m.R16(N + f.hairScroll, b) || b > f.maxHairScroll) return CasState{};
-        if (!m.R16(N + f.hairPos, d) || d > f.maxHairStyle) return CasState{};
+        // A field out of its range (the page object still being filled): the page without its
+        // fields (hairKnown false), as the Name page without its buffer; the rest valid.
+        if (!m.R16(N + f.hairSel, a) || a > f.maxHairStyle || !m.R16(N + f.hairScroll, b) || b > f.maxHairScroll) break;
+        if (!m.R16(N + f.hairPos, d) || d > f.maxHairStyle) break;
         c.hairStyle = (int)a; c.hairScroll = (int)b; c.hairPos = (int)d; c.hairKnown = true;
         arrows(f.hairArrowL, f.hairArrowR);
         break;
     case 2:
-        if (!m.R16(N + f.face, a) || a > f.maxFace) return CasState{};
+        if (!m.R16(N + f.face, a) || a > f.maxFace) break;   // (face -1: no fields)
         c.face = (int)a;
         break;
     case 3:
-        if (!m.R16(N + f.thCat, a) || a > f.maxCat || !m.R16(N + f.thPage, b) || b > f.maxThPage || !m.R16(N + f.thItem, d) || d > f.maxThItem) return CasState{};
+        if (!m.R16(N + f.thCat, a) || a > f.maxCat || !m.R16(N + f.thPage, b) || b > f.maxThPage || !m.R16(N + f.thItem, d) || d > f.maxThItem) break;
         c.category = (int)a; c.clothesPage = (int)b; c.item = (int)d; c.clothesKnown = true;
         arrows(f.thArrowL, f.thArrowR);
         {   // The game's ring: on the chosen item's cell when this page shows it.
@@ -1829,7 +1836,7 @@ CasState ReadCas(const Reader& m, u32 S)
         }
         break;
     case 4:
-        if (!m.R8(N + f.cfAsp, a) || a > 3 || !m.R8(N + f.cfAnswer, b) || b > 2) return CasState{};
+        if (!m.R8(N + f.cfAsp, a) || a > 3 || !m.R8(N + f.cfAnswer, b) || b > 2) break;
         c.aspiration = (int)a; c.answer = (int)b; c.keepKnown = true;
         break;
     default: break;
@@ -1944,6 +1951,10 @@ GameState ReadGameState(RamView ram)
     // Settings, Load-a-Sim and DS Wireless (the front end's bottom objects, port/frontmenus.h): the
     // front end's GScreen, as the title and the main menu (CONSOLE's screen from RAM there).
     if (g.screen == GScreen::Unknown && (g.front.settings.valid || g.front.load.valid)) g.screen = GScreen::FrontEnd;
+    // Create-a-Sim's bottom object and its page object both read (two vtables that agree: never an
+    // overlay's colliding one) while the overlay number still lags behind the swap: Create-a-Sim,
+    // as the RAM says, never None for a frame.
+    if (g.screen == GScreen::Unknown && g.front.cas.valid && !g.front.cas.switching) g.screen = GScreen::CreateASim;
 
     switch (g.screen)
     {

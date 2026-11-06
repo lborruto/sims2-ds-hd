@@ -1953,6 +1953,61 @@ check_pad pad-cas-looks cas_looks
 check_pad pad-cas-keep cas_keep
 check_pad pad-cas-cross cas_cross
 check_pad pad-cas-turn cas_turn
+# The HD screens hold through the game's swaps (src/consolehold.*, --print-console: each frame's
+# composition, milestone 1's marked -m1, and the counts at the end): Create-a-Sim's pages from s3 by
+# RB, LB and Start (every page change the game makes), the front end (title → menu → Create-a-Sim,
+# Load-a-Sim and Settings and back), the panel's tabs, the phone, Give Gift closing after a gift, the
+# Registry ↔ room info, a save loaded into the town: no frame shows milestone 1's picture (a frame of
+# the game's own between two objects shows the last HD picture, 12 frames at most, taking no input);
+# the tabs, the phone and the Registry's swaps are held (the hold is exercised).
+hold_walk() {
+    local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 save=$5; shift 5
+    rm -f "$tmp/$name.sav"
+    [ "$save" = complete ] && { cp "$complete_save" "$tmp/$name.sav" || return; }
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" \
+        --layout console --print-console --print-front --print-game "$@" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+hold_walk hold-cas s3 cas-walk 640 complete "${town[@]}" &
+hold_walk hold-title F-title0 front-title 300 fresh "${town[@]}" &
+hold_walk hold-load s2 front-load 330 fresh "${town[@]}" &
+hold_walk hold-settings s2 front-settings 330 fresh "${town[@]}" &
+wait
+hold_walk hold-tabs s7 tabs 320 fresh "${town[@]}" &
+hold_walk hold-phone s7 phone-pages 540 fresh "${town[@]}" &
+hold_walk hold-gift A-gift2-base gift-give 200 complete "${late[@]}" &
+hold_walk hold-registry D-hotel-down registry-concierge 380 fresh "${hotel[@]}" &
+hold_walk hold-load-slot F-cload-150 load-slot 360 complete "${late[@]}" &
+wait
+# (no frame shows milestone 1's picture; held: at least that many frames held)
+hold_none() {
+    local name=$1 held=${2:-0} line
+    line=$(grep '^console: ' "$tmp/$name.log") || { echo "  $name: no console summary"; return 1; }
+    echo "$line" | grep -q ', 0 milestone-1 shown$' || { echo "  $name: $line"; grep -E 'console [a-z-]+-m1( |$)' "$tmp/$name.log" | grep -v ' held ' | head -n 3; return 1; }
+    [ "$(echo "$line" | sed -n 's/.* \([0-9]*\) held,.*/\1/p')" -ge "$held" ] || { echo "  $name: fewer than $held held ($line)"; return 1; }
+}
+hold_cas() {
+    in_order hold-cas 'cas page=1 ' 'cas page=2 ' 'cas page=3 ' 'cas page=4 ' 'cas page=3 ' 'cas page=2 ' 'cas page=1 ' 'cas page=0 ' \
+        'cas page=1 ' 'cas page=2 ' 'cas page=3 ' 'cas page=4 ' || return 1
+    hold_none hold-cas
+}
+hold_title() { in_order hold-title 'game CreateASim' 'console cas$' && hold_none hold-title; }
+hold_load() { in_order hold-load 'front Load' 'front Title' && hold_none hold-load; }
+hold_settings() { in_order hold-settings 'front Settings' 'front Title' && hold_none hold-settings; }
+hold_tabs() { in_order hold-tabs 'game Panel/Pockets' 'game Panel/Goals' && hold_none hold-tabs 1; }
+hold_phone() { hold_none hold-phone 1; }
+hold_gift() { in_order hold-gift 'game Gift' 'game Panel/Interact' && hold_none hold-gift; }
+hold_registry() { hold_none hold-registry 1; }
+hold_load_slot() { in_order hold-load-slot 'front Load' 'game Panel/Interact' 'game Dialogue' && hold_none hold-load-slot; }
+check_pad hold-cas hold_cas
+check_pad hold-title hold_title
+check_pad hold-load hold_load
+check_pad hold-settings hold_settings
+check_pad hold-tabs hold_tabs
+check_pad hold-phone hold_phone
+check_pad hold-gift hold_gift
+check_pad hold-registry hold_registry
+check_pad hold-load-slot hold_load_slot
 # The HD Interact tab's words in each language (src/port/interact.*: --measure-menu): every verb
 # in its row and in the A hint, every Sim's and object's name in the title and the strip, held in
 # their boxes (shrunk at most; a neighbour's name beside the plate may end in an ellipsis).

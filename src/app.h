@@ -9,6 +9,7 @@
 #include "NDS.h"
 #include "common.h"
 #include "activities.h"
+#include "consolehold.h"
 #include "gamestate.h"
 #include "layout.h"
 #include "port/icons.h"
@@ -38,6 +39,7 @@ struct App
     u32 consoleArmed = 0;          // CONSOLE: the HD view item whose X is armed (Navigator::Armed), 0 none
     PointerView consolePointer;    // CONSOLE: a pointing minigame's pointer (the navigator's), drawn by its HD frame
     int consolePayout = 0;         // CONSOLE: the money's last change, for kPayoutFrames frames (Input::Steer), 0 none
+    ConsoleHold consoleHold;       // CONSOLE: the picture shown, the last HD one held through the game's swaps (consolehold.h)
     // The two above follow the navigator (Input::Steer), unless --console-menu or --console-focus
     // pinned them for a check's picture.
     bool consolePinned = false;

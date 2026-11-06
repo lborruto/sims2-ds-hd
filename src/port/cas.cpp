@@ -222,6 +222,7 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
         break;
     }
     case 2:
+        if (cs.face < 0) return v;   // (the face not read yet: the page's tab alone)
         for (int i = 0; i < 9; i++)
             v.items.push_back(Item(CasFaceRect(i), kCasFaceId + (u32)i, {Tap(kCasFaceX0 + kCasFaceDx * (i % 3), kCasFaceY0 + kCasFaceDy * (i / 3))}));
         v.initial = std::clamp(cs.face, 0, 8);

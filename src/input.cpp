@@ -381,9 +381,14 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
         // What RAM says on the minigame (activities.h): the cards' question and message, the
         // pointing games' tools and sliders, a question of the game's popup.
         navigator.SetActivityRam(MinigameRam(game));
-        navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
+        // A held picture (consolehold.h: the last HD one through a swap of the game's) takes no
+        // input: the navigator waits for the screen to read again (nothing typed meanwhile either).
+        if (!app.consoleHold.Holding())
+        {
+            navigator.Update(screen, p, touchScript, keys, app.Settled(), &view);
+            TypeName(app);
+        }
         steering = true;
-        TypeName(app);
         if (!app.consolePinned) { app.consoleMenu = navigator.MenuOpen(); app.consoleFocus = navigator.Focus(); }
         app.consoleArmed = navigator.Armed();
         app.consolePictureClosed = navigator.PictureClosed();

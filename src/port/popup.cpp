@@ -81,9 +81,11 @@ MenuView PopupViewOf(ScreenState s, const GameState& game, const RomData* rom)
     if (!PopupOver(s, game)) return v;
     const PopupState& p = game.town.popup;
     int x0, y0, x1, y1;
-    if (p.kind == 0)
+    // A box whose buttons are not placed yet (its slide-in: the box's place not in RAM yet): the
+    // HD popup with nothing to press until they are, never the game's own screen.
+    const bool placed = p.kind == 0 ? PopupButton(p, 0, x0, y0) : p.kind == 2 ? PopupButton(p, 0, x0, y0) && PopupButton(p, 1, x1, y1) : true;
+    if (p.kind == 0 && placed)
     {
-        if (!PopupButton(p, 0, x0, y0)) return v;
         ViewItem it;
         it.rect = kPopClose;
         it.id = kPopCloseId;
@@ -94,9 +96,8 @@ MenuView PopupViewOf(ScreenState s, const GameState& game, const RomData* rom)
         v.backCloses = true;
         v.passKeys = 1u << kStart; // (Game Paused resumes on Start too)
     }
-    else if (p.kind == 2)
+    else if (p.kind == 2 && placed)
     {
-        if (!PopupButton(p, 0, x0, y0) || !PopupButton(p, 1, x1, y1)) return v;
         // No first, and the focus opens there (a question's safe answer: two quick A never say
         // Yes); Yes one Right away.
         ViewItem no;
@@ -119,7 +120,7 @@ MenuView PopupViewOf(ScreenState s, const GameState& game, const RomData* rom)
         v.backCloses = true;
         v.replay = false; // (a late A answers Yes: never replayed)
     }
-    else if (p.kind != 3) return v;
+    else if (p.kind != 0 && p.kind != 2 && p.kind != 3) return v;
     v.own = v.popup = true;
     v.valid = true;
     return v;

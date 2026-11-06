@@ -103,10 +103,19 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // milestone 1's: the touch screen 3x over the dimmed world. armed: the view item whose X is
 // armed (the navigator's Armed(): Pockets' bin asking), 0 none. pointer: a pointing minigame's
 // pointer (port/minigame.h draws it; null: none).
+// Which of BuildConsole's compositions a frame got (--print-console; ConsoleHold, consolehold.h).
+// The *M1 ones are milestone 1's (the game's own screen framed): FrontM1 the front end's two
+// screens, CursorM1 the touch screen 3x over the dimmed world, DialogueM1 the game's box rebuilt,
+// ActivityM1 an activity's two screens; the rest are the HD ones (Backdrop the bare canvas of a
+// black load, WorldOnly / Veiled the world while the panel comes).
+enum class ConsoleBranch { Front, Cas, CasFade, Backdrop, FrontM1, Screen, Veiled, WorldOnly, CursorM1, Town, Dialogue, DialogueM1, Minigame, ActivityM1 };
+const char* ConsoleBranchName(ConsoleBranch b);
+inline bool IsMilestone1(ConsoleBranch b) { return b == ConsoleBranch::FrontM1 || b == ConsoleBranch::CursorM1 || b == ConsoleBranch::DialogueM1 || b == ConsoleBranch::ActivityM1; }
 Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int topH, const HudState* hud = nullptr,
                          const HudStrings* strings = nullptr, const GameState* game = nullptr, const RomData* rom = nullptr,
                          const u32* bottom = nullptr, IconCache* icons = nullptr, u32 armed = 0, const PointerView* pointer = nullptr,
-                         int payout = 0, bool pictureClosed = false, bool veiled = false, int worldOnlyFrames = 0);
+                         int payout = 0, bool pictureClosed = false, bool veiled = false, int worldOnlyFrames = 0,
+                         ConsoleBranch* branch = nullptr);
 // pictureClosed: the view's big picture (MenuView::picture: Settings' concept art) closed by B.
 // veiled: the panel's menu is coming back (Navigator::Returning: B from the Save slots or the phone
 // opened from it, the game passing through Interact first): the dimmed world and the status bar

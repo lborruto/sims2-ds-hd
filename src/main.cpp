@@ -104,6 +104,7 @@ static void Usage()
         "  --print-hotel                 print the hotel block (rooms, score, guests, songs) and the hotel's and shops' screens (registry, room info, music, build rooms, placement, catalogue, stat panel), read from RAM, when they change\n"
         "  --print-minigame              print the minigame the bottom screen shows (Alien Autopsy, Metal Detector, MooGoo Monkey, scratch lottery, Super Drencher, Crime, Music Mixer and its save menu, Art Gallery), read from RAM, when it changes\n"
         "  --print-front                 print the front end (title, Settings, Load-a-Sim, Create-a-Sim, boot screens, video), read from RAM, when it changes\n"
+        "  --print-console               print CONSOLE's composition (which branch; milestone 1's marked m1, a held picture) when it changes, and the counts at the end\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
         "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
@@ -173,7 +174,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, printConsole = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
     bool uiDemo = false;
@@ -221,6 +222,7 @@ int main(int argc, char** argv)
         else if (a == "--print-hotel") printHotel = true;
         else if (a == "--print-minigame") printMinigame = true;
         else if (a == "--print-front") printFront = true;
+        else if (a == "--print-console") printConsole = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -1584,6 +1586,17 @@ relaunch:
             lastMenu = app.consoleMenu;
             lastFocus = app.consoleFocus;
         }
+        {
+            // What CONSOLE shows this frame (consolehold.h): its own composition, or the last HD
+            // one held through a swap of the game's.
+            const ConsoleBranch fresh = app.consoleHold.Branch(), shown = app.consoleHold.ShownBranch();
+            const bool held = app.consoleHold.Holding();
+            app.consoleHold.Frame(app);
+            if (printConsole && app.shown == Layout::Console &&
+                (frame == 0 || fresh != app.consoleHold.Branch() || shown != app.consoleHold.ShownBranch() || held != app.consoleHold.Holding()))
+                fprintf(stderr, "frame %ld: console %s%s\n", frame, ConsoleBranchName(app.consoleHold.Branch()),
+                        app.consoleHold.Holding() ? (std::string(" held ") + ConsoleBranchName(app.consoleHold.ShownBranch())).c_str() : "");
+        }
         writeShots(false);
         frame++;
 
@@ -1614,6 +1627,9 @@ relaunch:
     Looks::Shutdown();
     if (app.settings.interpolate60) fprintf(stderr, "looks: %u in-between frames\n", melonDS::Looks3D.InterpolatedFrames);
     if (!stateSave.empty()) fprintf(stderr, "state save %s: %s\n", stateSave.c_str(), SaveState(nds, stateSave) ? "ok" : "failed");
+    if (printConsole)
+        fprintf(stderr, "console: %ld frames, %ld milestone-1 compositions, %ld held, %ld milestone-1 shown\n", app.consoleHold.frames,
+                app.consoleHold.fresh1, app.consoleHold.held, app.consoleHold.shown1);
     if (headless)
     {
         // For the tests: what the DS clock says at the end, and whether the game listened.
@@ -1638,6 +1654,7 @@ relaunch:
         app.icons.reset();
         app.hudStrings = HudStrings();
         app.game = GameState();
+        app.consoleHold.Reset();
         app.topBig.clear();
         app.topBigW = app.topBigH = 0;
         app.screens = ScreenTracker();
