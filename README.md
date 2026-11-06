@@ -66,6 +66,11 @@ It is an early version: see [Good to know](#good-to-know).
 </p>
 
 <p align="center">
+  <img src="docs/screenshots/console-shop.webp" alt="CONSOLE: the General Store's catalogue in HD: the items to buy in a grid with their icons, the chosen one's name, price and words, the buy button, the places you own at the right" width="440">
+  <img src="docs/screenshots/console-registry.webp" alt="CONSOLE: the hotel's Registry in HD: the five rooms with their guests, the hotel score above, the concierge's portrait and the room's details at the right" width="440">
+</p>
+
+<p align="center">
   <img src="docs/screenshots/console-town.webp" alt="CONSOLE: the town fills the window, the tabs' rail at the right and the HD status bar (clock, money, Sanity) below" width="700">
 </p>
 
@@ -139,7 +144,8 @@ empty slot at once, a used one after the game asks, A yes, B no; B closes).
 In the shop, A on an item picks it (a shop item to buy, one of yours to sell, with its price),
 A on the simoleon button buys or sells it (greyed when the game would not), Up / Down past the
 list scroll it, B closes. In Build Rooms, A on a room asks the game's question (its permit and
-the money left shown first), A again buys it, B goes back (B on the list closes). In the hotel's
+the money left shown first; the focus starts on No, so a stray double press never spends), Right
+and A buy it, A on No or B goes back (B on the list closes). In the hotel's
 Registry, A on a room shows its page (who stays, their mood, when they leave, what the room earns
 a day; A on a line explains it), and when a guest checks in, A on a free room gives it to them;
 B goes back. On a music panel, A plays the highlighted song (the room keeps it), Up / Down past
@@ -229,9 +235,12 @@ the game never meant to be seen can show at the edges. Each one costs speed; all
 
 ## Good to know
 
-- **An early version.** Town, conversations, Create-a-Sim, the shop, the social games, the
-  hotel's lobby and basement, the vacuum and the casino's card game are checked; not everything
-  the game has is yet.
+- **An early version.** Town, conversations, Create-a-Sim, the shop, Build Rooms, the hotel's
+  lobby, basement, Registry and music, the social games, the vacuum and the casino's card game are
+  checked; not everything the game has is yet.
+- **A few screens are still the game's own picture.** The furniture editor of a hotel room, and
+  any screen CONSOLE has no HD page for, are drawn big with the stick as a cursor (the right
+  stick moves it, A touches), and a hint box says so.
 - **The side panel covers a strip of the world.** In FOCUS the touch screen lies over the
   world's right edge (the status bar stays clear). Tab or SIDE (2) when you want all of it. (CONSOLE has no such strip.)
 - **Widescreen is on by default.** Switch it off in SETTINGS > GRAPHICS if a place shows something odd at the edges. See [Looks](#looks).
