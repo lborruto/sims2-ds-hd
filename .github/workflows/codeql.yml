@@ -1,3 +1,4 @@
+# Runs only once the repository is public (owner rule: no Actions on private repos).
 name: CodeQL
 
 # GitHub's code scanning on the C/C++ sources (src/): on pull requests, on pushes to main (the

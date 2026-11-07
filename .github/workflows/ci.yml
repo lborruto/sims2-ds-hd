@@ -1,3 +1,4 @@
+# Runs only once the repository is public (owner rule: no Actions on private repos).
 name: CI
 
 # Every pull request and every push to main: a Release build on Linux and macOS (with the
@@ -28,6 +29,7 @@ jobs:
   # read: no event payload.
   changes:
     name: Changed files
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -55,6 +57,7 @@ jobs:
 
   lint:
     name: Workflows (actionlint, shellcheck)
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -84,6 +87,7 @@ jobs:
 
   secrets:
     name: Secrets (gitleaks, whole history)
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -240,7 +244,7 @@ jobs:
   # The one check to require: green when every job passed or was skipped as docs-only.
   result:
     name: CI result
-    if: always()
+    if: ${{ always() && !github.event.repository.private }}
     needs: [changes, lint, secrets, build, build-windows]
     runs-on: ubuntu-24.04
     timeout-minutes: 5

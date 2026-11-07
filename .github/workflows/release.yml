@@ -1,3 +1,4 @@
+# Runs only once the repository is public (owner rule: no Actions on private repos).
 name: Release
 
 # A tag vX.Y.Z on main runs CI on the tagged commit, builds the program for Linux x86_64, macOS
@@ -28,6 +29,7 @@ jobs:
   # A release is only ever made from reviewed code: the tagged commit must be on main.
   on-main:
     name: Tagged commit is on main
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -253,7 +255,7 @@ jobs:
     name: GitHub release
     needs: [notes, build, build-windows, attest]
     # Runs when every build passed and the attestation passed, or was skipped (private).
-    if: ${{ always() && needs.notes.result == 'success' && needs.build.result == 'success' && needs.build-windows.result == 'success' && (needs.attest.result == 'success' || needs.attest.result == 'skipped') }}
+    if: ${{ always() && needs.notes.result == 'success' && needs.build.result == 'success' && needs.build-windows.result == 'success' && (needs.attest.result == 'success' || needs.attest.result == 'skipped') && !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
