@@ -71,4 +71,8 @@ private:
     std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> faded;   // the same at fadedLight
     int fadedLight = -1;
 };
+
+// (4c's screens) Frame `frame` of s at tier `tier` centred in `box` (IconCache::Tiered) appended to
+// `items`, `opacity` its fill (ImageItem's: 0 opaque); nothing without icons.
+void AddTiered(std::vector<ui::UiItem>& items, IconCache* icons, SpriteRef s, int frame, int tier, Rect box, u32 opacity = 0);
 }

@@ -86,13 +86,8 @@ struct FittedText
     bool fits = true;
 };
 FittedText FitLine(const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::Bold);
-// The same down to minSize whatever it is: the minigames' side panels and prompt bar alone, whose
-// columns hold the game's longest words only at 13-17 px (their layout is task 4c's to redo; every
-// other screen stops at ui::kMinText). PanelTextAny and Measurer::LineAny the same.
-FittedText FitLineAny(const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::Bold);
 // One fitted line of text in `r` (no wrap, centred vertically), on `layer` (1 by default); colour 0: the theme's.
 void PanelText(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour = 0, int layer = 1);
-void PanelTextAny(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour = 0, int layer = 1);
 // (A check, --measure-menu) what a screen's measure tallies: a line or block fitted (its size
 // shrunk or not, its ellipsis, its lines), each cut id once.
 struct BlockMeasure;
@@ -101,7 +96,6 @@ struct Measurer
     BlockMeasure& m;
     void Note(int id, bool shrunk, bool fits, int lines = 0) const;
     void Line(int id, const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::ExtraBold) const;
-    void LineAny(int id, const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::ExtraBold) const;
     void Block(int id, const std::string& text, float size, float minSize, Rect box) const;
 };
 // A touchable, invisible piece mapping the HD rectangle `to` onto the touch screen's `from`.

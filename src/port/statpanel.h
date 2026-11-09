@@ -74,9 +74,11 @@ constexpr int kStrStStats = 2012;                // 2012..2015
 constexpr int kStrStSkill = 2399;                // + skill
 
 // HD geometry (canvas): the panel menu's (kPmPanel, kPmTabBar, kPmTitle, kPmContent, kPmHints).
-Rect StatTabRect(int page);                      // the tab bar's cell of a page
+// The tab bar's cell of a page: the pages' names in a row between LB and RB, each as wide as its
+// widest word needs (rom's; null: all alike), the rest shared.
+Rect StatTabRect(int page, const RomData* rom = nullptr);
 Rect StatButtonRect(int page);                   // Main's button for page 1..4
-constexpr Rect kStClose = kPmPhoneWell;          // the X, in the tab bar's right cell (the panel's phone well)
+constexpr Rect kStClose {kPmTitle.x + kPmTitle.w - 52, kPmTitle.y + 2, 48, 48};   // the X, at the title well's right end
 
 // Item ids: the kind in bits 20-23 (1 a page: Main's button for it, or its tab while it is shown),
 // the page below.

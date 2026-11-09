@@ -846,6 +846,48 @@ static void focus_ring()
     CHECK(green >= 5 && line >= kFocusInnerW - 1);
 }
 
+// A panel's sign (the kit's scroll arrows, the wireless sign): drawn in its middle in its colour,
+// pointing its way; a panel without one rasters and hashes as before.
+static void signs()
+{
+    auto draw = [](const UiItem& it, int w, int h, float s) {
+        std::vector<u32> px((size_t)w * h);
+        Rasterise({it}, s, px.data(), w, h);
+        return px;
+    };
+    for (int s : {1, 2})
+    {
+        const int w = 80 * s, h = 80 * s;
+        auto at = [&](const std::vector<u32>& px, int x, int y) { return px[(size_t)y * w + x]; };
+        UiItem up = ScrollArrowItem({10, 10, 60, 60}, UiItem::Sign::Up, true);
+        UiItem down = ScrollArrowItem({10, 10, 60, 60}, UiItem::Sign::Down, true);
+        const std::vector<u32> pu = draw(up, w, h, (float)s), pd = draw(down, w, h, (float)s);
+        // Up: white near its apex, the button's fill past its base; Down the other way round.
+        CHECK(Rgb(at(pu, 40 * s, 32 * s)) == 0xFFFFFF);
+        CHECK(Rgb(at(pu, 40 * s, 56 * s)) == Rgb(kFillRow));
+        CHECK(Rgb(at(pd, 40 * s, 48 * s)) == 0xFFFFFF);
+        CHECK(Rgb(at(pd, 40 * s, 24 * s)) == Rgb(kFillRow));
+        // Beside the apex (a triangle, not a box): the fill.
+        CHECK(Rgb(at(pu, 26 * s, 34 * s)) == Rgb(kFillRow));
+        // Off: sunk, the triangle faint (not white).
+        const std::vector<u32> po = draw(ScrollArrowItem({10, 10, 60, 60}, UiItem::Sign::Up, false), w, h, (float)s);
+        CHECK(Rgb(at(po, 40 * s, 36 * s)) != 0xFFFFFF);
+        // The wireless sign: its dot low in the box, nothing at the box's corners.
+        UiItem wl = PanelItem({10, 10, 60, 60});
+        wl.plain = true;
+        wl.fill = 0;
+        wl.sign = UiItem::Sign::Wireless;
+        const std::vector<u32> pw = draw(wl, w, h, (float)s);
+        CHECK(Rgb(at(pw, 40 * s, 58 * s)) == 0xFFFFFF);
+        CHECK(at(pw, 12 * s, 12 * s) == 0);
+    }
+    // The hash: a sign changes it; none hashes as a panel always did.
+    UiItem a = PanelItem({0, 0, 40, 40}), b = a;
+    CHECK(Hash({a}) == Hash({b}));
+    b.sign = UiItem::Sign::Left;
+    CHECK(Hash({a}) != Hash({b}));
+}
+
 int main()
 {
     wrap_cases();
@@ -861,6 +903,7 @@ int main()
     ui_scale_and_smooth();
     tiers();
     focus_ring();
+    signs();
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("uikit_test: all passed\n");
     return 0;

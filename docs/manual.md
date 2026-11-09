@@ -124,8 +124,8 @@ The save slots and the phone, opened from the menu, come back to the menu where 
   what the room earns a day; A on a line explains it). When a guest checks in, A on a free room
   gives it to them.
 - **A music panel**: A plays the highlighted song (the room keeps it); Up / Down scroll.
-- **The stat panel**: A opens a page, LB / RB (or Left / Right) go to the previous / next one,
-  B goes back, then closes.
+- **The stat panel**: its tabs name the five pages; A opens a page, LB / RB (or Left / Right) go
+  to the previous / next one, B goes back, then closes.
 - **Conversations** go on with A. **Popups** (tips, goals, Game Paused) close with A or B. A
   **question** (Quit? Overwrite this save?) always opens on No: Right then A says yes, B is always
   no. When a popup opens over the menu, the menu comes back on the same row after it.

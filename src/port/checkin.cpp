@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -71,9 +72,10 @@ void PinkPlate(Composition& c, Rect r, const std::string& s, float size, float m
     c.ui.push_back(p);
 }
 
-// A room's picture in `box`: the occupant's portrait (the game's own row button, live) at `scale`,
-// else the game's key (frame 0) or its silhouette (frame 1, not built).
-void RoomPicture(Composition& c, IconCache* icons, const u32* bottom, const RegistryRow& r, int row, int scale, Rect box)
+// A room's picture in `box`: the occupant's portrait (the game's own row button, live) `scale`
+// times (a live crop: a whole factor), else the game's key (frame 0) or its silhouette (frame 1,
+// not built) at `tier` (the rows' ui::kTierS, the info's ui::kTierL).
+void RoomPicture(Composition& c, IconCache* icons, const u32* bottom, const RegistryRow& r, int row, int scale, int tier, Rect box)
 {
     if (r.occupant >= 0)
     {
@@ -83,7 +85,7 @@ void RoomPicture(Composition& c, IconCache* icons, const u32* bottom, const Regi
         c.ui.push_back(ImageItem({box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h}, bottom, SW, SH, from));
         return;
     }
-    AddSpriteIcon(c, icons, kSprCiKey, r.built ? 0 : 1, scale, box);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprCiKey), r.built ? 0 : 1, tier, box);
 }
 }
 
@@ -251,15 +253,15 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
     // The hints: B "Close" (the game's X), A with the focused room's word (none when the game refuses it).
     int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) right = AddHint(c, right, Button::A, v.items[focus].word);
-    AddHint(c, right, Button::DPadV, "");
+    AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
 
     // Images: the rooms' pictures (2x in a row, 3x for the focused room), the X.
     for (auto [box, i] : pictures)
     {
         const int row = i >= 0 ? i : -1 - i;
-        RoomPicture(c, icons, bottom, ci.rows[row], row, i >= 0 ? 2 : 3, box);
+        RoomPicture(c, icons, bottom, ci.rows[row], row, i >= 0 ? 2 : 3, i >= 0 ? kTierS : kTierL, box);
     }
-    AddSpriteIcon(c, icons, kSprCiX, 0, 2, kCiClose);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprCiX), 0, kTierS, kCiClose);
     SortUi(c.ui, first);
 }
 

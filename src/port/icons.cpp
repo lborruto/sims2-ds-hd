@@ -109,4 +109,13 @@ ui::UiItem IconCache::Tiered(SpriteRef s, int frame, int tier, Rect box)
     none.tier = tier;
     return none;
 }
+
+void AddTiered(std::vector<ui::UiItem>& items, IconCache* icons, SpriteRef s, int frame, int tier, Rect box, u32 opacity)
+{
+    if (!icons) return;
+    ui::UiItem it = icons->Tiered(s, frame, tier, box);
+    if (!it.src) return;
+    it.fill = opacity;
+    items.push_back(it);
+}
 }

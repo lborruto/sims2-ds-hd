@@ -100,11 +100,11 @@ constexpr int kMgSideBottom = kActivityBottomTo.y + kActivityBottomTo.h + 6;
 constexpr int kMgPad = 14;                                    // the side panel's inner margin
 constexpr int kMgInnerX = kMgSideX + kMgPad, kMgInnerW = kMgSideW - 2 * kMgPad;
 constexpr Rect kMgPrompt {kMgTitleX, kMgSideBottom + 10, kMgSideX + kMgSideW - kMgTitleX, 52};
-constexpr int kMgPromptPad = 20, kMgPromptGap = 34;           // the bar's margin; between two hints
-constexpr float kMgHintSize = 24, kMgHintMin = 17;            // the hints' chips and labels
+constexpr int kMgPromptPad = 20, kMgPromptGap = 34, kMgPromptGapMin = 16;   // the bar's margin; between two hints (closed to fit)
+constexpr float kMgHintSize = 24, kMgHintMin = 18;            // the hints' chips and labels (ui::kMinText at least)
 constexpr float kMgChipBig = 30;                              // the social answers' D-pad chips
 constexpr int kMgAnswerRow = 46;                              // a social answer's row (its label a live crop 2x)
-constexpr float kMgValueSize = 24, kMgValueMin = 16, kMgHeadSize = 18;
+constexpr float kMgValueSize = 24, kMgValueMin = 18, kMgHeadSize = 18;
 // The cards' deck on the touch screen (a thumbnail of the game's own: the values' well) and the
 // social answers' labels (left, middle, right: the game's own words, live crops shown 2x).
 constexpr Rect kMgDeckFrom {110, 6, 36, 53};

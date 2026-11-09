@@ -48,8 +48,8 @@ constexpr Rect kMuClose {1016, 48, 56, 56};
 constexpr Rect kMuArrows {200, 124, 72, 454};
 constexpr Rect kMuList {288, 124, 512, 454};
 constexpr Rect kMuInfo {816, 124, 264, 454};
-constexpr Rect kMuUp {kMuArrows.x + 4, kMuArrows.y + 8, 64, 56};
-constexpr Rect kMuDown {kMuArrows.x + 4, kMuArrows.y + kMuArrows.h - 64, 64, 56};
+constexpr Rect kMuUp {kMuArrows.x + 8, kMuArrows.y + 8, 56, 56};
+constexpr Rect kMuDown {kMuArrows.x + 8, kMuArrows.y + kMuArrows.h - 64, 56, 56};
 Rect MusicRowRect(int i);
 constexpr float kMuNameSize = 30, kMuNameMin = 20;
 
