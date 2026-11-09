@@ -55,6 +55,7 @@ void Push(std::string& out, std::vector<bool>& dropped, const std::string& add, 
 ui::UiItem PortraitFrame(Rect r)
 {
     ui::UiItem w = ui::WellItem(r);
+    w.fill = ui::GameTheme().frameDark; // (the game's well colour: the portrait's background meets it past its keyed band)
     w.radius = 10;
     return w;
 }

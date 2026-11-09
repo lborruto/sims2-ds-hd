@@ -137,7 +137,8 @@ struct UiItem
 
 // The game pictures' two sizes (one tier per component; a game pixel = TierFactor(tier, the
 // window's scale x the UI's size) output pixels): S the controls' (arrows, chips' icons, small
-// buttons), L the content's (items, portraits, tabs, the cells a player looks at).
+// buttons, a row's ▶), L the content's (items, portraits, the panel's tab icons: its main
+// navigation pictures, the cells a player looks at).
 constexpr int kTierS = 2, kTierL = 3;
 // Tiers are for small pictures only: an icon or sprite whose source (`from`) is at most
 // kTierMaxSource pixels on its longer side, and never a live crop of a DS screen (a 256 x 192

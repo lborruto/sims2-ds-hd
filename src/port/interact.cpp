@@ -192,7 +192,7 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
             const SpriteRef ref = SpriteRef::Of(focused ? kTabIconGreen : kTabIconBlue);
             if (icons->Frame(ref, 0))
             {
-                // The panel's tab bar's tier (one for the ▶ wherever it is).
+                // A control's tier (the tab bar's ▶ is the panel's navigation: kTierL, another component).
                 const Rect r = v.items[i].rect;
                 UiItem a = icons->Tiered(ref, 0, kTierS, {r.x + r.w - kArrowIcon - 10, r.y, kArrowIcon, r.h});
                 if (!v.items[i].enabled) a.fill = 0x50000000; // greyed: faint

@@ -15,6 +15,7 @@ namespace
 using namespace ui;
 
 constexpr u32 kPlateRim = 0xFFB2B2E3;
+constexpr u32 kRowWell = 0xFF51518A;     // a row's portrait well: the DS cell's inside
 constexpr int kRowPortrait = 68;        // a row's portrait well (the crop 2x inside)
 constexpr float kRowName = 24, kRowNameLine = 22, kRowNameMin = 18;
 
@@ -117,7 +118,7 @@ void BuildRelations(Composition& c, const MenuView& v, int focus, const GameStat
         c.ui.push_back(bar);
         UiItem well = PanelItem(RowPortrait(row));
         well.plain = true;
-        well.fill = th.frameDark;
+        well.fill = kRowWell; // (the DS cell's own inside: the portrait's background meets it)
         well.radius = 10;
         well.layer = 1;
         c.ui.push_back(well);
@@ -147,15 +148,14 @@ void BuildRelations(Composition& c, const MenuView& v, int focus, const GameStat
         c.ui.push_back(dt);
     }
 
-    // Images: the rows' portraits (2x) and the big one (3x), live.
+    // Images: the rows' portraits (28 x 28: kTierS) and the big one (3x, filled), live.
     if (bottom)
     {
         for (int i = 0; i < kRelRowsShown && r.first + i < n; i++)
         {
             const Rect from {kRelSimFrom.x, kRelSimFrom.y + kRelSimY[i] - kRelSimY[0], kRelSimFrom.w, kRelSimFrom.h};
             const Rect pw2 = RowPortrait(RowRect(i));
-            const int w = from.w * 2, h = from.h * 2;
-            c.ui.push_back(KeyedCrop(bottom, from, {pw2.x + (pw2.w - w) / 2, pw2.y + (pw2.h - h) / 2, w, h}));
+            c.ui.push_back(KeyedCrop(bottom, from, pw2, kTierS));
         }
         if (sel)
         {

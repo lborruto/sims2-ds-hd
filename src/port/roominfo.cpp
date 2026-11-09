@@ -247,7 +247,7 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
     if (bottom)
     {
         const int w = kRiPortraitFrom.w * 3, h = kRiPortraitFrom.h * 3;
-        c.ui.push_back(ImageItem({kRiPortrait.x + (kRiPortrait.w - w) / 2, kRiPortrait.y + (kRiPortrait.h - h) / 2, w, h}, bottom, SW, SH, kRiPortraitFrom));
+        c.ui.push_back(KeyedCrop(bottom, kRiPortraitFrom, {kRiPortrait.x + (kRiPortrait.w - w) / 2, kRiPortrait.y + (kRiPortrait.h - h) / 2, w, h}));
     }
     AddTiered(c.ui, icons, SpriteRef::Of(kSprRiX), 0, kTierS, kRiClose);
     SortUi(c.ui, first);

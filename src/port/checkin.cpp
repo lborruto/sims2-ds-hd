@@ -72,17 +72,17 @@ void PinkPlate(Composition& c, Rect r, const std::string& s, float size, float m
     c.ui.push_back(p);
 }
 
-// A room's picture in `box`: the occupant's portrait (the game's own row button, live) `scale`
-// times (a live crop: a whole factor), else the game's key (frame 0) or its silhouette (frame 1,
-// not built) at `tier` (the rows' ui::kTierS, the info's ui::kTierL).
-void RoomPicture(Composition& c, IconCache* icons, const u32* bottom, const RegistryRow& r, int row, int scale, int tier, Rect box)
+// A room's picture in `box` at `tier` (the rows' ui::kTierS, the info's ui::kTierL): the
+// occupant's portrait (the game's own row button, live: KeyedCrop), else the game's key (frame 0)
+// or its silhouette (frame 1, not built).
+void RoomPicture(Composition& c, IconCache* icons, const u32* bottom, const RegistryRow& r, int row, int tier, Rect box)
 {
     if (r.occupant >= 0)
     {
         if (!bottom) return;
         const Rect from {kCiPortraitFrom.x, kCiPortraitFrom.y + kCiRowDy * row, kCiPortraitFrom.w, kCiPortraitFrom.h};
-        const int w = from.w * scale, h = from.h * scale;
-        c.ui.push_back(ImageItem({box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h}, bottom, SW, SH, from));
+        // (28 x 30: small, at the key's tier; its DS bevel keyed out, the well its background's colour)
+        c.ui.push_back(KeyedCrop(bottom, from, box, tier));
         return;
     }
     AddTiered(c.ui, icons, SpriteRef::Of(kSprCiKey), r.built ? 0 : 1, tier, box);
@@ -259,7 +259,7 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
     for (auto [box, i] : pictures)
     {
         const int row = i >= 0 ? i : -1 - i;
-        RoomPicture(c, icons, bottom, ci.rows[row], row, i >= 0 ? 2 : 3, i >= 0 ? kTierS : kTierL, box);
+        RoomPicture(c, icons, bottom, ci.rows[row], row, i >= 0 ? kTierS : kTierL, box);
     }
     AddTiered(c.ui, icons, SpriteRef::Of(kSprCiX), 0, kTierS, kCiClose);
     SortUi(c.ui, first);

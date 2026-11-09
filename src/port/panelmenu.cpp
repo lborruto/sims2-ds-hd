@@ -141,8 +141,10 @@ void AddMousePiece(Composition& c, Rect from, Rect to)
     c.pieces.push_back(p);
 }
 
-UiItem KeyedCrop(const u32* bottom, Rect from, Rect to)
+UiItem KeyedCrop(const u32* bottom, Rect from, Rect to, int tier)
 {
+    // (No picture, or a rectangle off the screen: an image item without a source, which draws
+    // nothing and takes no room: ImageItem's own empty item.)
     if (!bottom || from.w <= 0 || from.h <= 0 || from.x < 0 || from.y < 0 || from.x + from.w > SW || from.y + from.h > SH)
         return ImageItem({to.x, to.y, 0, 0}, nullptr, 0, 0, {});
     static std::map<std::tuple<int, int, int, int>, std::vector<u32>> copies;
@@ -150,14 +152,11 @@ UiItem KeyedCrop(const u32* bottom, Rect from, Rect to)
     px.resize((size_t)from.w * from.h);
     for (int j = 0; j < from.h; j++)
         for (int i = 0; i < from.w; i++) px[(size_t)j * from.w + i] = bottom[(size_t)(from.y + j) * SW + from.x + i] | 0xFF000000;
-    auto frame = [](u32 c) {
-        c &= 0xFFFFFF;
-        return c == 0x383869 || c == 0x414979 || c == 0x51518A || c == 0x5961A2 || c == 0x6171B2 || c == 0x828ACB;
-    };
     std::vector<int> todo;
     auto push = [&](int i, int j) {
+        if (std::min({i, j, from.w - 1 - i, from.h - 1 - j}) >= kKeyBand) return; // (only the frame's band)
         u32& c = px[(size_t)j * from.w + i];
-        if ((c >> 24) != 0 && frame(c)) { c = 0; todo.push_back(j * from.w + i); }
+        if ((c >> 24) != 0 && KeyedColour(c)) { c = 0; todo.push_back(j * from.w + i); }
     };
     for (int i = 0; i < from.w; i++) { push(i, 0); push(i, from.h - 1); }
     for (int j = 0; j < from.h; j++) { push(0, j); push(from.w - 1, j); }
@@ -170,7 +169,14 @@ UiItem KeyedCrop(const u32* bottom, Rect from, Rect to)
         if (j > 0) push(i, j - 1);
         if (j + 1 < from.h) push(i, j + 1);
     }
+    if (tier > 0) return TierImage(to, px.data(), from.w, from.h, {0, 0, from.w, from.h}, tier);
     return ImageItem(to, px.data(), from.w, from.h, {0, 0, from.w, from.h});
+}
+
+bool KeyedColour(u32 c)
+{
+    c &= 0xFFFFFF;
+    return c == 0x383869 || c == 0x414979 || c == 0x51518A || c == 0x5961A2 || c == 0x6171B2 || c == 0x828ACB;
 }
 
 int PhoneButtonFrame(IconCache& icons, const u32* bottom)
@@ -396,7 +402,7 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
         for (int i = 0; i < 5; i++)
         {
             const SpriteRef ref = SpriteRef::Of(i == tab ? kTabIconGreen : kTabIconBlue);
-            if (icons->Frame(ref, i)) c.ui.push_back(icons->Tiered(ref, i, kTierS, {kPmTabsX + i * kPmTabCell, cellY, kPmTabCell, kPmTabCell}));
+            if (icons->Frame(ref, i)) c.ui.push_back(icons->Tiered(ref, i, kTierL, {kPmTabsX + i * kPmTabCell, cellY, kPmTabCell, kPmTabCell}));
         }
     // The phone: the game's own button sprite, in the frame the touch screen shows (ringing too),
     // at the tabs' tier.

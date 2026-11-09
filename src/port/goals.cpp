@@ -213,12 +213,8 @@ void BuildGoals(Composition& c, const MenuView& v, int focus, const GameState& g
         wt.layer = 1;
         c.ui.push_back(wt);
     }
-    // The giver's portrait (live, 3x) while the game lists a goal.
-    if (bottom && !g.entries.empty())
-    {
-        const int w = kGoalsPortraitFrom.w * 3, h = kGoalsPortraitFrom.h * 3;
-        c.ui.push_back(KeyedCrop(bottom, kGoalsPortraitFrom, {kGoalsPortrait.x + (kGoalsPortrait.w - w) / 2, kGoalsPortrait.y + (kGoalsPortrait.h - h) / 2, w, h}));
-    }
+    // The giver's portrait (live, 30 x 30 at kTierL) while the game lists a goal.
+    if (bottom && !g.entries.empty()) c.ui.push_back(KeyedCrop(bottom, kGoalsPortraitFrom, kGoalsPortrait, kTierL));
 }
 
 void MeasureGoals(const RomData& rom, BlockMeasure& m)

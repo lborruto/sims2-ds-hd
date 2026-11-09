@@ -351,12 +351,18 @@ SKIP_DS = ([(50, 26, 86, 70)] if case.split("-")[0] == "moogoo" else [(0, 68, 31
 # The game's frame colours a keyed crop (port/panelmenu.h KeyedCrop) may take out around a portrait.
 KEYED = {(0x38, 0x38, 0x69), (0x41, 0x49, 0x79), (0x51, 0x51, 0x8A), (0x59, 0x61, 0xA2), (0x61, 0x71, 0xB2), (0x82, 0x8A, 0xCB)}
 
+KEY_BAND = 3  # (port/panelmenu.h kKeyBand: only the crop's outer 3 pixels may be keyed out)
+
+def in_band(x, y, w, h):
+    return min(x, y, w - 1 - x, h - 1 - y) < KEY_BAND
+
 def piece(what, fx, fy, fw, fh, tx, ty, scale, step=5, keyed=False):
     """A piece of the bottom screen drawn whole-number times bigger: each DS pixel's block (keyed:
-    a DS pixel in the game's frame colours may be the HD well's instead, keyed out)."""
+    the piece is a KeyedCrop's whole rectangle; a DS pixel in the game's frame colours within its
+    outer KEY_BAND pixels may be the HD well's instead; every pixel further in is the DS's own)."""
     for y in range(0, fh, step):
         for x in range(0, fw, step):
-            if keyed and bottom(fx + x, fy + y) in KEYED:
+            if keyed and bottom(fx + x, fy + y) in KEYED and in_band(x, y, fw, fh):
                 continue
             if any(abs(tx + x * scale - sx) < 20 and abs(ty + y * scale - sy) < 20 for sx, sy in SKIP):
                 continue
@@ -1060,8 +1066,8 @@ elif case in ("registry", "registry-2x", "registry-wide", "registry-guest"):
         if len(key) < 6: errors.append(f"no key in the first row ({len(key)} colours)")
     else:
         if pink(144) < 10: errors.append("the occupied room's name not pink")
-        piece("row portrait 2x", 8, 24, 28, 30, 228, 145, 2, step=3)
-        piece("big portrait 3x", 8, 24, 28, 30, 906, 151, 3, step=3)
+        piece("row portrait 2x", 8, 24, 28, 30, 228, 145, 2, step=3, keyed=True)
+        piece("big portrait 3x", 8, 24, 28, 30, 906, 151, 3, step=3, keyed=True)
     not_big()
 elif case in ("roominfo", "roominfo-vacant", "roominfo-hint"):
     # Room info in HD (src/port/roominfo.*): the panel; the portrait the game's own (the concierge:
@@ -1079,7 +1085,7 @@ elif case in ("roominfo", "roominfo-vacant", "roominfo-hint"):
     else:
         expect("panel outline", C(176, 300), OUTLINE)
         expect("title well", C(640, 50), hexrgb("6870B6"))
-        piece("portrait 3x", 172, 36, 70, 86, 223, 145, 3, step=6)
+        piece("portrait 3x", 172, 36, 70, 86, 223, 145, 3, step=6, keyed=True)
         if not ring(484, 163): errors.append("no focus ring around the guest's line")
         if ring(484, 225): errors.append("a focus ring around the second line")
         warm = sum(1 for y in range(140, 570, 2) for x in range(880, 1060, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
@@ -1200,8 +1206,8 @@ elif case in ("s5-hd", "s5-hd-wide"):
     if white(140, 430, 400, 476) < 300:
         errors.append("no name on the plate")
     grid = [(x, y) for y in range(0, 84, 3) for x in range(0, 67, 3)]
-    # (its frame's colours keyed out from its edges: KeyedCrop, the well's colour there)
-    bad = sum(1 for x, y in grid if C(1006 + 2 * x, 504 + 2 * y) != bottom(174 + x, 38 + y) and bottom(174 + x, 38 + y) not in KEYED)
+    # (its frame's colours keyed out in its outer band: KeyedCrop, the well's colour there)
+    bad = sum(1 for x, y in grid if C(1006 + 2 * x, 504 + 2 * y) != bottom(174 + x, 38 + y) and not (bottom(174 + x, 38 + y) in KEYED and in_band(x, y, 67, 84)))
     if bad:
         errors.append(f"portrait: {bad} pixels not the touch screen's")
     if sum(1 for x, y in grid if max(C(1006 + 2 * x, 504 + 2 * y)) > 40) < len(grid) // 2:
