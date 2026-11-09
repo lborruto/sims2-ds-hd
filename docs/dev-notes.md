@@ -403,7 +403,9 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   the top screen at x 83-86, rows 3-12 (the checks compare x 82-87, rows 2-13). Vacuum: the
   left stick and the D-pad drive (the DS's D-pad); the hand is the activities' pointer
   (`ActivityState::px` / `py`, so it runs headless; drawn by the HD frame with a ring, `mark`, on
-  the find A takes), moved by the right stick alone (`MovePointer`). A takes a find
+  the find A takes), moved by the right stick alone (`MovePointer`), or on the keyboard by the
+  arrows while its X action (S) is held (`PadState::keyX` / `keyDx` / `keyDy`, the keyboard's own
+  keys only: `kHandStep` 2 a frame; they do not drive then). A takes a find
   (`VacuumTake`, pure: the bowl from `ActivityRam::vacuumThings`, the hand, its phase): the find
   nearest the hand; the stylus moves onto a point of its square no LOWER-slot dust square covers
   (`VacuumSafePoint`: the game grabs the first slot 0..8 whose square, half side 20 x scale, holds
@@ -413,7 +415,8 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   (`S+0x162`, `S+0x170`) to be idle, rests 2 frames and lets go. The game keeps a find only when
   released over the funnel (touch 108 < x < 147, 133 < y < 193; overlay 17 code 0x0214AFB4), never
   over the box at the bottom right (it shows the last find kept). No find in the bowl: A presses
-  nothing (a bare press only grabs dust). Gives up after 60 frames without a hold or 300 in all.
+  nothing (a bare press only grabs dust). Gives up after 60 frames without a hold or 300 in all; a bowl that does not read mid-take
+  (a misread) holds the stylus at its last point and press up to `kVacuumMissMax` (4) frames, then gives up.
   The bowl unread (another ROM): A held is the stylus down at the hand. The prototype (A held
   through the take) kept 41 finds of 41 with no clog over 63 presses; `mg-vacuum-pick` (act-vacuum
   driven over the rug, A at frame 300: the gold ring kept, no clog) and `mg-vacuum-none` (A on an
@@ -439,7 +442,8 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   nearest the pointer at `kAutopsyOrgan` 77,93 / 128,95 / 183,95; the nearest eating parasite,
   else the nearest; one walking in off the screen never): the pointer goes there at `kPtrMax` with
   the stylus up, rests a frame, presses, follows a parasite at `kPtrDrag`, and once RAM shows it
-  held (sub 3 / 6) glides as LB does; given up (the stylus up) when the target goes or after
+  held (sub 3 / 6) glides as LB does (`glideByA`: the hint's A chip shows for A's take and its carry,
+  LB's for LB's); given up (the stylus up) when the target goes or after
   `kSeekMax` (60) frames pressed. Nothing to take (and the laser): A held is the stylus, as before.
   `mg-autopsy-take-organ` (the laser's cut, Y, A: §84 banked) and `mg-autopsy-take-parasite`
   (G-A-para, RB, A: the eating parasite into the flask);

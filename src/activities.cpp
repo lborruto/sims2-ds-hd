@@ -146,26 +146,33 @@ void Vacuum(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState&
     if (pad.y && !st.prev.y) st.blowFrames = 8;
     st.blow = pad.y || st.blowFrames > 0;
     if (st.blowFrames > 0) st.blowFrames--;
-    // The D-pad and the left stick drive (the game's own D-pad); L / R its own camera.
+    // The D-pad and the left stick drive (the game's own D-pad); L / R its own camera. The keyboard's
+    // X action held: its arrows move the hand instead.
+    const bool keyHand = pad.keyX;
     auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
-    set(pad.up || pad.ly < -kStick, kUp);
-    set(pad.down || pad.ly > kStick, kDown);
-    set(pad.left || pad.lx < -kStick, kLeft);
-    set(pad.right || pad.lx > kStick, kRight);
+    set((pad.up && !keyHand) || pad.ly < -kStick, kUp);
+    set((pad.down && !keyHand) || pad.ly > kStick, kDown);
+    set((pad.left && !keyHand) || pad.lx < -kStick, kLeft);
+    set((pad.right && !keyHand) || pad.lx > kStick, kRight);
+    auto keyMove = [&] {
+        if (!keyHand) return;
+        st.px = std::clamp(st.px + kHandStep * pad.keyDx, 0.0f, (float)(SW - 1));
+        st.py = std::clamp(st.py + kHandStep * pad.keyDy, 0.0f, (float)(SH - 1));
+    };
     set(pad.lb, kL);
     set(pad.rb, kR);
     // The hand: the right stick alone (the left one drives).
     PadState aim = pad;
     aim.lx = aim.ly = 0;
-    if (!st.ram.vacuumBowl)
+    if (!st.ram.vacuumBowl && st.take.phase == 0)
     {
         // The bowl unread: A held is the stylus down at the hand (grab, drag to the funnel by hand).
-        st.take = {};
         MovePointer(aim, st, pad.a ? kPtrDrag : kPtrMax, false);
+        keyMove();
         st.down = pad.a && canTap;
         return;
     }
-    if (st.take.phase == 0) MovePointer(aim, st, kPtrMax, false);
+    if (st.take.phase == 0) { MovePointer(aim, st, kPtrMax, false); keyMove(); }
     const VacuumStylus v = VacuumTake(st.ram, st.px, st.py, Pressed(pad, st, &PadState::a) && canTap, st.take);
     st.px = std::clamp(v.x, 0.0f, (float)(SW - 1));
     st.py = std::clamp(v.y, 0.0f, (float)(SH - 1));
@@ -257,6 +264,7 @@ void Autopsy(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState
             st.gliding = true;
             st.glideRest = 0;
             st.glideTo = st.seek == 1 ? kAutopsyTray : kAutopsyFlask;
+            st.glideByA = true;
             st.seek = 0;
             st.down = true;
             return;
@@ -308,6 +316,7 @@ void Autopsy(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState
         st.gliding = true;
         st.glideRest = 0;
         st.glideTo = st.ram.autopsySub == 3 ? kAutopsyTray : kAutopsyFlask;
+        st.glideByA = false;
         st.down = true;
         return;
     }
@@ -889,7 +898,7 @@ bool VacuumSafePoint(const std::vector<VacuumThing>& things, int i, float& x, fl
     return ok;
 }
 
-VacuumStylus VacuumTake(const ActivityRam& ram, float px, float py, bool start, ActivityState::Take& t)
+static VacuumStylus TakeStep(const ActivityRam& ram, float px, float py, bool start, ActivityState::Take& t)
 {
     VacuumStylus s {px, py, false};
     const std::vector<VacuumThing>& th = ram.vacuumThings;
@@ -898,7 +907,14 @@ VacuumStylus VacuumTake(const ActivityRam& ram, float px, float py, bool start, 
             if (th[i].slot == slot) return i;
         return -1;
     };
-    if (!ram.vacuumBowl) { t = {}; return s; }
+    if (!ram.vacuumBowl)
+    {
+        // A misread mid-take: the last point held a few frames (letting go drops the find), then given up.
+        if (t.phase != 0 && ++t.missed <= kVacuumMissMax) return {t.x, t.y, t.down};
+        t = {};
+        return s;
+    }
+    t.missed = 0;
     if (start && t.phase == 0)
     {
         const int i = VacuumTarget(th, px, py);
@@ -963,6 +979,13 @@ VacuumStylus VacuumTake(const ActivityRam& ram, float px, float py, bool start, 
     return s;
 }
 
+VacuumStylus VacuumTake(const ActivityRam& ram, float px, float py, bool start, ActivityState::Take& t)
+{
+    const VacuumStylus s = TakeStep(ram, px, py, start, t);
+    if (t.phase != 0 && ram.vacuumBowl) { t.x = s.x; t.y = s.y; t.down = s.down; }
+    return s;
+}
+
 bool IsActivity(Screen s) { return s == Screen::Social || s == Screen::Cards || s == Screen::Vacuum || OwnScheme(s); }
 
 void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st)
@@ -1008,7 +1031,7 @@ std::vector<Hint> ActivityHints(Screen s)
     case Screen::Cards:
         return {{"D-PAD", "CHOOSE A CARD"}, {"A", "PICK UP, AGAIN\nTO PLAY"}, {"X", "DRAW A CARD"}, {"Y", "DISCARD"}, {"B", "QUIT"}};
     case Screen::Vacuum:
-        return {{"L-STICK", "DRIVE"}, {"R-STICK", "MOVE THE HAND"}, {"A", "TAKE A FIND\nTO THE FUNNEL"}, {"Y", "BLOW: UNCLOG"}};
+        return {{"L-STICK", "DRIVE"}, {"R-STICK", "MOVE THE HAND"}, {"A", "HOLD: GRAB,\nDROP IN FUNNEL"}, {"Y", "BLOW: UNCLOG"}};
     case Screen::Autopsy:
         return {{"STICK", "POINT (LT SLOW)"}, {"A", "HOLD: USE TOOL"}, {"X Y RB", "LASER, HAND,\nTWEEZERS"},
                 {"LB", "TO TRAY/FLASK"}, {"B B", "QUIT (NO PAY)"}};

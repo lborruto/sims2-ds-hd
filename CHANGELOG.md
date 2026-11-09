@@ -81,7 +81,7 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   (the one nearest the hand; the right stick moves the hand), presses where no dust lies over it,
   carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is
   kept and the filter never clogs. With no find in the bowl A does nothing. The hint said to drag
-  finds to the box: the game only keeps what is dropped in the funnel. The D-pad always drives now.
+  finds to the box: the game only keeps what is dropped in the funnel. On a controller the D-pad always drives now (the keyboard still moves the hand with S and the arrows).
 - Alien Autopsy on a controller: with the hand, A takes a freed organ to the tray by itself; with
   the tweezers, A takes the nearest parasite (an eating one first) to the flask. The laser still
   cuts with A held.

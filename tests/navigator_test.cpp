@@ -824,6 +824,34 @@ static void vacuum_takes_a_find()
     r.nav.SetActivityRam(ram);
     r.Frame(kVacuum);
     CHECK(!r.nav.PointerDown() && !r.nav.Taking());
+    // A misread of the bowl mid-take: the stylus held down at its last point kVacuumMissMax frames,
+    // the take going on when the bowl reads again; a longer one gives up.
+    ram.vacuumThings[0].held = false;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kVacuum);
+    r.Press(kVacuum, &PadState::a);
+    r.Frame(kVacuum);
+    CHECK(r.nav.PointerDown() && r.nav.Taking());
+    {
+        const float mx = r.nav.PointerX(), my = r.nav.PointerY();
+        ActivityRam none;
+        r.nav.SetActivityRam(none);
+        for (int i = 0; i < kVacuumMissMax; i++)
+        {
+            r.Frame(kVacuum);
+            CHECK(r.nav.PointerDown() && r.nav.Taking() && r.nav.PointerX() == mx && r.nav.PointerY() == my);
+        }
+        r.nav.SetActivityRam(ram);
+        r.Frame(kVacuum);
+        CHECK(r.nav.PointerDown() && r.nav.Taking());
+        r.nav.SetActivityRam(none);
+        for (int i = 0; i < kVacuumMissMax; i++) r.Frame(kVacuum);
+        CHECK(r.nav.PointerDown());
+        r.Frame(kVacuum);
+        CHECK(!r.nav.PointerDown() && !r.nav.Taking());
+        r.nav.SetActivityRam(ram);
+        r.Frame(kVacuum);
+    }
     // The find gone down the hole while reaching: the take ends.
     ram.vacuumThings[0].held = false;
     r.nav.SetActivityRam(ram);
@@ -832,6 +860,46 @@ static void vacuum_takes_a_find()
     r.nav.SetActivityRam(ram);
     r.Frame(kVacuum);
     CHECK(!r.nav.PointerDown() && !r.nav.Taking());
+
+    // No safe point when A is pressed (lower dust over the whole find): the stylus stays up, the take
+    // tries again each frame, and gives up after kVacuumReachMax frames.
+    Rig c;
+    ActivityRam cov;
+    cov.vacuumBowl = true;
+    cov.vacuumThings = {{0, 100, 100, 20, true, false}, {2, 100, 100, 6, false, false}};
+    c.nav.SetActivityRam(cov);
+    c.Frame(kVacuum);
+    c.Press(kVacuum, &PadState::a);
+    CHECK(c.nav.Taking() && !c.nav.PointerDown());
+    int up = 0;
+    while (c.nav.Taking() && up < 200) { c.Frame(kVacuum); CHECK(!c.nav.PointerDown()); up++; }
+    CHECK(up >= kVacuumReachMax - 2 && up <= kVacuumReachMax + 2);
+    // Covered only after the press: the stylus stays down, on the find's middle.
+    cov.vacuumThings = {{0, 40, 40, 10, true, false}, {2, 100, 100, 6, false, false}};
+    c.nav.SetActivityRam(cov);
+    c.Press(kVacuum, &PadState::a);   // (the move, then the press)
+    CHECK(c.nav.Taking() && c.nav.PointerDown());
+    cov.vacuumThings[0] = {0, 100, 100, 20, true, false};
+    cov.vacuumThings[1].x = 104;
+    c.nav.SetActivityRam(cov);
+    c.Frame(kVacuum);
+    CHECK(c.nav.PointerDown() && c.nav.PointerX() == 104 && c.nav.PointerY() == 100);
+
+    // The keyboard: its X action held, the arrows move the hand kHandStep a frame and do not drive;
+    // without it they drive.
+    Rig k;
+    k.Frame(kVacuum);
+    const float hx = k.nav.PointerX(), hy = k.nav.PointerY();
+    PadState kb;
+    kb.keyX = kb.x = kb.right = kb.up = true;
+    kb.keyDx = 1;
+    kb.keyDy = -1;
+    u32 keys = k.Frame(kVacuum, kb);
+    CHECK(!(keys & (1u << kRight)) && !(keys & (1u << kUp)) && !(keys & (1u << kX)));
+    CHECK(k.nav.PointerX() == hx + kHandStep && k.nav.PointerY() == hy - kHandStep);
+    kb.keyX = kb.x = false;
+    keys = k.Frame(kVacuum, kb);
+    CHECK((keys & (1u << kRight)) && k.nav.PointerX() == hx + kHandStep);
 }
 
 static const ScreenState kAutopsy {Screen::Autopsy, Tab::None};
@@ -985,6 +1053,8 @@ static void autopsy_takes()
     // Dragged (RAM): carried to the tray, let go there.
     ram.autopsySub = 3;
     r.nav.SetActivityRam(ram);
+    r.Frame(kAutopsy);
+    CHECK(r.nav.Taking() && r.nav.PointerDown());   // (A's carry: the hint's A chip)
     frames = 0;
     while (r.nav.PointerDown() && frames++ < 200) r.Frame(kAutopsy);
     CHECK(frames < 200 && r.nav.PointerX() == kAutopsyTray.x && r.nav.PointerY() == kAutopsyTray.y);
@@ -1059,6 +1129,7 @@ static void autopsy_scheme()
     PadState alb = a;
     alb.lb = true;
     r.Frame(kAutopsy, alb);
+    CHECK(r.nav.PointerDown() && !r.nav.Taking());   // (LB's carry, not A's take)
     float last = r.nav.PointerX();
     int frames = 0;
     bool smooth = true;

@@ -11,7 +11,7 @@
 //     B its cross. While RAM shows the end-of-turn message, A taps it (the turn goes on).
 //   Vacuum: the left stick (and the D-pad) are the DS's D-pad (the game's own steering); the
 //     hand is the pointer (px / py, drawn with a ring on the find A takes: `mark`): the right
-//     stick moves it (MovePointer). A takes a find (VacuumTake, from the bowl RAM shows: the find
+//     stick moves it (MovePointer), the keyboard's arrows with its X action held (kHandStep). A takes a find (VacuumTake, from the bowl RAM shows: the find
 //     nearest the hand): the stylus pressed where no dust lies over it, carried to the funnel
 //     (the game keeps a find only there: kVacuumFunnel) and let go once the funnel's keep
 //     animation is idle; no find: the stylus stays up (a bare press only grabs dust: a clog). The
@@ -201,6 +201,9 @@ struct ActivityState
         int phase = 0;              // 0 none, 1 reaching (the stylus onto the find), 2 carrying to the funnel
         int slot = -1;              // the find taken
         int frames = 0, pressed = 0, rest = 0;
+        int missed = 0;             // frames in a row the bowl did not read (kVacuumMissMax: given up)
+        float x = 0, y = 0;         // the stylus's last point and press (held through a misread)
+        bool down = false;
     } take;
     // The pointing minigames' pointer (DS touch pixels; it starts in the middle of a new screen).
     // Out: pointer (it is this screen's, drawn), down (the stylus down at px, py this frame).
@@ -211,6 +214,7 @@ struct ActivityState
     bool gliding = false;             // the autopsy's LB: carrying to glideTo, the stylus held
     Point glideTo {0, 0};
     int glideRest = 0;                // frames resting on glideTo before letting go
+    bool glideByA = false;            // the glide is A's take's carry (not LB's)
     // The autopsy's A take (AutopsySeek): 0 none, 1 an organ, 2 a parasite; which (organ 0-2, a
     // parasite's slot); pressed (frames down on it); frames in all.
     int seek = 0, seekWhich = -1, seekPressed = 0, seekFrames = 0;
@@ -246,7 +250,7 @@ struct PointerView
     float x = 0, y = 0;
     Rect mark {0, 0, 0, 0};           // MooGoo's focus on the playfield (DS pixels; w 0 none)
     int askFocus = -1;                // a question's focused answer (0 No, 1 Yes; ActivityState::askFocus), -1 none up
-    bool taking = false;              // A's take runs (the vacuum's find, the autopsy's organ or parasite; its LB carry)
+    bool taking = false;              // A's take runs (the vacuum's find, the autopsy's organ or parasite, their carry; not LB's)
 };
 
 // The screens ActivityInput plays.
@@ -270,6 +274,11 @@ constexpr Point kCardsMessage {128, 120};
 constexpr Point kVacuumFunnel {127, 150};
 constexpr float kVacuumCarry = 4.0f;
 constexpr int kVacuumRest = 2, kVacuumReachMax = 60, kVacuumTakeMax = 300;
+// A take holds its last point (and press) through this many frames of a bowl that does not read (a
+// misread: letting go would drop the find), then gives up.
+constexpr int kVacuumMissMax = 4;
+// The keyboard's hand: its X action held, the arrows move it this far a frame (they do not drive then).
+constexpr float kHandStep = 2.0f;
 // The find A takes from the hand at (hx, hy): the nearest one in the bowl (its index in things), -1 none.
 int VacuumTarget(const std::vector<VacuumThing>& things, float hx, float hy);
 // A point of thing i's square (one pixel inside it) that no square of the dust in a lower slot

@@ -367,6 +367,9 @@ PadState Input::Actions(const Settings& s) const
         p.rt = pad.btn[IN_RT] ? 1.0f : 0.0f;
     }
     p.cursor = s.stickCursor && pads.Any();
+    p.keyX = held[X];
+    p.keyDx = (held[RIGHT] ? 1 : 0) - (held[LEFT] ? 1 : 0);
+    p.keyDy = (held[DOWN] ? 1 : 0) - (held[UP] ? 1 : 0);
     p.speed = s.cursorSpeed / 100.0f;
     return p;
 }
