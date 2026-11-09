@@ -542,7 +542,7 @@ Prepared Prepare(const UiItem& it, float s0, float ox0, float oy0, int W, int H)
     return p;
 }
 
-void DrawPanel(Layer& L, const UiItem& it, float s0, float ox0, float oy0)
+void DrawPanelBody(Layer& L, const UiItem& it, float s0, float ox0, float oy0)
 {
     const Xf e = Eff(it, s0, ox0, oy0);
     const float s = e.s, ox = e.ox, oy = e.oy;
@@ -606,6 +606,62 @@ float SegmentDistance(float px, float py, float ax, float ay, float bx, float by
     const float t = std::clamp((wx * vx + wy * vy) / (vx * vx + vy * vy), 0.0f, 1.0f);
     const float dx = wx - t * vx, dy = wy - t * vy;
     return std::sqrt(dx * dx + dy * dy);
+}
+
+// A filled triangle (layer pixels), anti-aliased.
+void FillTriangle(Layer& L, float ax, float ay, float bx, float by, float cx, float cy, u32 argb)
+{
+    const float gx = (ax + bx + cx) / 3, gy = (ay + by + cy) / 3;
+    auto edge = [&](float px, float py, float x1, float y1, float x2, float y2) {
+        // Signed distance to the line through (x1, y1)-(x2, y2), negative on the centroid's side.
+        const float nx = y2 - y1, ny = x1 - x2, n = std::sqrt(nx * nx + ny * ny);
+        const float d = ((px - x1) * nx + (py - y1) * ny) / n, di = ((gx - x1) * nx + (gy - y1) * ny) / n;
+        return di < 0 ? d : -d;
+    };
+    FillDistance(L, std::min({ax, bx, cx}), std::min({ay, by, cy}), std::max({ax, bx, cx}), std::max({ay, by, cy}), argb,
+                 [&](float x, float y) { return std::max({edge(x, y, ax, ay, bx, by), edge(x, y, bx, by, cx, cy), edge(x, y, cx, cy, ax, ay)}); });
+}
+
+// A panel's sign (UiItem::sign) in its middle, layer pixels: (x0, y0)-(x1, y1) the panel.
+void DrawSign(Layer& L, UiItem::Sign sign, float x0, float y0, float x1, float y1, u32 c)
+{
+    using Sign = UiItem::Sign;
+    const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, m = std::min(x1 - x0, y1 - y0);
+    if (sign == Sign::Up || sign == Sign::Down || sign == Sign::Left || sign == Sign::Right)
+    {
+        // An isosceles triangle, its apex pointing `sign`, half the box's side wide, centred.
+        const float half = m * 0.25f, depth = m * 0.21f;
+        const float k = sign == Sign::Up || sign == Sign::Left ? -1.0f : 1.0f;
+        if (sign == Sign::Up || sign == Sign::Down)
+            FillTriangle(L, cx, cy + k * depth, cx - half, cy - k * depth, cx + half, cy - k * depth, c);
+        else
+            FillTriangle(L, cx + k * depth, cy, cx - k * depth, cy - half, cx - k * depth, cy + half, c);
+    }
+    else if (sign == Sign::Wireless)
+    {
+        // A dot low in the box and two arcs above it (a quarter turn each side of up), round ends.
+        const float ox = cx, oy = cy + m * 0.30f, w = m * 0.11f, dot = m * 0.085f;
+        FillDistance(L, ox - dot, oy - dot, ox + dot, oy + dot, c, [&](float x, float y) { return std::hypot(x - ox, y - oy) - dot; });
+        const float spread = 0.80f; // (radians each side of up)
+        for (float R : {m * 0.30f, m * 0.55f})
+            FillDistance(L, ox - R - w, oy - R - w, ox + R + w, oy + w, c, [&](float x, float y) {
+                const float dx = x - ox, dy = y - oy, t = std::atan2(dx, -dy);
+                if (std::fabs(t) <= spread) return std::fabs(std::hypot(dx, dy) - R) - w / 2;
+                const float ex = ox + (t < 0 ? -1 : 1) * R * std::sin(spread), ey = oy - R * std::cos(spread);
+                return std::hypot(x - ex, y - ey) - w / 2;
+            });
+    }
+}
+
+void DrawPanel(Layer& L, const UiItem& it, float s0, float ox0, float oy0)
+{
+    DrawPanelBody(L, it, s0, ox0, oy0);
+    if (it.sign == UiItem::Sign::None) return;
+    const Xf e = Eff(it, s0, ox0, oy0);
+    const float x0 = (it.to.x - e.ox) * e.s, y0 = (it.to.y - e.oy) * e.s;
+    // (a raised panel's fill sits a line lower: the sign with it)
+    const float down = !it.plain && it.raised ? std::max(1.0f, std::round(e.s)) * 0.5f : 0;
+    DrawSign(L, it.sign, x0, y0 + down, x0 + it.to.w * e.s, y0 + down + it.to.h * e.s, it.colour);
 }
 
 // PlayStation's face symbols, outlined, centred at (cx, cy) in a chip of height hs (layer pixels).
@@ -853,6 +909,20 @@ UiItem WellItem(Rect to, const Theme& t)
     it.border = 0;
     it.raised = false;
     return it;
+}
+
+UiItem ScrollArrowItem(Rect to, UiItem::Sign dir, bool on)
+{
+    const Theme& t = GameTheme();
+    UiItem b = PanelItem(to);
+    b.fill = on ? kFillRow : t.frameDark;
+    b.borderArgb = t.frame;
+    b.border = 3;
+    b.radius = std::min(to.w, to.h) / 2.0f;
+    b.raised = on;
+    b.sign = dir;
+    b.colour = on ? 0xFFFFFFFF : 0x59FFFFFF;
+    return b;
 }
 
 UiItem TextItem(Rect to, const std::string& utf8, float size, Align align, Weight w)
@@ -1171,6 +1241,7 @@ void MixItem(u64& h, const UiItem& it)
     Mix(h, it.text.size());
     for (char c : it.text) Mix(h, (u8)c);
     if (it.layer != 0) Mix(h, 0x4C41594552ull ^ (u64)(u32)it.layer); // (layer 0 hashes as before)
+    if (it.sign != UiItem::Sign::None) Mix(h, 0x5349474Eull ^ (u64)it.sign); // (a panel without a sign hashes as before)
     if (it.face != Face::Xbox || !it.glyph.empty())
     {   // (a chip of the Xbox look hashes as before)
         Mix(h, 0x46414345ull ^ (u64)it.face);
