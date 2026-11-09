@@ -5,6 +5,8 @@
 
 #include "console.h"
 #include "port/front.h"
+#include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -259,13 +261,6 @@ void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState
         pct.middle = true;
         pct.layer = 1;
         c.ui.push_back(pct);
-        if (focused)
-        {   // The D-pad's chip: Left / Right move the knob.
-            const Rect dp = ChipRect(0, 0, Button::DPadH, "", 26);
-            UiItem chip = ChipItem(w.x + 28, w.y + 18 + (64 - dp.h) / 2, Button::DPadH, "", 26);
-            chip.layer = 1;
-            c.ui.push_back(chip);
-        }
         const int ty = w.y + 124;
         UiItem track = PanelItem({kSeHdTrackX - 6, ty - 7, kSeHdTrackW + 12, 14});
         track.plain = true;
@@ -343,13 +338,15 @@ void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState
         }
     }
 
-    // The hints: A (an unlocked picture), B "Close" (the title).
+    // The hints: A (an unlocked picture: View), B "Close" (the title); a volume's D-pad (Left /
+    // Right move the knob: Adjust).
     int right = kSeHints.x + kSeHints.w - 8;
     SeHint(c, right, Button::B, MenuWords(rom, kStrClose));
-    if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) SeHint(c, right, Button::A, "");
+    if (st.page <= 1 && focus == 0 && !v.items.empty()) SeHint(c, right, Button::DPadH, OwnWord(&rom, OwnWordId::HintAdjust));
+    if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) SeHint(c, right, Button::A, OwnWord(&rom, OwnWordId::HintView));
     for (UiItem& im : images) c.ui.push_back(im);
     // The game's X (B), the mouse onto its own.
-    AddSpriteIcon(c, icons, kSprX, 0, 2, kSeX);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprX), 0, kTierS, kSeX);
     AddMousePiece(c, {kSeCloseX - 14, kSeCloseY - 14, 28, 28}, kSeX);
     SortUi(c.ui, first);
 }
@@ -487,7 +484,7 @@ void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& ga
     // The game's X (B, while no popup is up), the mouse onto its own.
     if (!popup)
     {
-        AddSpriteIcon(c, icons, kSprX, 0, 2, kLdX);
+        AddTiered(c.ui, icons, SpriteRef::Of(kSprX), 0, kTierS, kLdX);
         AddMousePiece(c, {kLdCloseX - 14, kLdCloseY - 14, 28, 28}, kLdX);
     }
     SortUi(c.ui, first);

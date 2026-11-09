@@ -52,6 +52,9 @@ enum class OwnWordId : int
     TradingNote,
     // A help text, a card: closed.
     Close,
+    // (ux task 4c) A word on every hint chip: the D-pad moving a list's or a question's focus, the
+    // stat panel's pages, a slider's value, the concept art opened, Create-a-Sim's model turned.
+    HintChoose, HintPages, HintAdjust, HintView, HintTurn,
     // The town's hint for the HD menu (its chip says the button).
     Menu,
     // A controller connected (@1 its name, @2 its pause buttons, Pads' PauseCombo): the window's toast.

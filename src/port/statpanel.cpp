@@ -1,9 +1,11 @@
 #include "port/statpanel.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/pockets.h"
 #include "port/statusbar.h"
 #include "romdata.h"
@@ -18,9 +20,11 @@ using namespace ui;
 
 constexpr u32 kButtonFill = 0xFF9AA2E3, kButtonFocusFill = 0xFFB4BBF0;
 constexpr u32 kTabPlateFill = 0xFF9AA2E3;            // (the panel's selected tab)
-constexpr u32 kValueColour = 0xFFFFE9A0;             // a warm white (the money's)
-constexpr u32 kIconWell = 0xFF5961A2;
-constexpr float kLineSize = 28, kLineMin = 18, kButtonSize = 28, kTextSize = 26, kTextMin = 18;
+// The game's stat sprites are drawn for its white paper (their specks, rims and brush strokes
+// glow on a purple well): the rows and the aspiration's picture sit on paper, in dark ink (10.8:1),
+// the values a dark amber (6.4:1). The light buttons and the tab's plate take the ink too (5:1).
+constexpr u32 kPaper = 0xFFF4F1E8, kInk = 0xFF2E3063, kValueInk = 0xFF7A4E00;
+constexpr float kLineSize = 28, kLineMin = 18, kButtonSize = 28, kTextSize = 26, kTextMin = 18, kTabSize = 22, kTabMin = 18;
 
 std::string PageName(const RomData& rom, int page) { return MenuWords(rom, page == 0 ? kStrStTitle : kStrStPage + page); }
 
@@ -58,26 +62,35 @@ void Split(const RomData& rom, int id, const std::vector<std::string>& args, std
 
 std::string Lots(const RomData& rom, int v, bool lots) { return lots ? MenuWords(rom, kStrStLots) : GroupThousands(v); }
 
-void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0) { PanelText(c, r, s, size, minSize, a, w, colour); }
+void Text(Composition& c, Rect r, const std::string& s, float size, float minSize, Align a, Weight w, u32 colour = 0)
+{
+    PanelText(c, r, s, size, minSize, a, w, colour);
+    if (colour == kInk || colour == kValueInk) c.ui.back().shadowArgb = 0; // (dark ink: no shadow)
+}
 // A receipt line's value width: its own (at most half the line).
 int ValueWidth(const std::string& value, int w) { return value.empty() ? 0 : std::min(w / 2, (int)TextWidth(value, kLineSize, Weight::ExtraBold) + 4); }
-// A label and its value in `r` (the label at the left, the value right-aligned in warm white).
+// A label and its value in `r` (the label at the left, the value right-aligned), in ink on paper.
 void Receipt(Composition& c, Rect r, const std::string& label, const std::string& value)
 {
     const int vw = ValueWidth(value, r.w);
-    Text(c, {r.x, r.y, r.w - vw - (vw ? 16 : 0), r.h}, label, kLineSize, kLineMin, Align::Left, Weight::ExtraBold);
-    if (vw) Text(c, {r.x + r.w - vw, r.y, vw, r.h}, value, kLineSize, kLineMin, Align::Right, Weight::ExtraBold, kValueColour);
+    Text(c, {r.x, r.y, r.w - vw - (vw ? 16 : 0), r.h}, label, kLineSize, kLineMin, Align::Left, Weight::ExtraBold, kInk);
+    if (vw) Text(c, {r.x + r.w - vw, r.y, vw, r.h}, value, kLineSize, kLineMin, Align::Right, Weight::ExtraBold, kValueInk);
 }
 
+// A game picture: a small one (at most ui::kTierMaxSource) at its tier (ui::kTierS, kTierL), a
+// larger one (the Main page's buttons, the gauge, the skills' bars) `scale` times its size, centred in box.
 struct Icon
 {
     SpriteRef ref;
-    int frame, scale;
+    int frame, tier, scale;
     Rect box;
 };
+Icon Small(SpriteRef ref, int frame, int tier, Rect box) { return {ref, frame, tier, 0, box}; }
+Icon Large(SpriteRef ref, int frame, int scale, Rect box) { return {ref, frame, 0, scale, box}; }
 void AddIcon(Composition& c, IconCache* icons, const Icon& i)
 {
     if (!icons) return;
+    if (i.tier > 0) { AddTiered(c.ui, icons, i.ref, i.frame, i.tier, i.box); return; }
     if (const SpriteFrame* f = icons->Scaled(i.ref, i.frame, i.scale))
         c.ui.push_back(icons->Image(i.ref, i.frame, *f, {i.box.x + (i.box.w - f->w) / 2, i.box.y + (i.box.h - f->h) / 2, f->w, f->h}));
 }
@@ -94,7 +107,7 @@ void Well(Composition& c, Rect r, u32 fill, float radius)
 // The pages' rows inside kPmContent.
 Rect HotelRow(int i) { return {kPmContent.x + 16, kPmContent.y + 8 + i * 72, kPmContent.w - 32, 64}; }
 Rect StatsRow(int i) { return {kPmContent.x + 16, kPmContent.y + 8 + i * 90, kPmContent.w - 32, 82}; }
-constexpr Rect kAspIcon {kPmContent.x + 16, kPmContent.y + 8, 140, 140};
+constexpr Rect kAspIcon {kPmContent.x + 16, kPmContent.y + 8, 144, 144}; // (the 64-pixel picture at tier S, 8 of paper round it)
 constexpr Rect kAspName {kPmContent.x + 176, kPmContent.y + 8, kPmContent.w - 192, 60};
 constexpr Rect kAspGauge {kPmContent.x + 176, kPmContent.y + 84, 432, 56};
 constexpr Rect kAspStars {kPmContent.x + 640, kPmContent.y + 84, 224, 56};
@@ -103,10 +116,31 @@ constexpr Rect kAspHow {kPmContent.x + 16, kPmContent.y + 268, kPmContent.w - 32
 constexpr int kSkillBarW = 320;
 }
 
-Rect StatTabRect(int page)
+Rect StatTabRect(int page, const RomData* rom)
 {
-    const int cellY = kPmTabBar.y + (kPmTabBar.h - kPmTabCell) / 2;
-    return {kPmTabsX + std::clamp(page, 0, kStPages - 1) * kPmTabCell, cellY, kPmTabCell, kPmTabCell};
+    constexpr int chips = 64, x0 = kPmTabBar.x + 16 + chips, x1 = kPmTabBar.x + kPmTabBar.w - 16 - chips, h = 56;
+    int need[kStPages] {}, sum = 0;
+    for (int p = 0; p < kStPages; p++)
+    {
+        // (a name on two lines at most: its widest word at the smallest size, a margin each side)
+        if (rom)
+        {
+            const std::string name = PageName(*rom, p);
+            size_t a = 0;
+            while (a <= name.size())
+            {
+                const size_t b = std::min(name.find(' ', a), name.size());
+                need[p] = std::max(need[p], (int)std::ceil(TextWidth(name.substr(a, b - a), kTabMin, Weight::ExtraBold)) + 22);
+                a = b + 1;
+            }
+        }
+        sum += need[p];
+    }
+    const int spare = std::max(0, x1 - x0 - sum) / kStPages;
+    page = std::clamp(page, 0, kStPages - 1);
+    int x = x0;
+    for (int p = 0; p < page; p++) x += need[p] + spare;
+    return {x + 3, kPmTabBar.y + (kPmTabBar.h - h) / 2, need[page] + spare - 6, h};
 }
 
 Rect StatButtonRect(int page)
@@ -196,7 +230,7 @@ MenuView StatPanelViewOf(ScreenState s, const GameState& game, const RomData* ro
     {
         // The page's tab: where the focus rests (A does nothing), its id Main's button's for it.
         ViewItem it;
-        it.rect = StatTabRect(st.page);
+        it.rect = StatTabRect(st.page, rom);
         it.id = kStPageId + (u32)st.page;
         for (int& n : it.next) n = kNoMove;
         v.items.push_back(it);
@@ -229,29 +263,22 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
     bar.fill = th.frameDark;
     bar.radius = 16;
     c.ui.push_back(bar);
-    const Rect cell = StatTabRect(page);
+    const Rect cell = StatTabRect(page, &rom);
     UiItem title = WellItem(kPmTitle);
     title.radius = 14;
     c.ui.push_back(title);
     {
-        const Rect lb = ChipRect(0, 0, Button::LB, "", 26);
-        c.ui.push_back(ChipItem(kPmTabsX - 14 - lb.w, kPmTabBar.y + (kPmTabBar.h - lb.h) / 2, Button::LB, "", 26));
-        c.ui.push_back(ChipItem(kPmTabsX + kStPages * kPmTabCell + 14, kPmTabBar.y + (kPmTabBar.h - lb.h) / 2, Button::RB, "", 26));
+        const Rect lb = ChipRect(0, 0, Button::LB, "", 26), rb = ChipRect(0, 0, Button::RB, "", 26);
+        c.ui.push_back(ChipItem(kPmTabBar.x + 16, kPmTabBar.y + (kPmTabBar.h - lb.h) / 2, Button::LB, "", 26));
+        c.ui.push_back(ChipItem(kPmTabBar.x + kPmTabBar.w - 16 - rb.w, kPmTabBar.y + (kPmTabBar.h - rb.h) / 2, Button::RB, "", 26));
     }
 
-    // Layer 1: the X's cell, the title, the page, the focus, the hints.
-    UiItem xCell = PanelItem(kStClose);
-    xCell.fill = th.frameDark;
-    xCell.border = 0;
-    xCell.raised = false;
-    xCell.radius = 14;
-    xCell.layer = 1;
-    c.ui.push_back(xCell);
-    Text(c, {kPmTitle.x + 24, kPmTitle.y, kPmTitle.w - 48, kPmTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Centre, Weight::ExtraBold);
+    // Layer 1: the title (the X at its right end), the page, the focus, the hints.
+    Text(c, {kPmTitle.x + 64, kPmTitle.y, kPmTitle.w - 128, kPmTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Centre, Weight::ExtraBold);
     // The page's raised plate in the tab bar (on a page the focus rests there: its halo first).
-    if (page != 0 && focus == 0) AddFocusRing(c, {cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4}, 18, 1, kTabPlateFill);
+    if (page != 0 && focus == 0) AddFocusRing(c, cell, 18, 1, kTabPlateFill);
     {
-        UiItem plate = PanelItem({cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4});
+        UiItem plate = PanelItem(cell);
         plate.fill = kTabPlateFill;
         plate.borderArgb = th.fill;
         plate.border = 3;
@@ -261,9 +288,15 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
     }
     for (int p = 0; p < kStPages; p++)
     {
-        // Main's own picture 3x (24 px), the pages' buttons 1x (72 x 56): each fills a cell.
-        Icon i {SpriteRef::Of(kSprStNav[p]), 0, p == 0 ? 3 : 1, StatTabRect(p)};
-        images.push_back(i);
+        // The pages by their names (the game's pictures for them are a 24-pixel one and four 72 x
+        // 56 brush strokes: no one size of pixel for the row), the page's own in ink on its plate.
+        const Rect r = StatTabRect(p, &rom), in {r.x + 8, r.y + 2, r.w - 16, r.h - 4};
+        const FittedBlock f = FitBlock(PageName(rom, p), kTabSize, kTabMin, in);
+        UiItem t = TextItem(in, f.text, f.size, Align::Centre, Weight::ExtraBold);
+        t.middle = true;
+        if (p == page) { t.colour = kInk; t.shadowArgb = 0; }
+        t.layer = 1;
+        c.ui.push_back(t);
     }
 
     if (page == 0)
@@ -280,20 +313,20 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
             b.radius = 24;
             b.layer = 1;
             c.ui.push_back(b);
-            images.push_back({SpriteRef::Of(kSprStNav[p]), 0, 2, {r.x, r.y + 8, r.w, 112}});
-            Text(c, {r.x + 16, r.y + 124, r.w - 32, 44}, PageName(rom, p), kButtonSize, kLineMin, Align::Centre, Weight::ExtraBold);
+            images.push_back(Large(SpriteRef::Of(kSprStNav[p]), 0, 2, {r.x, r.y + 8, r.w, 112}));
+            Text(c, {r.x + 16, r.y + 124, r.w - 32, 44}, PageName(rom, p), kButtonSize, kLineMin, Align::Centre, Weight::ExtraBold, kInk);
             AddMousePiece(c, kStButtonFrom[p], r);
-            AddMousePiece(c, kStButtonFrom[p], StatTabRect(p));
+            AddMousePiece(c, kStButtonFrom[p], StatTabRect(p, &rom));
         }
     }
     else if (page == 1)
     {
         const int asp = std::clamp(st.aspiration, 0, 3), level = std::clamp(st.level, 0, 3), j = kStLevelPal[level];
-        Well(c, kAspIcon, kIconWell, 20);
-        images.push_back({SpriteRef::Of(kSprStAspiration), kStAspFrame[asp], 2, kAspIcon});
+        Well(c, kAspIcon, kPaper, 20);
+        images.push_back(Small(SpriteRef::Of(kSprStAspiration), kStAspFrame[asp], kTierS, kAspIcon));
         Text(c, kAspName, MenuWords(rom, kStrStAspName + asp), 44, 26, Align::Left, Weight::ExtraBold);
-        images.push_back({{kSprStGauge - 1, kSprStGauge, kStGaugePal[j]}, std::clamp(st.gaugeFrame, 0, 20), 3, kAspGauge});
-        images.push_back({{kSprStStars - 1, kSprStStars, kStStarsPal[j]}, level, 3, kAspStars});
+        images.push_back(Large({kSprStGauge - 1, kSprStGauge, kStGaugePal[j]}, std::clamp(st.gaugeFrame, 0, 20), 3, kAspGauge));
+        images.push_back(Small({kSprStStars - 1, kSprStStars, kStStarsPal[j]}, level, kTierL, kAspStars));
         for (auto [r, id] : {std::pair {kAspBonus, kStrStAspBonus + asp}, std::pair {kAspHow, kStrStAspHow + asp}})
         {
             Well(c, r, kFillRow, 16);
@@ -311,9 +344,9 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
         for (int i = 0; i < n; i++)
         {
             const Rect r = page == 2 ? HotelRow(i) : StatsRow(i);
-            Well(c, r, kFillRow, 18);
+            Well(c, r, kPaper, 18);
             const Rect icon {r.x + 8, r.y + (r.h - 64) / 2, 64, 64};
-            images.push_back({SpriteRef::Of(page == 2 ? kSprStHotel[i] : kSprStStats[i]), 0, 2, icon});
+            images.push_back(Small(SpriteRef::Of(page == 2 ? kSprStHotel[i] : kSprStStats[i]), 0, kTierS, icon));
             std::string label, value;
             if (page == 2) StatHotelLine(st, rom, i, label, value);
             else StatStatsLine(st, rom, i, label, value);
@@ -325,25 +358,25 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
         for (int i = 0; i < 5; i++)
         {
             const Rect r = HotelRow(i);
-            Well(c, r, kFillRow, 18);
-            images.push_back({SpriteRef::Of(kSprStSkill[i]), 0, 2, {r.x + 8, r.y, 64, 64}});
+            Well(c, r, kPaper, 18);
+            images.push_back(Small(SpriteRef::Of(kSprStSkill[i]), 0, kTierS, {r.x + 8, r.y, 64, 64}));
             const Rect barBox {r.x + r.w - 16 - kSkillBarW, r.y, kSkillBarW, r.h};
-            Text(c, {r.x + 88, r.y, barBox.x - 16 - (r.x + 88), r.h}, MenuWords(rom, kStrStSkill + i), kLineSize, kLineMin, Align::Left, Weight::ExtraBold);
-            images.push_back({SpriteRef::Of(kSprStSkillBar[i]), std::clamp(st.skills[i], 0, 10), 2, barBox});
+            Text(c, {r.x + 88, r.y, barBox.x - 16 - (r.x + 88), r.h}, MenuWords(rom, kStrStSkill + i), kLineSize, kLineMin, Align::Left, Weight::ExtraBold, kInk);
+            images.push_back(Large(SpriteRef::Of(kSprStSkillBar[i]), std::clamp(st.skills[i], 0, 10), 2, barBox));
         }
     }
     // The X: closes from Main, back to Main from a page (and the Main tab is that X too).
     AddMousePiece(c, kStCloseFrom, kStClose);
-    if (page != 0) AddMousePiece(c, kStCloseFrom, StatTabRect(0));
+    if (page != 0) AddMousePiece(c, kStCloseFrom, StatTabRect(0, &rom));
 
     // The hints: B "Close" on Main (the page's name, Main's, on a page: back there), A the focused
     // button's page; on a page the D-pad's Left / Right (the pages).
     int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, page == 0 ? MenuWords(rom, kStrClose) : PageName(rom, 0));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) right = AddHint(c, right, Button::A, v.items[focus].word);
-    if (page != 0) AddHint(c, right, Button::DPadH, "");
+    if (page != 0) AddHint(c, right, Button::DPadH, OwnWord(&rom, OwnWordId::HintPages));
 
     for (const Icon& i : images) AddIcon(c, icons, i);
-    AddIcon(c, icons, {SpriteRef::Of(kSprStX), 0, 2, kStClose});
+    AddIcon(c, icons, Small(SpriteRef::Of(kSprStX), 0, kTierS, kStClose));
     SortUi(c.ui, first);
 }
 
@@ -358,8 +391,13 @@ void MeasureStatPanel(const RomData& rom, BlockMeasure& m)
         line(id, label, kLineSize, kLineMin, w - vw - (vw ? 16 : 0));
         if (vw) line(id, value, kLineSize, kLineMin, vw);
     };
-    for (int p = 0; p < kStPages; p++) line(p == 0 ? kStrStTitle : kStrStPage + p, PageName(rom, p), kPmTitleSize, kPmTextMin, kPmTitle.w - 48);
+    for (int p = 0; p < kStPages; p++) line(p == 0 ? kStrStTitle : kStrStPage + p, PageName(rom, p), kPmTitleSize, kPmTextMin, kPmTitle.w - 128);
     for (int p = 1; p < kStPages; p++) line(kStrStPage + p, PageName(rom, p), kButtonSize, kLineMin, StatButtonRect(p).w - 32);
+    for (int p = 0; p < kStPages; p++)   // (the tabs: two lines at most)
+    {
+        const Rect r = StatTabRect(p, &rom);
+        block(p == 0 ? kStrStTitle : kStrStPage + p, PageName(rom, p), kTabSize, kTabMin, {0, 0, r.w - 16, r.h - 4});
+    }
     for (int a = 0; a < 4; a++)
     {
         line(kStrStAspName + a, MenuWords(rom, kStrStAspName + a), 44, 26, kAspName.w);

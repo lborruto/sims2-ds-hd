@@ -562,8 +562,8 @@ def front_menu(focus, raw_top=True):
         white = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (255, 255, 255))
         arrow = [C(x, y) for y in range(y0 + 18, y0 + 82) for x in range(1164, 1228)]
         if i == 3:
-            # Greyed: a dim label (no white), no arrow.
-            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (0xB8, 0xBC, 0xE0))
+            # Greyed: a dim label (no white: the kit's inactive #D4D7F2), no arrow.
+            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (0xD4, 0xD7, 0xF2))
             if white or dim < 30: errors.append(f"button 3: not greyed ({white} white, {dim} dim pixels)")
             if sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40) > 300: errors.append("button 3: an arrow")  # (an arrow: about 1100; the rim alone: under 100)
             r, g, b = C(835, y0 + 50)
@@ -983,12 +983,12 @@ elif case in ("shop", "shop-2x", "shop-wide", "shop-sell", "shop-poor"):
     if white(210, 128, 526, 160) == sell: errors.append(f"the Buy header {'lit' if sell else 'dim'}")
     if white(888, 128, 1070, 160) != sell: errors.append(f"the Sell header {'dim' if sell else 'lit'}")
     ring = lambda x, y: RINGED(x, y)
-    at = {"shop-sell": (981, 330), "shop-poor": (537, 514)}.get(case, (197, 224)) # (cell 1; owned place 4; Pay)
+    at = {"shop-sell": (973, 340), "shop-poor": (551, 514)}.get(case, (197, 224)) # (cell 1; owned place 4; Pay)
     if not ring(*at): errors.append(f"no focus ring at {at}")
     if case != "shop-sell" and case != "shop-poor" and ring(313, 224): errors.append("a focus ring around cell 2")
     cell = {C(x, y) for y in range(186, 266, 4) for x in range(210, 290, 4)}
     if len(cell) < 8: errors.append(f"cell 1 has no icon ({len(cell)} colours)")
-    if white(630, 490, 840, 540) == (case == "shop-poor"): errors.append(f"Pay's word {'white' if case == 'shop-poor' else 'dim'}")
+    if white(645, 490, 825, 540) == (case == "shop-poor"): errors.append(f"Pay's word {'white' if case == 'shop-poor' else 'dim'}")
     not_big()
 elif case in ("build-list", "build-list-2x", "build-list-wide", "build-ask", "build-poor", "build-empty"):
     # Build Rooms in HD (src/port/build.*): the panel, the title's well, the money in its warm
@@ -1093,15 +1093,16 @@ elif case in ("music", "music-2x", "music-wide", "music-scrolled"):
     not_big()
 elif case.startswith("stat-"):
     # The stat panel in HD (src/port/statpanel.*): the panel, the title's well, the tab bar's five
-    # pictures; Main: four buttons, the ring around Aspirations; a page: the ring around its tab,
-    # its content: Aspirations' gauge green (level 2's palette), Hotel Info's and Game Stats'
-    # values in warm white, Skills' star bars (2, 2, 1, 1, 6 filled); never the touch screen 3x.
+    # names; Main: four buttons, the ring around Aspirations; a page: the ring around its tab (the
+    # tabs' widths follow their words: the ring is looked for along the bar, left of the page's
+    # share of it), its content: Aspirations' gauge green (level 2's palette), Hotel Info's and
+    # Game Stats' values in amber ink on paper, Skills' star bars (2, 2, 1, 1, 6 filled); never the
+    # touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
     expect("title well", C(640, 146), hexrgb("6870B6"))
     ring = lambda x, y: RINGED(x, y)
     colours = lambda x0, y0, w, h: len({C(x, y) for y in range(y0, y0 + h, 3) for x in range(x0, x0 + w, 3)})
-    for i in range(5):
-        if colours(420 + 88 * i + 12, 52, 64, 64) < 4: errors.append(f"no picture in tab {i}")
+    if colours(280, 70, 720, 32) < 4: errors.append("no names in the tab bar")
     page = {"stat-asp": 1, "stat-hotel": 2, "stat-skills": 3, "stat-stats": 4}.get(case, 0)
     warm = lambda x0, y0, w, h: sum(1 for y in range(y0, y0 + h, 2) for x in range(x0, x0 + w, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
     if page == 0:
@@ -1110,14 +1111,15 @@ elif case.startswith("stat-"):
         for x, y in ((212, 210), (644, 210), (212, 398), (644, 398)):
             if colours(x + 140, y + 10, 144, 108) < 6: errors.append(f"no picture on the button at {x},{y}")
     else:
-        cell = 420 + 88 * page
-        if not ring(cell, 86): errors.append(f"no focus ring around tab {page}")
+        rings = [x for x in range(270, 1010, 2) if ring(x, 86)]
+        if not rings or not (220 + 100 * (page - 1) <= rings[0] <= 280 + 170 * page): errors.append(f"no focus ring around tab {page} {rings[:1]}")
         if ring(209, 298): errors.append("Main's ring on a page")
         if page == 1:
             g = sum(1 for y in range(296, 334, 2) for x in range(380, 800, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 60)(C(x, y)))
             if g < 1000: errors.append(f"the gauge not green ({g})")
         elif page in (2, 4):
-            if warm(880, 214, 180, 360) < 150: errors.append("too few values")
+            ink = sum(1 for y in range(214, 574, 2) for x in range(880, 1060, 2) if (lambda p: 90 < p[0] < 160 and p[2] < 60 and p[0] > p[1] + 20)(C(x, y)))
+            if ink < 100: errors.append(f"too few values ({ink} amber pixels)")
         else:
             lit = [colours(728, 214 + 72 * i + 16, 320, 32) for i in range(5)]
             if min(lit) < 4: errors.append(f"a star bar missing {lit}")

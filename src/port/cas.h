@@ -104,8 +104,8 @@ constexpr int kSprCasGender[2] = {1052, 1061}, kSprCasArrow = 1140, kSprCasTabTi
 // The pages' sprite lists (CasState::sprites): Hair's arrows; Clothes' categories [0..5], arrows, cells [9..14].
 constexpr int kCasHairArrowSpr[2] = {2, 3}, kCasClothArrowSpr[2] = {6, 7}, kCasCatSpr0 = 0, kCasClothSpr0 = 9;
 // The aspirations' picture (the stat panel's too): frames Fortune, Popularity, Romance, Party, the
-// game's order on this page (kCasAspOfSlot), 64 x 64, drawn kCasAspScale times (a whole factor).
-constexpr int kSprCasAsp = 362, kCasAspScale = 2;
+// game's order on this page (kCasAspOfSlot), 64 x 64, drawn at tier kCasAspTier (S: 128 at 100 %).
+constexpr int kSprCasAsp = 362, kCasAspTier = ui::kTierS;
 // The keyboard pages' labels, as the game's own buttons show them (not words: the same in every language).
 constexpr const char* kCasKbLabel[3] = {"ABC", "abc", "123!"};
 

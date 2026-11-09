@@ -1,9 +1,11 @@
 #include "port/music.h"
 
 #include <algorithm>
+#include <tuple>
 
 #include "port/goals.h"
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -95,7 +97,7 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
 
     // Layer 1: the title, the rows, the song playing, the scroll bar, the hints.
     Text(c, {kMuTitle.x + 24, kMuTitle.y, kMuClose.x - 16 - (kMuTitle.x + 24), kMuTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Left, Weight::ExtraBold);
-    struct Icon { int desc, frame, scale; Rect box; u32 opacity; };
+    struct Icon { int desc, frame, tier; Rect box; u32 opacity; };
     std::vector<Icon> images;
     for (int i = 0; i < rows; i++)
     {
@@ -111,14 +113,18 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
         row.layer = 1;
         c.ui.push_back(row);
         const Rect icon {rr.x + 8, rr.y + 7, 64, 64}; // (the game's button: no well of its own)
-        images.push_back({kSprMuPlay, playing ? kSprMuPlayingFrame : 0, 2, icon, 0});
+        images.push_back({kSprMuPlay, playing ? kSprMuPlayingFrame : 0, kTierS, icon, 0});
         Text(c, {rr.x + 88, rr.y, rr.w - 88 - 16, rr.h}, SongName(rom, m.list[at]), kMuNameSize, kMuNameMin, Align::Left, Weight::ExtraBold,
              playing ? kPlayingColour : 0);
         AddMousePiece(c, {kMuRowX - 16, kMuRowY0 + i * kMuRowDy - 15, 32, 30}, rr);
     }
-    // The arrows (dim where the game cannot scroll) and the scroll bar between them.
-    images.push_back({kSprMuUp, 0, 2, kMuUp, v.scrollUp.empty() ? 0x60000000u : 0});
-    images.push_back({kSprMuDown, 0, 2, kMuDown, v.scrollDown.empty() ? 0x60000000u : 0});
+    // The arrows (the kit's, sunk where the game cannot scroll) and the scroll bar between them.
+    for (auto [r, dir, on] : {std::tuple {kMuUp, UiItem::Sign::Up, !v.scrollUp.empty()}, std::tuple {kMuDown, UiItem::Sign::Down, !v.scrollDown.empty()}})
+    {
+        UiItem a = ScrollArrowItem(r, dir, on);
+        a.layer = 1;
+        c.ui.push_back(a);
+    }
     AddScrollBar(c, {kMuArrows.x + kMuArrows.w / 2 - 5, kMuUp.y + kMuUp.h + 12, 10, kMuDown.y - 12 - (kMuUp.y + kMuUp.h + 12)}, m.scroll, rows, count);
     AddMousePiece(c, {kMuUpX - 16, kMuUpY - 5, 32, 30}, kMuUp);
     AddMousePiece(c, {kMuDownX - 16, kMuDownY - 25, 32, 30}, kMuDown);
@@ -134,7 +140,7 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
     c.ui.push_back(bw);
     if (m.playing >= 0 && m.playing < count)
     {
-        images.push_back({kSprMuPlay, kSprMuPlayingFrame, 3, big, 0});
+        images.push_back({kSprMuPlay, kSprMuPlayingFrame, kTierL, big, 0});
         const Rect nb {ix, kMuInfo.y + 152, iw, 120};
         const FittedBlock name = FitBlock(SongName(rom, m.list[m.playing]), kMuNameSize, kMuNameMin, nb);
         UiItem nt = TextItem(nb, name.text, name.size, Align::Centre, Weight::ExtraBold);
@@ -142,7 +148,7 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
         nt.layer = 1;
         c.ui.push_back(nt);
     }
-    else images.push_back({kSprMuPlay, 0, 3, big, 0x60000000u});
+    else images.push_back({kSprMuPlay, 0, kTierL, big, 0x60000000u});
     if (m.place >= 0)
     {
         const Rect pb {ix, kMuInfo.y + 290, iw, 120};
@@ -158,11 +164,11 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
     // when the list scrolls.
     int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) right = AddHint(c, right, Button::A, v.items[focus].word);
-    if (count > rows) AddHint(c, right, Button::DPadV, "");
+    if (count > rows) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
 
-    // Images: the play buttons, the arrows, the X.
-    for (const Icon& i : images) AddSpriteIcon(c, icons, i.desc, i.frame, i.scale, i.box, i.opacity);
-    AddSpriteIcon(c, icons, kSprMuX, 0, 2, kMuClose);
+    // Images: the play buttons, the X.
+    for (const Icon& i : images) AddTiered(c.ui, icons, SpriteRef::Of(i.desc), i.frame, i.tier, i.box, i.opacity);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprMuX), 0, kTierS, kMuClose);
     SortUi(c.ui, first);
 }
 

@@ -154,6 +154,12 @@ constexpr const char* kWords[][5] = {
      "El juego inalámbrico necesita otra DS: no está en esta versión."},
     // A help text
     {"Close", "Fermer", "Schließen", "Chiudi", "Cerrar"},
+    // A word on every hint chip (4c): a list's D-pad, the stat panel's pages, a slider, the concept art, the model
+    {"Choose", "Choisir", "Wählen", "Scegli", "Elegir"},
+    {"Pages", "Pages", "Seiten", "Pagine", "Páginas"},
+    {"Adjust", "Régler", "Einstellen", "Regola", "Ajustar"},
+    {"View", "Voir", "Ansehen", "Guarda", "Ver"},
+    {"Turn", "Tourner", "Drehen", "Ruota", "Girar"},
     // The town's menu hint
     {"Menu", "Menu", "Menü", "Menu", "Menú"},
     // Controllers

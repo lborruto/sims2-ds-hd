@@ -1,12 +1,14 @@
 #include "port/build.h"
 
 #include <algorithm>
+#include <tuple>
 #include <cmath>
 #include <cstdlib>
 #include <iterator>
 
 #include "port/goals.h"
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -256,6 +258,13 @@ void BuildBuildRooms(Composition& c, const MenuView& v, int focus, const GameSta
             AddMousePiece(c, Around(kBdRowX, kBdRowY0 + i * kBdRowDy), r);
         }
         AddScrollBar(c, kBdScroll, b.scroll, kBdRows, (int)b.places.size());
+        // The arrows (the kit's: every list's look), sunk when the game cannot scroll that way.
+        for (auto [r, dir, on] : {std::tuple {kBdUp, UiItem::Sign::Up, !v.scrollUp.empty()}, std::tuple {kBdDown, UiItem::Sign::Down, !v.scrollDown.empty()}})
+        {
+            UiItem a = ScrollArrowItem(r, dir, on);
+            a.layer = 1;
+            c.ui.push_back(a);
+        }
         AddMousePiece(c, Around(kBdUpX, kBdArrowY), kBdUp);
         AddMousePiece(c, Around(kBdDownX, kBdArrowY), kBdDown);
         // The sum of the focused room (none focused: the first row's).
@@ -293,22 +302,16 @@ void BuildBuildRooms(Composition& c, const MenuView& v, int focus, const GameSta
     // D-pad's vertical arms while the list scrolls.
     int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, ask ? kStrBdNo : kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) right = AddHint(c, right, Button::A, v.items[focus].word);
-    if (!ask && !(v.scrollUp.empty() && v.scrollDown.empty())) AddHint(c, right, Button::DPadV, "");
+    if (!ask && !(v.scrollUp.empty() && v.scrollDown.empty())) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
 
-    // Images: the knobs, the arrows (dim when the game cannot scroll that way), page 1's cross and
-    // tick, the X.
-    for (Rect k : knobs) AddSpriteIcon(c, icons, kSprBdKnob, 0, 2, k);
-    if (!ask)
+    // Images: the knobs, page 1's cross and tick, the X.
+    for (Rect k : knobs) AddTiered(c.ui, icons, SpriteRef::Of(kSprBdKnob), 0, kTierS, k);
+    if (ask)
     {
-        AddSpriteIcon(c, icons, kSprBdUp, 0, 2, kBdUp, v.scrollUp.empty() ? 0x60000000 : 0);
-        AddSpriteIcon(c, icons, kSprBdDown, 0, 2, kBdDown, v.scrollDown.empty() ? 0x60000000 : 0);
+        AddTiered(c.ui, icons, SpriteRef::Of(kSprBdX), 0, kTierS, AskIcon(kBdCross));
+        AddTiered(c.ui, icons, SpriteRef::Of(kSprBdTick), 0, kTierS, AskIcon(kBdTick));
     }
-    else
-    {
-        AddSpriteIcon(c, icons, kSprBdX, 0, 2, AskIcon(kBdCross));
-        AddSpriteIcon(c, icons, kSprBdTick, 0, 2, AskIcon(kBdTick));
-    }
-    AddSpriteIcon(c, icons, kSprBdX, 0, 2, kBdClose);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprBdX), 0, kTierS, kBdClose);
 
     SortUi(c.ui, first);
 }

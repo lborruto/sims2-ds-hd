@@ -17,8 +17,8 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kChipPlate = 0xB0202436;
-constexpr u32 kWirelessText = 0xFFB8BCE0;                                 // DS Wireless's label, greyed                                   // the title's chip plate: dark, see-through
+constexpr u32 kChipPlate = 0xB0202436;                                    // the title's chip plate: dark, see-through
+constexpr u32 kWirelessText = kTextInactive;                              // DS Wireless's label and sign, greyed (3.2:1)
 
 enum class FrontScreen { None, Boot, Title, Menu };
 
@@ -51,6 +51,12 @@ Rect TopFrom(int topW, int topH)
 }
 
 std::string Label(const RomData& rom, int i) { return MenuWords(rom, kStrFrMenu[i]); }
+// The width the A hint's word is fitted to: what the D-pad's "Choose" leaves of the hints' band.
+int HintAWidth(const RomData& rom)
+{
+    const Rect d = ChipRect(0, 0, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose), kPmHintSize, 0, Weight::ExtraBold);
+    return kFrHints.w - d.w - 28 - 40;
+}
 }
 
 // `w` x `h` fitted in box at its shape, centred (shared: CONSOLE's top screen, the HD screens').
@@ -173,7 +179,7 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         UiItem st = ChipItem(plate.x + 28 + chip.w + gap, plate.y + (ph - start.h) / 2, Button::Start, "", 40, 0, Weight::ExtraBold);
         st.layer = 1;
         c.ui.push_back(st);
-        AddSpriteIcon(c, icons, kSprFrArrow, 0, 2, {plate.x + 28 + chip.w + gap + start.w + gap, plate.y + (ph - arrow) / 2, arrow, arrow});
+        AddTiered(c.ui, icons, SpriteRef::Of(kSprFrArrow), 0, kTierS, {plate.x + 28 + chip.w + gap + start.w + gap, plate.y + (ph - arrow) / 2, arrow, arrow});
     }
     else if (at == FrontScreen::Menu)
     {
@@ -181,7 +187,7 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         UiItem panel = PanelItem(kFrPanel);
         panel.radius = 22;
         c.ui.push_back(panel);
-        struct Icon { int desc, frame, scale; Rect box; };
+        struct Icon { int desc, frame, tier; Rect box; };
         std::vector<Icon> images;
         for (int i = 0; i < (int)v.items.size() && i < kFrMenuButtons; i++)
         {
@@ -204,8 +210,17 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
             PanelText(c, {tx, r.y, tw, r.h}, Label(rom, i), kFrLabelSize, kFrLabelMin, Align::Left, Weight::ExtraBold);
             if (wireless)
                 for (size_t k = label; k < c.ui.size(); k++) c.ui[k].colour = kWirelessText;
-            if (i == 3) images.push_back({kSprFrWireless, 0, 2, {r.x + 24, r.y + (r.h - 48) / 2, 48, 48}});
-            if (!wireless) images.push_back({focused ? kSprFrArrowOn : kSprFrArrow, 0, 2, {r.x + r.w - 12 - arrow, r.y + (r.h - arrow) / 2, arrow, arrow}});
+            if (i == 3)
+            {   // DS Wireless's sign, the kit's (the game's is a 16-pixel one-colour box), greyed as its label.
+                UiItem sign = PanelItem({r.x + 24, r.y + (r.h - 48) / 2, 48, 48});
+                sign.plain = true;
+                sign.fill = 0;
+                sign.sign = UiItem::Sign::Wireless;
+                sign.colour = kWirelessText;
+                sign.layer = 1;
+                c.ui.push_back(sign);
+            }
+            if (!wireless) images.push_back({focused ? kSprFrArrowOn : kSprFrArrow, 0, kTierS, {r.x + r.w - 12 - arrow, r.y + (r.h - arrow) / 2, arrow, arrow}});
             if (!wireless) AddMousePiece(c, {kFrMenuBoxX, kFrMenuBoxY0 + i * kFrMenuBoxDy, kFrMenuBoxW, kFrMenuBoxH}, r);
         }
         // The hints: the D-pad's Up / Down and A with the focused button's label (none while the
@@ -223,18 +238,19 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         }
         else if (MenuFocusable(v, focus))
         {
-            const FittedText w = FitLine(v.items[focus].word, kPmHintSize, 18, kFrHints.w - 140, Weight::ExtraBold);
+            const std::string choose = OwnWord(&rom, OwnWordId::HintChoose);
+            const Rect dr = ChipRect(0, 0, Button::DPadV, choose, kPmHintSize, 0, Weight::ExtraBold);
+            const FittedText w = FitLine(v.items[focus].word, kPmHintSize, 18, HintAWidth(rom), Weight::ExtraBold);
             const Rect ar = ChipRect(0, 0, Button::A, w.text, kPmHintSize, 0, Weight::ExtraBold);
-            const Rect dr = ChipRect(0, 0, Button::DPadV, "", kPmHintSize, 0, Weight::ExtraBold);
             const int right = kFrHints.x + kFrHints.w;
             UiItem a = ChipItem(right - ar.w, kFrHints.y + (kFrHints.h - ar.h) / 2, Button::A, w.text, kPmHintSize, 0, Weight::ExtraBold);
             a.layer = 1;
             c.ui.push_back(a);
-            UiItem d = ChipItem(right - ar.w - 28 - dr.w, kFrHints.y + (kFrHints.h - dr.h) / 2, Button::DPadV, "", kPmHintSize, 0, Weight::ExtraBold);
+            UiItem d = ChipItem(right - ar.w - 28 - dr.w, kFrHints.y + (kFrHints.h - dr.h) / 2, Button::DPadV, choose, kPmHintSize, 0, Weight::ExtraBold);
             d.layer = 1;
             c.ui.push_back(d);
         }
-        for (const Icon& i : images) AddSpriteIcon(c, icons, i.desc, i.frame, i.scale, i.box);
+        for (const Icon& i : images) AddTiered(c.ui, icons, SpriteRef::Of(i.desc), i.frame, i.tier, i.box);
     }
     else if (at == FrontScreen::Boot)
     {
@@ -265,6 +281,7 @@ void MeasureFront(const RomData& rom, BlockMeasure& m)
         const Rect r = FrontButtonRect(i);
         const int arrow = kFrArrow, iconW = i == 3 ? kFrIconW : 0;
         tally.Line(kStrFrMenu[i], Label(rom, i), kFrLabelSize, kFrLabelMin, r.w - 28 - iconW - 12 - arrow - 12);
+        tally.Line(kStrFrMenu[i], Label(rom, i), kPmHintSize, 18, HintAWidth(rom));   // (the A hint, beside the D-pad's word)
     }
     // DS Wireless's note in the hints' box (two lines at most).
     tally.Block(9000 + (int)OwnWordId::WirelessNote, OwnWord(&rom, OwnWordId::WirelessNote), 19, 18, kFrNote);

@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "port/popup.h"
@@ -239,7 +240,7 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
     {
         int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
         if (MenuFocusable(v, focus)) right = AddHint(c, right, Button::A, v.items[focus].word);
-        AddHint(c, right, Button::DPadV, "");
+        AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
     }
 
     // Images: the portrait (the game's own, 3x), the X.
@@ -248,7 +249,7 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
         const int w = kRiPortraitFrom.w * 3, h = kRiPortraitFrom.h * 3;
         c.ui.push_back(ImageItem({kRiPortrait.x + (kRiPortrait.w - w) / 2, kRiPortrait.y + (kRiPortrait.h - h) / 2, w, h}, bottom, SW, SH, kRiPortraitFrom));
     }
-    AddSpriteIcon(c, icons, kSprRiX, 0, 2, kRiClose);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprRiX), 0, kTierS, kRiClose);
     SortUi(c.ui, first);
 }
 

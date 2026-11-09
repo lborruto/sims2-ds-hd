@@ -98,6 +98,15 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The launch panel keeps out of the screen's outer edge, where some TVs cut the picture.
 - The D-pad chips that mean Up / Down or Left / Right show two arrowheads (˄ ˅, ‹ ›) instead of a
   bar that read as a plus or a minus.
+- The shops, the hotel, the front end, Create-a-Sim and the stat panel draw the game's small
+  pictures at one of two sizes, the same for every item of a kind: a shop's items no longer mix
+  big and small ones, and they stay crisp at any window size.
+- The stat panel's pages sit on white paper, as the game drew its pictures for, in dark ink; its
+  tabs name the pages and its X sits beside the title.
+- One look for every list's arrows (the shop, Build Rooms, the music panel): round buttons with a
+  drawn arrow. DS Wireless's icon is drawn sharp, and the shop's greyed words are readable.
+- Every button hint says what it does: the D-pad's (Choose, Pages, Adjust), Create-a-Sim's (Turn,
+  Select) and the concept art's (View).
 - The vacuum on a controller: A takes a find for you. The hand goes to the find in the green ring
   (the one nearest the hand; the right stick moves the hand), presses where no dust lies over it,
   carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is
