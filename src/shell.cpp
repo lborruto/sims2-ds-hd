@@ -14,9 +14,9 @@ using W = OwnWordId;
 namespace
 {
 constexpr u32 kVeil = 0xB8101218;            // over the game
-constexpr u32 kButtonFill = 0xFF6A72B8, kButtonFocusFill = 0xFF9AA2E3;
-constexpr u32 kFocusGreen = 0xFF309A41;      // the game's selection green
-constexpr u32 kDim = 0xFFB8BCE0, kWarm = 0xFFFFF1C9;
+// The rows' fills, notes and inactive text: the kit's palette (ui::kFillRow, kFillFocus,
+// kTextNote, kTextInactive: 4.5:1 and more for text, 3:1 for inactive). kWarm only on the focused fill.
+constexpr u32 kWarm = 0xFFFFF1C9;
 constexpr Rect kPanel {200, 32, 880, 656};
 constexpr Rect kContent {kPanel.x + 32, kPanel.y + 84, kPanel.w - 64, kPanel.h - 84 - 80};
 constexpr int kHintsY = kPanel.y + kPanel.h - 66, kHintsH = 44;
@@ -29,7 +29,10 @@ int ListTop(Page) { return 40; }
 constexpr int kSetRowH = 50, kSetRowStep = 54, kSetHeadH = 32, kSetListH = 410;
 constexpr int kTabBarY = kPanel.y + 20, kTabBarH = 48;
 constexpr Rect kAskBox {280, 200, 720, 320};
-constexpr Rect kLaunchList {48, 104, 680, 600}, kLaunchCard {752, 104, 480, 600};
+// The TV's safe area (the outer 5 % left clear: x 64-1216, y 36-684); the launch panel inside it
+// at every UI size (Zoom).
+constexpr Rect kSafe {64, 36, 1152, 648};
+constexpr Rect kLaunchList {64, 104, 664, 580}, kLaunchCard {752, 104, 464, 580};
 
 const char* Wd(int lang, W id) { return OwnWordIn(lang, id); }
 std::string Fill(std::string s, const std::string& v)
@@ -41,7 +44,8 @@ std::string Fill(std::string s, const std::string& v)
 // One line, shrunk from size down to min, then cut with an ellipsis.
 UiItem Line(Rect r, const std::string& text, float size, float min, Align a = Align::Left, Weight w = Weight::Bold)
 {
-    float s = size;
+    min = std::max(min, kMinText); // (never below the smallest text: ui::kMinText)
+    float s = std::max(size, min);
     std::string t = text;
     while (s > min && TextWidth(t, s, w) > r.w) s -= 1;
     if (TextWidth(t, s, w) > r.w)
@@ -77,20 +81,18 @@ struct Items
     }
 };
 
-UiItem Ring(Rect r, float radius)
+// The focus ring (ui::FocusRing: the green, a white line inside it) on `layer`, before the item.
+void Ring(Items& it, int layer, Rect r, float radius)
 {
-    constexpr int t = 5;
-    UiItem g = PanelItem({r.x - t, r.y - t, r.w + 2 * t, r.h + 2 * t});
-    g.plain = true;
-    g.fill = kFocusGreen;
-    g.radius = radius + t;
-    return g;
+    const FocusRingItems g = FocusRing(r, radius);
+    it.Add(layer, g.outer);
+    it.Add(layer, g.inner);
 }
 
 UiItem Button(Rect r, bool focused, bool enabled = true)
 {
     UiItem b = PanelItem(r);
-    b.fill = !enabled ? GameTheme().fillDark : focused ? kButtonFocusFill : kButtonFill;
+    b.fill = !enabled ? GameTheme().fillDark : focused ? kFillFocus : kFillRow;
     b.borderArgb = GameTheme().frame;
     b.border = 3;
     b.radius = std::min(r.h / 2.0f, 24.0f);
@@ -732,7 +734,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         AddCard(it, {kLaunchCard.x + 20, kLaunchCard.y + 70, kLaunchCard.w - 40, 420}, 1, m);
         UiItem drop = TextItem({kLaunchCard.x + 24, kLaunchCard.y + kLaunchCard.h - 76, kLaunchCard.w - 48, 60}, Wd(lang, W::LaunchDrop), 20, Align::Centre);
         drop.middle = true;
-        drop.colour = kDim;
+        drop.colour = kTextNote;
         it.Add(1, drop);
 
         const std::vector<LaunchEntry> e = LaunchEntries(m);
@@ -748,13 +750,13 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             {
                 recentHeader = true;
                 UiItem h = Line({x + 8, y, w, 32}, Wd(lang, W::LaunchRecent), 22, 18);
-                h.colour = kDim;
+                h.colour = kTextNote;
                 it.Add(1, h);
                 r.y = y += 34;
             }
             if (e[i].kind == LaunchItem::Recent) r.h = 48;
             if (e[i].kind == LaunchItem::Language || e[i].kind == LaunchItem::Quit) r.h = 56;
-            if (f) it.Add(1, Ring(r, std::min(r.h / 2.0f, 24.0f)));
+            if (f) Ring(it, 1, r, std::min(r.h / 2.0f, 24.0f));
             it.Add(1, Button(r, f));
             rects_[i] = r;
             switch (e[i].kind)
@@ -770,12 +772,12 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 const int tw = r.x + r.w - 20 - tx;
                 it.Add(1, Line({tx, r.y + 8, tw, 44}, Wd(lang, W::LaunchContinue), 34, 24, Align::Left, Weight::ExtraBold));
                 UiItem name = Line({tx, r.y + 50, tw, 34}, m.recents.empty() ? "" : m.recents[0], 22, 16);
-                name.colour = kWarm;
+                name.colour = f ? kWarm : kTextNote;
                 it.Add(1, name);
                 if (m.hasSuspend)
                 {
                     UiItem when = TextItem({tx, r.y + 86, tw, 56}, Fill(Wd(lang, W::LaunchWhere), FormatTime(m.suspend.time)), 19);
-                    when.colour = f ? th.text : kDim;
+                    when.colour = kTextNote;
                     it.Add(1, when);
                 }
                 break;
@@ -855,7 +857,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             {
                 UiItem b = TextItem({c.x + 8, c.y - 6, c.w - 16, bannerH + 4}, m.banner, 18, Align::Centre);
                 b.middle = true;
-                b.colour = kWarm;
+                b.colour = kTextNote;
                 it.Add(1, b);
             }
             const int n = (int)e.size(), step = bannerH ? 58 : 64, top = c.y + bannerH + (c.h - bannerH - (n * step - 8)) / 2;
@@ -863,7 +865,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             {
                 const Rect r {c.x + 120, top + i * step, c.w - 240, step - 8};
                 const bool f = !asking && focus == i;
-                if (f) it.Add(1, Ring(r, 24));
+                if (f) Ring(it, 1, r, 24);
                 it.Add(1, Button(r, f));
                 it.Add(1, Line({r.x + 24, r.y, r.w - 48, r.h}, Wd(lang, words[(int)e[i]]), 30, 20, Align::Centre, Weight::ExtraBold));
                 rects_[i] = r;
@@ -911,7 +913,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 if (i == tl.advanced)
                 {
                     UiItem h = Line({c.x + 12, y, c.w - 24, kSetHeadH}, Wd(lang, W::SetAdvanced), 20, 16);
-                    h.colour = kDim;
+                    h.colour = kTextNote;
                     it.Add(1, h);
                     y += kSetHeadH;
                 }
@@ -919,7 +921,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 const Rect r {c.x, y, c.w, kSetRowH};
                 y += kSetRowStep;
                 const bool f = !asking && focus == i, held = RowHeld(row, st);
-                if (f) it.Add(1, Ring(r, 16));
+                if (f) Ring(it, 1, r, 16);
                 UiItem b = Button(r, f, !held);
                 b.radius = 16;
                 it.Add(1, b);
@@ -927,7 +929,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 const Rect pill {r.x + r.w - 14 - 250, r.y + 6, 250, r.h - 12};
                 const int tagW = row == Row::Language ? 200 : 0;
                 UiItem label = Line({r.x + 20, r.y, pill.x - 16 - tagW - (r.x + 20), r.h}, RowLabel(row, lang), 24, 17);
-                if (held) label.colour = kDim;
+                if (held) label.colour = kTextInactive;
                 it.Add(1, label);
                 if (row == Row::Keys)
                 {
@@ -938,8 +940,8 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 if (tagW)
                 {
                     // Language applies at the game's next start: said on the row.
-                    UiItem tag = Line({pill.x - 12 - tagW, r.y, tagW, r.h}, Wd(lang, W::NextStart), 17, 13, Align::Right);
-                    tag.colour = kWarm;
+                    UiItem tag = Line({pill.x - 12 - tagW, r.y, tagW, r.h}, Wd(lang, W::NextStart), 18, 18, Align::Right);
+                    tag.colour = f ? kWarm : kTextNote;
                     it.Add(1, tag);
                 }
                 UiItem pl = PanelItem(pill);
@@ -954,7 +956,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                     it.Add(1, Line({pill.x + pill.w - 32, pill.y, 26, pill.h}, "\xE2\x80\xBA", 34, 34, Align::Centre, Weight::ExtraBold));
                 }
                 UiItem v = Line({pill.x + 34, pill.y, pill.w - 68, pill.h}, RowValue(row, st, lang), 22, 15, Align::Centre);
-                if (held) v.colour = kDim;
+                if (held) v.colour = kTextInactive;
                 it.Add(1, v);
             }
             // The focused row's note under the list (Battery saver's hold on a row it holds).
@@ -963,7 +965,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 const Row row = tl.rows[focus];
                 UiItem note = TextItem({c.x + 8, c.y + kSetListH, c.w - 16, c.h - kSetListH}, Wd(lang, RowHeld(row, st) ? W::SaverHolds : (W)RowNote(row)), 18);
                 note.middle = true;
-                note.colour = kDim;
+                note.colour = kTextNote;
                 it.Add(1, note);
             }
             const bool keysRow = focus >= 0 && focus < (int)tl.rows.size() && tl.rows[focus] == Row::Keys;
@@ -979,7 +981,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             {
                 const Rect r {c.x, top + (i - scroll) * kRowStep, c.w - 20, kRowH};
                 const bool f = !asking && focus == i;
-                if (f) it.Add(1, Ring(r, 16));
+                if (f) Ring(it, 1, r, 16);
                 UiItem b = Button(r, f);
                 b.radius = 16;
                 it.Add(1, b);
@@ -996,7 +998,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                         if (g.empty())
                         {
                             UiItem none = Line({x, r.y, 160, r.h}, "\xE2\x80\x94", 24, 24); // "—"
-                            none.colour = kDim;
+                            none.colour = kTextInactive;
                             it.Add(1, none);
                             continue;
                         }
@@ -1027,7 +1029,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 // The columns' heads, above the list.
                 UiItem kh = Line({c.x + 360, c.y, 180, 34}, Wd(lang, W::KeysKeyboard), 20, 16);
                 UiItem ph = Line({c.x + 550, c.y, 180, 34}, Wd(lang, W::KeysController), 20, 16);
-                kh.colour = ph.colour = kDim;
+                kh.colour = ph.colour = kTextNote;
                 it.Add(1, kh);
                 it.Add(1, ph);
                 if (focus < Controls::COUNT)
@@ -1049,11 +1051,11 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 // What Keys and buttons can do (one button alone for the pause menu, too).
                 UiItem kn = TextItem({c.x + 8, r.y - 60, c.w - 16, 50}, Wd(lang, W::KeysNote), 18, Align::Centre);
                 kn.middle = true;
-                kn.colour = kDim;
+                kn.colour = kTextNote;
                 it.Add(1, kn);
             }
             const bool f = !asking && focus == 0;
-            if (f) it.Add(1, Ring(r, 24));
+            if (f) Ring(it, 1, r, 24);
             it.Add(1, Button(r, f));
             it.Add(1, Line({r.x + 24, r.y, r.w - 48, r.h}, Wd(lang, W::CtlKeys), 28, 20, Align::Centre, Weight::ExtraBold));
             rects_[0] = r;
@@ -1066,7 +1068,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             if (!m.statesOk)
             {
                 UiItem t = Line({c.x, c.y, c.w, c.h}, Wd(lang, W::StNoFolder), 28, 20, Align::Centre);
-                t.colour = kDim;
+                t.colour = kTextNote;
                 it.Add(1, t);
                 Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellBack));
                 break;
@@ -1075,7 +1077,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             {
                 const Rect r {c.x + (c.w - 696) / 2 + (i % 2) * 360, c.y + (i / 2) * 206, 336, 196};
                 const bool f = !asking && focus == i;
-                if (f) it.Add(1, Ring(r, 18));
+                if (f) Ring(it, 1, r, 18);
                 UiItem b = Button(r, f);
                 b.radius = 18;
                 it.Add(1, b);
@@ -1088,7 +1090,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                     w.radius = 8;
                     it.Add(1, w);
                     UiItem e = Line(pic, Wd(lang, W::StEmpty), 24, 18, Align::Centre);
-                    e.colour = kDim;
+                    e.colour = kTextInactive;
                     it.Add(1, e);
                 }
                 std::string label = Fill(Wd(lang, W::SaveSlot), std::to_string(i + 1));
@@ -1098,10 +1100,10 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             {
                 const Rect r {c.x + 170, c.y + 2 * 206 + 2, c.w - 340, 50};
                 const bool f = !asking && focus == kStateSlots;
-                if (f) it.Add(1, Ring(r, 22));
+                if (f) Ring(it, 1, r, 22);
                 it.Add(1, Button(r, f, m.canUndo));
                 UiItem t = Line({r.x + 20, r.y, r.w - 40, r.h}, Wd(lang, W::StUndo), 24, 18, Align::Centre, Weight::ExtraBold);
-                if (!m.canUndo) t.colour = kDim;
+                if (!m.canUndo) t.colour = kTextInactive;
                 it.Add(1, t);
                 rects_[kStateSlots] = r;
             }
@@ -1158,7 +1160,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         {
             UiItem n = TextItem({textBox.x + 16, textBox.y + textBox.h - 62, textBox.w - 32, 54}, note, 19, Align::Centre);
             n.middle = true;
-            n.colour = kDim;
+            n.colour = kTextNote;
             it.Add(3, n);
         }
         const int by = kAskBox.y + kAskBox.h - 96;
@@ -1170,7 +1172,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             {
                 const Rect r {kAskBox.x + 110 + i * 270, by, 230, 64};
                 const bool f = askFocus == i;
-                if (f) it.Add(3, Ring(r, 24));
+                if (f) Ring(it, 3, r, 24);
                 it.Add(3, Button(r, f));
                 const std::string w = Wd(lang, words[i]);
                 const ui::Button chip = f ? ui::Button::A : ui::Button::B;
@@ -1186,7 +1188,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         else if (m.capturing < 0)
         {
             const Rect r {kAskBox.x + (kAskBox.w - 230) / 2, by, 230, 64};
-            it.Add(3, Ring(r, 24));
+            Ring(it, 3, r, 24);
             it.Add(3, Button(r, true));
             const std::string w = Wd(lang, W::ShellOk);
             const Rect cr = ChipRect(0, 0, ui::Button::A, w, 28, 0, Weight::ExtraBold);
@@ -1221,7 +1223,7 @@ void Shell::Zoom(std::vector<UiItem>& items) const
         }
     if (x1 <= x0) return;
     constexpr float ax = kW / 2.0f, ay = kH / 2.0f;
-    float f = ui::FitZoom({x0, y0, x1 - x0, y1 - y0}, z, ax, ay, {8, 8, kW - 16, kH - 16});
+    float f = ui::FitZoom({x0, y0, x1 - x0, y1 - y0}, z, ax, ay, page == Page::Launch ? kSafe : Rect {8, 8, kW - 16, kH - 16});
     if (z > 1) f = std::max(f, 1.0f);
     if (f == 1) return;
     for (UiItem& u : items)

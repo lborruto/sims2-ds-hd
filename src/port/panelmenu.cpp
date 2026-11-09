@@ -22,8 +22,6 @@ namespace
 using namespace ui;
 
 constexpr u32 kPhoneId = 1;
-// The focus ring's green (the game's own selection green, as its tab ring and arrows).
-constexpr u32 kFocusGreen = 0xFF309A41;
 // The selected tab's raised plate and the hints' text.
 constexpr u32 kTabPlateFill = 0xFF9AA2E3;
 
@@ -112,6 +110,12 @@ std::string MenuTitle(const RomData& rom, int tab, const std::string& name)
 
 FittedText FitLine(const std::string& text, float size, float minSize, int width, Weight w)
 {
+    minSize = std::max(minSize, kMinText); // (never below the smallest text: ui::kMinText)
+    return FitLineAny(text, std::max(size, minSize), minSize, width, w);
+}
+
+FittedText FitLineAny(const std::string& text, float size, float minSize, int width, Weight w)
+{
     FittedText f {text, size, true};
     for (float s = size; s >= minSize - 1e-3f; s -= 1)
         if (TextWidth(text, s, w) <= width) { f.size = s; return f; }
@@ -138,15 +142,12 @@ void AddMousePiece(Composition& c, Rect from, Rect to)
     c.pieces.push_back(p);
 }
 
-void AddFocusRing(Composition& c, Rect r, float radius)
+void AddFocusRing(Composition& c, Rect r, float radius, int layer, u32 behind)
 {
-    constexpr int t = 5;
-    UiItem g = PanelItem({r.x - t, r.y - t, r.w + 2 * t, r.h + 2 * t});
-    g.plain = true;
-    g.fill = kFocusGreen;
-    g.radius = radius + t;
-    g.layer = 1;
-    c.ui.push_back(g);
+    FocusRingItems g = FocusRing(r, radius, behind);
+    g.outer.layer = g.inner.layer = layer;
+    c.ui.push_back(g.outer);
+    c.ui.push_back(g.inner);
 }
 
 int AddHint(Composition& c, int right, Button b, const std::string& label)
@@ -322,7 +323,12 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
 
 void PanelText(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour, int layer)
 {
-    const FittedText f = FitLine(s, size, minSize, r.w, w);
+    PanelTextAny(c, r, s, std::max(size, kMinText), std::max(minSize, kMinText), a, w, colour, layer);
+}
+
+void PanelTextAny(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour, int layer)
+{
+    const FittedText f = FitLineAny(s, size, minSize, r.w, w);
     ui::UiItem t = ui::TextItem(r, f.text, f.size, a, w);
     t.wrap = false;
     t.middle = true;
@@ -341,6 +347,11 @@ void Measurer::Note(int id, bool shrunk, bool fits, int lines) const
 void Measurer::Line(int id, const std::string& text, float size, float minSize, int width, ui::Weight w) const
 {
     const FittedText f = FitLine(text, size, minSize, width, w);
+    Note(id, f.size < size, f.fits);
+}
+void Measurer::LineAny(int id, const std::string& text, float size, float minSize, int width, ui::Weight w) const
+{
+    const FittedText f = FitLineAny(text, size, minSize, width, w);
     Note(id, f.size < size, f.fits);
 }
 void Measurer::Block(int id, const std::string& text, float size, float minSize, Rect box) const

@@ -14,7 +14,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kBtnFill = 0xFF6A72B8, kBtnFocusFill = 0xFF9AA2E3;
 constexpr u32 kTrackFill = 0xFF51518A, kTrackOn = 0xFFB2B2E3, kNotch = 0xFF383869;
 constexpr u32 kCurrent = 0xFF6BD36B;      // the game's green for its current slot's number
 constexpr u32 kLabel = 0xFFD6DAF6;
@@ -36,7 +35,7 @@ void AddButton(Composition& c, Rect r, const std::string& word, bool focused)
     const Theme& th = GameTheme();
     if (focused) AddFocusRing(c, r, r.h / 2.0f);
     UiItem b = PanelItem(r);
-    b.fill = focused ? kBtnFocusFill : kBtnFill;
+    b.fill = focused ? kFillFocus : kFillRow;
     b.borderArgb = th.frame;
     b.border = 3;
     b.radius = r.h / 2.0f;
@@ -103,7 +102,7 @@ void AddSlider(Composition& c, Rect well, const std::string& label, int notch, b
         c.ui.push_back(d);
     }
     UiItem knob = PanelItem({KnobX(notch) - (int)kKnob / 2, ty - (int)kKnob / 2, (int)kKnob, (int)kKnob});
-    knob.fill = focused ? kBtnFocusFill : th.fill;
+    knob.fill = focused ? kFillFocus : th.fill;
     knob.borderArgb = th.frame;
     knob.border = 4;
     knob.radius = kKnob / 2;
@@ -252,7 +251,7 @@ void BuildSaveSlots(Composition& c, const MenuView& v, int focus, const GameStat
         const bool focused = i == focus;
         if (focused) AddFocusRing(c, r, 22);
         UiItem row = PanelItem(r);
-        row.fill = focused ? kBtnFocusFill : kBtnFill;
+        row.fill = focused ? kFillFocus : kFillRow;
         row.borderArgb = th.frame;
         row.border = 3;
         row.radius = 22;

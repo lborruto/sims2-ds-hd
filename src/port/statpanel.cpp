@@ -16,7 +16,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kRowFill = 0xFF6A72B8;                 // (Interact's rows)
 constexpr u32 kButtonFill = 0xFF9AA2E3, kButtonFocusFill = 0xFFB4BBF0;
 constexpr u32 kTabPlateFill = 0xFF9AA2E3;            // (the panel's selected tab)
 constexpr u32 kValueColour = 0xFFFFE9A0;             // a warm white (the money's)
@@ -250,7 +249,7 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
     c.ui.push_back(xCell);
     Text(c, {kPmTitle.x + 24, kPmTitle.y, kPmTitle.w - 48, kPmTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Centre, Weight::ExtraBold);
     // The page's raised plate in the tab bar (on a page the focus rests there: its halo first).
-    if (page != 0 && focus == 0) AddFocusRing(c, {cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4}, 18);
+    if (page != 0 && focus == 0) AddFocusRing(c, {cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4}, 18, 1, kTabPlateFill);
     {
         UiItem plate = PanelItem({cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4});
         plate.fill = kTabPlateFill;
@@ -273,7 +272,7 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
         {
             const Rect r = StatButtonRect(p);
             const bool focused = focus == p - 1;
-            if (focused) AddFocusRing(c, r, 24);
+            if (focused) AddFocusRing(c, r, 24, 1, kButtonFocusFill);
             UiItem b = PanelItem(r);
             b.fill = focused ? kButtonFocusFill : kButtonFill;
             b.borderArgb = th.frame;
@@ -297,7 +296,7 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
         images.push_back({{kSprStStars - 1, kSprStStars, kStStarsPal[j]}, level, 3, kAspStars});
         for (auto [r, id] : {std::pair {kAspBonus, kStrStAspBonus + asp}, std::pair {kAspHow, kStrStAspHow + asp}})
         {
-            Well(c, r, kRowFill, 16);
+            Well(c, r, kFillRow, 16);
             const Rect in {r.x + 20, r.y + 8, r.w - 40, r.h - 16};
             const FittedBlock f = FitBlock(MenuWords(rom, id), kTextSize, kTextMin, in);
             UiItem t = TextItem(in, f.text, f.size, Align::Left, Weight::Bold);
@@ -312,7 +311,7 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
         for (int i = 0; i < n; i++)
         {
             const Rect r = page == 2 ? HotelRow(i) : StatsRow(i);
-            Well(c, r, kRowFill, 18);
+            Well(c, r, kFillRow, 18);
             const Rect icon {r.x + 8, r.y + (r.h - 64) / 2, 64, 64};
             images.push_back({SpriteRef::Of(page == 2 ? kSprStHotel[i] : kSprStStats[i]), 0, 2, icon});
             std::string label, value;
@@ -326,7 +325,7 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
         for (int i = 0; i < 5; i++)
         {
             const Rect r = HotelRow(i);
-            Well(c, r, kRowFill, 18);
+            Well(c, r, kFillRow, 18);
             images.push_back({SpriteRef::Of(kSprStSkill[i]), 0, 2, {r.x + 8, r.y, 64, 64}});
             const Rect barBox {r.x + r.w - 16 - kSkillBarW, r.y, kSkillBarW, r.h};
             Text(c, {r.x + 88, r.y, barBox.x - 16 - (r.x + 88), r.h}, MenuWords(rom, kStrStSkill + i), kLineSize, kLineMin, Align::Left, Weight::ExtraBold);

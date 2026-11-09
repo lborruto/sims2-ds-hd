@@ -17,7 +17,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kButtonFill = 0xFF6A72B8, kButtonFocusFill = 0xFF9AA2E3;   // (the HD rows' lavender)
 constexpr u32 kChipPlate = 0xB0202436;
 constexpr u32 kWirelessText = 0xFFB8BCE0;                                 // DS Wireless's label, greyed                                   // the title's chip plate: dark, see-through
 
@@ -192,7 +191,7 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
             if (focused) AddFocusRing(c, r, r.h / 2.0f);
             const bool wireless = i == kFrWireless; // greyed: a second DS is needed
             UiItem b = PanelItem(r);
-            b.fill = wireless ? GameTheme().fillDark : focused ? kButtonFocusFill : kButtonFill;
+            b.fill = wireless ? GameTheme().fillDark : focused ? kFillFocus : kFillRow;
             b.borderArgb = GameTheme().frame;
             b.border = 3;
             b.radius = r.h / 2.0f;
@@ -216,7 +215,7 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
             // DS Wireless: its note in the hints' place.
             const std::string text = OwnWord(&rom, OwnWordId::WirelessNote);
             float size = 19;
-            while (size > 15 && Wrap(text, size, (float)kFrNote.w).size() * size * 1.3f > kFrNote.h) size -= 1;
+            while (size > kMinText && Wrap(text, size, (float)kFrNote.w).size() * size * 1.3f > kFrNote.h) size -= 1;
             UiItem note = TextItem(kFrNote, text, size, Align::Right);
             note.middle = true;
             note.layer = 1;
@@ -268,6 +267,6 @@ void MeasureFront(const RomData& rom, BlockMeasure& m)
         tally.Line(kStrFrMenu[i], Label(rom, i), kFrLabelSize, kFrLabelMin, r.w - 28 - iconW - 12 - arrow - 12);
     }
     // DS Wireless's note in the hints' box (two lines at most).
-    tally.Block(9000 + (int)OwnWordId::WirelessNote, OwnWord(&rom, OwnWordId::WirelessNote), 19, 15, kFrNote);
+    tally.Block(9000 + (int)OwnWordId::WirelessNote, OwnWord(&rom, OwnWordId::WirelessNote), 19, 18, kFrNote);
 }
 }

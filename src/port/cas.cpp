@@ -19,7 +19,7 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kCellFill = 0xFF6A72B8, kCellFocusFill = 0xFF9AA2E3, kTabPlateFill = 0xFF9AA2E3;
+constexpr u32 kTabPlateFill = 0xFF9AA2E3; // (behind the game's tab pictures; the rows: ui::kFillRow, kFillFocus)
 constexpr u32 kChosenRim = 0xFFB2B2E3;   // the game's choice (the focus alone is green)
 constexpr u32 kDim = 0x80FFFFFF;          // a key that would do nothing (the name is full)
 constexpr u32 kWarm = 0xFFFFF2D6;         // the chosen aspiration's name
@@ -55,7 +55,7 @@ void Cell(Composition& c, Rect r, bool focused, bool chosen, float radius = 14)
 {
     if (focused) AddFocusRing(c, r, radius);
     UiItem w = PanelItem(r);
-    w.fill = focused ? kCellFocusFill : kCellFill;
+    w.fill = focused ? kFillFocus : kFillRow;
     w.borderArgb = chosen ? kChosenRim : GameTheme().frame;
     w.border = chosen ? 4 : 3;
     w.radius = radius;
@@ -419,7 +419,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         }
         const Rect b {cell.x + (cell.w - kCasTabButton) / 2, cell.y + (cell.h - kCasTabButton) / 2, kCasTabButton, kCasTabButton};
         UiItem button = PanelItem(b);
-        button.fill = i == cs.page ? kTabLit : kCellFill;
+        button.fill = i == cs.page ? kTabLit : kFillRow;
         button.borderArgb = i == cs.page ? kTabLitRim : th.frame;
         button.border = 3;
         button.radius = b.h / 2.0f;
@@ -641,7 +641,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             const Rect r = it.rect;
             if (focused(k)) AddFocusRing(c, r, r.h / 2.0f);
             UiItem b = PanelItem(r);
-            b.fill = focused(k) ? kCellFocusFill : kCellFill;
+            b.fill = focused(k) ? kFillFocus : kFillRow;
             b.borderArgb = th.frame;
             b.border = 3;
             b.radius = r.h / 2.0f;

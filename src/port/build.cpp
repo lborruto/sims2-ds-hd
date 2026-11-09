@@ -19,7 +19,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kRowFill = 0xFF6A72B8, kRowFocusFill = 0xFF9AA2E3;   // (Interact's rows)
 constexpr u32 kWhereColour = 0xFFD8DAF4;                           // a room's place: a pale lavender
 constexpr u32 kPriceColour = 0xFFFFE9A0;                           // a warm white: money (the catalogue's)
 constexpr u32 kPoorColour = 0xFFFF6A6A;                            // the game's red for a permit the money does not cover
@@ -114,7 +113,7 @@ void AskButton(Composition& c, Rect r, bool focused, const std::string& word)
     const Theme& th = GameTheme();
     if (focused) AddFocusRing(c, r, 24);
     UiItem b = PanelItem(r);
-    b.fill = focused ? kRowFocusFill : th.frame;
+    b.fill = focused ? kFillFocus : th.frame;
     b.borderArgb = th.frameDark;
     b.border = 3;
     b.radius = 24;
@@ -245,7 +244,7 @@ void BuildBuildRooms(Composition& c, const MenuView& v, int focus, const GameSta
             const bool focused = focus == i;
             if (focused) AddFocusRing(c, r, 24);
             UiItem row = PanelItem(r);
-            row.fill = focused ? kRowFocusFill : kRowFill;
+            row.fill = focused ? kFillFocus : kFillRow;
             row.borderArgb = th.frame;
             row.border = 3;
             row.radius = 24;
@@ -272,7 +271,7 @@ void BuildBuildRooms(Composition& c, const MenuView& v, int focus, const GameSta
         qt.layer = 1;
         c.ui.push_back(qt);
         UiItem plate = PanelItem(kBdChosen);
-        plate.fill = kRowFill;
+        plate.fill = kFillRow;
         plate.borderArgb = th.frame;
         plate.border = 3;
         plate.radius = 24;

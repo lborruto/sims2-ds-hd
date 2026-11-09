@@ -14,7 +14,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kRowFill = 0xFF6A72B8, kRowSelFill = 0xFF9AA2E3;
 constexpr u32 kLabel = 0xFFD6DAF6;      // a well's small label: a pale lavender
 constexpr u32 kPlateRim = 0xFFB2B2E3;
 constexpr int kRowPortrait = 68;        // a row's portrait well (the crop 2x inside)
@@ -40,7 +39,7 @@ RowName FitRowName(const std::string& name, int width)
 // A small well: its label above, the value below.
 void AddPair(Composition& c, Rect r, const std::string& label, const std::string& value)
 {
-    const FittedText l = FitLine(label, 20, 16, r.w - 36, Weight::Bold);
+    const FittedText l = FitLine(label, 20, 18, r.w - 36, Weight::Bold);
     UiItem lt = TextItem({r.x + 18, r.y + 6, r.w - 36, 26}, l.text, l.size, Align::Left, Weight::Bold);
     lt.wrap = false;
     lt.middle = true;
@@ -110,7 +109,7 @@ void BuildRelations(Composition& c, const MenuView& v, int focus, const GameStat
         const bool selected = r.first + i == r.selected;
         if (i == focus) AddFocusRing(c, row, 16);
         UiItem bar = PanelItem(row);
-        bar.fill = selected ? kRowSelFill : kRowFill;
+        bar.fill = selected ? kFillFocus : kFillRow;
         bar.borderArgb = selected ? th.fill : th.frame;
         bar.border = 2;
         bar.radius = 16;
@@ -189,7 +188,7 @@ void MeasureRelations(const RomData& rom, BlockMeasure& m)
     }
     for (int id : {kStrMood, kStrRelationship})
     {
-        const FittedText f = FitLine(MenuWords(rom, id), 20, 16, kRelMood.w - 36, Weight::Bold);
+        const FittedText f = FitLine(MenuWords(rom, id), 20, 18, kRelMood.w - 36, Weight::Bold);
         note(id, f.size < 20, f.fits);
     }
     for (int id = 184; id <= 192 + 7 * 6 + 6; id++)

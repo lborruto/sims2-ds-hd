@@ -409,6 +409,7 @@ static UiItem RandomItem(Rng& g, const u32* pic, const u32* icon)
         static const float zooms[] = {0.75f, 0.8f, 0.85f, 1.05f, 1.35f, 1.5f};
         if (g.In(0, 2)) ZoomItem(it, zooms[g.In(0, 5)], (float)g.In(0, 1280), (float)g.In(0, 720));
         if (it.kind == UiItem::Image) it.smooth = g.In(0, 1);
+        if (it.kind == UiItem::Image && g.In(0, 2) == 0) it.tier = g.In(1, 3);
     }
     return it;
 }
@@ -673,6 +674,178 @@ static void ui_scale_and_smooth()
     ClearEnlarged();
 }
 
+// Tiers (UiItem::tier): a picture pixel is TierFactor(tier, scale x zoom) whole output pixels,
+// never resampled, centred on `to`; at 100 % the same bytes as the untiered picture `tier` times
+// its size; the layer has room for blocks that pass `to`; the GPU may draw a tiered crop.
+static void tiers()
+{
+    CHECK(TierFactor(kTierS, 1) == 2 && TierFactor(kTierL, 1) == 3);
+    CHECK(TierFactor(kTierS, 1.5f) == 3 && TierFactor(kTierL, 1.5f) == 4); // (4.5: a half down)
+    CHECK(TierFactor(kTierL, 1.6f) == 5 && TierFactor(kTierL, 3) == 9 && TierFactor(kTierS, 0.3f) == 1);
+    CHECK(TierFactor(kTierS, 1.3f * 1.111f) == 3 && TierFactor(0, 2) == 1);
+    // Two colours, a transparent corner.
+    std::vector<u32> icon(16 * 16);
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++) icon[y * 16 + x] = x + y < 4 ? 0 : x > y ? 0xFFF0E0A0u : 0xFF203060u;
+    const UiItem t = TierImage({100, 100, 60, 60}, icon.data(), 16, 16, {0, 0, 16, 16}, kTierS);
+    CHECK(t.tier == kTierS && t.to.x == 114 && t.to.y == 114 && t.to.w == 32 && t.to.h == 32);
+    UiItem plain = t;
+    plain.tier = 0;
+    CHECK(HashImage(plain) != HashImage(t));
+    {   // 100 %: the untiered picture's bytes.
+        std::vector<u32> a(300 * 300), b(300 * 300);
+        Rasterise({t}, 1, a.data(), 300, 300);
+        Rasterise({plain}, 1, b.data(), 300, 300);
+        CHECK(a == b);
+    }
+    auto colours = [](const std::vector<u32>& v) {
+        std::vector<u32> u(v);
+        std::sort(u.begin(), u.end());
+        return (int)(std::unique(u.begin(), u.end()) - u.begin());
+    };
+    for (float s : {1.5f, 1.6f, 2.25f, 3.0f})
+    {
+        const int k = TierFactor(kTierL, s);
+        UiItem l = TierImage({100, 100, 60, 60}, icon.data(), 16, 16, {0, 0, 16, 16}, kTierL);
+        const Rect r = TierRect(l, s, 0, 0);
+        CHECK(r.w == 16 * k && r.h == 16 * k);
+        // Centred on `to` (canvas 100 + 6 .. + 48: its centre 130) within a pixel.
+        CHECK(std::abs(r.x + r.w / 2.0f - 130 * s) <= 1 && std::abs(r.y + r.h / 2.0f - 130 * s) <= 1);
+        const int W = (int)(400 * s), H = W;
+        std::vector<u32> a((size_t)W * H);
+        Rasterise({l}, s, a.data(), W, H);
+        // Three values (transparent, two colours), each picture pixel a whole k x k block.
+        CHECK(colours(a) == 3);
+        bool blocks = true;
+        int drawn = 0;
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+                const u32 v = a[(size_t)y * W + x];
+                const bool in = x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
+                if (!in) { blocks &= v == 0; continue; }
+                drawn += v != 0;
+                const int i = (x - r.x) / k, j = (y - r.y) / k;
+                blocks &= v == icon[j * 16 + i];
+            }
+        CHECK(blocks && drawn == (16 * 16 - 10) * k * k);
+        // Its layer holds every block (5 x 16 = 80 output pixels where `to` is 76.8 at 1.6), drawn as the whole raster.
+        const std::vector<LayerAt> at = LayersAt({l}, s, 0.25f, 0.5f);
+        CHECK(at.size() == 1);
+        std::vector<u32> lp((size_t)at[0].w * at[0].h);
+        Rasterise(at[0].items, s, lp.data(), at[0].w, at[0].h, at[0].ox, at[0].oy);
+        int n = 0;
+        for (u32 v : lp) n += v != 0;
+        CHECK(n == drawn);
+        // Smooth at exactly k (9: the scaler's 3, then 3 x 3 blocks); the same on any number of threads.
+        UiItem sm = l;
+        sm.smooth = true;
+        std::vector<u32> b((size_t)W * H), c((size_t)W * H);
+        SetRasterThreads(1);
+        Rasterise({sm}, s, b.data(), W, H);
+        SetRasterThreads(0);
+        Rasterise({sm}, s, c.data(), W, H);
+        CHECK(b == c && (k == 7 ? b == a : colours(b) > 3)); // (7: no scaler divides it, nearest alone)
+        bool inside = true;
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                if (b[(size_t)y * W + x] && !(x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h)) inside = false;
+        CHECK(inside);
+        if (k == 9)
+        {
+            const auto e3 = Enlarge(sm, 3);
+            CHECK(e3 && b[(size_t)(r.y + 4) * W + r.x + 40] == e3->px[(size_t)1 * e3->w + 13]);
+        }
+    }
+    // Zoomed: the factor of scale x zoom.
+    UiItem z = TierImage({100, 100, 60, 60}, icon.data(), 16, 16, {0, 0, 16, 16}, kTierS);
+    ZoomItem(z, 1.5f, 0, 0);
+    CHECK(TierRect(z, 1, 0, 0).w == 48 && TierRect(z, 2, 0, 0).w == 96);
+    // An opaque small tiered picture is drawn by whole blocks at any scale (WholeFactorCrop), at
+    // TierRect; transparent pixels are not.
+    std::vector<u32> opaque(48 * 32);
+    for (size_t i = 0; i < opaque.size(); i++) opaque[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    const std::vector<UiItem> small = {TierImage({10, 10, 90, 60}, opaque.data(), 48, 32, {5, 5, 30, 20}, kTierL)};
+    const LayerAt at = LayersAt(small, 1.6f, 0, 0)[0];
+    CHECK(Tiered(small[0]) && WholeFactorCrop(small[0], at, 1.6f));
+    const Rect cr = CropRect(small[0], 1.6f, at.x, at.y, at.ox, at.oy);
+    CHECK(cr.w == 150 && cr.h == 100 && cr.x >= at.x && cr.x + cr.w <= at.x + at.w);
+    CHECK(!WholeFactorCrop(t, LayersAt({t}, 1.5f, 0, 0)[0], 1.5f));
+    // Large pictures ignore a tier (the ruling: tiers for sources of 64 pixels or less, never a
+    // live crop of a DS screen): a touch-screen crop and an 80-pixel picture fill `to` the Sharp
+    // way, the bytes and hash of the untiered item, at 100 % and at 1.6.
+    std::vector<u32> pic(256 * 192);
+    for (size_t i = 0; i < pic.size(); i++) pic[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    std::vector<u32> big(80 * 80);
+    for (size_t i = 0; i < big.size(); i++) big[i] = 0xFF000000u | (u32)(i * 40503u);
+    for (UiItem tiered : {TierImage({10, 10, 90, 60}, pic.data(), 256, 192, {5, 5, 30, 20}, kTierL),
+                          TierImage({10, 10, 240, 240}, big.data(), 80, 80, {0, 0, 80, 80}, kTierL)})
+    {
+        UiItem untiered = tiered;
+        untiered.tier = 0;
+        CHECK(!Tiered(tiered) && HashImage(tiered) == HashImage(untiered) && TierRect(tiered, 1.6f, 0, 0).w == 0);
+        for (float s : {1.0f, 1.6f})
+        {
+            const int W = (int)(260 * s), H = W;
+            std::vector<u32> a((size_t)W * H), b((size_t)W * H);
+            Rasterise({tiered}, s, a.data(), W, H);
+            Rasterise({untiered}, s, b.data(), W, H);
+            CHECK(a == b);
+        }
+        CHECK(WholeFactorCrop(tiered, LayersAt({tiered}, 1.6f, 0, 0)[0], 1.6f) == WholeFactorCrop(untiered, LayersAt({untiered}, 1.6f, 0, 0)[0], 1.6f));
+    }
+    std::vector<u32> b64(64 * 40, 0xFF102030u);
+    CHECK(Tiered(TierImage({0, 0, 128, 80}, b64.data(), 64, 40, {0, 0, 64, 40}, kTierS)));
+    CHECK(!Tiered(TierImage({0, 0, 130, 80}, b64.data(), 65, 40, {0, 0, 65, 40}, kTierS)));
+    // TierImage centres with floor (an odd room: the left gets the smaller half).
+    CHECK(TierImage({0, 0, 33, 33}, b64.data(), 64, 40, {0, 0, 16, 16}, kTierS).to.x == 0);
+    // An empty picture (IconCache::Tiered of a frame that does not read) draws nothing and has no footprint.
+    UiItem none = ImageItem({10, 10, 0, 0}, nullptr, 0, 0, {});
+    none.tier = kTierL;
+    {
+        LayerCache lc;
+        const std::vector<UiItem> two = {PanelItem({20, 20, 200, 100}), none};
+        lc.Update(two, 1, 0, 0);
+        CHECK(lc.entries.size() == 1);
+    }
+}
+
+// The focus ring: the game's green at least 5 wide outside, then a line chosen by what it rings:
+// white on a dark fill (3:1 or more for white), the theme's shadow on a light one.
+static void focus_ring()
+{
+    CHECK(kFocusOuterW - kFocusInnerW >= 5);
+    CHECK(Contrast(0xFFFFFFFF, 0xFF000000) > 20.9f && std::abs(Contrast(0xFFFFFFFF, kFillRow) - 4.58f) < 0.02f);
+    CHECK(std::abs(Contrast(0xFFFFFFFF, kFillFocus) - 7.15f) < 0.02f && std::abs(Contrast(0xFFFFFFFF, 0xFF9AA2E3) - 2.43f) < 0.02f);
+    for (u32 dark : {kFillRow, kFillFocus, GameTheme().fill, GameTheme().frame})
+    {
+        const FocusRingItems g = FocusRing({100, 100, 200, 50}, 25, dark);
+        CHECK(g.inner.fill == kFocusInner && g.outer.fill == kFocusOuter);
+        CHECK(g.outer.to.x == 100 - kFocusOuterW && g.inner.to.x == 100 - kFocusInnerW && g.outer.radius == 25 + kFocusOuterW);
+    }
+    for (u32 light : {0xFF9AA2E3u, 0xFFB4BBF0u, 0xFFF0E2B8u}) // (the stat panel's plate and focused button, the note's paper)
+    {
+        const FocusRingItems g = FocusRing({100, 100, 200, 50}, 25, light);
+        CHECK(g.inner.fill == GameTheme().shadow && Contrast(g.inner.fill, light) >= 3); // (WCAG 1.4.11: 3:1 for a UI part)
+    }
+    CHECK(FocusRing({0, 0, 10, 10}, 5).inner.fill == kFocusInner); // (by default: a row's fill)
+    // Drawn: at the ring's middle row, the green band 5 wide, then the line, then the item.
+    const FocusRingItems g = FocusRing({40, 40, 200, 60}, 10, 0xFF9AA2E3);
+    UiItem item = PanelItem({40, 40, 200, 60});
+    item.plain = true;
+    item.fill = 0xFF9AA2E3;
+    std::vector<u32> px(300 * 150);
+    Rasterise({g.outer, g.inner, item}, 1, px.data(), 300, 150);
+    int green = 0, line = 0;
+    for (int x = 20; x < 40; x++)
+    {
+        const u32 v = px[70 * 300 + x] | 0xFF000000u;
+        green += v == kFocusOuter;
+        line += v == GameTheme().shadow;
+    }
+    CHECK(green >= 5 && line >= kFocusInnerW - 1);
+}
+
 int main()
 {
     wrap_cases();
@@ -686,6 +859,8 @@ int main()
     raster_ways(false);
     raster_ways(true);
     ui_scale_and_smooth();
+    tiers();
+    focus_ring();
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("uikit_test: all passed\n");
     return 0;

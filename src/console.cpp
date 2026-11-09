@@ -192,13 +192,18 @@ static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right 
     // The UI's size: about the hints' bottom right (or bottom centre). At the right (the stick
     // cursor's framed touch screen above), the hints below the frame (kCursorHintsLimit), the pause
     // panel its own group about its bottom right, right of the frame (kCursorPauseLimit).
-    if (right) ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW - 24.0f, (float)(y + kH), kCursorHintsLimit);
-    const Rect panel = right ? Rect {std::max(kCursorPauseLimit.x, kConsoleW - 16 - pw), y - kH - kGap, pw, kH}
-                             : Rect {bx + bw + kGap, y, pw, kH};
+    // (A pause chip wider than the room right of the frame, its glyph at the smallest text size,
+    // START + BACK: the pause panel in the hints' row instead, left of them, zoomed with them.)
+    const bool beside = right && kConsoleW - 16 - pw < kCursorPauseLimit.x;
+    if (right && !beside) ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW - 24.0f, (float)(y + kH), kCursorHintsLimit);
+    const Rect panel = beside  ? Rect {bx - kGap - pw, y, pw, kH}
+                       : right ? Rect {std::max(kCursorPauseLimit.x, kConsoleW - 16 - pw), y - kH - kGap, pw, kH}
+                               : Rect {bx + bw + kGap, y, pw, kH};
     const size_t pause = c.ui.size();
     c.ui.push_back(ui::PanelItem(panel));
     c.ui.push_back(ui::ChipItem(panel.x + kPad, panel.y + (kH - chip.h) / 2, ui::Button::Pause, word, kSize));
-    if (right) ZoomUi(c, pause, c.pieces.size(), ui::UiScale(), (float)(panel.x + panel.w), (float)(panel.y + panel.h), kCursorPauseLimit);
+    if (beside) ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW - 24.0f, (float)(y + kH), kCursorHintsLimit);
+    else if (right) ZoomUi(c, pause, c.pieces.size(), ui::UiScale(), (float)(panel.x + panel.w), (float)(panel.y + panel.h), kCursorPauseLimit);
     else ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW / 2.0f, (float)(y + kH), kUiLimit);
 }
 

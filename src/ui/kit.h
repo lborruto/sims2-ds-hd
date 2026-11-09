@@ -22,6 +22,21 @@ struct Theme
 };
 const Theme& GameTheme();
 
+// The HD screens' shared palette, measured with WCAG's contrast formula (research checklist B1-B4;
+// XAG 102: 4.5:1 for text, 3:1 for inactive text): a row, button or well kFillRow (white text on it
+// 4.58:1; GameTheme().fillDark is the same), the focused row kFillFocus (white 7.15:1), notes and
+// subtitles kTextNote (white: 4.58:1 on a well), inactive text kTextInactive (3.23:1 on kFillRow).
+// The panel's own fill (#828ACB, the game's) takes white at 3.26:1: large text only (titles).
+constexpr u32 kFillRow = 0xFF6870B6, kFillFocus = 0xFF4A5296, kTextNote = 0xFFFFFFFF, kTextInactive = 0xFFD4D7F2;
+// The focus ring: the game's green outside (kFocusOuterW around the item, 5 wide), a light or dark
+// line inside it (kFocusInnerW): it reads without its colour (FocusRing: white on a dark fill,
+// against the panel 3.26:1, a well 4.58:1; the theme's shadow #383869 on a light one).
+constexpr u32 kFocusOuter = 0xFF309A41, kFocusInner = 0xFFFFFFFF;
+constexpr int kFocusOuterW = 8, kFocusInnerW = 3; // (the green 5 wide)
+// The smallest text at 100 % (canvas pixels, a shrunk-to-fit line and a chip's glyph included):
+// 27 px at 1080p full screen, past the console's minimum of 26 (XAG 101; the PC's is 18).
+constexpr float kMinText = 18;
+
 enum class Align { Left, Centre, Right };
 // The controller's buttons a chip can show: A, B, X, Y as round chips, the others as pills
 // (the D-pad as a cross).
@@ -101,6 +116,12 @@ struct UiItem
     // pixel-art scaler (xBRZ, src/thirdparty/xbrz) to the whole factor at or above the size it is
     // drawn at, then bilinear to it; false: nearest by the whole factor, then bilinear (Pixel).
     bool smooth = false;
+    // Image: its tier (kTierS, kTierL; 0: none, drawn to fill `to` as above). Tiered, every pixel of
+    // the picture is a k x k block of whole output pixels, k = TierFactor(tier, scale x zoom),
+    // never resampled: Pixel nearest, Smooth the pixel-art scaler at exactly k (past its 6: at
+    // k's largest divisor 2-6, then nearest). The block of pictures is centred on `to` (TierRect),
+    // which a builder makes the picture `tier` times its size (TierImage): at 100 % it fills it.
+    int tier = 0;
 
     // The UI's size (SetUiScale; console.cpp, the shell and the window's marks set it per group of
     // items about the group's anchor): every canvas point p of the item is drawn at
@@ -110,7 +131,31 @@ struct UiItem
     float zoom = 1, dx = 0, dy = 0;
 };
 
+// The game pictures' two sizes (one tier per component; a game pixel = TierFactor(tier, the
+// window's scale x the UI's size) output pixels): S the controls' (arrows, chips' icons, small
+// buttons), L the content's (items, portraits, tabs, the cells a player looks at).
+constexpr int kTierS = 2, kTierL = 3;
+// Tiers are for small pictures only: an icon or sprite whose source (`from`) is at most
+// kTierMaxSource pixels on its longer side, and never a live crop of a DS screen (a 256 x 192
+// picture). A larger picture (a portrait past 64, a touch-screen crop, a playfield, Create-a-Sim's
+// model) fills its `to` exactly the Sharp way (nearest by the whole factor, then bilinear for the
+// rest), as the game's own screens do: a tier on it is ignored (Tiered()).
+constexpr int kTierMaxSource = 64;
+// Whether an image item is drawn by its tier (tier set, a small source, not a live crop).
+bool Tiered(const UiItem& image);
+// The whole output pixels a picture pixel takes at tier `tier` drawn at s output pixels per canvas
+// pixel: tier x s rounded (a half down: never larger than its layout when it can be smaller), 1 at least.
+int TierFactor(int tier, float s);
+
 UiItem PanelItem(Rect to, const Theme& t = GameTheme());          // the light panel (fill, frame)
+// The focus ring around `r` (`radius` its corners'): the green, then the line inside it, two plain
+// boxes to give before the item they ring (the item covers their middle). `behind`: the ringed
+// item's fill, which picks the line: white when white text would read on it (3:1 or more), else
+// the theme's shadow (#383869: a light button, the paper).
+struct FocusRingItems { UiItem outer, inner; };
+FocusRingItems FocusRing(Rect r, float radius, u32 behind = kFillRow);
+// WCAG's contrast ratio between two colours (alpha ignored): 1 to 21.
+float Contrast(u32 a, u32 b);
 UiItem WellItem(Rect to, const Theme& t = GameTheme());           // a darker inset box inside a panel
 UiItem TextItem(Rect to, const std::string& utf8, float size, Align align = Align::Left, Weight w = Weight::Bold);
 // A chip at (x, y) with its label, printed as the current ChipLook says; its rectangle is the
@@ -123,6 +168,13 @@ Rect ChipRect(int x, int y, Button b, const std::string& label, float size, floa
 // what it is: the keyboard's key, or a pad input by its settings name, "lb", "rt", "start"…).
 UiItem ChipItemAs(int x, int y, Face face, const std::string& glyph, const std::string& label, float size, Weight w = Weight::Bold);
 UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from);
+// The same at a tier: `from` `tier` times its size, centred in `box` (canvas pixels, the centre
+// rounded down as TierRect's), tier set (ignored at raster for a large source: Tiered()).
+UiItem TierImage(Rect box, const u32* src, int srcW, int srcH, Rect from, int tier);
+// A tiered picture's output pixels in a raster at `scale` whose canvas origin is (ox, oy)
+// (Rasterise's): from's size times TierFactor, centred on `to` as drawn (zoom applied), its top left
+// rounded to a whole pixel. Empty for an image without a tier.
+Rect TierRect(const UiItem& image, float scale, float ox, float oy);
 
 // The UI's size (the player's setting, Auto or 60-150 %, the window's; 1 headless unless
 // --ui-scale): what the HD screens' builders zoom their groups of items by (console.cpp, the
@@ -222,8 +274,12 @@ struct LayerCache
 
 // Whether a picture (an image layer of LayersAt at `scale`) is drawn by the kit's scaler as
 // nearest alone: opaque, its rectangle inside the picture, scaled by a whole factor to whole
-// pixels. The window draws such a live crop with the GPU (nearest) rather than rastering it.
+// pixels (a tiered one in Pixel: always, at TierRect). The window draws such a live crop with the
+// GPU (nearest) rather than rastering it, at CropRect.
 bool WholeFactorCrop(const UiItem& image, const LayerAt& at, float scale);
+// Where such a crop lands, output pixels: its layer's whole pixel (x, y) and canvas origin (ox, oy)
+// (LayerAt's, LayerCache::Entry's) at `scale`.
+Rect CropRect(const UiItem& image, float scale, int x, int y, float ox, float oy);
 
 // A demonstration of the kit (--ui-demo): a panel, text, every chip and a live crop of `bottom`
 // (the DS's touch screen, 256 x 192; null: none).

@@ -96,6 +96,8 @@ bool PocketsItemText(const InventoryState& inv, int item, int& nameId, int& desc
 
 FittedBlock FitBlock(const std::string& text, float size, float minSize, Rect box)
 {
+    minSize = std::max(minSize, ui::kMinText); // (never below the smallest text: ui::kMinText)
+    size = std::max(size, minSize);
     FittedBlock b {text, size, 0, true};
     for (float s = size; s >= minSize - 1e-3f; s -= 1)
     {

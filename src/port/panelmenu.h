@@ -77,7 +77,8 @@ std::string MenuWordsWith(const RomData& rom, int id, const std::string& at1);
 // The "@1: @2" title with the tab's name and `name` (empty: the tab's name alone, as the game).
 std::string MenuTitle(const RomData& rom, int tab, const std::string& name);
 // A single line fitted to `width`: the size shrunk from `size` to `minSize`, then "…"
-// (an ellipsis) when it still does not fit. fits: no ellipsis was needed.
+// (an ellipsis) when it still does not fit. fits: no ellipsis was needed. Neither size is ever
+// below ui::kMinText (18: the console's smallest text); FitBlock the same.
 struct FittedText
 {
     std::string text;
@@ -85,8 +86,13 @@ struct FittedText
     bool fits = true;
 };
 FittedText FitLine(const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::Bold);
+// The same down to minSize whatever it is: the minigames' side panels and prompt bar alone, whose
+// columns hold the game's longest words only at 13-17 px (their layout is task 4c's to redo; every
+// other screen stops at ui::kMinText). PanelTextAny and Measurer::LineAny the same.
+FittedText FitLineAny(const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::Bold);
 // One fitted line of text in `r` (no wrap, centred vertically), on `layer` (1 by default); colour 0: the theme's.
 void PanelText(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour = 0, int layer = 1);
+void PanelTextAny(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour = 0, int layer = 1);
 // (A check, --measure-menu) what a screen's measure tallies: a line or block fitted (its size
 // shrunk or not, its ellipsis, its lines), each cut id once.
 struct BlockMeasure;
@@ -95,12 +101,14 @@ struct Measurer
     BlockMeasure& m;
     void Note(int id, bool shrunk, bool fits, int lines = 0) const;
     void Line(int id, const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::ExtraBold) const;
+    void LineAny(int id, const std::string& text, float size, float minSize, int width, ui::Weight w = ui::Weight::ExtraBold) const;
     void Block(int id, const std::string& text, float size, float minSize, Rect box) const;
 };
 // A touchable, invisible piece mapping the HD rectangle `to` onto the touch screen's `from`.
 void AddMousePiece(Composition& c, Rect from, Rect to);
-// A row's focus ring (UI items, layer 1): a green halo 4 pixels around `r`, drawn before the row.
-void AddFocusRing(Composition& c, Rect r, float radius);
+// A row's focus ring (UI items, on `layer`): ui::FocusRing around `r` (the game's green, a line inside
+// it, white or dark by `behind`, the ringed item's fill), drawn before the row.
+void AddFocusRing(Composition& c, Rect r, float radius, int layer = 1, u32 behind = ui::kFillRow);
 // A hint chip right-aligned at `right` in the hints band; returns the next right edge.
 int AddHint(Composition& c, int right, ui::Button b, const std::string& label);
 }

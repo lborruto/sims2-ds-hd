@@ -465,7 +465,8 @@ void Video::DrawUi(const std::vector<ui::UiItem>& items, const CanvasFit& fit, U
             if (!cropTex) continue;
             const ui::UiItem& im = e.image;
             const SDL_Rect f {im.from.x, im.from.y, im.from.w, im.from.h};
-            const SDL_Rect d {e.x, e.y, (int)(im.to.w * fit.scale), (int)(im.to.h * fit.scale)};
+            const Rect r = ui::CropRect(im, fit.scale, e.x, e.y, e.ox, e.oy);
+            const SDL_Rect d {r.x, r.y, r.w, r.h};
             SDL_SetTextureAlphaMod(cropTex, im.fill ? (Uint8)(im.fill >> 24) : 255);
             SDL_RenderCopy(ren, cropTex, &f, &d);
             continue;

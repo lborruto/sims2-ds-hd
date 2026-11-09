@@ -20,7 +20,9 @@ const Theme& GameTheme()
 {
     // The game's own colours (CLAUDE.md, the console's frames): frame #6171B2 / #5961A2, fills
     // #828ACB, the dark outline and text shadow #383869, the backdrop #101218.
-    static const Theme t {0xFF6171B2, 0xFF5961A2, 0xFF828ACB, 0xFF6A72B8, 0xFFFFFFFF, 0xFF383869, 0xFF101218, 18, 5};
+    // (The wells: kFillRow, #6870B6, one shade darker than the game's #6A72B8 so white text on
+    // them reaches 4.5:1.)
+    static const Theme t {0xFF6171B2, 0xFF5961A2, 0xFF828ACB, kFillRow, 0xFFFFFFFF, 0xFF383869, 0xFF101218, 18, 5};
     return t;
 }
 
@@ -30,7 +32,11 @@ namespace
 float ChipHeight(float size) { return std::round(size * 1.3f); }
 bool Cross(Button b) { return b == Button::DPad || b == Button::DPadV || b == Button::DPadH || b == Button::DPadL || b == Button::DPadU ||
                         b == Button::DPadR || b == Button::DPadD; }
-float PillText(float size) { return size * 0.56f; }
+// A chip's glyph text, `f` of the chip's text size: at least kMinText for a chip at the hints'
+// size (24) or larger (its glyph three quarters of it then); a chip shrunk below it (a crowded
+// prompt bar's fallback) keeps its proportion.
+float GlyphText(float size, float f) { return size >= kMinText / 0.75f ? std::max(size * f, kMinText) : size * f; }
+float PillText(float size) { return GlyphText(size, 0.56f); }
 
 // What a chip's face shows, from its button, face and glyph (UiItem::face / glyph).
 enum class Mark { Letter, Pill, Key, Stick, Cross, PsCross, PsCircle, PsSquare, PsTriangle };
@@ -90,7 +96,7 @@ Resolved Resolve(Button b, Face face, const std::string& glyph)
 }
 Resolved Resolve(const UiItem& it) { return Resolve(it.button, it.face, it.glyph); }
 bool RoundMark(Mark m) { return m != Mark::Pill && m != Mark::Key; }
-float KeyText(float size, const std::string& t) { return t.size() <= 2 ? size * 0.62f : PillText(size); }
+float KeyText(float size, const std::string& t) { return t.size() <= 2 ? GlyphText(size, 0.62f) : PillText(size); }
 float ChipWidth(const Resolved& r, float size)
 {
     const float h = ChipHeight(size);
@@ -474,6 +480,14 @@ inline Xf Eff(const UiItem& it, float s, float ox, float oy)
 bool PsMarkOf(Mark m) { return m == Mark::PsCross || m == Mark::PsCircle || m == Mark::PsSquare || m == Mark::PsTriangle; }
 
 int SmoothFactor(const UiItem& it, float s);
+// A tiered Smooth picture's scaler factor for its k: k itself up to the scaler's 6, past it k's
+// largest divisor 2-6 (the rest nearest: 9 = 3 x 3), 0 when none (k 1, or 7: nearest alone).
+int TierScaler(int k)
+{
+    for (int d = std::min(k, (int)xbrz::SCALE_FACTOR_MAX); d >= 2; d--)
+        if (k % d == 0) return d;
+    return 0;
+}
 Prepared Prepare(const UiItem& it, float s0, float ox0, float oy0, int W, int H)
 {
     const Xf e = Eff(it, s0, ox0, oy0);
@@ -481,7 +495,11 @@ Prepared Prepare(const UiItem& it, float s0, float ox0, float oy0, int W, int H)
     Prepared p;
     if (it.kind == UiItem::Image && it.smooth)
     {
-        if (const int k = SmoothFactor(it, s); k >= 2) p.big = Enlarge(it, k);
+        if (Tiered(it))
+        {
+            if (const int d = TierScaler(TierFactor(it.tier, s)); d >= 2) p.big = Enlarge(it, d);
+        }
+        else if (const int k = SmoothFactor(it, s); k >= 2) p.big = Enlarge(it, k);
         return p;
     }
     if (it.kind == UiItem::Text)
@@ -505,7 +523,7 @@ Prepared Prepare(const UiItem& it, float s0, float ox0, float oy0, int W, int H)
         const float x1 = x0 + cw * s, y1 = y0 + h * s;
         if (rv.mark != Mark::Cross && !PsMarkOf(rv.mark))
         {
-            const float ts = rv.mark == Mark::Stick ? size * 0.6f : rv.mark == Mark::Letter ? size * 0.82f
+            const float ts = rv.mark == Mark::Stick ? GlyphText(size, 0.6f) : rv.mark == Mark::Letter ? GlyphText(size, 0.82f)
                            : rv.mark == Mark::Key   ? KeyText(size, rv.text) : PillText(size);
             const LineMetrics m = Metrics(ts, Weight::ExtraBold);
             // Centred on the cap height (about 0.7 em).
@@ -645,12 +663,40 @@ void DrawChip(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const 
     // The D-pad's look: the button's own, or the direction a glyph names.
     Button d = it.button;
     if (!Cross(d)) d = it.glyph == "up" ? Button::DPadU : it.glyph == "down" ? Button::DPadD : it.glyph == "left" ? Button::DPadL : Button::DPadR;
-    if (rv.mark == Mark::Cross && (d == Button::DPad || d == Button::DPadV || d == Button::DPadH))
+    if (rv.mark == Mark::Cross && d == Button::DPad)
     {
-        // A cross: two rounded bars (one faint when only the other's directions do something).
+        // A cross: two rounded bars.
         const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
-        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, d == Button::DPadV ? 0x59FFFFFF : 0xFFFFFFFF);
-        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, d == Button::DPadH ? 0x59FFFFFF : 0xFFFFFFFF);
+        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0xFFFFFFFF);
+        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0xFFFFFFFF);
+    }
+    else if (rv.mark == Mark::Cross && (d == Button::DPadV || d == Button::DPadH))
+    {
+        // The cross faint, an arrowhead at each end of the lit arm, pointing out: ‹ › (Left /
+        // Right), ˄ ˅ (Up / Down): it reads as two directions, not as a plus or a bar.
+        const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
+        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0x38FFFFFF);
+        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0x38FFFFFF);
+        const float tip = a * 1.12f, base = a * 0.22f, half = a * 0.62f;
+        for (int sign : {-1, 1})
+        {
+            // A filled triangle: its apex `tip` out along the arm, its base `base` from the centre.
+            const bool v = d == Button::DPadV;
+            const float ax = v ? cx : cx + sign * tip, ay = v ? cy + sign * tip : cy;
+            const float b1x = v ? cx - half : cx + sign * base, b1y = v ? cy + sign * base : cy - half;
+            const float b2x = v ? cx + half : cx + sign * base, b2y = v ? cy + sign * base : cy + half;
+            auto edge = [](float px, float py, float x1, float y1, float x2, float y2, float ix, float iy) {
+                // Signed distance to the line through (x1, y1)-(x2, y2), negative on (ix, iy)'s side.
+                const float nx = y2 - y1, ny = x1 - x2, n = std::sqrt(nx * nx + ny * ny);
+                const float dd = ((px - x1) * nx + (py - y1) * ny) / n, di = ((ix - x1) * nx + (iy - y1) * ny) / n;
+                return di < 0 ? dd : -dd;
+            };
+            const float gx = (ax + b1x + b2x) / 3, gy = (ay + b1y + b2y) / 3;
+            FillDistance(L, std::min({ax, b1x, b2x}), std::min({ay, b1y, b2y}), std::max({ax, b1x, b2x}), std::max({ay, b1y, b2y}), 0xFFFFFFFF,
+                         [&](float x, float y) {
+                             return std::max({edge(x, y, ax, ay, b1x, b1y, gx, gy), edge(x, y, b1x, b1y, b2x, b2y, gx, gy), edge(x, y, b2x, b2y, ax, ay, gx, gy)});
+                         });
+        }
     }
     else if (rv.mark == Mark::Cross)
     {
@@ -701,8 +747,36 @@ int SmoothFactor(const UiItem& it, float s)
     return std::clamp((int)std::ceil(f - 1e-4f), 2, xbrz::SCALE_FACTOR_MAX);
 }
 
+// A tiered picture: each of its pixels a k x k block at TierRect (Smooth: the scaler's picture,
+// each of its pixels a block k / its factor wide), its alpha the cover; nothing blended.
+void DrawTiered(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const Prepared& p)
+{
+    const Rect r = TierRect(it, s0, ox0, oy0);
+    if (r.w <= 0 || r.h <= 0) return;
+    const int k = r.w / it.from.w;
+    const Enlarged* big = it.smooth ? p.big.get() : nullptr;
+    const int m = big ? k / (big->w / it.from.w) : k; // (output pixels per texel)
+    const float alpha = it.fill ? (it.fill >> 24) / 255.0f : 1.0f;
+    const int X0 = std::max(r.x, L.x0), X1 = std::min(r.x + r.w, L.x1), Y0 = std::max(r.y, L.y0), Y1 = std::min(r.y + r.h, L.y1);
+    for (int y = Y0; y < Y1; y++)
+    {
+        const int j = (y - r.y) / m;
+        for (int x = X0; x < X1; x++)
+        {
+            const int i = (x - r.x) / m;
+            const u32 c = big ? big->px[(size_t)j * big->w + i] : Texel(it, 1, i, j);
+            if (c >> 24) L.Over(x, y, c | 0xFF000000u, alpha * (c >> 24) / 255.0f);
+        }
+    }
+}
+
 void DrawImage(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const Prepared& p)
 {
+    if (Tiered(it))
+    {
+        if (it.src && it.from.w > 0 && it.from.h > 0 && it.srcW > 0 && it.srcH > 0) DrawTiered(L, it, s0, ox0, oy0, p);
+        return;
+    }
     const Xf e = Eff(it, s0, ox0, oy0);
     const float s = e.s, ox = e.ox, oy = e.oy;
     if (!it.src || it.from.w <= 0 || it.from.h <= 0 || it.srcW <= 0 || it.srcH <= 0) return;
@@ -989,6 +1063,73 @@ UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from)
     return it;
 }
 
+float Contrast(u32 a, u32 b)
+{
+    auto lum = [](u32 c) {
+        auto ch = [](u32 v) { const float x = v / 255.0f; return x <= 0.03928f ? x / 12.92f : std::pow((x + 0.055f) / 1.055f, 2.4f); };
+        return 0.2126f * ch((c >> 16) & 0xFF) + 0.7152f * ch((c >> 8) & 0xFF) + 0.0722f * ch(c & 0xFF);
+    };
+    const float la = lum(a), lb = lum(b);
+    return (std::max(la, lb) + 0.05f) / (std::min(la, lb) + 0.05f);
+}
+
+FocusRingItems FocusRing(Rect r, float radius, u32 behind)
+{
+    const u32 line = Contrast(kFocusInner, behind) >= 3 ? kFocusInner : GameTheme().shadow;
+    auto box = [&](int t, u32 c) {
+        UiItem g = PanelItem({r.x - t, r.y - t, r.w + 2 * t, r.h + 2 * t});
+        g.plain = true;
+        g.fill = c;
+        g.radius = radius + t;
+        return g;
+    };
+    return {box(kFocusOuterW, kFocusOuter), box(kFocusInnerW, line)};
+}
+
+UiItem TierImage(Rect box, const u32* src, int srcW, int srcH, Rect from, int tier)
+{
+    const int w = from.w * std::max(tier, 1), h = from.h * std::max(tier, 1);
+    const int x = (int)std::floor(box.x + box.w / 2.0f - w / 2.0f), y = (int)std::floor(box.y + box.h / 2.0f - h / 2.0f);
+    UiItem it = ImageItem({x, y, w, h}, src, srcW, srcH, from);
+    it.tier = std::max(tier, 0);
+    return it;
+}
+
+int TierFactor(int tier, float s)
+{
+    if (tier <= 0 || !(s > 0)) return 1;
+    return std::max(1, (int)std::ceil(tier * s - 0.5f - 1e-4f));
+}
+
+bool Tiered(const UiItem& it)
+{
+    return it.kind == UiItem::Image && it.tier > 0 && it.from.w > 0 && it.from.h > 0 && std::max(it.from.w, it.from.h) <= kTierMaxSource &&
+           !(it.srcW == 256 && it.srcH == 192);
+}
+
+Rect TierRect(const UiItem& it, float s0, float ox0, float oy0)
+{
+    if (!Tiered(it)) return {};
+    const Xf e = Eff(it, s0, ox0, oy0);
+    const int k = TierFactor(it.tier, e.s), w = it.from.w * k, h = it.from.h * k;
+    const float cx = (it.to.x + it.to.w / 2.0f - e.ox) * e.s, cy = (it.to.y + it.to.h / 2.0f - e.oy) * e.s;
+    return {(int)std::floor(cx - w / 2.0f + 0.5f), (int)std::floor(cy - h / 2.0f + 0.5f), w, h};
+}
+
+namespace
+{
+// A tiered picture's bounds on the canvas at `scale` (its zoom applied, a pixel to spare each side):
+// where TierRect puts it, which may pass `to` (k rounded up).
+Rect TierBounds(const UiItem& it, float scale)
+{
+    const int k = TierFactor(it.tier, scale * it.zoom);
+    const float hw = (it.from.w * k / 2.0f + 1) / scale, hh = (it.from.h * k / 2.0f + 1) / scale;
+    const float cx = it.zoom * (it.to.x + it.to.w / 2.0f) + it.dx, cy = it.zoom * (it.to.y + it.to.h / 2.0f) + it.dy;
+    const int x0 = (int)std::floor(cx - hw), y0 = (int)std::floor(cy - hh);
+    return {x0, y0, (int)std::ceil(cx + hw) - x0, (int)std::ceil(cy + hh) - y0};
+}
+}
+
 Rect Bounds(const std::vector<UiItem>& items)
 {
     int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
@@ -1061,6 +1202,7 @@ u64 HashImage(const UiItem& it)
     Mix(h, ((u64)(u32)it.srcW << 32) | (u32)it.srcH);
     Mix(h, it.fill);
     if (it.smooth) Mix(h, 0x534D4F4F5448ull);
+    if (Tiered(it)) Mix(h, 0x54494552ull ^ (u64)(u32)it.tier); // (an image without a tier, or one ignored, hashes as before)
     if (it.zoom != 1 || it.dx != 0 || it.dy != 0)
     {
         Mix(h, 0x5A4F4F4Dull ^ FloatBits(it.zoom));
@@ -1090,7 +1232,13 @@ std::vector<LayerAt> LayersAt(const std::vector<UiItem>& items, float scale, flo
     std::vector<UiItem> still, images;
     Layers(items, still, images);
     auto add = [&](std::vector<UiItem> part, bool isStill, int layer) {
-        const Rect b = Bounds(part);
+        Rect b = Bounds(part);
+        if (!isStill && part.size() == 1 && Tiered(part[0]) && b.w > 0 && b.h > 0)
+        {   // (a tiered picture: room for its blocks where they pass `to`)
+            const Rect t = TierBounds(part[0], scale);
+            const int x0 = std::min(b.x, t.x), y0 = std::min(b.y, t.y);
+            b = {x0, y0, std::max(b.x + b.w, t.x + t.w) - x0, std::max(b.y + b.h, t.y + t.h) - y0};
+        }
         if (b.w <= 0 || b.h <= 0) return;
         const int x0 = (int)std::floor(originX + b.x * scale), y0 = (int)std::floor(originY + b.y * scale);
         const int x1 = (int)std::ceil(originX + (b.x + b.w) * scale), y1 = (int)std::ceil(originY + (b.y + b.h) * scale);
@@ -1201,7 +1349,15 @@ Rect Footprint(const UiItem& it, float s0, float ox0, float oy0, int w, int h)
 {
     const Xf e = Eff(it, s0, ox0, oy0);
     const float s = e.s, ox = e.ox, oy = e.oy;
+    // (a picture with nothing to draw: no pixels; an empty IconCache::Tiered item)
+    if (it.kind == UiItem::Image && (!it.src || it.from.w <= 0 || it.from.h <= 0 || it.srcW <= 0 || it.srcH <= 0)) return {};
     if (it.to.w <= 0 || it.to.h <= 0) return {0, 0, w, h};
+    if (Tiered(it))
+    {   // (its blocks where TierRect puts them, a pixel around)
+        const Rect q = TierRect(it, s0, ox0, oy0);
+        const int x0 = std::max(q.x - 1, 0), y0 = std::max(q.y - 1, 0), x1 = std::min(q.x + q.w + 1, w), y1 = std::min(q.y + q.h + 1, h);
+        return {x0, y0, std::max(x1 - x0, 0), std::max(y1 - y0, 0)};
+    }
     float l = 2, r = 2, t = 2, b = 2; // canvas pixels around `to`
     if (it.kind == UiItem::Panel) l = r = t = b = 12;
     else if (it.kind == UiItem::Chip)
@@ -1463,9 +1619,19 @@ bool WholeFactorCrop(const UiItem& im, const LayerAt& at, float scale)
 {
     if (im.kind != UiItem::Image || !im.src || im.srcW <= 0 || im.srcH <= 0) return false;
     // (Smooth: the scaler's, on the CPU; zoomed: the kit's raster, whatever the factor.)
-    if (im.smooth || im.zoom != 1 || im.dx != 0 || im.dy != 0) return false;
+    if (im.smooth) return false;
     const Rect f = im.from;
     if (f.w <= 0 || f.h <= 0 || f.x < 0 || f.y < 0 || f.x + f.w > im.srcW || f.y + f.h > im.srcH) return false;
+    if (Tiered(im))
+    {   // (tiered: whole blocks at any scale and zoom, inside its layer: LayersAt made room)
+        const Rect r = TierRect(im, scale, at.ox, at.oy);
+        if (r.x < 0 || r.y < 0 || r.x + r.w > at.w || r.y + r.h > at.h) return false;
+        for (int y = f.y; y < f.y + f.h; y++)
+            for (int x = f.x; x < f.x + f.w; x++)
+                if ((im.src[(size_t)y * im.srcW + x] >> 24) != 0xFF) return false;
+        return true;
+    }
+    if (im.zoom != 1 || im.dx != 0 || im.dy != 0) return false;
     const float tw = im.to.w * scale, th = im.to.h * scale;
     if (tw != std::floor(tw) || th != std::floor(th) || at.ox != (float)im.to.x || at.oy != (float)im.to.y) return false;
     const int k = std::max(1, (int)std::floor(std::min(tw / f.w, th / f.h)));
@@ -1474,6 +1640,16 @@ bool WholeFactorCrop(const UiItem& im, const LayerAt& at, float scale)
         for (int x = f.x; x < f.x + f.w; x++)
             if ((im.src[(size_t)y * im.srcW + x] >> 24) != 0xFF) return false;
     return true;
+}
+
+Rect CropRect(const UiItem& im, float scale, int x, int y, float ox, float oy)
+{
+    if (Tiered(im))
+    {
+        const Rect r = TierRect(im, scale, ox, oy);
+        return {x + r.x, y + r.y, r.w, r.h};
+    }
+    return {x, y, (int)(im.to.w * scale), (int)(im.to.h * scale)};
 }
 
 std::vector<UiItem> DemoItems(const u32* bottom)

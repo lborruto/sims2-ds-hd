@@ -37,7 +37,7 @@ const SpriteFrame* IconCache::Scaled(SpriteRef s, int frame, int w, int h)
             out.h = h;
             out.argb.assign((size_t)w * h, 0);
             // The kit's scaler, as an image item of the whole frame drawn at w x h.
-            // (Pixel's nearest copy, whatever the game pictures' setting: Image() gives Smooth the frame.)
+            // (the nearest copy, whatever the game pictures' setting: Image() draws the frame itself.)
             ui::UiItem im = ui::ImageItem({0, 0, w, h}, src->argb.data(), src->w, src->h, {0, 0, src->w, src->h});
             im.smooth = false;
             ui::Rasterise({im}, 1.0f, out.argb.data(), w, h);
@@ -93,9 +93,20 @@ const SpriteFrame* IconCache::Scaled(SpriteRef s, int frame, int scale)
 
 ui::UiItem IconCache::Image(SpriteRef s, int frame, const SpriteFrame& scaled, Rect to)
 {
-    if (ui::SmoothPictures())
-        if (const SpriteFrame* f = Frame(s, frame); f && f->w > 0 && f->h > 0)
-            return ui::ImageItem(to, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h});
+    // The frame as it is, in both looks: the kit enlarges it at the window's own size (Pixel:
+    // nearest by the whole factor; a copy scaled first would hide the real pixels behind bilinear
+    // at a fractional size). At a whole factor the pixels are the copy's.
+    if (const SpriteFrame* f = Frame(s, frame); f && f->w > 0 && f->h > 0)
+        return ui::ImageItem(to, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h});
     return ui::ImageItem(to, scaled.argb.data(), scaled.w, scaled.h, {0, 0, scaled.w, scaled.h});
+}
+
+ui::UiItem IconCache::Tiered(SpriteRef s, int frame, int tier, Rect box)
+{
+    if (const SpriteFrame* f = Frame(s, frame); f && f->w > 0 && f->h > 0)
+        return ui::TierImage(box, f->argb.data(), f->w, f->h, {0, 0, f->w, f->h}, tier);
+    ui::UiItem none = ui::ImageItem({box.x, box.y, 0, 0}, nullptr, 0, 0, {});
+    none.tier = tier;
+    return none;
 }
 }
