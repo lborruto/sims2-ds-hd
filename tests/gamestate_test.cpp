@@ -1542,6 +1542,12 @@ static void front_cas()
         r.W32(spr + 0x80 * 8 + 0x50, 136u << 12); r.W32(spr + 0x80 * 8 + 0x54, 105u << 12);   // the ring on cell 4
         g = ReadGameState(r.View());
         CHECK(g.front.cas.arrowsKnown && g.front.cas.canLeft && !g.front.cas.canRight && g.front.cas.clothesCell == 4);
+        CHECK(!g.front.cas.loading);
+        // a shown sprite whose graphics are not uploaded yet (+0x4 bit 7): the page's pictures not drawn; a hidden one: nothing
+        r.W32(spr + 0x80 * 3 + 4, 0x48009081); CHECK(ReadGameState(r.View()).front.cas.loading && ReadGameState(r.View()).front.cas.clothesKnown);
+        r.W32(spr + 0x80 * 3 + 4, 0x48009080); CHECK(!ReadGameState(r.View()).front.cas.loading);
+        r.W32(spr + 0x80 * 3 + 4, 0x48009001); CHECK(!ReadGameState(r.View()).front.cas.loading);
+        CHECK(!ReadGameState(r.View()).front.cas.drawn);   // (the frame loop's, never RAM's)
         r.W32(spr + 0x80 * 8 + 0x50, 137u << 12); CHECK(ReadGameState(r.View()).front.cas.clothesCell == -1);   // between cells
         r.W32(spr + 0x80 * 8 + 4, 0); r.W32(spr + 0x80 * 8 + 0x50, 136u << 12); CHECK(ReadGameState(r.View()).front.cas.clothesCell == -1);   // hidden
         r.W32(spr + 0x80 * 6, 0x12345678); CHECK(!ReadGameState(r.View()).front.cas.arrowsKnown);   // not a sprite

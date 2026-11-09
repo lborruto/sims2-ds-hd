@@ -782,6 +782,12 @@ struct CasState
     bool valid = false;
     int page = -1;                    // S+0x74: 0 Name, 1 Hair, 2 Face, 3 Clothes, 4 Keep this Sim?; in game 5 Tan, 6 Hair, 7 Clothes
     bool switching = false;           // the page object is not yet the page's (a page change in flight, 2-4 frames): no page fields
+    // A sprite of the page's list is shown (+0x4 bit 0) with its graphics not uploaded yet (bit 7):
+    // the page's pictures on the touch screen are still the last page's (or empty).
+    bool loading = false;
+    // (Not RAM's: the frame loop's) the page's own pictures are on the touch screen: neither
+    // switching nor loading this frame and the one before (the picture lags the RAM by a frame).
+    bool drawn = false;
     int gender = -1;                  // 0 female, 1 male
     std::string simName;              // G+0x53, the committed name, at most 7 characters, as UTF-8
     int skin = -1;                    // skin figure 0..3 (hero), -1 not read

@@ -101,6 +101,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Fixed
 
+- Create-a-Sim: changing page no longer flashes the last page's pictures in the new page's cells
+  (letters in the hair styles, text over the clothes); they stay empty until the game has drawn them.
 - The HD menus no longer lag on a 4K screen: a tab change takes about 10 ms instead of 150, a
   focus move about 3 instead of 38.
 - The HD screens never flash the DS's own pictures while the game swaps its screens (tabs, the

@@ -300,6 +300,10 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     if (!cs.valid || cs.page < 0 || cs.page >= kCasPages) return;
     const size_t first = c.ui.size();
     std::vector<UiItem> images;
+    // The touch screen's pictures only once they are the page's own (CasState::drawn): through a
+    // page change (and the Clothes page's next cells) the game's screen still shows the last
+    // page's, or nothing, for a frame or two: the cells stay empty meanwhile.
+    const u32* live = cs.drawn ? bottom : nullptr;
 
     // The model: the top screen at its shape, framed; the camera for the mouse (its right drag turns it).
     const Rect top = FrontFit(kCasTopBox, topW, topH);
@@ -372,7 +376,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             plate.layer = 1;
             c.ui.push_back(plate);
         }
-        Crop(images, bottom, Plus(kCasTabFrom, 0, kCasTabDy * i), 2, cell);
+        Crop(images, live, Plus(kCasTabFrom, 0, kCasTabDy * i), 2, cell);
         if (!cs.switching) AddMousePiece(c, Plus(kCasTabFrom, 0, kCasTabDy * i), cell);
     }
     if (!v.title.empty()) PanelText(c, {kCasTitle.x + 20, kCasTitle.y, kCasTitle.w - 40, kCasTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Centre, Weight::ExtraBold);
@@ -421,14 +425,14 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         for (int g = 0; g < 2; g++)
         {
             Cell(c, v.items[g].rect, focused(g), cs.gender == g, 42);
-            Crop(images, bottom, kCasGenderFrom[g], 2, v.items[g].rect);
+            Crop(images, live, kCasGenderFrom[g], 2, v.items[g].rect);
             mouse(g, kCasGenderFrom[g]);
         }
         for (int i = 0; i < 4; i++)
         {
             const int k = 2 + i;
             Cell(c, v.items[k].rect, focused(k), cs.skin == i);
-            Crop(images, bottom, Plus(kCasSkinFrom, kCasSkinDx * i, 0), 2, v.items[k].rect);
+            Crop(images, live, Plus(kCasSkinFrom, kCasSkinDx * i, 0), 2, v.items[k].rect);
             mouse(k, Plus(kCasSkinFrom, kCasSkinDx * i, 0));
         }
         // The keyboard's pages (the game's labels) and X's chip: the next one.
@@ -462,7 +466,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         // Backspace: the game's ← (live) and Y's chip.
         const int k = 9 + kCasKeys;
         Cell(c, kCasBackRect, focused(k), false, 12);
-        Crop(images, bottom, kCasBackFrom, 2, {kCasBackRect.x, kCasBackRect.y, kCasBackRect.w - 40, kCasBackRect.h});
+        Crop(images, live, kCasBackFrom, 2, {kCasBackRect.x, kCasBackRect.y, kCasBackRect.w - 40, kCasBackRect.h});
         {
             const Rect yr = ChipRect(0, 0, Button::Y, "", 24);
             UiItem y = ChipItem(kCasBackRect.x + kCasBackRect.w - 12 - yr.w, kCasBackRect.y + (kCasBackRect.h - yr.h) / 2, Button::Y, "", 24);
@@ -478,7 +482,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         for (int i = 0; i < 8; i++)
         {
             Cell(c, v.items[i].rect, focused(i), cs.hairColour == i, 12);
-            Crop(images, bottom, Plus(kCasSwatchFrom, kCasSwatchDx * i, 0), 2, v.items[i].rect);
+            Crop(images, live, Plus(kCasSwatchFrom, kCasSwatchDx * i, 0), 2, v.items[i].rect);
             mouse(i, Plus(kCasSwatchFrom, kCasSwatchDx * i, 0));
         }
         for (int cell = 0; cell < 4; cell++)
@@ -487,12 +491,12 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             const bool chosen = cs.hairPos / 9 == row && cs.hairPos % 9 - cs.hairScroll == col;
             const Rect from = Plus(kCasHairFrom, kCasHairDx * col, kCasHairDy * row);
             Cell(c, v.items[k].rect, focused(k), chosen, 16);
-            Crop(images, bottom, from, 3, v.items[k].rect);
+            Crop(images, live, from, 3, v.items[k].rect);
             mouse(k, from);
         }
         // The game's arrows, where it shows them.
-        if (cs.canLeft) { Crop(images, bottom, kCasHairLeftFrom, 2, kCasHairLeft); AddMousePiece(c, kCasHairLeftFrom, kCasHairLeft); }
-        if (cs.canRight) { Crop(images, bottom, kCasHairRightFrom, 2, kCasHairRight); AddMousePiece(c, kCasHairRightFrom, kCasHairRight); }
+        if (cs.canLeft) { Crop(images, live, kCasHairLeftFrom, 2, kCasHairLeft); AddMousePiece(c, kCasHairLeftFrom, kCasHairLeft); }
+        if (cs.canRight) { Crop(images, live, kCasHairRightFrom, 2, kCasHairRight); AddMousePiece(c, kCasHairRightFrom, kCasHairRight); }
         break;
     }
     case 2:
@@ -501,7 +505,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         {
             const Rect from = Plus(kCasFaceFrom, kCasFaceDx * (i % 3), kCasFaceDy * (i / 3));
             Cell(c, v.items[i].rect, focused(i), cs.face == i, 16);
-            Crop(images, bottom, from, 3, v.items[i].rect);
+            Crop(images, live, from, 3, v.items[i].rect);
             mouse(i, from);
         }
         break;
@@ -512,7 +516,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         {
             const Rect from {kCasCatFrom.x, kCasCatFromY[i], kCasCatFrom.w, kCasCatFrom.h};
             Cell(c, v.items[i].rect, focused(i), cs.category == i, 14);
-            Crop(images, bottom, from, 2, v.items[i].rect);
+            Crop(images, live, from, 2, v.items[i].rect);
             mouse(i, from);
         }
         for (int cell = 0; cell < 6; cell++)
@@ -520,7 +524,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             const int k = 6 + cell;
             const Rect from = Plus(kCasClothFrom, kCasClothDx * (cell % 3), kCasClothDy * (cell / 3));
             Cell(c, v.items[k].rect, focused(k), cs.clothesCell == cell, 16);
-            Crop(images, bottom, from, 3, v.items[k].rect);
+            Crop(images, live, from, 3, v.items[k].rect);
             mouse(k, from);
         }
         for (int k = 12; k < 14 && k < (int)v.items.size(); k++)
@@ -528,7 +532,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             if (!v.items[k].enabled) continue;
             const Rect from = k == 12 ? kCasClothLeftFrom : kCasClothRightFrom;
             Cell(c, v.items[k].rect, focused(k), false, 12);
-            Crop(images, bottom, from, 2, v.items[k].rect);
+            Crop(images, live, from, 2, v.items[k].rect);
             mouse(k, from);
         }
         break;

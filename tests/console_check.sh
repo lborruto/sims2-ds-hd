@@ -2109,6 +2109,58 @@ check_pad hold-phone hold_phone
 check_pad hold-gift hold_gift
 check_pad hold-registry hold_registry
 check_pad hold-load-slot hold_load_slot
+# Create-a-Sim's pictures through every page change (src/port/cas.cpp, CasState::drawn): from s3,
+# RB, LB and Start (scripts/console/cas-walk.txt), each of the 9 frames from a change on: every
+# cell and tab of the page either empty (one colour: the game's last page never shows in it) or
+# the page's own picture (as 8 frames after the change).
+cas_gate_run() {
+    local frames
+    frames=$(for b in 20 70 120 170 220 270 320 370 420 470 520 570; do for d in 0 1 2 3 4 5 6 7 8; do printf '%s,' $((b + d)); done; done)
+    cp "$complete_save" "$tmp/cas-gate.sav" || return
+    "$bin" "$rom" --headless --frames 580 --state-load "$shots/s3.st" --save "$tmp/cas-gate.sav" --layout console --compose \
+        --print-front "${town[@]}" --input "$repo/scripts/console/cas-walk.txt" --shot-at "${frames%,}" --shot-dir "$tmp/cas-gate" > "$tmp/cas-gate.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/cas-gate.log" && touch "$tmp/cas-gate.ok"
+}
+cas_gate_run
+cas_gate() {
+    "$python" -I -c '
+import sys
+from PIL import Image
+d = sys.argv[1]
+# Each change: its first frame and the page it goes to (cas-walk: RB x4, LB x4, Start x4).
+changes = [(20, 1), (70, 2), (120, 3), (170, 4), (220, 3), (270, 2), (320, 1), (370, 0), (420, 1), (470, 2), (520, 3), (570, 4)]
+tabs = [(780 + 80 * i + 6, 38, 68, 60) for i in range(5)]
+cells = {0: [(750 + 94 * g, 188, 84, 84) for g in range(2)] + [(956 + 66 * i, 184, 56, 92) for i in range(4)],
+         1: [(728 + 64 * i, 186, 56, 56) for i in range(8)] + [(822 + 166 * (c & 1), 258 + 183 * (c >> 1), 150, 171) for c in range(4)],
+         2: [(754 + 155 * (i % 3), 190 + 141 * (i // 3), 141, 129) for i in range(9)],
+         3: [(716, 190 + 70 * i, 64, 64) for i in range(6)] + [(824 + 130 * (c % 3), 200 + 184 * (c // 3), 120, 174) for c in range(6)],
+         4: []}
+# The page at each frame (--print-front): a change lands a frame after its press or on it.
+at, cur = {}, -1
+for line in open(sys.argv[2]):
+    if line.startswith("frame ") and ": cas page=" in line:
+        n = int(line.split()[1].rstrip(":"))
+        at[n] = int(line.split("page=")[1].split()[0])
+pages = []
+for n in range(600):
+    cur = at.get(n, cur)
+    pages.append(cur)
+bad = []
+for f0, page in changes:
+    final = Image.open(f"{d}/f{f0 + 8:06d}.png").convert("RGB")
+    for f in range(f0, f0 + 8):
+        if pages[f] != page: continue                                     # (the last page still: its own pictures)
+        im = Image.open(f"{d}/f{f:06d}.png").convert("RGB")
+        for (x, y, w, h) in tabs + cells[page]:
+            box = (x + w // 4, y + h // 4, x + w - w // 4, y + h - h // 4)   # (its middle: the well s bevel aside)
+            a = im.crop(box)
+            if len(a.getcolors(1 << 16) or [0, 0]) == 1: continue          # empty
+            if a.tobytes() == final.crop(box).tobytes(): continue          # the page s own
+            bad.append(f"frame {f} page {page}: box {x},{y} neither empty nor the page s picture")
+for b in bad[:4]: print("  cas-gate: " + b)
+sys.exit(1 if bad else 0)' "$tmp/cas-gate" "$tmp/cas-gate.log"
+}
+check_pad cas-gate cas_gate
 # The world's camera on the right stick (navigator.h, WorldKeys; from s7, the phone closed): held
 # left it turns (the DS's L), held up it zooms in (X): the world's picture differs from the same
 # run without it; LB held (the shoulders' default L) changes nothing there any more.

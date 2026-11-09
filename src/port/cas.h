@@ -3,7 +3,8 @@
 // here is one of its touch targets, and what the HD shows is read back from RAM every frame, so
 // the HD page is the game's page (S+0x74) and follows it the frame its page object (S+0x58)
 // swaps; while a page change is in flight (`CasState::switching`, 2-4 frames) the panel shows the
-// new page's tab with nothing in it and nothing to press.
+// new page's tab with nothing in it and nothing to press, and the touch screen's pictures wait until
+// they are the page's own (`CasState::drawn`: the game draws them a frame or two after its object).
 //
 // The model: the game's top screen (the 3D Sim in its room) at its shape, large, at the left,
 // framed. The right stick turns it (MenuView::stickTurns: the DS's L / R held, as the game turns

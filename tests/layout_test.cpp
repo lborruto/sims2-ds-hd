@@ -3052,6 +3052,7 @@ int main()
             c.simName = "Sim";
             c.skin = 1;
             c.hairColour = 3;
+            c.drawn = true;
             return g;
         };
         // The game's target box of an item (the picture or box its tap lies in), by its id.
@@ -3129,6 +3130,13 @@ int main()
                         if (q.src == Src::Top) { tops++; CHECK(q.touch && q.from.w == topW && q.to.x + q.to.w <= kCasPanel.x); }
                     CHECK(tops == 1);
                     if (topW != 256 || focus != MenuFirst(v)) continue;
+                    {   // The touch screen's pictures only once they are the page's (CasState::drawn).
+                        GameState u = g;
+                        u.front.cas.drawn = false;
+                        Composition cu {kConsoleW, kConsoleH, {}, {}};
+                        BuildCas(cu, v, focus, u, rom, nullptr, bottom.data(), topW, 192);
+                        for (const ui::UiItem& it : cu.ui) CHECK(!(it.kind == ui::UiItem::Image && it.src == bottom.data()));
+                    }
                     if (g.front.cas.switching)
                     {
                         for (const Piece& q : comp.pieces) CHECK(q.src != Src::Bottom);   // (nothing to click)
