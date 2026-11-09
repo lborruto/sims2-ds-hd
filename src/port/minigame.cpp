@@ -186,11 +186,16 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         if (quitArmed) return {{{C(Button::B)}, w.quitAgain, true}};
         const int tool = a.valid ? std::clamp(a.tool, 0, 2) : 0;
         std::vector<HdHint> h {PointHint(rom), SlowHint(rom)};
+        // What A does now: a freed organ or a parasite to take (the hand, the tweezers: activities.h), else held the tool.
+        bool organ = false, parasite = false;
+        for (int i = 0; a.valid && i < kAutopsyOrgans; i++) organ = organ || (a.organs[i].freed && a.organs[i].present());
+        for (const AutopsyParasite& p : a.parasites) parasite = parasite || (p.x >= 0 && p.x < SW && p.y >= 0 && p.y < SH);
         if (a.valid && (a.phase == 5 || a.phase == 6)) h.push_back({{C(Button::A)}, w.tear});
-        else if (a.valid && (a.sub == 3 || a.sub == 6)) h.push_back({{C(Button::LB)}, w.carry[a.sub == 3 ? 0 : 1], true});
+        else if (a.valid && (a.sub == 3 || a.sub == 6)) h.push_back({{C(taking ? Button::A : Button::LB)}, w.carry[a.sub == 3 ? 0 : 1], true});
         else
         {
-            h.push_back({{C(Button::A)}, w.use[tool]});
+            const bool take = a.valid && a.sub == 0 && a.phase <= 2 && ((tool == 1 && organ) || (tool == 2 && parasite));
+            h.push_back({{C(Button::A)}, take ? Own(rom, tool == 1 ? OwnWordId::AutopsyTakeOrgan : OwnWordId::AutopsyTakeParasite) : w.use[tool]});
             // The other tools (the one the game flashes for lit: an organ freed, a parasite eating).
             const Button key[3] = {Button::X, Button::Y, Button::RB};
             const bool alert[3] = {false, a.valid && a.handAlert, a.valid && a.tweezersAlert};
@@ -1142,7 +1147,15 @@ ActivityRam MinigameRam(const GameState* game)
     if (!game || !game->valid) return r;
     const MinigameState& m = game->minigame;
     if (game->screen == GScreen::Cards && m.cards.valid) { r.cards = true; r.quitAsk = m.cards.quitAsk; r.message = m.cards.message; }
-    if (game->screen == GScreen::Autopsy && m.autopsy.valid) { r.autopsy = true; r.autopsyTool = m.autopsy.tool; r.autopsySub = m.autopsy.sub; }
+    if (game->screen == GScreen::Autopsy && m.autopsy.valid)
+    {
+        r.autopsy = true;
+        r.autopsyTool = m.autopsy.tool;
+        r.autopsySub = m.autopsy.sub;
+        r.autopsyPhase = m.autopsy.phase;
+        for (int i = 0; i < kAutopsyOrgans && i < 3; i++) r.autopsyFreed[i] = m.autopsy.organs[i].freed && m.autopsy.organs[i].present();
+        for (const AutopsyParasite& p : m.autopsy.parasites) r.autopsyParasites.push_back({p.slot, (float)p.x, (float)p.y, p.eating});
+    }
     if (game->screen == GScreen::Detector && m.detector.valid) { r.detector = true; r.detectorSlider = m.detector.slider; }
     if (game->screen == GScreen::ArtGallery && m.art.valid) { r.art = true; r.artButton = m.art.button; r.artSwatch = m.art.swatch; }
     if (game->screen == GScreen::MooGoo && m.mooGoo.valid)
@@ -1321,6 +1334,15 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     add(Screen::Autopsy, [](GameState& g) { g.minigame.autopsy.valid = true; g.minigame.autopsy.phase = 5; });
     add(Screen::Autopsy, [](GameState& g) { g.minigame.autopsy.valid = true; g.minigame.autopsy.sub = 3; });
     add(Screen::Autopsy, [](GameState& g) { g.minigame.autopsy.valid = true; g.minigame.autopsy.sub = 6; });
+    for (int tool = 1; tool < 3; tool++)   // (A's take: a freed organ, a parasite on the body)
+        add(Screen::Autopsy, [tool](GameState& g) {
+            AutopsyState& a = g.minigame.autopsy;
+            a.valid = a.handAlert = a.tweezersAlert = true;
+            a.tool = a.phase = tool;
+            a.organs[0].kind = 0;
+            a.organs[0].freed = true;
+            a.parasites.push_back({0, 100, 100, 0, true});
+        });
     add(Screen::Detector, [](GameState& g) { g.minigame.detector.valid = g.minigame.detector.inRange = true; });
     add(Screen::Art, [](GameState& g) { g.minigame.art.valid = true; });
     add(Screen::Art, [](GameState& g) { g.town.popup.valid = true; g.town.popup.state = 2; g.town.popup.kind = 2; });
@@ -1351,6 +1373,10 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
         GameState g;
         g.valid = g.minigame.vacuum.valid = g.minigame.vacuum.clogged = g.minigame.vacuum.bowl = true;
         bars.push_back(Hints(Screen::Vacuum, g, rom, false, -1, -1, true));   // the vacuum's take running
+        g.screen = GScreen::Autopsy;
+        g.minigame.autopsy.valid = true;
+        g.minigame.autopsy.sub = 3;
+        bars.push_back(Hints(Screen::Autopsy, g, rom, false, -1, -1, true));   // the autopsy's take carrying
     }
     for (int f : {0, 30}) bars.push_back(Hints(Screen::MixerSave, states.back().second, rom, false, f));   // a key, a slot
     bars.push_back(Hints(Screen::MixerSave, states.back().second, rom, true, 30));   // a slot's overwrite asked

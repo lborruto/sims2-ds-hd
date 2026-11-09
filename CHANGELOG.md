@@ -82,6 +82,9 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is
   kept and the filter never clogs. With no find in the bowl A does nothing. The hint said to drag
   finds to the box: the game only keeps what is dropped in the funnel. The D-pad always drives now.
+- Alien Autopsy on a controller: with the hand, A takes a freed organ to the tray by itself; with
+  the tweezers, A takes the nearest parasite (an eating one first) to the flask. The laser still
+  cuts with A held.
 - CONSOLE is the default layout; AUTO, FOCUS, SIDE and STACKED stay in the pause menu's Settings
   (keys 0 to 4). Sharper 3D, widescreen and 60 fps are on by default; a settings file from before
   CONSOLE that still holds the old defaults is moved to the new ones once, and a file that names a

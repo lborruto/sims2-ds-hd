@@ -433,7 +433,16 @@ frames go back to `top big` around frame 1570, when the game returns to town.
   `kPtrLaser` (1: it cuts through in one pass, research). Autopsy: X / Y / RB tap the laser / hand
   / tweezers (16, 96 / 32 / 160), never while A holds the stylus; LB while the hand drags an organ
   (sub 3) or the tweezers hold a parasite (6) glides the pointer to the tray (236,36) or the flask
-  (236,156) at `kPtrDrag`, rests 4 frames and lets go (A must be let go before it presses again);
+  (236,156) at `kPtrDrag`, rests 4 frames and lets go (A must be let go before it presses again).
+  A pressed with the hand and an organ freed (`ActivityRam::autopsyFreed`, not removed), or with
+  the tweezers and a parasite on the touch screen, takes it (`AutopsyTarget`: the freed organ
+  nearest the pointer at `kAutopsyOrgan` 77,93 / 128,95 / 183,95; the nearest eating parasite,
+  else the nearest; one walking in off the screen never): the pointer goes there at `kPtrMax` with
+  the stylus up, rests a frame, presses, follows a parasite at `kPtrDrag`, and once RAM shows it
+  held (sub 3 / 6) glides as LB does; given up (the stylus up) when the target goes or after
+  `kSeekMax` (60) frames pressed. Nothing to take (and the laser): A held is the stylus, as before.
+  `mg-autopsy-take-organ` (the laser's cut, Y, A: §84 banked) and `mg-autopsy-take-parasite`
+  (G-A-para, RB, A: the eating parasite into the flask);
   the game quits on B or Start at once and pays nothing, so the first asks (`quitArmed`, the
   prompt lit, `kQuitWindow` 180 frames, any other press forgets it) and the second holds the
   game's B 4 frames; Start is never passed on there. Detector: the left stick and the D-pad are the

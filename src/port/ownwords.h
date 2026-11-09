@@ -31,6 +31,7 @@ enum class OwnWordId : int
     // The vacuum.
     VacuumDrive, VacuumHand, VacuumGrab, VacuumBlow, VacuumBlowNow,
     VacuumTake, VacuumTaking, VacuumNoFind,
+    AutopsyTakeOrgan, AutopsyTakeParasite,
     // The social reaction games.
     SocialAnswer, SocialAgain, SocialMatch,
     // MooGoo Monkey: the hints, the round and the deck.

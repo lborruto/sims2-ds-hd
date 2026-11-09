@@ -198,6 +198,8 @@ have a pointer on the sticks (LT slows it).
 | Alien Autopsy, painting | either stick (LT: slow), D-pad | Arrows | move the pointer (the D-pad a pixel at a time, faster held) |
 | | A (hold) | X (hold) | the stylus down: cut, lift an organ, pick a parasite, paint |
 | Alien Autopsy | X / Y / RB | S / A / W | laser / hand / tweezers |
+| | A (the hand, an organ cut free) | X | take the freed organ to the tray by itself |
+| | A (the tweezers) | X | take the nearest parasite (an eating one first) to the flask by itself |
 | | LB | Q | carry the organ to the tray (the parasite to the flask) |
 | | B twice | Z twice | quit (the game pays nothing then) |
 | Metal Detector | left stick or D-pad | Arrows | walk |

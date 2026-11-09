@@ -2162,6 +2162,9 @@ pad_mg mg-autopsy-quit G-X-autopsy autopsy-quit 150 &
 pad_mg mg-autopsy-stay G-X-autopsy autopsy-quit-once 200 &
 pad_mg mg-autopsy-payout G-A-payout-base autopsy-wait 120 &
 wait
+pad_mg mg-autopsy-take-organ G-A-autopsy-nopara autopsy-take-organ 1000 &
+pad_mg mg-autopsy-take-parasite G-A-para autopsy-take-parasite 200 &
+wait
 pad_mg mg-detector-dig G-A-md-walk detector-dig 220 &
 pad_mg mg-detector-quit G-X-metal detector-quit 120 &
 pad_mg mg-art-play G-X-artgal art-play 200 &
@@ -2176,6 +2179,19 @@ autopsy_bank() {
         'minigame autopsy .*sub=3 .*dragged=0' 'minigame autopsy .*sub=4 ' 'minigame autopsy .*earnings=84 .*organs=5:'
 }
 check_pad mg-autopsy-bank autopsy_bank
+# A alone takes (activities.h's AutopsyTarget): the hand's freed organ (the pointer from the middle to
+# 77,93, pressed, dragged, carried to the tray and let go there: §84 banked, the slot removed); the
+# tweezers' nearest eating parasite (followed, held, carried to the flask: into it, sub 7).
+autopsy_take_organ() {
+    in_order mg-autopsy-take-organ 'minigame autopsy .*organs=0:[0-9]+:freed' 'minigame autopsy phase=1 .*tool=1 ' 'pointer down at 77,93' \
+        'minigame autopsy .*sub=3 .*dragged=0' 'pointer up at 236,36' 'minigame autopsy .*sub=4 ' 'minigame autopsy .*earnings=84 .*organs=5:'
+}
+check_pad mg-autopsy-take-organ autopsy_take_organ
+autopsy_take_parasite() {
+    in_order mg-autopsy-take-parasite 'minigame autopsy .*tool=2 ' 'pointer down' 'minigame autopsy .*sub=6 .*held=[0-7] ' 'pointer up at 236,156' \
+        'minigame autopsy .*sub=7 '
+}
+check_pad mg-autopsy-take-parasite autopsy_take_parasite
 autopsy_quit() { in_order mg-autopsy-quit 'game Autopsy' 'game Panel/Interact'; }
 check_pad mg-autopsy-quit autopsy_quit
 autopsy_stay() {

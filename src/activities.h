@@ -27,7 +27,11 @@
 //   30 Hz) and the autopsy's laser at kPtrLaser (its cutting pace).
 //   Alien Autopsy: X / Y / RB take the laser / hand / tweezers (their buttons tapped); LB, while
 //     the hand holds an organ or the tweezers a parasite, carries it to the tray / the flask
-//     (the pointer glides there at kPtrDrag, the stylus held, and lets go); B or Start quits
+//     (the pointer glides there at kPtrDrag, the stylus held, and lets go). A with the hand and an
+//     organ freed, or the tweezers and a parasite on the body, takes it (AutopsySeek): the pointer
+//     goes to the freed organ nearest it (kAutopsyOrgan) or the nearest parasite (an eating one
+//     first), presses, follows it until RAM shows it held, then carries it as LB does; nothing to
+//     take (and the laser): A held is the stylus down at the pointer; B or Start quits
 //     (the game's own keys: at once, the earnings forfeited), so the first press asks
 //     (ActivityState::quitArmed, the prompt lit) and a second within kQuitWindow frames quits.
 //   Metal Detector: the left stick and the D-pad walk (the game's own D-pad); A digs, B powers
@@ -128,6 +132,10 @@ struct ActivityRam
     // The pointing minigames (GameState::minigame's parts; each false when its part does not read).
     bool autopsy = false;
     int autopsyTool = 0, autopsySub = 0;   // the tool (0 laser, 1 hand, 2 tweezers); 3 an organ dragged, 6 a parasite held
+    int autopsyPhase = 0;                  // AutopsyState::phase (0-2 the tools; 3 on: the specimen done, the tear)
+    bool autopsyFreed[3] = {};             // an organ freed (the hand can lift it), not removed yet
+    struct Parasite { int slot = 0; float x = 0, y = 0; bool eating = false; };
+    std::vector<Parasite> autopsyParasites;   // the live ones on the touch screen
     bool detector = false;
     int detectorSlider = 0;                // the depth slider, 0..4096
     bool art = false;
@@ -203,6 +211,9 @@ struct ActivityState
     bool gliding = false;             // the autopsy's LB: carrying to glideTo, the stylus held
     Point glideTo {0, 0};
     int glideRest = 0;                // frames resting on glideTo before letting go
+    // The autopsy's A take (AutopsySeek): 0 none, 1 an organ, 2 a parasite; which (organ 0-2, a
+    // parasite's slot); pressed (frames down on it); frames in all.
+    int seek = 0, seekWhich = -1, seekPressed = 0, seekFrames = 0;
     int quitArmed = 0;                // the autopsy: frames left for the second B / Start
     int quitKeys = 0;                 // the autopsy: frames B is still held for the game
     int sliderFrames = 0;             // the detector: frames the knob has been held
@@ -235,7 +246,7 @@ struct PointerView
     float x = 0, y = 0;
     Rect mark {0, 0, 0, 0};           // MooGoo's focus on the playfield (DS pixels; w 0 none)
     int askFocus = -1;                // a question's focused answer (0 No, 1 Yes; ActivityState::askFocus), -1 none up
-    bool taking = false;              // the vacuum: A's take runs (the find carried to the funnel)
+    bool taking = false;              // A's take runs (the vacuum's find, the autopsy's organ or parasite; its LB carry)
 };
 
 // The screens ActivityInput plays.
@@ -293,6 +304,15 @@ bool OwnScheme(Screen s);
 // right): laser, hand, tweezers; where an organ is dropped (the tray) and a parasite (the flask).
 constexpr Point kAutopsyTool[3] = {{16, 96}, {16, 32}, {16, 160}};
 constexpr Point kAutopsyTray {236, 36}, kAutopsyFlask {236, 156};
+// Where the hand lifts organ slot i (the organs lie there whatever their kind: mg-autopsy-bank).
+constexpr Point kAutopsyOrgan[3] = {{77, 93}, {128, 95}, {183, 95}};
+// A's take: the pointer moves at kPtrMax a frame to its target, presses kSeekSettle frames after it
+// is there, follows it (a parasite crawls) and gives up kSeekMax frames after the press without RAM
+// showing it held.
+constexpr int kSeekSettle = 1, kSeekMax = 60;
+// What the autopsy's A takes from (px, py) now: 1 an organ (which: its slot), 2 a parasite (which:
+// its slot), 0 nothing (A held is the stylus); the tool and the RAM say.
+int AutopsyTarget(const ActivityRam& ram, float px, float py, int& which);
 constexpr int kQuitWindow = 180;      // frames the second B / Start has to quit
 // The Metal Detector's buttons (power 54-101 and dig 156-203, rows 136-167) and its depth slider
 // (the knob along x 195, rows 33-121 for 0..4096).

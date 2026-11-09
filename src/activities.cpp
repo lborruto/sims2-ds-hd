@@ -248,6 +248,58 @@ void Autopsy(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState
         if (!st.down) { st.gliding = false; st.latch = true; }
         return;
     }
+    // A's take (the hand's freed organ, the tweezers' parasite): to it, pressed, followed until held.
+    if (st.seek)
+    {
+        if (st.ram.autopsy && ((st.seek == 1 && st.ram.autopsySub == 3) || (st.seek == 2 && st.ram.autopsySub == 6)))
+        {
+            // Held: carried to the tray / the flask as LB does.
+            st.gliding = true;
+            st.glideRest = 0;
+            st.glideTo = st.seek == 1 ? kAutopsyTray : kAutopsyFlask;
+            st.seek = 0;
+            st.down = true;
+            return;
+        }
+        float tx = 0, ty = 0;
+        bool there = st.ram.autopsy && st.ram.autopsyTool == st.seek && st.ram.autopsySub == 0;
+        if (there && st.seek == 1 && st.seekWhich >= 0 && st.seekWhich < 3 && st.ram.autopsyFreed[st.seekWhich])
+        { tx = (float)kAutopsyOrgan[st.seekWhich].x; ty = (float)kAutopsyOrgan[st.seekWhich].y; }
+        else if (there && st.seek == 2)
+        {
+            there = false;
+            for (const ActivityRam::Parasite& p : st.ram.autopsyParasites)
+                if (p.slot == st.seekWhich) { tx = p.x; ty = p.y; there = true; }
+        }
+        else there = false;
+        // Gone (eaten up, flicked off, the tool changed), or not held in time: given up, the stylus up.
+        if (!there || ++st.seekFrames > 4 * kSeekMax || st.seekPressed > kSeekMax)
+        {
+            st.seek = 0;
+            st.latch = pad.a;   // (A still held: not a press at the pointer until let go)
+            st.down = false;
+            return;
+        }
+        const float dx = tx - st.px, dy = ty - st.py, d = std::sqrt(dx * dx + dy * dy);
+        const float cap = st.seekPressed > kSeekSettle ? kPtrDrag : kPtrMax;
+        if (d > cap) { st.px += dx * cap / d; st.py += dy * cap / d; }
+        else { st.px = tx; st.py = ty; }
+        if (st.seekPressed > 0 || d <= cap) st.seekPressed++;   // (there: a frame still, then pressed)
+        st.down = st.seekPressed > kSeekSettle;
+        return;
+    }
+    if (Pressed(pad, st, &PadState::a) && canTap)
+    {
+        int which = -1;
+        if (const int k = AutopsyTarget(st.ram, st.px, st.py, which))
+        {
+            st.seek = k;
+            st.seekWhich = which;
+            st.seekPressed = st.seekFrames = 0;
+            st.down = false;
+            return;
+        }
+    }
     const bool laser = st.ram.autopsy && st.ram.autopsyTool == 0;
     MovePointer(pad, st, pad.a ? (laser ? kPtrLaser : kPtrDrag) : kPtrMax, true);
     PressPointer(pad, st, canTap);
@@ -771,6 +823,37 @@ void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
     }
     st.px = std::clamp(st.px, 0.0f, (float)(SW - 1));
     st.py = std::clamp(st.py, 0.0f, (float)(SH - 1));
+}
+
+int AutopsyTarget(const ActivityRam& ram, float px, float py, int& which)
+{
+    which = -1;
+    if (!ram.autopsy || ram.autopsySub != 0 || ram.autopsyPhase > 2) return 0;
+    float bd = 0;
+    auto near = [&](float x, float y, int w, bool better) {
+        const float d = (x - px) * (x - px) + (y - py) * (y - py);
+        if (which < 0 || better || d < bd) { which = w; bd = d; }
+    };
+    if (ram.autopsyTool == 1)
+    {
+        for (int i = 0; i < 3; i++)
+            if (ram.autopsyFreed[i]) near((float)kAutopsyOrgan[i].x, (float)kAutopsyOrgan[i].y, i, false);
+        return which >= 0 ? 1 : 0;
+    }
+    if (ram.autopsyTool == 2)
+    {
+        // An eating one first (it does the harm), the nearest; one walking in off the screen is not taken.
+        bool eating = false;
+        for (const ActivityRam::Parasite& p : ram.autopsyParasites)
+        {
+            if (p.x < 0 || p.x > SW - 1 || p.y < 0 || p.y > SH - 1) continue;
+            if (eating && !p.eating) continue;
+            near(p.x, p.y, p.slot, p.eating && !eating);
+            eating = eating || p.eating;
+        }
+        return which >= 0 ? 2 : 0;
+    }
+    return 0;
 }
 
 int VacuumTarget(const std::vector<VacuumThing>& things, float hx, float hy)

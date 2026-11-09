@@ -936,6 +936,97 @@ static void pointer_moves()
     CHECK(a.nav.PointerX() == SW / 2 && a.nav.PointerY() == SH / 2);
 }
 
+// Alien Autopsy's A take: with the hand and an organ freed, the pointer goes to the freed organ
+// nearest it, presses there, and once RAM shows it dragged (sub 3) carries it to the tray; with the
+// tweezers, the nearest eating parasite (before a nearer one not eating; never one off the screen),
+// followed as it crawls until held (sub 6), then the flask. Nothing to take, or the laser: A held is
+// the stylus down at the pointer, as before.
+static void autopsy_takes()
+{
+    {
+        ActivityRam ram;
+        ram.autopsy = true;
+        int which = -1;
+        CHECK(AutopsyTarget(ram, 128, 96, which) == 0);            // the laser
+        ram.autopsyTool = 1;
+        CHECK(AutopsyTarget(ram, 128, 96, which) == 0);            // no organ freed
+        ram.autopsyFreed[0] = ram.autopsyFreed[2] = true;
+        CHECK(AutopsyTarget(ram, 200, 96, which) == 1 && which == 2);
+        CHECK(AutopsyTarget(ram, 10, 96, which) == 1 && which == 0);
+        ram.autopsySub = 3;
+        CHECK(AutopsyTarget(ram, 10, 96, which) == 0);             // (already dragging)
+        ram.autopsySub = 0;
+        ram.autopsyPhase = 5;
+        CHECK(AutopsyTarget(ram, 10, 96, which) == 0);             // (the tear)
+        ram.autopsyPhase = 2;
+        ram.autopsyTool = 2;
+        CHECK(AutopsyTarget(ram, 10, 96, which) == 0);             // no parasite
+        ram.autopsyParasites = {{0, 20, 90, false}, {3, 200, 150, true}, {5, -12, 90, true}};
+        CHECK(AutopsyTarget(ram, 10, 96, which) == 2 && which == 3);   // the eating one, far as it is; never the one off the screen
+        ram.autopsyParasites[1].eating = false;
+        CHECK(AutopsyTarget(ram, 10, 96, which) == 2 && which == 0);
+    }
+    Rig r;
+    ActivityRam ram;
+    ram.autopsy = true;
+    ram.autopsyTool = 1;
+    ram.autopsyFreed[1] = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kAutopsy);
+    PadState a;
+    a.a = true;
+    r.Frame(kAutopsy, a);
+    CHECK(!r.nav.PointerDown() && r.nav.Taking());
+    // The pointer goes to organ 1 (stylus up), rests a frame there, then presses.
+    int frames = 0;
+    while (!r.nav.PointerDown() && frames++ < 100) r.Frame(kAutopsy, a);
+    CHECK(r.nav.PointerDown() && r.nav.PointerX() == kAutopsyOrgan[1].x && r.nav.PointerY() == kAutopsyOrgan[1].y);
+    CHECK(!r.touch.Owns());
+    // Dragged (RAM): carried to the tray, let go there.
+    ram.autopsySub = 3;
+    r.nav.SetActivityRam(ram);
+    frames = 0;
+    while (r.nav.PointerDown() && frames++ < 200) r.Frame(kAutopsy);
+    CHECK(frames < 200 && r.nav.PointerX() == kAutopsyTray.x && r.nav.PointerY() == kAutopsyTray.y);
+    CHECK(!r.nav.Taking());
+    // Never held (the organ freed no longer, say): given up kSeekMax frames after the press.
+    ram.autopsySub = 0;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kAutopsy);
+    r.Press(kAutopsy, &PadState::a);
+    frames = 0;
+    while (r.nav.Taking() && frames++ < 400) r.Frame(kAutopsy);
+    CHECK(frames < 400 && !r.nav.PointerDown());
+    // The organ gone (removed): the take ends at once.
+    r.Press(kAutopsy, &PadState::a);
+    CHECK(r.nav.Taking());
+    ram.autopsyFreed[1] = false;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kAutopsy);
+    CHECK(!r.nav.Taking() && !r.nav.PointerDown());
+    // Nothing to take: A held is the stylus at the pointer.
+    r.Frame(kAutopsy, a);
+    CHECK(r.nav.PointerDown() && !r.nav.Taking());
+    r.Frame(kAutopsy);
+    // The tweezers: the eating parasite, followed as it crawls, then the flask.
+    ram.autopsyTool = 2;
+    ram.autopsyParasites = {{2, 60, 60, false}, {4, 150, 120, true}};
+    r.nav.SetActivityRam(ram);
+    r.Frame(kAutopsy, a);
+    frames = 0;
+    while (!r.nav.PointerDown() && frames++ < 100) r.Frame(kAutopsy);
+    CHECK(r.nav.PointerX() == 150 && r.nav.PointerY() == 120);
+    ram.autopsyParasites[1].x = 152;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kAutopsy);
+    CHECK(r.nav.PointerDown() && r.nav.PointerX() == 152);
+    ram.autopsySub = 6;
+    r.nav.SetActivityRam(ram);
+    frames = 0;
+    while (r.nav.PointerDown() && frames++ < 200) r.Frame(kAutopsy);
+    CHECK(r.nav.PointerX() == kAutopsyFlask.x && r.nav.PointerY() == kAutopsyFlask.y);
+}
+
 // Alien Autopsy: X / Y / RB tap the tools (not while A holds the stylus); LB carries the organ
 // held to the tray and lets go; B (or Start) asks, a second one quits (the game's B held), any
 // other press forgets the question; Start is never the DS's.
@@ -3447,6 +3538,7 @@ int main()
     vacuum_blows_drives_and_grabs();
     vacuum_takes_a_find();
     pointer_moves();
+    autopsy_takes();
     autopsy_scheme();
     detector_scheme();
     art_scheme();
