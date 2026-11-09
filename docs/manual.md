@@ -191,8 +191,8 @@ have a pointer on the sticks (LT slows it).
 | | Y | A | discard the chosen card |
 | | B | Z | quit (it asks: No first) |
 | Vacuum | left stick (or D-pad) | Arrows | drive |
-| | right stick (or X + D-pad) | S + arrows | move the hand over the bowl |
-| | A (hold) | X (hold) | grab a find and drag it to the box |
+| | right stick | (the mouse drags as the stylus) | move the hand over the bowl (a green ring shows the find nearest it) |
+| | A | X | take the ringed find to the funnel at the bowl's bottom (kept; dust left alone) |
 | | Y | A | blow: clears a clogged filter |
 | | B | Z | put the vacuum away |
 | Alien Autopsy, painting | either stick (LT: slow), D-pad | Arrows | move the pointer (the D-pad a pixel at a time, faster held) |

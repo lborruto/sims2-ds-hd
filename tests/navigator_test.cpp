@@ -673,7 +673,7 @@ static void vacuum_blows_drives_and_grabs()
 {
     Rig r;
     r.Frame(kVacuum);
-    CHECK(r.nav.CursorScreen() && r.nav.Hand());
+    CHECK(!r.nav.CursorScreen() && r.nav.PointerShown() && !r.nav.PointerDown());
     CHECK(r.nav.Focus() == -1);
     // Y: the microphone, not the DS's Y.
     PadState p;
@@ -696,9 +696,11 @@ static void vacuum_blows_drives_and_grabs()
     PadState d;
     d.up = d.b = d.lb = true;
     d.lx = 1;
+    const float x0 = r.nav.PointerX(), y0 = r.nav.PointerY();
     u32 k = r.Frame(kVacuum, d);
     for (int key : {kUp, kRight, kL}) CHECK(k & (1u << key));
     CHECK(!(k & (1u << kB)));
+    CHECK(r.nav.PointerX() == x0 && r.nav.PointerY() == y0);   // (the left stick and the D-pad never move the hand)
     {
         int tx, ty;
         CHECK(r.Touched(tx, ty) && tx == kVacuumX.x && ty == kVacuumX.y);
@@ -707,30 +709,129 @@ static void vacuum_blows_drives_and_grabs()
         CHECK(!r.touch.Owns());
         r.Frame(kVacuum);
     }
-    CHECK(r.nav.HandDx() == 0 && r.nav.HandDy() == 0);
-    // X held: the D-pad moves the hand (no driving); the stick still drives.
+    // X with the D-pad: driving still (no hand on the D-pad any more), not the DS's X.
     PadState hx;
-    hx.x = hx.up = hx.right = true;
-    hx.ly = 1;
+    hx.x = hx.up = true;
     k = r.Frame(kVacuum, hx);
-    CHECK(!(k & (1u << kUp)) && !(k & (1u << kRight)) && !(k & (1u << kX)));
-    CHECK(k & (1u << kDown));
-    CHECK(r.nav.HandDx() > 0 && r.nav.HandDy() < 0);
-    CHECK(!r.nav.CursorPress());
-    // A held: the stylus down at the hand (and the D-pad drags it), not the DS's A.
+    CHECK((k & (1u << kUp)) && !(k & (1u << kX)));
+    CHECK(r.nav.PointerX() == x0 && r.nav.PointerY() == y0);
+    // The right stick moves the hand.
+    PadState rs;
+    rs.rx = 1;
+    r.Frame(kVacuum, rs);
+    CHECK(r.nav.PointerX() > x0 && r.nav.PointerY() == y0 && !r.nav.PointerDown());
+    // The bowl unread (another ROM): A held is the stylus down at the hand, not the DS's A.
     PadState a;
-    a.a = a.left = true;
+    a.a = true;
     k = r.Frame(kVacuum, a);
-    CHECK(!(k & (1u << kA)) && !(k & (1u << kLeft)));
-    CHECK(r.nav.CursorPress());
-    CHECK(r.nav.HandDx() < 0);
-    CHECK(!r.touch.Owns()); // (the hand is the stick cursor, not a touch script)
+    CHECK(!(k & (1u << kA)) && r.nav.PointerDown() && !r.nav.Taking());
+    CHECK(!r.touch.Owns()); // (the hand is the pointer, not a touch script)
     r.Frame(kVacuum);
-    CHECK(!r.nav.CursorPress());
+    CHECK(!r.nav.PointerDown());
     // Leaving the vacuum lets go.
     r.Frame(kVacuum, a);
     r.Frame(kInteract);
-    CHECK(!r.nav.CursorPress() && !r.nav.Hand());
+    CHECK(!r.nav.PointerDown() && !r.nav.PointerShown());
+}
+
+// The vacuum's A on a bowl RAM shows: the nearest find taken (its ring), the stylus pressed where no
+// lower dust lies over it, carried to the funnel, let go once the keep animation is idle; no find:
+// the stylus stays up.
+static void vacuum_takes_a_find()
+{
+    // The pure parts on made-up bowls.
+    {
+        std::vector<VacuumThing> b {{0, 100, 100, 10, true, false}, {1, 104, 100, 13, false, false}, {2, 60, 60, 13, false, false}};
+        CHECK(VacuumTarget(b, 110, 100) == 1 && VacuumTarget(b, 50, 50) == 2);
+        float x = 0, y = 0;
+        CHECK(VacuumSafePoint(b, 1, x, y));
+        CHECK(std::fabs(x - 104) <= 12 && std::fabs(y - 100) <= 12);                 // inside the find's square
+        CHECK(std::fabs(x - 100) > 11 || std::fabs(y - 100) > 11);                   // outside the lower dust's
+        // Dust in a higher slot is no matter (the find's slot comes first): its middle.
+        b[0].slot = 5;
+        CHECK(VacuumSafePoint(b, 1, x, y) && x == 104 && y == 100);
+        // Covered all over by lower dust: none.
+        std::vector<VacuumThing> c {{0, 100, 100, 20, true, false}, {1, 100, 100, 5, false, false}};
+        CHECK(!VacuumSafePoint(c, 1, x, y));
+        // Only dust: no target.
+        CHECK(VacuumTarget({{0, 1, 1, 5, true, false}}, 0, 0) == -1);
+    }
+    Rig r;
+    ActivityRam ram;
+    ram.vacuumBowl = true;
+    ram.vacuumThings = {{0, 100, 100, 10, true, false}};
+    r.nav.SetActivityRam(ram);
+    r.Frame(kVacuum);
+    PadState a;
+    a.a = true;
+    // Dust alone: A presses nothing (a bare press would clog), no ring.
+    for (int i = 0; i < 5; i++) { r.Frame(kVacuum, a); CHECK(!r.nav.PointerDown() && !r.nav.Taking()); }
+    CHECK(r.nav.Mark().w == 0);
+    r.Frame(kVacuum);
+    // A find: the ring on it; A's press takes it.
+    ram.vacuumThings.push_back({3, 104, 100, 13, false, false});
+    r.nav.SetActivityRam(ram);
+    r.Frame(kVacuum);
+    CHECK(r.nav.Mark().w > 0 && r.nav.Mark().x < 104 && r.nav.Mark().x + r.nav.Mark().w > 104);
+    r.Frame(kVacuum, a);
+    CHECK(r.nav.Taking() && !r.nav.PointerDown());                                  // the move first
+    const float px = r.nav.PointerX(), py = r.nav.PointerY();
+    CHECK(std::fabs(px - 100) > 11 || std::fabs(py - 100) > 11);
+    r.Frame(kVacuum);                                                               // (A let go: the take runs on)
+    CHECK(r.nav.PointerDown() && r.nav.Taking());
+    // The game's tick: held. The stylus carries it to the funnel at kVacuumCarry a frame.
+    ram.vacuumThings[1].held = true;
+    r.nav.SetActivityRam(ram);
+    float lx = r.nav.PointerX(), ly = r.nav.PointerY();
+    int frames = 0;
+    while (frames++ < 100)
+    {
+        r.Frame(kVacuum);
+        CHECK(r.nav.PointerDown());
+        const float step = std::hypot(r.nav.PointerX() - lx, r.nav.PointerY() - ly);
+        CHECK(step <= kVacuumCarry + 1e-3f);
+        lx = r.nav.PointerX(); ly = r.nav.PointerY();
+        if (lx == kVacuumFunnel.x && ly == kVacuumFunnel.y) break;
+    }
+    CHECK(lx == kVacuumFunnel.x && ly == kVacuumFunnel.y);
+    // The keep animation runs: held over the funnel; idle: let go after kVacuumRest frames.
+    ram.vacuumKeeping = true;
+    r.nav.SetActivityRam(ram);
+    for (int i = 0; i < 10; i++) { r.Frame(kVacuum); CHECK(r.nav.PointerDown()); }
+    ram.vacuumKeeping = false;
+    r.nav.SetActivityRam(ram);
+    int down = 0;
+    for (int i = 0; i < 10; i++) { r.Frame(kVacuum); down += r.nav.PointerDown(); }
+    CHECK(down == kVacuumRest && !r.nav.Taking());
+    // Dropped on the way (RAM no longer shows it held): the take ends, the stylus up.
+    ram.vacuumThings[1].held = false;
+    r.nav.SetActivityRam(ram);
+    r.Press(kVacuum, &PadState::a);
+    r.Frame(kVacuum);
+    CHECK(r.nav.PointerDown());
+    ram.vacuumThings[1].held = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kVacuum);
+    r.Frame(kVacuum);
+    ram.vacuumThings[1].held = false;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kVacuum);
+    CHECK(!r.nav.PointerDown() && !r.nav.Taking());
+    // Dust grabbed instead (a clog): let go at once.
+    r.Press(kVacuum, &PadState::a);
+    r.Frame(kVacuum);
+    ram.vacuumThings[0].held = true;
+    r.nav.SetActivityRam(ram);
+    r.Frame(kVacuum);
+    CHECK(!r.nav.PointerDown() && !r.nav.Taking());
+    // The find gone down the hole while reaching: the take ends.
+    ram.vacuumThings[0].held = false;
+    r.nav.SetActivityRam(ram);
+    r.Press(kVacuum, &PadState::a);
+    ram.vacuumThings.pop_back();
+    r.nav.SetActivityRam(ram);
+    r.Frame(kVacuum);
+    CHECK(!r.nav.PointerDown() && !r.nav.Taking());
 }
 
 static const ScreenState kAutopsy {Screen::Autopsy, Tab::None};
@@ -3344,6 +3445,7 @@ int main()
     cards_ram_answered();
     cards_question_moves_while_touching();
     vacuum_blows_drives_and_grabs();
+    vacuum_takes_a_find();
     pointer_moves();
     autopsy_scheme();
     detector_scheme();

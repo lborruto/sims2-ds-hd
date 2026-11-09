@@ -698,15 +698,37 @@ struct CardsState
     bool operator==(const CardsState&) const = default;
 };
 
+// One thing swirling in the vacuum's bowl (a slot of the object's nine): where it is (touch pixels,
+// its sprite's), the half side of the square the game grabs it by (20 x its scale), its kind
+// (dust 0x186-0x188 clogs the filter; above, a find: 0x196 the gold ring), held by the stylus.
+struct VacuumItem
+{
+    int slot = 0;
+    float x = 0, y = 0, half = 0;
+    int type = 0;
+    bool held = false;
+    bool Dust() const { return type <= kVacuumDustMax; }
+    static constexpr int kVacuumDustMax = 0x188;
+    bool operator==(const VacuumItem&) const = default;
+};
+
 // The vacuum (overlay 17; GScreen::Vacuum): the filter's clog (touching dust; a blow clears it) and
-// the stat panel's "Vacuum Earnings" (G).
+// the stat panel's "Vacuum Earnings" (G). The bowl reads on its own (bowl false: none of it known):
+// the things in it (active slots, in slot order: the game grabs the first whose square holds the
+// stylus), the slot held (-1 none), the funnel's keep animation running (a find dropped in it now
+// is not kept: the game waits for it to end).
 struct VacuumState
 {
     bool valid = false;
     bool clogged = false;
     int earnings = 0;
+    bool bowl = false;
+    std::vector<VacuumItem> items;
+    int heldSlot = -1;
+    bool keeping = false;
     bool operator==(const VacuumState&) const = default;
 };
+constexpr int kVacuumSlots = 9;
 
 struct MinigameState
 {
@@ -901,6 +923,9 @@ std::vector<int> SpeechStringIds(RamView ram);
 // One line of the minigame the screen shows (the part's fields as k=v), empty when the screen is
 // none or its part does not read: what --print-minigame logs when it changes.
 std::string MinigameLine(const GameState&);
+// The vacuum's bowl (its own line: it moves every other frame): "bowl held=H keeping=K items=
+// slot:kind@x,y/half[H],...", empty when the vacuum is not up or its bowl does not read (--print-vacuum).
+std::string VacuumBowlLine(const GameState&);
 const char* GScreenName(GScreen);
 std::string GameStateName(const GameState&);   // "Panel/Goals", "Popup", "Unknown(ov=8,vt=0x0214B1C4)"
 // CONSOLE's screen from the game's: Panel with its tab, the rest by name; not valid, a Panel

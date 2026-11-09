@@ -410,7 +410,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
                                    ? app.consoleWorldOnly + 1
                                    : 0;
         app.consolePointer = {navigator.PointerShown(), navigator.PointerDown(), navigator.QuitArmed(), navigator.PointerX(), navigator.PointerY(),
-                              navigator.Mark(), navigator.AskFocus()};
+                              navigator.Mark(), navigator.AskFocus(), navigator.Taking()};
         // The money's last change, shown on the panel's world for kPayoutFrames frames (an
         // animation's payout: the slot machine's coin then its win; a ticket's prize).
         // (Only on the panel and the activities: the front end, Create-a-Sim and a load show another save's money.)
@@ -546,19 +546,16 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     if (tapFrames > 0) tapFrames--;
 
     // The stick cursor: faster with a fuller deflection, for both precision and reach.
-    // In CONSOLE only where no table of targets is (navigator.h), with A as its press there too;
-    // in the vacuum it is the hand, there without a controller too (the D-pad moves it while X or
-    // A is held: activities.h).
+    // In CONSOLE only where no table of targets is (navigator.h), with A as its press there too
+    // (the minigames' pointers, the vacuum's hand among them, are the activities': activities.h).
     const bool console = app.shown == Layout::Console;
-    const bool hand = console && navigator.Hand();
     cursorPress = held[TOUCH] || PadOn(s, TOUCH) || (console && navigator.CursorPress());
     if (console && !navigator.CursorScreen()) cursorShownUntil = 0; // (not left over from a screen before)
-    if ((s.stickCursor && pads.Any() && (!console || navigator.CursorScreen())) || hand)
+    if (s.stickCursor && pads.Any() && (!console || navigator.CursorScreen()))
     {
         // (The stick reads 0 inside its dead zone: Pads::Read.)
-        const float mag = pads.Any() ? std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry) : 0.0f;
-        const bool stepped = hand && (navigator.HandDx() != 0 || navigator.HandDy() != 0);
-        if (mag > 0 || stepped || cursorPress)
+        const float mag = std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry);
+        if (mag > 0 || cursorPress)
         {
             if (mag > 0)
             {
@@ -566,14 +563,8 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
                 cursorX = std::clamp(cursorX + pad.rx * step, 0.0f, (float)(SW - 1));
                 cursorY = std::clamp(cursorY + pad.ry * step, 0.0f, (float)(SH - 1));
             }
-            if (stepped)
-            {
-                cursorX = std::clamp(cursorX + navigator.HandDx(), 0.0f, (float)(SW - 1));
-                cursorY = std::clamp(cursorY + navigator.HandDy(), 0.0f, (float)(SH - 1));
-            }
             cursorShownUntil = frame + 180;
         }
-        if (hand) cursorShownUntil = frame + 180; // the vacuum's hand never hides
         if (cursorPress && !touching) { touching = true; tx = (int)cursorX; ty = (int)cursorY; }
     }
     // A pointing minigame without its HD frame (no strings): the pointer drawn as the stick cursor's cross.

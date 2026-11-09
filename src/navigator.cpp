@@ -490,7 +490,6 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     const std::vector<Hotspot>& h = HotspotsFor(s);
     cursorScreen_ = h.empty() && !useView && !OwnScheme(s.screen); // (the HD Save slots, the minigames with a scheme of their own: no cursor)
     cursorPress_ = blow_ = voice_ = false;
-    handDx_ = handDy_ = 0;
     // A tap only when nothing else touches: a press while a tap or a drag runs is dropped.
     const bool canTap = !touch.Owns() && closing_ == 0;
     // Back from the Save slots or the phone: the tab it came from, tapped once the panel is settled.
@@ -713,12 +712,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         activity_.ram = activityRam_;
         ActivityInput(s.screen, pad, touch, dsKeys, activity_);
         focus_ = activity_.focus;
-        // The vacuum's hand is the stick cursor: A held presses it.
-        cursorPress_ = activity_.grab;
         blow_ = activity_.blow;
         voice_ = activity_.voice;
-        handDx_ = activity_.handDx;
-        handDy_ = activity_.handDy;
         break;
     }
 
@@ -757,7 +752,6 @@ void Navigator::Leave(TouchScript& touch)
 {
     touch.Cancel();
     menuOpen_ = cursorPress_ = cursorScreen_ = blow_ = voice_ = false;
-    handDx_ = handDy_ = 0;
     activity_ = ActivityState();
     focus_ = -1;
     closing_ = 0;

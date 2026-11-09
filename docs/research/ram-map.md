@@ -273,7 +273,13 @@ The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the 
   discard, 3 the plank, 4 the cannon, 5 two cards drawn, 6 the turn ending, 7 the deal, 8 a card drawn), `S+0x2F1` u8 whose turn (0 the player, 1 the opponent); `S+0x308` the player's name (ASCII, as the board shows it). Found on the owner's `act-cards` (draw, discard, the message,
   quit, help: states saved by `--state-save`, the board's numbers compared on the same frames), checked on the research's `G-cas-next-row1` / `G-X-pirate`.
 - **Vacuum** (`VacuumState`, overlay 17, vtable 0x0214C658): `S+0x158` u8 the filter clogged (1 from touching dust to 17 frames after a 7-frame blow: `act-vacuum-clog`, the
-  blow script), the stat panel's "Vacuum Earnings" `G+0x7C`.
+  blow script), the stat panel's "Vacuum Earnings" `G+0x7C`. The bowl (`VacuumState::bowl`, read apart; updated every other frame): nine slots of 0x1C at `S+0x28 + 0x1C i`,
+  `+0` the sprite's pointer (its place `sprite+0x50` / `+0x54`, 20.12 touch pixels), `+4` angle, `+8` radius, `+0xC` / `+0x10` speeds, `+0x14` scale (20.12), `+0x18` u8 active,
+  `+0x19` u8 held, `+0x1A` u16 kind (0x186-0x188 dust, above a find: 0x196 the gold ring); `S+0x24` u8 the stylus down since a fresh press, `S+0x26` u16 the slot held (0xA
+  none), `S+0x140` / `S+0x142` the stylus's last point; `S+0x162` and `S+0x170` u8 the funnel's keep animation (both 0: idle). The grab (code 0x0214A3C4): while the stylus is
+  down, the first slot 0..8 whose square (half side 20 x scale) holds it is grabbed (sweeping grabs too; dust = the clog); a held find follows the stylus every tick, nothing
+  else is grabbable meanwhile. The keep (0x0214AFB4): a find let go over the funnel (touch 108 < x < 147, 133 < y < 193, bottom middle) while the keep animation is idle is kept;
+  the box at the bottom right only shows the last find kept. Found on `act-vacuum` driven over the lobby's rug (the research's prototype, `mg-vacuum-pick`).
 - **Social** (CSocialScreen): no part. `*0x0213E70C + 0xC..0x12` held 0, 1, 2 for Impress's High Five / Dance / Laugh, but re-ordered after an answer: neither the social verb
   nor the answers' words were found in RAM (the frame shows the game's own labels, live crops).
 The screen request that brings one up (`P + 0xDF0 + 0x20 * slot`: module, r3, ...) is research-only; the port never writes RAM.
