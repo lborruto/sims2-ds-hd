@@ -782,7 +782,7 @@ int MixerSaveValues(Composition& c, int y, const MixerSaveState& v, const RomDat
         PanelText(c, {ix + 6, yy, 130, row}, With(Own(rom, OwnWordId::SaveSlot), j + 1), kMgValueSize - 4, kMgValueMin, Align::Left, Weight::Bold,
                   0xFFFFFFFF);
         const std::string n = v.used[j] ? GameTextToUtf8(v.slotName[j]) : Words(rom, kStrMgNoData);
-        PanelText(c, {ix + 140, yy, iw - 146, row}, n, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, v.used[j] ? kValueColour : kHeadColour);
+        PanelText(c, {ix + 140, yy, iw - 146, row}, n, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, v.used[j] ? kValueColour : 0xFFFFFFFF);   // (white: on a row 6.2:1)
     }
     return h;
 }

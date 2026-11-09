@@ -164,7 +164,7 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
     // when the list scrolls.
     int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) right = AddHint(c, right, Button::A, v.items[focus].word);
-    if (count > rows) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
+    if (count > rows) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintScroll));
 
     // Images: the play buttons, the X.
     for (const Icon& i : images) AddTiered(c.ui, icons, SpriteRef::Of(i.desc), i.frame, i.tier, i.box, i.opacity);

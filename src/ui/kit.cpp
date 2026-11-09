@@ -639,16 +639,19 @@ void DrawSign(Layer& L, UiItem::Sign sign, float x0, float y0, float x1, float y
     }
     else if (sign == Sign::Wireless)
     {
-        // A dot low in the box and two arcs above it (a quarter turn each side of up), round ends.
+        // A dot low in the box and two arcs above it (0.8 radian each side of up), round ends. Only
+        // +, *, / and sqrt per pixel (IEEE exact: the same bytes on every libm); the wedge's sine
+        // and cosine are constants.
         const float ox = cx, oy = cy + m * 0.30f, w = m * 0.11f, dot = m * 0.085f;
-        FillDistance(L, ox - dot, oy - dot, ox + dot, oy + dot, c, [&](float x, float y) { return std::hypot(x - ox, y - oy) - dot; });
-        const float spread = 0.80f; // (radians each side of up)
+        constexpr float kSin = 0.71735609f, kCos = 0.69670671f; // sin, cos 0.8
+        FillDistance(L, ox - dot, oy - dot, ox + dot, oy + dot, c, [&](float x, float y) { return std::sqrt((x - ox) * (x - ox) + (y - oy) * (y - oy)) - dot; });
         for (float R : {m * 0.30f, m * 0.55f})
             FillDistance(L, ox - R - w, oy - R - w, ox + R + w, oy + w, c, [&](float x, float y) {
-                const float dx = x - ox, dy = y - oy, t = std::atan2(dx, -dy);
-                if (std::fabs(t) <= spread) return std::fabs(std::hypot(dx, dy) - R) - w / 2;
-                const float ex = ox + (t < 0 ? -1 : 1) * R * std::sin(spread), ey = oy - R * std::cos(spread);
-                return std::hypot(x - ex, y - ey) - w / 2;
+                const float dx = x - ox, dy = y - oy;
+                // Inside the wedge: above the centre, within the angle of up.
+                if (-dy * kSin >= std::fabs(dx) * kCos) return std::fabs(std::sqrt(dx * dx + dy * dy) - R) - w / 2;
+                const float ex = ox + (dx < 0 ? -1 : 1) * R * kSin, ey = oy - R * kCos;
+                return std::sqrt((x - ex) * (x - ex) + (y - ey) * (y - ey)) - w / 2;
             });
     }
 }

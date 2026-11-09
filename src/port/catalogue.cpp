@@ -39,22 +39,28 @@ DsPoint OwnedPoint(int i) { return {kCaOwnedX0 + (i % 2) * kCaOwnedDx, kCaCellY0
 Rect HitAround(DsPoint p) { return {p.x - 16, p.y - 16, 32, 32}; }
 Rect ButtonHit(int x, int y) { return {x - 15, y - 15, 30, 30}; }
 
-// The width the A hint's word is fitted to: what B's "Close" leaves of the hints' band.
+// The width the A hint's word is fitted to: what B's "Close" and the D-pad's "Scroll" leave of the
+// hints' band.
 int HintAWidth(const RomData& rom)
 {
     const Rect b = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold);
+    const Rect d = ChipRect(0, 0, Button::DPadV, OwnWord(&rom, OwnWordId::HintScroll), kPmHintSize, 0, Weight::ExtraBold);
     const int right = kPmHints.x + kPmHints.w - 8 - b.w - 28;
-    return right - kPmHints.x - 60;
+    return right - kPmHints.x - d.w - 28 - 20;
 }
 
 // An item's icon in its cell, from the record's own triple (tiles, descriptor, palette: a few
 // items' palettes are not the descriptor's neighbour), at the content's tier (ui::kTierL: the
 // store's pictures are 24 to 32 pixels, every one at the same size of pixel; kCaCell holds 32 x 3).
+// (A picture past kCaItemMax, none seen in the record table, would pass the cell at L: tier S.)
+constexpr int kCaItemMax = 32;
 void AddItemIcon(Composition& c, IconCache* icons, const ShopItem& it, Rect cell)
 {
-    if (it.iconRes < 0) return;
+    if (it.iconRes < 0 || !icons) return;
     const SpriteRef ref = it.tilesRes >= 0 && it.palRes >= 0 ? SpriteRef {it.tilesRes, it.iconRes, it.palRes} : SpriteRef::Of(it.iconRes);
-    AddTiered(c.ui, icons, ref, 0, kTierL, cell);
+    const SpriteFrame* f = icons->Frame(ref, 0);
+    const bool big = f && std::max(f->w, f->h) > kCaItemMax;
+    AddTiered(c.ui, icons, ref, 0, big ? kTierS : kTierL, cell);
 }
 
 // "§1,200" (the game's "$@1", its '$' the simoleon drawn §); a negative price is not shown.
@@ -403,7 +409,7 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
         const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, HintAWidth(rom), Weight::ExtraBold);
         right = AddHint(c, right, Button::A, a.text);
     }
-    if (!ca.vendor && (ca.upEnabled || ca.downEnabled)) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
+    if (!ca.vendor && (ca.upEnabled || ca.downEnabled)) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintScroll));
 
     // Images: the items (the record table's sprites at tier L), the pay button, the X.
     for (int i = 0; i < kCells; i++)

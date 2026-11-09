@@ -160,6 +160,7 @@ constexpr const char* kWords[][5] = {
     {"Adjust", "Régler", "Einstellen", "Regola", "Ajustar"},
     {"View", "Voir", "Ansehen", "Guarda", "Ver"},
     {"Turn", "Tourner", "Drehen", "Ruota", "Girar"},
+    {"Scroll", "Défiler", "Blättern", "Scorri", "Desplazar"},
     // The town's menu hint
     {"Menu", "Menu", "Menü", "Menu", "Menú"},
     // Controllers

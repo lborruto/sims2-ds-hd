@@ -104,6 +104,25 @@ void Well(Composition& c, Rect r, u32 fill, float radius)
     c.ui.push_back(w);
 }
 
+// A tab's name in `box`, two lines at most: the largest size from `size` down to `minSize` at which
+// no word is wider than the box (a word is never broken) and the lines fit.
+FittedBlock TabName(const std::string& name, float size, float minSize, Rect box)
+{
+    for (float s = size; s > minSize; s -= 1)
+    {
+        bool words = true;
+        size_t a = 0;
+        while (words && a <= name.size())
+        {
+            const size_t b = std::min(name.find(' ', a), name.size());
+            words = TextWidth(name.substr(a, b - a), s, Weight::ExtraBold) <= box.w;
+            a = b + 1;
+        }
+        if (words)
+            if (const FittedBlock f = FitBlock(name, s, s, box); f.fits) return f;
+    }
+    return FitBlock(name, minSize, minSize, box);
+}
 // The pages' rows inside kPmContent.
 Rect HotelRow(int i) { return {kPmContent.x + 16, kPmContent.y + 8 + i * 72, kPmContent.w - 32, 64}; }
 Rect StatsRow(int i) { return {kPmContent.x + 16, kPmContent.y + 8 + i * 90, kPmContent.w - 32, 82}; }
@@ -286,12 +305,19 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
         plate.layer = 1;
         c.ui.push_back(plate);
     }
+    // (one size for every tab: the largest at which each name holds, words whole)
+    float tabSize = kTabSize;
+    for (int q = 0; q < kStPages; q++)
+    {
+        const Rect r = StatTabRect(q, &rom);
+        tabSize = std::min(tabSize, TabName(PageName(rom, q), kTabSize, kTabMin, {r.x + 8, r.y + 2, r.w - 16, r.h - 4}).size);
+    }
     for (int p = 0; p < kStPages; p++)
     {
         // The pages by their names (the game's pictures for them are a 24-pixel one and four 72 x
         // 56 brush strokes: no one size of pixel for the row), the page's own in ink on its plate.
         const Rect r = StatTabRect(p, &rom), in {r.x + 8, r.y + 2, r.w - 16, r.h - 4};
-        const FittedBlock f = FitBlock(PageName(rom, p), kTabSize, kTabMin, in);
+        const FittedBlock f = TabName(PageName(rom, p), tabSize, tabSize, in);
         UiItem t = TextItem(in, f.text, f.size, Align::Centre, Weight::ExtraBold);
         t.middle = true;
         if (p == page) { t.colour = kInk; t.shadowArgb = 0; }

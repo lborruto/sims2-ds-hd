@@ -620,10 +620,11 @@ def front_boot(raw=True):
 
 def front_settings(page, focus):
     """HD Settings (src/port/frontmenus.*): the top screen 3x framed at the left, the panel at the
-    right, the game's four tabs = the touch screen's pixels 2x in the tab bar, the page: Music's
-    slider (its percent's white text, the knob at the right end: 100 %), Concept Art's twelve
-    cells = the touch screen's pixels 2x with the focus ring on `focus`, Credits' lines (white and
-    the game's green) in their well."""
+    right, the four pages' names in the tab bar (two rows of two; the page's in ink on its light
+    plate, the others white), the page: Music's slider (its percent's white text, the knob at the
+    right end: 100 %), Concept Art's twelve cells (an unlocked one = the touch screen's art less its
+    4-pixel frame, 2x; a locked one the ROM's orange padlock) with the focus ring on `focus`,
+    Credits' lines (white and the game's green) in their well."""
     expect("canvas", comp.size, (1280, 720))
     for x in range(0, 256, 11):
         for y in range(0, 192, 11):
@@ -633,12 +634,16 @@ def front_settings(page, focus):
     expect("panel", C(1240, 600), FRAME)
     expect("backdrop", C(5, 5), BACKDROP)
     for i in range(4):
-        cx = 908 + 64 * i
-        for dy in range(0, 26, 5):
-            for dx in range(0, 28, 5):
-                expect(f"tab {i} DS {7 + dx},{41 + 40 * i + dy}", C(cx + 4 + 2 * dx, 138 + 6 + 2 * dy), bottom(7 + dx, 41 + 40 * i + dy))
-        if len(errors) > 4:
-            return
+        tx, ty = 884 + (i % 2) * 152 + 2, 140 + (i // 2) * 62
+        px = [C(x, y) for y in range(ty + 4, ty + 54) for x in range(tx + 4, tx + 144)]
+        plate = sum(1 for p in px if p == hexrgb("9AA2E3"))
+        ink = sum(1 for p in px if p == hexrgb("2E3063"))
+        white = sum(1 for p in px if p == (255, 255, 255))
+        if (plate > 500) != (i == page): errors.append(f"tab {i}: the plate {'missing' if i == page else 'drawn'} ({plate})")
+        if i == page and ink < 30: errors.append(f"tab {i}: no name in ink ({ink})")
+        if i != page and white < 30: errors.append(f"tab {i}: no name in white ({white})")
+    if len(errors) > 4:
+        return
     if page == 0:
         well = [C(x, y) for y in range(338, 402) for x in range(950, 1130)]
         if sum(1 for p in well if p == (255, 255, 255)) < 100: errors.append("no percent text")
@@ -650,9 +655,11 @@ def front_settings(page, focus):
         for i in range(12):
             gx, gy = 842 + (i % 4) * 100 + 4, 292 + (i // 4) * 88 + 4
             fx, fy = 56 + (i % 4) * 48, 72 + (i // 4) * 40
-            for dy in range(0, 32, 7):
-                for dx in range(0, 40, 7):
-                    expect(f"cell {i} DS {fx + dx},{fy + dy}", C(gx + 2 * dx, gy + 2 * dy), bottom(fx + dx, fy + dy))
+            orange = sum(1 for y in range(gy, gy + 64, 2) for x in range(gx, gx + 80, 2) if (lambda p: p[0] > 180 and 70 < p[1] < 180 and p[2] < 90)(C(x, y)))
+            if orange < 50:   # (an unlocked picture: the art, its frame left out, centred 2x)
+                for dy in range(0, 24, 5):
+                    for dx in range(0, 32, 5):
+                        expect(f"cell {i} DS {fx + 4 + dx},{fy + 4 + dy}", C(gx + 8 + 2 * dx, gy + 8 + 2 * dy), bottom(fx + 4 + dx, fy + 4 + dy))
             r, g, b = C(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
             ringed = RINGED(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
             if ringed != (i == focus): errors.append(f"cell {i}: ring {ringed}")

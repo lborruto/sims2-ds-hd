@@ -302,7 +302,7 @@ void BuildBuildRooms(Composition& c, const MenuView& v, int focus, const GameSta
     // D-pad's vertical arms while the list scrolls.
     int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, ask ? kStrBdNo : kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) right = AddHint(c, right, Button::A, v.items[focus].word);
-    if (!ask && !(v.scrollUp.empty() && v.scrollDown.empty())) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
+    if (!ask && !(v.scrollUp.empty() && v.scrollDown.empty())) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintScroll));
 
     // Images: the knobs, page 1's cross and tick, the X.
     for (Rect k : knobs) AddTiered(c.ui, icons, SpriteRef::Of(kSprBdKnob), 0, kTierS, k);

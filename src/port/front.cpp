@@ -18,7 +18,9 @@ namespace
 using namespace ui;
 
 constexpr u32 kChipPlate = 0xB0202436;                                    // the title's chip plate: dark, see-through
-constexpr u32 kWirelessText = kTextInactive;                              // DS Wireless's label and sign, greyed (3.2:1)
+// DS Wireless (greyed: a second DS is needed): the kit's one inactive look, the shop's, a sunk plate
+// with pale lavender words (5.8:1).
+constexpr u32 kWirelessPlate = 0xFF444A85, kWirelessText = 0xFFD4D7F2;
 
 enum class FrontScreen { None, Boot, Title, Menu };
 
@@ -197,10 +199,11 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
             if (focused) AddFocusRing(c, r, r.h / 2.0f);
             const bool wireless = i == kFrWireless; // greyed: a second DS is needed
             UiItem b = PanelItem(r);
-            b.fill = wireless ? GameTheme().fillDark : focused ? kFillFocus : kFillRow;
+            b.fill = wireless ? kWirelessPlate : focused ? kFillFocus : kFillRow;
             b.borderArgb = GameTheme().frame;
             b.border = 3;
             b.radius = r.h / 2.0f;
+            b.raised = !wireless; // (sunk, as the shop's inactive plates)
             b.layer = 1;
             c.ui.push_back(b);
             // The label (DS Wireless: after the game's icon), the game's ▶ at the right end.

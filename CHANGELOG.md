@@ -105,8 +105,10 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   tabs name the pages and its X sits beside the title.
 - One look for every list's arrows (the shop, Build Rooms, the music panel): round buttons with a
   drawn arrow. DS Wireless's icon is drawn sharp, and the shop's greyed words are readable.
-- Every button hint says what it does: the D-pad's (Choose, Pages, Adjust), Create-a-Sim's (Turn,
-  Select) and the concept art's (View).
+- Every button hint says what it does: the D-pad's (Choose, Scroll, Pages, Adjust), Create-a-Sim's
+  (Turn, Select) and the concept art's (View).
+- The front end's Settings name their four pages in the tab bar, as the stat panel does; the concept
+  art's cells show the art without the DS's frame; DS Wireless is greyed the way the shop greys.
 - The minigames' numbers and button bar sit on dark wells and are never smaller than 18 points:
   the cards' line, MooGoo's players and the long German words fit without shrinking further.
 - The vacuum on a controller: A takes a find for you. The hand goes to the find in the green ring
