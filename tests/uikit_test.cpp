@@ -761,15 +761,89 @@ static void tiers()
     UiItem z = TierImage({100, 100, 60, 60}, icon.data(), 16, 16, {0, 0, 16, 16}, kTierS);
     ZoomItem(z, 1.5f, 0, 0);
     CHECK(TierRect(z, 1, 0, 0).w == 48 && TierRect(z, 2, 0, 0).w == 96);
-    // An opaque tiered crop is the GPU's at any scale, at TierRect; transparent pixels are not.
-    std::vector<u32> pic(256 * 192);
-    for (size_t i = 0; i < pic.size(); i++) pic[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
-    const std::vector<UiItem> crop = {TierImage({10, 10, 90, 60}, pic.data(), 256, 192, {5, 5, 30, 20}, kTierL)};
-    const LayerAt at = LayersAt(crop, 1.6f, 0, 0)[0];
-    CHECK(WholeFactorCrop(crop[0], at, 1.6f));
-    const Rect cr = CropRect(crop[0], 1.6f, at.x, at.y, at.ox, at.oy);
+    // An opaque small tiered picture is drawn by whole blocks at any scale (WholeFactorCrop), at
+    // TierRect; transparent pixels are not.
+    std::vector<u32> opaque(48 * 32);
+    for (size_t i = 0; i < opaque.size(); i++) opaque[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    const std::vector<UiItem> small = {TierImage({10, 10, 90, 60}, opaque.data(), 48, 32, {5, 5, 30, 20}, kTierL)};
+    const LayerAt at = LayersAt(small, 1.6f, 0, 0)[0];
+    CHECK(Tiered(small[0]) && WholeFactorCrop(small[0], at, 1.6f));
+    const Rect cr = CropRect(small[0], 1.6f, at.x, at.y, at.ox, at.oy);
     CHECK(cr.w == 150 && cr.h == 100 && cr.x >= at.x && cr.x + cr.w <= at.x + at.w);
     CHECK(!WholeFactorCrop(t, LayersAt({t}, 1.5f, 0, 0)[0], 1.5f));
+    // Large pictures ignore a tier (the ruling: tiers for sources of 64 pixels or less, never a
+    // live crop of a DS screen): a touch-screen crop and an 80-pixel picture fill `to` the Sharp
+    // way, the bytes and hash of the untiered item, at 100 % and at 1.6.
+    std::vector<u32> pic(256 * 192);
+    for (size_t i = 0; i < pic.size(); i++) pic[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    std::vector<u32> big(80 * 80);
+    for (size_t i = 0; i < big.size(); i++) big[i] = 0xFF000000u | (u32)(i * 40503u);
+    for (UiItem tiered : {TierImage({10, 10, 90, 60}, pic.data(), 256, 192, {5, 5, 30, 20}, kTierL),
+                          TierImage({10, 10, 240, 240}, big.data(), 80, 80, {0, 0, 80, 80}, kTierL)})
+    {
+        UiItem untiered = tiered;
+        untiered.tier = 0;
+        CHECK(!Tiered(tiered) && HashImage(tiered) == HashImage(untiered) && TierRect(tiered, 1.6f, 0, 0).w == 0);
+        for (float s : {1.0f, 1.6f})
+        {
+            const int W = (int)(260 * s), H = W;
+            std::vector<u32> a((size_t)W * H), b((size_t)W * H);
+            Rasterise({tiered}, s, a.data(), W, H);
+            Rasterise({untiered}, s, b.data(), W, H);
+            CHECK(a == b);
+        }
+        CHECK(WholeFactorCrop(tiered, LayersAt({tiered}, 1.6f, 0, 0)[0], 1.6f) == WholeFactorCrop(untiered, LayersAt({untiered}, 1.6f, 0, 0)[0], 1.6f));
+    }
+    std::vector<u32> b64(64 * 40, 0xFF102030u);
+    CHECK(Tiered(TierImage({0, 0, 128, 80}, b64.data(), 64, 40, {0, 0, 64, 40}, kTierS)));
+    CHECK(!Tiered(TierImage({0, 0, 130, 80}, b64.data(), 65, 40, {0, 0, 65, 40}, kTierS)));
+    // TierImage centres with floor (an odd room: the left gets the smaller half).
+    CHECK(TierImage({0, 0, 33, 33}, b64.data(), 64, 40, {0, 0, 16, 16}, kTierS).to.x == 0);
+    // An empty picture (IconCache::Tiered of a frame that does not read) draws nothing and has no footprint.
+    UiItem none = ImageItem({10, 10, 0, 0}, nullptr, 0, 0, {});
+    none.tier = kTierL;
+    {
+        LayerCache lc;
+        const std::vector<UiItem> two = {PanelItem({20, 20, 200, 100}), none};
+        lc.Update(two, 1, 0, 0);
+        CHECK(lc.entries.size() == 1);
+    }
+}
+
+// The focus ring: the game's green at least 5 wide outside, then a line chosen by what it rings:
+// white on a dark fill (3:1 or more for white), the theme's shadow on a light one.
+static void focus_ring()
+{
+    CHECK(kFocusOuterW - kFocusInnerW >= 5);
+    CHECK(Contrast(0xFFFFFFFF, 0xFF000000) > 20.9f && std::abs(Contrast(0xFFFFFFFF, kFillRow) - 4.58f) < 0.02f);
+    CHECK(std::abs(Contrast(0xFFFFFFFF, kFillFocus) - 7.15f) < 0.02f && std::abs(Contrast(0xFFFFFFFF, 0xFF9AA2E3) - 2.43f) < 0.02f);
+    for (u32 dark : {kFillRow, kFillFocus, GameTheme().fill, GameTheme().frame})
+    {
+        const FocusRingItems g = FocusRing({100, 100, 200, 50}, 25, dark);
+        CHECK(g.inner.fill == kFocusInner && g.outer.fill == kFocusOuter);
+        CHECK(g.outer.to.x == 100 - kFocusOuterW && g.inner.to.x == 100 - kFocusInnerW && g.outer.radius == 25 + kFocusOuterW);
+    }
+    for (u32 light : {0xFF9AA2E3u, 0xFFB4BBF0u, 0xFFF0E2B8u}) // (the stat panel's plate and focused button, the note's paper)
+    {
+        const FocusRingItems g = FocusRing({100, 100, 200, 50}, 25, light);
+        CHECK(g.inner.fill == GameTheme().shadow && Contrast(g.inner.fill, light) >= 3); // (WCAG 1.4.11: 3:1 for a UI part)
+    }
+    CHECK(FocusRing({0, 0, 10, 10}, 5).inner.fill == kFocusInner); // (by default: a row's fill)
+    // Drawn: at the ring's middle row, the green band 5 wide, then the line, then the item.
+    const FocusRingItems g = FocusRing({40, 40, 200, 60}, 10, 0xFF9AA2E3);
+    UiItem item = PanelItem({40, 40, 200, 60});
+    item.plain = true;
+    item.fill = 0xFF9AA2E3;
+    std::vector<u32> px(300 * 150);
+    Rasterise({g.outer, g.inner, item}, 1, px.data(), 300, 150);
+    int green = 0, line = 0;
+    for (int x = 20; x < 40; x++)
+    {
+        const u32 v = px[70 * 300 + x] | 0xFF000000u;
+        green += v == kFocusOuter;
+        line += v == GameTheme().shadow;
+    }
+    CHECK(green >= 5 && line >= kFocusInnerW - 1);
 }
 
 int main()
@@ -786,6 +860,7 @@ int main()
     raster_ways(true);
     ui_scale_and_smooth();
     tiers();
+    focus_ring();
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("uikit_test: all passed\n");
     return 0;

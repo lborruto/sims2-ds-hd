@@ -79,7 +79,7 @@ void BuildNote(Composition& c, const MenuView&, int focus, const GameState& game
     c.ui.push_back(t);
     if (focus == 0)
     {
-        AddFocusRing(c, kNoteX, kNoteX.w / 2.0f);
+        AddFocusRing(c, kNoteX, kNoteX.w / 2.0f, 1, kPaper); // (on the paper: the dark line)
     }
     // The hints: A / B close (the game's word), at the paper's foot, ink on paper.
     const Rect cr = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold);

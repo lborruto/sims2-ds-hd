@@ -327,7 +327,14 @@ C = lambda x, y: comp.getpixel((x, y))
 hexrgb = lambda h: (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 FRAME, OUTLINE, PANEL, RING = hexrgb("828ACB"), hexrgb("383869"), hexrgb("5961A2"), hexrgb("309A41")
 # The focus ring (ui::FocusRing): the green outside, a white line inside it: either is the ring.
-RINGED = lambda r, g, b: (g > r + 60 and g > b + 40) or min(r, g, b) > 230
+def RINGED(x, y):
+    # The focus ring (ui::FocusRing) at (x, y): its green there, or its inner line (white, or the
+    # theme's shadow on a light fill) with the green within 6 pixels beside it (a white letter alone is not a ring).
+    green = lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 40
+    p = C(x, y)
+    if green(p): return True
+    if not (min(p) > 230 or max(abs(a - b) for a, b in zip(p, OUTLINE)) <= 12): return False
+    return any(green(C(min(max(x + dx * d, 0), 1279), min(max(y + dy * d, 0), 719))) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)) for d in range(1, 7))
 errors = []
 
 def expect(what, got, want):
@@ -529,7 +536,7 @@ def front_cas(page, focus, raw_top=True):
     if near and same < total * 0.6: errors.append(f"the cell's sprite: {same} of {total} pixels the touch screen's")
     x, y, w, h = focus
     r, g, b = C(x + w // 2, y - 3)
-    if not (RINGED(r, g, b)): errors.append(f"no focus halo above {focus}: {(r, g, b)}")
+    if not (RINGED(x + w // 2, y - 3)): errors.append(f"no focus halo above {focus}: {(r, g, b)}")
     words = sum(1 for yy in range(122, 166) for xx in range(730, 1230) if C(xx, yy) == (255, 255, 255))
     if words < 60: errors.append(f"no title or name ({words})")
     hints = [C(xx, yy) for yy in range(654, 690) for xx in range(1000, 1240)]
@@ -560,18 +567,18 @@ def front_menu(focus, raw_top=True):
             if white or dim < 30: errors.append(f"button 3: not greyed ({white} white, {dim} dim pixels)")
             if sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40) > 300: errors.append("button 3: an arrow")  # (an arrow: about 1100; the rim alone: under 100)
             r, g, b = C(835, y0 + 50)
-            if (i == focus) != (RINGED(r, g, b)): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
+            if (i == focus) != (RINGED(835, y0 + 50)): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
             continue
         if white < 30: errors.append(f"button {i}: no label ({white} white pixels)")
         green = sum(1 for r, g, b in arrow if g > r + 60 and g > b + 40)
         blue = sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40)
         if i == focus:
             r, g, b = C(835, y0 + 50)
-            if not (RINGED(r, g, b)): errors.append(f"button {i}: no focus ring ({r}, {g}, {b})")
+            if not (RINGED(835, y0 + 50)): errors.append(f"button {i}: no focus ring ({r}, {g}, {b})")
             if green < 50: errors.append(f"button {i}: the arrow is not green ({green})")
         else:
             r, g, b = C(835, y0 + 50)
-            if RINGED(r, g, b): errors.append(f"button {i}: ringed")
+            if RINGED(835, y0 + 50): errors.append(f"button {i}: ringed")
             if blue < 50: errors.append(f"button {i}: the arrow is not blue ({blue})")
     hints = [C(x, y) for y in range(616, 656) for x in range(1100, 1232)]
     if sum(1 for p in hints if p != FRAME) < 40: errors.append("no hints")
@@ -638,7 +645,7 @@ def front_settings(page, focus):
         r, g, b = C(1192, 444)
         if not ((r > 120 and b > 180) or (r, g, b) == (74, 82, 150)): errors.append(f"knob not at 100 %: {(r, g, b)}")
         r, g, b = C(1036, 318)
-        if not (RINGED(r, g, b)): errors.append(f"slider not focused: {(r, g, b)}")
+        if not (RINGED(1036, 318)): errors.append(f"slider not focused: {(r, g, b)}")
     elif page == 2:
         for i in range(12):
             gx, gy = 842 + (i % 4) * 100 + 4, 292 + (i // 4) * 88 + 4
@@ -647,7 +654,7 @@ def front_settings(page, focus):
                 for dx in range(0, 40, 7):
                     expect(f"cell {i} DS {fx + dx},{fy + dy}", C(gx + 2 * dx, gy + 2 * dy), bottom(fx + dx, fy + dy))
             r, g, b = C(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
-            ringed = RINGED(r, g, b)
+            ringed = RINGED(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
             if ringed != (i == focus): errors.append(f"cell {i}: ring {ringed}")
             if len(errors) > 4:
                 return
@@ -673,7 +680,7 @@ def front_load(focus, used, loading=False):
             if name < 60: errors.append(f"row {i}: no name ({name})")
             if line2 < 60: errors.append(f"row {i}: no place / time ({line2})")
         r, g, b = C(640, y0 - 3)
-        ringed = RINGED(r, g, b)
+        ringed = RINGED(640, y0 - 3)
         if ringed != (i == focus): errors.append(f"row {i}: ring {ringed}")
     if not loading:
         num = [C(x, y) for y in range(124 + 30, 124 + 110) for x in range(240, 300)]
@@ -820,7 +827,7 @@ def hd_menu(rows, focus, wide=False):
         if white != (i < rows):
             errors.append(f"row {i}: label {'missing' if i < rows else 'drawn'}")
         r, g, b = C(456, 241 + 76 * i)
-        ring = RINGED(r, g, b)  # the ring's green (its edge softened by the row's shadow)
+        ring = RINGED(456, 241 + 76 * i)  # the ring's green (its edge softened by the row's shadow)
         if ring != (i == focus):
             errors.append(f"row {i}: focus ring {'missing' if i == focus else 'drawn'}")
     if C(256 + 3 * 120 + 1, 72 + 3 * 100 + 1) == bottom(120, 100) and C(256 + 3 * 30 + 1, 72 + 3 * 160 + 1) == bottom(30, 160):
@@ -847,7 +854,7 @@ def hd_phone(y, wide=False):
     if y is not None:
         expect("highlight bar", C(410, y), BAR)
         r, g, b = C(393, y)
-        if not (RINGED(r, g, b)):
+        if not (RINGED(393, y)):
             errors.append(f"no focus halo at {y}")
     if INK not in [C(x, yy) for yy in range(152, 500) for x in range(500, 780)]:
         errors.append("no row letters")
@@ -865,13 +872,13 @@ def hd_popup(kind, title, menu):
         expect("title plate", C(450, 170), hexrgb("6171B2"))
     if kind == 0:
         r, g, b = C(477, 448)
-        if not (RINGED(r, g, b)): errors.append("no focus ring around Close")
+        if not (RINGED(477, 448)): errors.append("no focus ring around Close")
     else:
         expect("No", C(400, 448), hexrgb("4A5296"))
         r, g, b = C(345, 448)
-        if not (RINGED(r, g, b)): errors.append("no focus ring around No")
+        if not (RINGED(345, 448)): errors.append("no focus ring around No")
         r, g, b = C(670, 448)
-        if RINGED(r, g, b): errors.append("a focus ring around Yes")
+        if RINGED(670, 448): errors.append("a focus ring around Yes")
         expect("Yes", C(880, 448), WELL)
     if menu:
         r, g, b = C(190, 300)
@@ -950,7 +957,7 @@ elif case in ("gift", "gift-items", "gift-items-2x", "gift-items-wide"):
         errors.append("no bow in its bar")
     if C(256 + 3 * 120 + 1, 72 + 3 * 100 + 1) == bottom(120, 100) and C(256 + 3 * 30 + 1, 72 + 3 * 160 + 1) == bottom(30, 160):
         errors.append("the touch screen 3x is drawn")
-    ring = lambda x, y: RINGED(*C(x, y))
+    ring = lambda x, y: RINGED(x, y)
     # The focus ring (green) around the game's selected slot when the pockets hold something.
     if case == "gift":
         if ring(197, 235): errors.append("a focus ring with empty pockets")
@@ -975,7 +982,7 @@ elif case in ("shop", "shop-2x", "shop-wide", "shop-sell", "shop-poor"):
     sell = case == "shop-sell"
     if white(210, 128, 526, 160) == sell: errors.append(f"the Buy header {'lit' if sell else 'dim'}")
     if white(888, 128, 1070, 160) != sell: errors.append(f"the Sell header {'dim' if sell else 'lit'}")
-    ring = lambda x, y: RINGED(*C(x, y))
+    ring = lambda x, y: RINGED(x, y)
     at = {"shop-sell": (981, 330), "shop-poor": (537, 514)}.get(case, (197, 224)) # (cell 1; owned place 4; Pay)
     if not ring(*at): errors.append(f"no focus ring at {at}")
     if case != "shop-sell" and case != "shop-poor" and ring(313, 224): errors.append("a focus ring around cell 2")
@@ -994,7 +1001,7 @@ elif case in ("build-list", "build-list-2x", "build-list-wide", "build-ask", "bu
     expect("title well", C(640, 50), hexrgb("6870B6"))
     warm = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
     if warm(840, 54, 1010, 100) < 20: errors.append("no money in the title")
-    ring = lambda x, y: RINGED(*C(x, y))
+    ring = lambda x, y: RINGED(x, y)
     red = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if (lambda p: p[0] > 200 and p[1] < 140 and p[2] < 140)(C(x, y)))
     if case == "build-ask":
         if not ring(678, 496): errors.append("no focus ring around the tick")
@@ -1024,7 +1031,7 @@ elif case in ("registry", "registry-2x", "registry-wide", "registry-guest"):
     expect("panel outline", C(176, 300), OUTLINE)
     expect("panel band", C(180, 300), hexrgb("6171B2"))
     expect("title well", C(640, 50), hexrgb("6870B6"))
-    ring = lambda x, y: RINGED(*C(x, y))
+    ring = lambda x, y: RINGED(x, y)
     if not ring(212, 175): errors.append("no focus ring around the first room")
     if ring(212, 261): errors.append("a focus ring around the second room")
     warm = sum(1 for y in range(56, 98, 2) for x in range(700, 1000, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
@@ -1047,7 +1054,7 @@ elif case in ("roominfo", "roominfo-vacant", "roominfo-hint"):
     # the hint (M-ci-occ-info, Down, Down, A: the check-out's 2603): the popups' veil and box over
     # it, its Close button (the picture's focus is pinned to none), the portrait under the box
     # gone; never the touch screen 3x.
-    ring = lambda x, y: RINGED(*C(x, y))
+    ring = lambda x, y: RINGED(x, y)
     if case == "roominfo-hint":
         expect("box band", C(304, 400), hexrgb("6171B2"))
         expect("the Close button", C(500, 470), hexrgb("6870B6"))
@@ -1072,7 +1079,7 @@ elif case in ("music", "music-2x", "music-wide", "music-scrolled"):
     expect("panel outline", C(176, 300), OUTLINE)
     expect("title well", C(640, 50), hexrgb("6870B6"))
     green = lambda x0, y0, w, h: sum(1 for y in range(y0, y0 + h, 2) for x in range(x0, x0 + w, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 100)(C(x, y)))
-    ring = lambda x, y: RINGED(*C(x, y))
+    ring = lambda x, y: RINGED(x, y)
     rows = [green(312, 143 + 86 * i, 64, 64) for i in range(5)]
     playing = 2 if case != "music-scrolled" else None
     for i, n in enumerate(rows):
@@ -1091,7 +1098,7 @@ elif case.startswith("stat-"):
     # values in warm white, Skills' star bars (2, 2, 1, 1, 6 filled); never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
     expect("title well", C(640, 146), hexrgb("6870B6"))
-    ring = lambda x, y: RINGED(*C(x, y))
+    ring = lambda x, y: RINGED(x, y)
     colours = lambda x0, y0, w, h: len({C(x, y) for y in range(y0, y0 + h, 3) for x in range(x0, x0 + w, 3)})
     for i in range(5):
         if colours(420 + 88 * i + 12, 52, 64, 64) < 4: errors.append(f"no picture in tab {i}")
@@ -1099,7 +1106,7 @@ elif case.startswith("stat-"):
     warm = lambda x0, y0, w, h: sum(1 for y in range(y0, y0 + h, 2) for x in range(x0, x0 + w, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
     if page == 0:
         if not ring(209, 298): errors.append("no focus ring around Aspirations")
-        if ring(644, 298) or ring(209, 486): errors.append("a focus ring around another button")
+        if ring(1070, 298) or ring(209, 486): errors.append("a focus ring around another button")
         for x, y in ((212, 210), (644, 210), (212, 398), (644, 398)):
             if colours(x + 140, y + 10, 144, 108) < 6: errors.append(f"no picture on the button at {x},{y}")
     else:
@@ -1131,7 +1138,7 @@ elif case in ("pockets-menu", "pockets-armed"):
     for i in range(4):
         piece(f"counted {i} 2x", 99 + 29 * i, 155, 23, 23, 200 + 87 * i + 14, 462, 2, step=3)
     r, g, b = C(197, 258)
-    if not (RINGED(r, g, b)): errors.append("no focus ring around slot 1")
+    if not (RINGED(197, 258)): errors.append("no focus ring around slot 1")
     if (255, 255, 255) not in [C(x, y) for y in range(540, 560) for x in range(215, 260)]:
         errors.append("no count under the first counted item")
     if (255, 255, 255) not in [C(x, y) for y in range(222, 258) for x in range(692, 900)]:
@@ -1344,7 +1351,7 @@ elif case in ("slots", "slots-hd"):
         green = lambda y0: sum(1 for y in range(y0 + 30, y0 + 112, 2) for x in range(230, 310, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 60)(C(x, y)))
         if green(rows[2]) < 40 or green(rows[0]) or green(rows[1]): errors.append(f"current slot's green number {[green(r) for r in rows]}")
         r, g, b = C(197, rows[2] + 70)
-        if not (RINGED(r, g, b)): errors.append("no focus ring around slot 3")
+        if not (RINGED(197, rows[2] + 70)): errors.append("no focus ring around slot 3")
         if (255, 255, 255) not in [C(x, y) for y in range(rows[2] + 30, rows[2] + 70) for x in range(348, 460)]:
             errors.append("no name in slot 3")
 elif case == "goals-menu":
@@ -1354,7 +1361,7 @@ elif case == "goals-menu":
     expect("panel outline", C(176, 300), OUTLINE)
     piece("giver", 47, 88, 30, 30, 219, 225, 3, step=3)
     r, g, b = C(355, 240)
-    if not (RINGED(r, g, b)): errors.append("no focus ring around the first goal")
+    if not (RINGED(355, 240)): errors.append("no focus ring around the first goal")
     if sum(1 for y in range(220, 400, 2) for x in range(390, 1000, 2) if min(C(x, y)) > 235) < 300:
         errors.append("no goal text")
     same = sum(1 for y in range(8, 184, 16) for x in range(8, 248, 16) if C(256 + 3 * x + 1, 72 + 3 * y + 1) == bottom(x, y))
@@ -1367,7 +1374,7 @@ elif case in ("rel-menu", "rel-menu-wide"):
     piece("big portrait", 84, 37, 69, 84, 474, 222, 3, step=4)
     piece("row 1 portrait", 43, 28, 28, 28, 214, 220, 2, step=3)
     r, g, b = C(197, 248)
-    if not (RINGED(r, g, b)): errors.append("no focus ring around the first Sim")
+    if not (RINGED(197, 248)): errors.append("no focus ring around the first Sim")
     if (255, 255, 255) not in [C(x, y) for y in range(240, 280) for x in range(728, 900)]:
         errors.append("no mood word")
 elif case == "opt-menu":
@@ -1377,7 +1384,7 @@ elif case == "opt-menu":
     expect("music knob (focused)", C(1012, 390), hexrgb("4A5296"))
     expect("SFX knob", C(1012, 536), FRAME)
     r, g, b = C(197, 360)
-    if not (RINGED(r, g, b)): errors.append("no focus ring around the music volume")
+    if not (RINGED(197, 360)): errors.append("no focus ring around the music volume")
 elif case.startswith("prompt-"):
     # The world's prompt: a kit plate (the panel's fill) centred at the world's foot, it and its
     # shadow above the strip (row 661), white words in it; none without a target or on another tab.

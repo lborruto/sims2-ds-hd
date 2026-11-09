@@ -940,7 +940,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 if (tagW)
                 {
                     // Language applies at the game's next start: said on the row.
-                    UiItem tag = Line({pill.x - 12 - tagW, r.y, tagW, r.h}, Wd(lang, W::NextStart), 17, 13, Align::Right);
+                    UiItem tag = Line({pill.x - 12 - tagW, r.y, tagW, r.h}, Wd(lang, W::NextStart), 18, 18, Align::Right);
                     tag.colour = f ? kWarm : kTextNote;
                     it.Add(1, tag);
                 }

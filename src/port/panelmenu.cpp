@@ -142,9 +142,9 @@ void AddMousePiece(Composition& c, Rect from, Rect to)
     c.pieces.push_back(p);
 }
 
-void AddFocusRing(Composition& c, Rect r, float radius, int layer)
+void AddFocusRing(Composition& c, Rect r, float radius, int layer, u32 behind)
 {
-    FocusRingItems g = FocusRing(r, radius);
+    FocusRingItems g = FocusRing(r, radius, behind);
     g.outer.layer = g.inner.layer = layer;
     c.ui.push_back(g.outer);
     c.ui.push_back(g.inner);

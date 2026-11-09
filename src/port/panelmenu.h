@@ -106,9 +106,9 @@ struct Measurer
 };
 // A touchable, invisible piece mapping the HD rectangle `to` onto the touch screen's `from`.
 void AddMousePiece(Composition& c, Rect from, Rect to);
-// A row's focus ring (UI items, on `layer`): ui::FocusRing around `r` (the game's green, a white line
-// inside it), drawn before the row.
-void AddFocusRing(Composition& c, Rect r, float radius, int layer = 1);
+// A row's focus ring (UI items, on `layer`): ui::FocusRing around `r` (the game's green, a line inside
+// it, white or dark by `behind`, the ringed item's fill), drawn before the row.
+void AddFocusRing(Composition& c, Rect r, float radius, int layer = 1, u32 behind = ui::kFillRow);
 // A hint chip right-aligned at `right` in the hints band; returns the next right edge.
 int AddHint(Composition& c, int right, ui::Button b, const std::string& label);
 }

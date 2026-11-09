@@ -28,11 +28,11 @@ const Theme& GameTheme();
 // subtitles kTextNote (white: 4.58:1 on a well), inactive text kTextInactive (3.23:1 on kFillRow).
 // The panel's own fill (#828ACB, the game's) takes white at 3.26:1: large text only (titles).
 constexpr u32 kFillRow = 0xFF6870B6, kFillFocus = 0xFF4A5296, kTextNote = 0xFFFFFFFF, kTextInactive = 0xFFD4D7F2;
-// The focus ring: the game's green outside (kFocusOuterW wide around the item), a white line
-// inside it (kFocusInnerW): it reads without its colour (white against the panel 3.26:1, against a
-// well 4.58:1, a focused fill against an unfocused one besides).
+// The focus ring: the game's green outside (kFocusOuterW around the item, 5 wide), a light or dark
+// line inside it (kFocusInnerW): it reads without its colour (FocusRing: white on a dark fill,
+// against the panel 3.26:1, a well 4.58:1; the theme's shadow #383869 on a light one).
 constexpr u32 kFocusOuter = 0xFF309A41, kFocusInner = 0xFFFFFFFF;
-constexpr int kFocusOuterW = 7, kFocusInnerW = 4;
+constexpr int kFocusOuterW = 8, kFocusInnerW = 3; // (the green 5 wide)
 // The smallest text at 100 % (canvas pixels, a shrunk-to-fit line and a chip's glyph included):
 // 27 px at 1080p full screen, past the console's minimum of 26 (XAG 101; the PC's is 18).
 constexpr float kMinText = 18;
@@ -135,15 +135,27 @@ struct UiItem
 // window's scale x the UI's size) output pixels): S the controls' (arrows, chips' icons, small
 // buttons), L the content's (items, portraits, tabs, the cells a player looks at).
 constexpr int kTierS = 2, kTierL = 3;
+// Tiers are for small pictures only: an icon or sprite whose source (`from`) is at most
+// kTierMaxSource pixels on its longer side, and never a live crop of a DS screen (a 256 x 192
+// picture). A larger picture (a portrait past 64, a touch-screen crop, a playfield, Create-a-Sim's
+// model) fills its `to` exactly the Sharp way (nearest by the whole factor, then bilinear for the
+// rest), as the game's own screens do: a tier on it is ignored (Tiered()).
+constexpr int kTierMaxSource = 64;
+// Whether an image item is drawn by its tier (tier set, a small source, not a live crop).
+bool Tiered(const UiItem& image);
 // The whole output pixels a picture pixel takes at tier `tier` drawn at s output pixels per canvas
 // pixel: tier x s rounded (a half down: never larger than its layout when it can be smaller), 1 at least.
 int TierFactor(int tier, float s);
 
 UiItem PanelItem(Rect to, const Theme& t = GameTheme());          // the light panel (fill, frame)
-// The focus ring around `r` (`radius` its corners'): the green, then the white line inside it, two
-// plain boxes to give before the item they ring (the item covers their middle).
+// The focus ring around `r` (`radius` its corners'): the green, then the line inside it, two plain
+// boxes to give before the item they ring (the item covers their middle). `behind`: the ringed
+// item's fill, which picks the line: white when white text would read on it (3:1 or more), else
+// the theme's shadow (#383869: a light button, the paper).
 struct FocusRingItems { UiItem outer, inner; };
-FocusRingItems FocusRing(Rect r, float radius);
+FocusRingItems FocusRing(Rect r, float radius, u32 behind = kFillRow);
+// WCAG's contrast ratio between two colours (alpha ignored): 1 to 21.
+float Contrast(u32 a, u32 b);
 UiItem WellItem(Rect to, const Theme& t = GameTheme());           // a darker inset box inside a panel
 UiItem TextItem(Rect to, const std::string& utf8, float size, Align align = Align::Left, Weight w = Weight::Bold);
 // A chip at (x, y) with its label, printed as the current ChipLook says; its rectangle is the
@@ -156,7 +168,8 @@ Rect ChipRect(int x, int y, Button b, const std::string& label, float size, floa
 // what it is: the keyboard's key, or a pad input by its settings name, "lb", "rt", "start"…).
 UiItem ChipItemAs(int x, int y, Face face, const std::string& glyph, const std::string& label, float size, Weight w = Weight::Bold);
 UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from);
-// The same at a tier: `from` `tier` times its size, centred in `box` (canvas pixels), tier set.
+// The same at a tier: `from` `tier` times its size, centred in `box` (canvas pixels, the centre
+// rounded down as TierRect's), tier set (ignored at raster for a large source: Tiered()).
 UiItem TierImage(Rect box, const u32* src, int srcW, int srcH, Rect from, int tier);
 // A tiered picture's output pixels in a raster at `scale` whose canvas origin is (ox, oy)
 // (Rasterise's): from's size times TierFactor, centred on `to` as drawn (zoom applied), its top left

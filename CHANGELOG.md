@@ -92,8 +92,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - With *Game icons* on Pixels, the game's icons stay crisp at any window size: they are enlarged
   from the DS's own pixels, never from a copy already enlarged and then blurred again.
 - Easier to read from the sofa: the focused row is a deep blue with white words (its words were
-  white on light lavender), the focus ring has a white line inside the green so it shows without
-  its colour, notes and headings are white, and no text is smaller than 18 points at 100 % (27
+  white on light lavender), the focus ring has a light line inside the green (a dark one on light
+  buttons) so it shows without its colour, notes and headings are white, and no text is smaller than 18 points at 100 % (27
   pixels on a 1080p TV), the buttons' names in their chips (START + BACK, LB, keys) included.
 - The launch panel keeps out of the screen's outer edge, where some TVs cut the picture.
 - The D-pad chips that mean Up / Down or Left / Right show two arrowheads (˄ ˅, ‹ ›) instead of a

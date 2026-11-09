@@ -249,7 +249,7 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
     c.ui.push_back(xCell);
     Text(c, {kPmTitle.x + 24, kPmTitle.y, kPmTitle.w - 48, kPmTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Centre, Weight::ExtraBold);
     // The page's raised plate in the tab bar (on a page the focus rests there: its halo first).
-    if (page != 0 && focus == 0) AddFocusRing(c, {cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4}, 18);
+    if (page != 0 && focus == 0) AddFocusRing(c, {cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4}, 18, 1, kTabPlateFill);
     {
         UiItem plate = PanelItem({cell.x + 2, cell.y + 2, cell.w - 4, cell.h - 4});
         plate.fill = kTabPlateFill;
@@ -272,7 +272,7 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
         {
             const Rect r = StatButtonRect(p);
             const bool focused = focus == p - 1;
-            if (focused) AddFocusRing(c, r, 24);
+            if (focused) AddFocusRing(c, r, 24, 1, kButtonFocusFill);
             UiItem b = PanelItem(r);
             b.fill = focused ? kButtonFocusFill : kButtonFill;
             b.borderArgb = th.frame;

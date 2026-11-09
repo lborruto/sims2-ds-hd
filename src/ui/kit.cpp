@@ -495,7 +495,7 @@ Prepared Prepare(const UiItem& it, float s0, float ox0, float oy0, int W, int H)
     Prepared p;
     if (it.kind == UiItem::Image && it.smooth)
     {
-        if (it.tier > 0)
+        if (Tiered(it))
         {
             if (const int d = TierScaler(TierFactor(it.tier, s)); d >= 2) p.big = Enlarge(it, d);
         }
@@ -772,7 +772,7 @@ void DrawTiered(Layer& L, const UiItem& it, float s0, float ox0, float oy0, cons
 
 void DrawImage(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const Prepared& p)
 {
-    if (it.tier > 0)
+    if (Tiered(it))
     {
         if (it.src && it.from.w > 0 && it.from.h > 0 && it.srcW > 0 && it.srcH > 0) DrawTiered(L, it, s0, ox0, oy0, p);
         return;
@@ -1063,8 +1063,19 @@ UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from)
     return it;
 }
 
-FocusRingItems FocusRing(Rect r, float radius)
+float Contrast(u32 a, u32 b)
 {
+    auto lum = [](u32 c) {
+        auto ch = [](u32 v) { const float x = v / 255.0f; return x <= 0.03928f ? x / 12.92f : std::pow((x + 0.055f) / 1.055f, 2.4f); };
+        return 0.2126f * ch((c >> 16) & 0xFF) + 0.7152f * ch((c >> 8) & 0xFF) + 0.0722f * ch(c & 0xFF);
+    };
+    const float la = lum(a), lb = lum(b);
+    return (std::max(la, lb) + 0.05f) / (std::min(la, lb) + 0.05f);
+}
+
+FocusRingItems FocusRing(Rect r, float radius, u32 behind)
+{
+    const u32 line = Contrast(kFocusInner, behind) >= 3 ? kFocusInner : GameTheme().shadow;
     auto box = [&](int t, u32 c) {
         UiItem g = PanelItem({r.x - t, r.y - t, r.w + 2 * t, r.h + 2 * t});
         g.plain = true;
@@ -1072,13 +1083,14 @@ FocusRingItems FocusRing(Rect r, float radius)
         g.radius = radius + t;
         return g;
     };
-    return {box(kFocusOuterW, kFocusOuter), box(kFocusInnerW, kFocusInner)};
+    return {box(kFocusOuterW, kFocusOuter), box(kFocusInnerW, line)};
 }
 
 UiItem TierImage(Rect box, const u32* src, int srcW, int srcH, Rect from, int tier)
 {
     const int w = from.w * std::max(tier, 1), h = from.h * std::max(tier, 1);
-    UiItem it = ImageItem({box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h}, src, srcW, srcH, from);
+    const int x = (int)std::floor(box.x + box.w / 2.0f - w / 2.0f), y = (int)std::floor(box.y + box.h / 2.0f - h / 2.0f);
+    UiItem it = ImageItem({x, y, w, h}, src, srcW, srcH, from);
     it.tier = std::max(tier, 0);
     return it;
 }
@@ -1089,9 +1101,15 @@ int TierFactor(int tier, float s)
     return std::max(1, (int)std::ceil(tier * s - 0.5f - 1e-4f));
 }
 
+bool Tiered(const UiItem& it)
+{
+    return it.kind == UiItem::Image && it.tier > 0 && it.from.w > 0 && it.from.h > 0 && std::max(it.from.w, it.from.h) <= kTierMaxSource &&
+           !(it.srcW == 256 && it.srcH == 192);
+}
+
 Rect TierRect(const UiItem& it, float s0, float ox0, float oy0)
 {
-    if (it.kind != UiItem::Image || it.tier <= 0 || it.from.w <= 0 || it.from.h <= 0) return {};
+    if (!Tiered(it)) return {};
     const Xf e = Eff(it, s0, ox0, oy0);
     const int k = TierFactor(it.tier, e.s), w = it.from.w * k, h = it.from.h * k;
     const float cx = (it.to.x + it.to.w / 2.0f - e.ox) * e.s, cy = (it.to.y + it.to.h / 2.0f - e.oy) * e.s;
@@ -1184,7 +1202,7 @@ u64 HashImage(const UiItem& it)
     Mix(h, ((u64)(u32)it.srcW << 32) | (u32)it.srcH);
     Mix(h, it.fill);
     if (it.smooth) Mix(h, 0x534D4F4F5448ull);
-    if (it.tier) Mix(h, 0x54494552ull ^ (u64)(u32)it.tier); // (an image without a tier hashes as before)
+    if (Tiered(it)) Mix(h, 0x54494552ull ^ (u64)(u32)it.tier); // (an image without a tier, or one ignored, hashes as before)
     if (it.zoom != 1 || it.dx != 0 || it.dy != 0)
     {
         Mix(h, 0x5A4F4F4Dull ^ FloatBits(it.zoom));
@@ -1215,7 +1233,7 @@ std::vector<LayerAt> LayersAt(const std::vector<UiItem>& items, float scale, flo
     Layers(items, still, images);
     auto add = [&](std::vector<UiItem> part, bool isStill, int layer) {
         Rect b = Bounds(part);
-        if (!isStill && part.size() == 1 && part[0].tier > 0 && b.w > 0 && b.h > 0)
+        if (!isStill && part.size() == 1 && Tiered(part[0]) && b.w > 0 && b.h > 0)
         {   // (a tiered picture: room for its blocks where they pass `to`)
             const Rect t = TierBounds(part[0], scale);
             const int x0 = std::min(b.x, t.x), y0 = std::min(b.y, t.y);
@@ -1331,8 +1349,10 @@ Rect Footprint(const UiItem& it, float s0, float ox0, float oy0, int w, int h)
 {
     const Xf e = Eff(it, s0, ox0, oy0);
     const float s = e.s, ox = e.ox, oy = e.oy;
+    // (a picture with nothing to draw: no pixels; an empty IconCache::Tiered item)
+    if (it.kind == UiItem::Image && (!it.src || it.from.w <= 0 || it.from.h <= 0 || it.srcW <= 0 || it.srcH <= 0)) return {};
     if (it.to.w <= 0 || it.to.h <= 0) return {0, 0, w, h};
-    if (it.kind == UiItem::Image && it.tier > 0)
+    if (Tiered(it))
     {   // (its blocks where TierRect puts them, a pixel around)
         const Rect q = TierRect(it, s0, ox0, oy0);
         const int x0 = std::max(q.x - 1, 0), y0 = std::max(q.y - 1, 0), x1 = std::min(q.x + q.w + 1, w), y1 = std::min(q.y + q.h + 1, h);
@@ -1602,7 +1622,7 @@ bool WholeFactorCrop(const UiItem& im, const LayerAt& at, float scale)
     if (im.smooth) return false;
     const Rect f = im.from;
     if (f.w <= 0 || f.h <= 0 || f.x < 0 || f.y < 0 || f.x + f.w > im.srcW || f.y + f.h > im.srcH) return false;
-    if (im.tier > 0)
+    if (Tiered(im))
     {   // (tiered: whole blocks at any scale and zoom, inside its layer: LayersAt made room)
         const Rect r = TierRect(im, scale, at.ox, at.oy);
         if (r.x < 0 || r.y < 0 || r.x + r.w > at.w || r.y + r.h > at.h) return false;
@@ -1624,7 +1644,7 @@ bool WholeFactorCrop(const UiItem& im, const LayerAt& at, float scale)
 
 Rect CropRect(const UiItem& im, float scale, int x, int y, float ox, float oy)
 {
-    if (im.tier > 0)
+    if (Tiered(im))
     {
         const Rect r = TierRect(im, scale, ox, oy);
         return {x + r.x, y + r.y, r.w, r.h};

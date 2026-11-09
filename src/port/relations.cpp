@@ -39,7 +39,7 @@ RowName FitRowName(const std::string& name, int width)
 // A small well: its label above, the value below.
 void AddPair(Composition& c, Rect r, const std::string& label, const std::string& value)
 {
-    const FittedText l = FitLine(label, 20, 16, r.w - 36, Weight::Bold);
+    const FittedText l = FitLine(label, 20, 18, r.w - 36, Weight::Bold);
     UiItem lt = TextItem({r.x + 18, r.y + 6, r.w - 36, 26}, l.text, l.size, Align::Left, Weight::Bold);
     lt.wrap = false;
     lt.middle = true;
@@ -188,7 +188,7 @@ void MeasureRelations(const RomData& rom, BlockMeasure& m)
     }
     for (int id : {kStrMood, kStrRelationship})
     {
-        const FittedText f = FitLine(MenuWords(rom, id), 20, 16, kRelMood.w - 36, Weight::Bold);
+        const FittedText f = FitLine(MenuWords(rom, id), 20, 18, kRelMood.w - 36, Weight::Bold);
         note(id, f.size < 20, f.fits);
     }
     for (int id = 184; id <= 192 + 7 * 6 + 6; id++)

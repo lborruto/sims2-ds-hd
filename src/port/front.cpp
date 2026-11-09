@@ -215,7 +215,7 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
             // DS Wireless: its note in the hints' place.
             const std::string text = OwnWord(&rom, OwnWordId::WirelessNote);
             float size = 19;
-            while (size > 15 && Wrap(text, size, (float)kFrNote.w).size() * size * 1.3f > kFrNote.h) size -= 1;
+            while (size > kMinText && Wrap(text, size, (float)kFrNote.w).size() * size * 1.3f > kFrNote.h) size -= 1;
             UiItem note = TextItem(kFrNote, text, size, Align::Right);
             note.middle = true;
             note.layer = 1;
@@ -267,6 +267,6 @@ void MeasureFront(const RomData& rom, BlockMeasure& m)
         tally.Line(kStrFrMenu[i], Label(rom, i), kFrLabelSize, kFrLabelMin, r.w - 28 - iconW - 12 - arrow - 12);
     }
     // DS Wireless's note in the hints' box (two lines at most).
-    tally.Block(9000 + (int)OwnWordId::WirelessNote, OwnWord(&rom, OwnWordId::WirelessNote), 19, 15, kFrNote);
+    tally.Block(9000 + (int)OwnWordId::WirelessNote, OwnWord(&rom, OwnWordId::WirelessNote), 19, 18, kFrNote);
 }
 }
