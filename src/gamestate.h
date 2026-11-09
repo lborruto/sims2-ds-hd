@@ -777,6 +777,15 @@ struct LoadScreen
     bool operator==(const LoadScreen&) const = default;
 };
 constexpr int kCasName = 7;           // the game's name limit
+// A sprite of a Create-a-Sim page's list (CActorSprite): what the game draws there, from the ROM.
+struct CasSprite
+{
+    bool shown = false;               // +0x4 bit 0
+    int frame = 0;                    // +0x1A: the frame shown (a category's, an arrow's: 1 lit)
+    int tiles = -1, desc = -1, pal = -1;   // *(+0x20): the resources (pal -1: the game's palette at run time)
+    bool operator==(const CasSprite&) const = default;
+};
+constexpr int kCasSprites = 16;       // the most a page lists (Clothes: 15)
 struct CasState
 {
     bool valid = false;
@@ -815,6 +824,9 @@ struct CasState
     bool keepKnown = false;
     int aspiration = -1;              // 0 Fortune, 1 Romance, 2 Popularity, 3 Party
     int answer = -1;                  // 0 choosing, 1 tick pressed, 2 cross pressed
+    // The page's sprites, in the list's order (not switching; those that do not read: desc -1).
+    int spriteCount = 0;
+    CasSprite sprites[kCasSprites];
     bool operator==(const CasState&) const = default;
 };
 struct BootState

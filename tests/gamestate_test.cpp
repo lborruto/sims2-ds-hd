@@ -1548,6 +1548,17 @@ static void front_cas()
         r.W32(spr + 0x80 * 3 + 4, 0x48009080); CHECK(!ReadGameState(r.View()).front.cas.loading);
         r.W32(spr + 0x80 * 3 + 4, 0x48009001); CHECK(!ReadGameState(r.View()).front.cas.loading);
         CHECK(!ReadGameState(r.View()).front.cas.drawn);   // (the frame loop's, never RAM's)
+        {   // each sprite's resources (*(+0x20): tiles, descriptor, palette; 0xFFFF the game's at run time) and frame (+0x1A)
+            const u32 tri = 0x021A4F00;
+            r.W32(spr + 0x20, tri); r.W16(tri, 1110); r.W16(tri + 2, 1111); r.W16(tri + 4, 0xFFFF); r.W8(spr + 0x1A, 1);
+            CasState c = ReadGameState(r.View()).front.cas;
+            CHECK(c.spriteCount == 9 && c.sprites[0].shown && c.sprites[0].frame == 1 && c.sprites[0].tiles == 1110 && c.sprites[0].desc == 1111 && c.sprites[0].pal == -1);
+            CHECK(c.sprites[1].desc == -1 && c.sprites[7].shown == false);   // (no resources; hidden)
+            r.W16(tri + 4, 1076); CHECK(ReadGameState(r.View()).front.cas.sprites[0].pal == 1076);
+            r.W16(tri + 2, 0x5000); CHECK(ReadGameState(r.View()).front.cas.sprites[0].desc == -1 && ReadGameState(r.View()).front.cas.valid);   // not an archive id
+            r.W32(spr + 0x20, 0x09000000); CHECK(ReadGameState(r.View()).front.cas.sprites[0].desc == -1);   // outside RAM
+            r.W32(spr + 0x20, 0);
+        }
         r.W32(spr + 0x80 * 8 + 0x50, 137u << 12); CHECK(ReadGameState(r.View()).front.cas.clothesCell == -1);   // between cells
         r.W32(spr + 0x80 * 8 + 4, 0); r.W32(spr + 0x80 * 8 + 0x50, 136u << 12); CHECK(ReadGameState(r.View()).front.cas.clothesCell == -1);   // hidden
         r.W32(spr + 0x80 * 6, 0x12345678); CHECK(!ReadGameState(r.View()).front.cas.arrowsKnown);   // not a sprite

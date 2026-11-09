@@ -174,7 +174,7 @@ struct EUTable
         u32 bgMode, bgCount, bgDuration, bgMaxMode, vdMovie, vdMaxMovie;   // boot, video
         u32 pgSprites, vtSprite, sprFlags, sprX, sprY, maxSprites;   // a page's CActorSprite list (null-ended), a sprite's vtable, visible bit 0, position 20.12
         u32 hairPos, hairArrowL, hairArrowR, thArrowL, thArrowR, thRing, thCellX0, thCellY0, thCellDx, thCellDy;   // sprite indices; the Clothes ring at (x0 + dx c, y0 + dy r)
-        u32 sprLoading;                                      // a sprite's flags: graphics not uploaded yet (with bit 0: shown, not drawn)
+        u32 sprLoading, sprFrame, sprRes, maxRes;            // a sprite's flags: graphics not uploaded yet (with bit 0: shown, not drawn); its frame (u8), its resources' u16 triplet's pointer; the archive's ids below
     } front;
 };
 constexpr int kAnyOverlay = -2;
@@ -317,7 +317,7 @@ constexpr EUTable kEU = {
         0x28, 0x24, 0x26, 6, 0x2C, 3,
         0x8, 0x0212FED8, 0x4, 0x50, 0x54, 24,
         0x3A, 2, 3, 6, 7, 8, 88, 41, 48, 64,
-        0x80,
+        0x80, 0x1A, 0x20, 0x4000,
     },
 };
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
@@ -1796,12 +1796,27 @@ CasState ReadCas(const Reader& m, u32 S)
     };
     // A shown sprite whose graphics are not there yet (the game uploads a page's pictures a frame
     // or more after its object is made, and again for the Clothes page's next cells).
+    // Each sprite's resources and frame too (the HD draws the game's pictures from the ROM).
     if (!switching)
     {
         u32 list, sp, sv, flags;
         if (m.R32(N + f.pgSprites, list) && list != 0)
             for (u32 k = 0; k < f.maxSprites && m.R32(list + 4 * k, sp) && sp != 0; k++)
-                if (m.R32(sp, sv) && sv == f.vtSprite && m.R32(sp + f.sprFlags, flags) && (flags & (f.sprLoading | 1)) == (f.sprLoading | 1)) c.loading = true;
+            {
+                if (!m.R32(sp, sv) || sv != f.vtSprite || !m.R32(sp + f.sprFlags, flags)) continue;
+                if ((flags & (f.sprLoading | 1)) == (f.sprLoading | 1)) c.loading = true;
+                if (k >= (u32)kCasSprites) continue;
+                c.spriteCount = (int)k + 1;
+                CasSprite& s = c.sprites[k];
+                s.shown = flags & 1;
+                u32 fr, t, a, b, p;
+                if (m.R8(sp + f.sprFrame, fr) && fr < 64) s.frame = (int)fr;
+                if (m.R32(sp + f.sprRes, t) && m.In(t, 6) && m.R16(t, a) && m.R16(t + 2, b) && m.R16(t + 4, p) && a < f.maxRes && b < f.maxRes)
+                {
+                    s.tiles = (int)a; s.desc = (int)b;
+                    s.pal = p < f.maxRes ? (int)p : -1;
+                }
+            }
     }
     switch (switching ? -1 : idx)
     {

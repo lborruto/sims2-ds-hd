@@ -10,31 +10,31 @@
 // framed. The right stick turns it (MenuView::stickTurns: the DS's L / R held, as the game turns
 // it); the mouse's right drag too (the piece is the camera). An RS chip under it.
 //
-// The panel at the right: a tab bar with the game's five page tabs (live crops of its own tab
-// column, 2x: their sprites are not known) between LB and RB, which tap the game's tabs (18,
+// The panel at the right: a tab bar with the game's five page tabs (round kit buttons, its digits
+// and its tick sprite; the page's green) between LB and RB, which tap the game's tabs (18,
 // 23 + 37 i) in a ring; Start taps the next page's tab (pages 0-3: on the Name page that is what
 // commits the name, as the game commits it when the page closes); the title well; the page:
 // - Name (0): the title well is the name field, the game's live buffer (N+0x70) in seven slots
-//   (the game's limit: never more); the gender buttons ♀ / ♂ and the four skin figures as live
-//   crops 2x (A taps them: 66,25 / 102,25; 144 + 29 i, 23); the keyboard's three pages as a row
+//   (the game's limit: never more); the gender buttons ♀ / ♂ (the game's sprites 2x, the one
+//   not chosen grey) and the four skin figures as live crops 2x (A taps them: 66,25 / 102,25; 144 + 29 i, 23); the keyboard's three pages as a row
 //   (ABC abc 123!, the game's own labels; A or X taps the game's page buttons, 58, 115 / 145 /
 //   174; X the next one in a ring) over the HD keyboard: the page's characters from the game's
 //   strings (241 + k A-Z, 267 + k a-z, 293 + k the 20 of 123!), nine to a row as the game has
 //   them; A types (the game's cell tap, 88 + 19 c, 85 + 30 r), nothing once the name holds seven
-//   (the game refuses it); the backspace key (the game's ← as a live crop; 165,168) and Y erase
+//   (the game refuses it); the backspace key (a kit ←; 165,168) and Y erase
 //   the last character (nothing at empty, as the game).
 // - Hair (1): the eight colour swatches (live crops 2x; 59 + 25 i, 42) and the 2 x 2 style grid
 //   (live crops 3x of the game's cells, 117 + 60 c, 90 + 63 r) over its column scroll; Right from
 //   the right column / Left from the left one tap the game's arrows (228,120 / 65,120) while the
-//   game shows them (CasState::canLeft / canRight, its sprites); the arrows drawn as live crops.
+//   game shows them (CasState::canLeft / canRight, its sprites); the arrows the game's sprite 2x (the left one mirrored).
 // - Face (2): the 3 x 3 grid (live crops 3x, 90 + 57 c, 58 + 51 r).
-// - Clothes (3): the six categories (live crops 2x, 50, y_i) and the 3 x 2 cells of the game's
-//   page (live crops 3x, 111 + 48 c, 72 + 64 r), its arrows as buttons beside them (77,105 /
+// - Clothes (3): the six categories (their sprites 2x, 50, y_i) and the 3 x 2 cells of the game's
+//   page (each item's own sprite 3x, from the page's list; 111 + 48 c, 72 + 64 r), its arrows as buttons beside them (77,105 /
 //   240,105: A pages; focusable only while the game shows them, the categories left of them);
 //   the cell holding the game's choice rimmed (its ring sprite, CasState::clothesCell). Medium:
 //   which item a cell holds is the game's table (not decoded), the HD shows its picture.
 // - Keep this Sim? (4): the four aspirations (the game's pictures, sprite 362, in its order on
-//   screen: Fortune, Popularity, Romance, Party, the others dimmed; A taps them, 82 + 45 j, 44), the chosen one's
+//   screen: Fortune, Popularity, Romance, Party, 2x, the others dimmed; A taps them, 82 + 45 j, 44), the chosen one's
 //   name (1994 + a) and text (1998 + a), the game's tick (974, "Yes" 48: A taps 116,170, the
 //   game then starts: never replayed) and cross (7683, "No" 49: A or B tap 176,170, the title at
 //   phase 0, as the game). Once one is pressed (C+0x11) nothing more is (the game counts down).
@@ -97,9 +97,15 @@ constexpr int kStrCasKeys[3] = {241, 267, 293};
 constexpr int kStrCasTitle0 = 2016;                           // + page 1..4: Hair Style, Face Style, Clothes, Confirm
 constexpr int kStrCasKeep = 2021, kStrAsp0 = 1994, kStrAspText0 = 1998, kStrCasYes = 48, kStrCasNo = 49;
 constexpr int kSprCasTick = 974, kSprCasCross = 7683;
+// The pages' own sprites (descriptors; tiles - 1, palette + 1), drawn from the ROM in place of the
+// touch screen's pixels: ♀ / ♂ (the Name page's [4] / [5]), the arrows (frame 1 lit; the left one the
+// right one mirrored), the tabs' tick; the Clothes categories' palette (the game's for all six).
+constexpr int kSprCasGender[2] = {1052, 1061}, kSprCasArrow = 1140, kSprCasTabTick[2] = {1137, 1132}, kCasCatPal = 1076;   // (the tick: blue, lit green)
+// The pages' sprite lists (CasState::sprites): Hair's arrows; Clothes' categories [0..5], arrows, cells [9..14].
+constexpr int kCasHairArrowSpr[2] = {2, 3}, kCasClothArrowSpr[2] = {6, 7}, kCasCatSpr0 = 0, kCasClothSpr0 = 9;
 // The aspirations' picture (the stat panel's too): frames Fortune, Popularity, Romance, Party, the
-// game's order on this page (kCasAspOfSlot), 64 x 64, drawn kCasAspIcon wide.
-constexpr int kSprCasAsp = 362, kCasAspIcon = 96;
+// game's order on this page (kCasAspOfSlot), 64 x 64, drawn kCasAspScale times (a whole factor).
+constexpr int kSprCasAsp = 362, kCasAspScale = 2;
 // The keyboard pages' labels, as the game's own buttons show them (not words: the same in every language).
 constexpr const char* kCasKbLabel[3] = {"ABC", "abc", "123!"};
 
@@ -133,9 +139,9 @@ constexpr Rect CasCatRect(int i) { return {kCasX, 190 + 70 * i, 64, 64}; }
 constexpr Rect CasClothRect(int cell) { return {824 + 130 * (cell % 3), 200 + 184 * (cell / 3), 120, 174}; }
 constexpr Rect kCasClothLeft {788, 200, 32, 358}, kCasClothRight {1208, 200, 32, 358};
 // Keep this Sim?
-constexpr Rect CasAspRect(int slot) { return {746 + 120 * slot, 186, 108, 112}; }
-constexpr Rect kCasAspName {kCasX, 312, kCasW, 48};
-constexpr Rect kCasAspText {kCasX, 370, kCasW, 150};
+constexpr Rect CasAspRect(int slot) { return {718 + 132 * slot, 182, 128, 128}; }
+constexpr Rect kCasAspName {kCasX, 320, kCasW, 48};
+constexpr Rect kCasAspText {kCasX, 376, kCasW, 150};
 constexpr Rect kCasTick {756, 544, 210, 88}, kCasCross {994, 544, 210, 88};
 
 // The character key i of keyboard page p shows (the game's string), empty past the page's keys.

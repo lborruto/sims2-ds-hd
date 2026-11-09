@@ -484,30 +484,44 @@ def front_cas(page, focus, raw_top=True):
     expect("top frame", C(12, 300), OUTLINE)
     expect("backdrop", C(5, 5), BACKDROP)
     expect("panel", C(704, 640), FRAME)
+    # The tabs: round kit buttons, the page's green, the others the cells' blue.
     for i in range(5):
-        x0, y0 = 780 + 80 * i + 6, 34 + 4
-        for dy in range(0, 30, 5):
-            for dx in range(0, 34, 5):
-                expect(f"tab {i} DS {1 + dx},{8 + 37 * i + dy}", C(x0 + 2 * dx + 1, y0 + 2 * dy + 1), bottom(1 + dx, 8 + 37 * i + dy))
-        if len(errors) > 4:
-            return
-    # One live crop of the page: DS x, y, w, h, its scale, its HD box (Keep this Sim?: the game's
-    # aspiration pictures, sprite 362, their blue splash in each cell).
+        r, g, b = C(820 + 80 * i, 46)
+        lit = g > r + 40 and g > b
+        if lit != (i == page): errors.append(f"tab {i}: {(r, g, b)} {'not ' if i == page else ''}green")
+    # One picture of the page: DS x, y, w, h, its scale, its HD box (Keep this Sim?: the game's
+    # aspiration pictures, sprite 362, 2x, their blue splash in the chosen one, dimmed in the others;
+    # the Name page: the game's ♀ green (chosen), ♂ grey; Clothes: a cell's sprite from the ROM, the
+    # same pixel art as the touch screen's where it is opaque).
+    green = lambda x0, y0, w, h: sum(1 for yy in range(y0, y0 + h, 2) for xx in range(x0, x0 + w, 2) if C(xx, yy)[1] > C(xx, yy)[0] + 60)
+    near = 0
     if page == 4:
         for j in range(4):
-            blue = sum(1 for yy in range(190, 294, 2) for xx in range(750 + 120 * j, 850 + 120 * j, 2) if C(xx, yy)[2] > 200 and C(xx, yy)[0] < 140)
-            if blue < 100: errors.append(f"aspiration {j}: no picture ({blue})")
+            blue = sum(1 for yy in range(186, 306, 2) for xx in range(722 + 132 * j, 842 + 132 * j, 2) if C(xx, yy)[2] > 200 and C(xx, yy)[0] < 140)
+            if (blue >= 100) != (j == 0): errors.append(f"aspiration {j}: {'no picture' if j == 0 else 'not dimmed'} ({blue})")
         fw = fh = 0
+    elif page == 0:
+        if green(750, 188, 84, 84) < 150: errors.append(f"no green ♀ ({green(750, 188, 84, 84)})")
+        if green(844, 188, 84, 84) > 10: errors.append(f"♂ not grey ({green(844, 188, 84, 84)})")
+        fw = fh = 0
+    elif page == 3:
+        fx, fy, fw, fh, s, ox, oy = 188, 109, 38, 54, 3, 1084, 387
+        near = 1
     else:
         fx, fy, fw, fh, s, (bx, by, bw, bh) = {
-            0: (47, 7, 37, 37, 2, (750, 188, 84, 84)), 1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129)),
-            3: (188, 109, 38, 54, 3, (1084, 384, 120, 174))}[page]
+            1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129))}[page]
         ox, oy = bx + (bw - fw * s) // 2, by + (bh - fh * s) // 2
+    same = total = 0
     for dy in range(0, fh, 4):
         for dx in range(0, fw, 4):
+            total += 1
+            if near:
+                same += C(ox + s * dx + s // 2, oy + s * dy + s // 2) == bottom(fx + dx, fy + dy)
+                continue
             expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), bottom(fx + dx, fy + dy))
             if len(errors) > 4:
                 return
+    if near and same < total * 0.6: errors.append(f"the cell's sprite: {same} of {total} pixels the touch screen's")
     x, y, w, h = focus
     r, g, b = C(x + w // 2, y - 3)
     if not (g > r + 80 and g > b + 60): errors.append(f"no focus halo above {focus}: {(r, g, b)}")
@@ -1279,7 +1293,7 @@ elif case == "s3-res2":
         expect(f"turn pill {name} covered", C(16 + int(dx * k), 87 + int(150 * k)), hexrgb("5961A2"))
         expect(f"turn pill {name} covered (its end)", C(16 + int((dx + 23) * k), 87 + int(146 * k)), hexrgb("5961A2"))
 elif case == "s4":
-    front_cas(4, (746, 186, 108, 112))
+    front_cas(4, (718, 182, 128, 128))
 elif case == "s4-it":
     front_cas(4, (756, 544, 210, 88))
 elif case == "cas-hair":
@@ -2145,6 +2159,7 @@ pages = []
 for n in range(600):
     cur = at.get(n, cur)
     pages.append(cur)
+FILLS = [(0x6A, 0x72, 0xB8), (0x9A, 0xA2, 0xE3)]                       # (a cell, a focused cell)
 bad = []
 for f0, page in changes:
     final = Image.open(f"{d}/f{f0 + 8:06d}.png").convert("RGB")
@@ -2155,7 +2170,15 @@ for f0, page in changes:
             box = (x + w // 4, y + h // 4, x + w - w // 4, y + h - h // 4)   # (its middle: the well s bevel aside)
             a = im.crop(box)
             if len(a.getcolors(1 << 16) or [0, 0]) == 1: continue          # empty
-            if a.tobytes() == final.crop(box).tobytes(): continue          # the page s own
+            # the page s own: as 8 frames later but for the cells fill under a picture s
+            # transparent pixels (the focus lands a frame late) and the game s brief dimming
+            fa, fb, n, off = a.tobytes(), final.crop(box).tobytes(), a.size[0] * a.size[1], 0
+            for k in range(0, 3 * n, 3):
+                pa, pb = fa[k:k + 3], fb[k:k + 3]
+                if max(abs(pa[c] - pb[c]) for c in range(3)) <= 8: continue
+                if any(max(abs(q[c] - f[c]) for c in range(3)) <= 10 for q in (pa, pb) for f in FILLS): continue
+                off += 1
+            if off <= n // 10: continue
             bad.append(f"frame {f} page {page}: box {x},{y} neither empty nor the page s picture")
 for b in bad[:4]: print("  cas-gate: " + b)
 sys.exit(1 if bad else 0)' "$tmp/cas-gate" "$tmp/cas-gate.log"
