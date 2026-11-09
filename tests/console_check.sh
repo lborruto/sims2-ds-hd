@@ -348,10 +348,22 @@ SKIP = [(421, 356)] if case.split("-")[0] in ("autopsy", "art", "scratch", "vacu
 SKIP_DS = ([(50, 26, 86, 70)] if case.split("-")[0] == "moogoo" else [(0, 68, 31, 110)] if case == "mixer-save"
            else [(114, 54, 146, 86)] if case == "vacuum-clog" else [])
 
-def piece(what, fx, fy, fw, fh, tx, ty, scale, step=5):
-    """A piece of the bottom screen drawn whole-number times bigger: each DS pixel's block."""
+# The game's frame colours a keyed crop (port/panelmenu.h KeyedCrop) may take out around a portrait.
+KEYED = {(0x38, 0x38, 0x69), (0x41, 0x49, 0x79), (0x51, 0x51, 0x8A), (0x59, 0x61, 0xA2), (0x61, 0x71, 0xB2), (0x82, 0x8A, 0xCB)}
+
+KEY_BAND = 3  # (port/panelmenu.h kKeyBand: only the crop's outer 3 pixels may be keyed out)
+
+def in_band(x, y, w, h):
+    return min(x, y, w - 1 - x, h - 1 - y) < KEY_BAND
+
+def piece(what, fx, fy, fw, fh, tx, ty, scale, step=5, keyed=False):
+    """A piece of the bottom screen drawn whole-number times bigger: each DS pixel's block (keyed:
+    the piece is a KeyedCrop's whole rectangle; a DS pixel in the game's frame colours within its
+    outer KEY_BAND pixels may be the HD well's instead; every pixel further in is the DS's own)."""
     for y in range(0, fh, step):
         for x in range(0, fw, step):
+            if keyed and bottom(fx + x, fy + y) in KEYED and in_band(x, y, fw, fh):
+                continue
             if any(abs(tx + x * scale - sx) < 20 and abs(ty + y * scale - sy) < 20 for sx, sy in SKIP):
                 continue
             if any(x0 <= fx + x <= x1 and y0 <= fy + y <= y1 for x0, y0, x1, y1 in SKIP_DS):
@@ -827,11 +839,13 @@ def hd_menu(rows, focus, wide=False):
     counts = [greens(i) for i in range(5)]
     if counts[0] < 200 or any(counts[1:]):
         errors.append(f"tab icons' green pixels {counts} (want Interact's only)")
-    piece("portrait 3x", 63, 47, 65, 81, 220, 230, 3, step=4)
+    piece("portrait 3x", 63, 47, 65, 81, 220, 230, 3, step=4, keyed=True)
+    if rows == 0 and (255, 255, 255) not in [C(x, y) for y in range(214, 498) for x in range(470, 1070)]:
+        errors.append("no rows: the port's words (NoActions) missing")
     for i in range(4):
         row = [C(x, y) for y in range(214 + 76 * i, 268 + 76 * i) for x in range(488, 900)]
         white = (255, 255, 255) in row
-        if white != (i < rows):
+        if rows > 0 and white != (i < rows):  # (no rows: the port's white words lie across them)
             errors.append(f"row {i}: label {'missing' if i < rows else 'drawn'}")
         r, g, b = C(456, 241 + 76 * i)
         ring = RINGED(456, 241 + 76 * i)  # the ring's green (its edge softened by the row's shadow)
@@ -957,7 +971,7 @@ elif case in ("gift", "gift-items", "gift-items-2x", "gift-items-wide"):
     expect("panel outline", C(176, 300), OUTLINE)
     expect("panel band", C(180, 300), hexrgb("6171B2"))
     expect("title well", C(640, 50), hexrgb("6870B6"))
-    piece("portrait 3x", 167, 47, 65, 81, 862, 195, 3, step=4)
+    piece("portrait 3x", 167, 47, 65, 81, 862, 195, 3, step=4, keyed=True)
     # The bow: the game's sprite (3631, blue on its round button) in its bar.
     bow = [C(x, y) for y in range(486, 546, 2) for x in range(470, 530, 2)]
     if sum(1 for p in bow if p[2] > p[0] + 60 and p[2] > p[1] + 40) < 20:
@@ -1052,8 +1066,8 @@ elif case in ("registry", "registry-2x", "registry-wide", "registry-guest"):
         if len(key) < 6: errors.append(f"no key in the first row ({len(key)} colours)")
     else:
         if pink(144) < 10: errors.append("the occupied room's name not pink")
-        piece("row portrait 2x", 8, 24, 28, 30, 228, 145, 2, step=3)
-        piece("big portrait 3x", 8, 24, 28, 30, 906, 151, 3, step=3)
+        piece("row portrait 2x", 8, 24, 28, 30, 228, 145, 2, step=3, keyed=True)
+        piece("big portrait 3x", 8, 24, 28, 30, 906, 151, 3, step=3, keyed=True)
     not_big()
 elif case in ("roominfo", "roominfo-vacant", "roominfo-hint"):
     # Room info in HD (src/port/roominfo.*): the panel; the portrait the game's own (the concierge:
@@ -1071,7 +1085,7 @@ elif case in ("roominfo", "roominfo-vacant", "roominfo-hint"):
     else:
         expect("panel outline", C(176, 300), OUTLINE)
         expect("title well", C(640, 50), hexrgb("6870B6"))
-        piece("portrait 3x", 172, 36, 70, 86, 223, 145, 3, step=6)
+        piece("portrait 3x", 172, 36, 70, 86, 223, 145, 3, step=6, keyed=True)
         if not ring(484, 163): errors.append("no focus ring around the guest's line")
         if ring(484, 225): errors.append("a focus ring around the second line")
         warm = sum(1 for y in range(140, 570, 2) for x in range(880, 1060, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
@@ -1133,9 +1147,10 @@ elif case.startswith("stat-"):
     not_big()
 elif case in ("pockets-menu", "pockets-armed"):
     # Pockets in HD (src/port/pockets.*): the Pockets tab's icon green, the focus ring around slot
-    # 1 (the Arcade-Pie Factory), the counted items' icons the touch screen's pixels 2x (DS 99 +
-    # 29i, 155, 23 x 23), their counts in white, the item's name in the info; never the touch
-    # screen 3x.
+    # 1 (the Arcade-Pie Factory), the counted items' icons the game's record sprites 2x (their
+    # pictures' colours the touch screen's own at DS 99 + 29i, 155, 23 x 23; no dark square of the
+    # button's well #51518A around them), their counts in white, the item's name in the info;
+    # never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
     def greens(cell):
         x0 = 420 + 88 * cell
@@ -1144,8 +1159,13 @@ elif case in ("pockets-menu", "pockets-armed"):
     counts = [greens(i) for i in range(5)]
     if counts[1] < 200 or counts[0] or any(counts[2:]):
         errors.append(f"tab icons' green pixels {counts} (want Pockets' only)")
+    WELL = (81, 81, 138)
     for i in range(4):
-        piece(f"counted {i} 2x", 99 + 29 * i, 155, 23, 23, 200 + 87 * i + 14, 462, 2, step=3)
+        hd = [C(x, y) for y in range(454, 526) for x in range(200 + 87 * i, 275 + 87 * i)]
+        ds = set(bottom(99 + 29 * i + x, 155 + y) for y in range(23) for x in range(23)) - {WELL}
+        shared = len(ds & set(hd))
+        if shared < 5: errors.append(f"counted {i}: {shared} of the touch screen's colours (want the game's picture)")
+        if hd.count(WELL) > 40: errors.append(f"counted {i}: the button's dark well around it ({hd.count(WELL)} pixels)")
     r, g, b = C(197, 258)
     if not (RINGED(197, 258)): errors.append("no focus ring around slot 1")
     if (255, 255, 255) not in [C(x, y) for y in range(540, 560) for x in range(215, 260)]:
@@ -1175,7 +1195,7 @@ elif case == "s5":
 elif case in ("s5-hd", "s5-hd-wide"):
     # The HD conversation (port/dialogue.h): the panel 1060 wide from x 110 (its frame band
     # #6171B2), the text well, white text in it, the name plate's white text above it, the
-    # portrait: the touch screen's x 174-240, rows 38-121, 2x from (1006, 504) (a page of
+    # portrait: the touch screen's x 174-240, rows 38-121, 2x from (1006, 504), its frame keyed out (a page of
     # four rows: the panel 254 high from y 452), nothing of the game's own box.
     BAND, TWELL = hexrgb("6171B2"), hexrgb("6870B6")
     expect("panel band", C(112, 600), BAND)
@@ -1186,7 +1206,8 @@ elif case in ("s5-hd", "s5-hd-wide"):
     if white(140, 430, 400, 476) < 300:
         errors.append("no name on the plate")
     grid = [(x, y) for y in range(0, 84, 3) for x in range(0, 67, 3)]
-    bad = sum(1 for x, y in grid if C(1006 + 2 * x, 504 + 2 * y) != bottom(174 + x, 38 + y))
+    # (its frame's colours keyed out in its outer band: KeyedCrop, the well's colour there)
+    bad = sum(1 for x, y in grid if C(1006 + 2 * x, 504 + 2 * y) != bottom(174 + x, 38 + y) and not (bottom(174 + x, 38 + y) in KEYED and in_band(x, y, 67, 84)))
     if bad:
         errors.append(f"portrait: {bad} pixels not the touch screen's")
     if sum(1 for x, y in grid if max(C(1006 + 2 * x, 504 + 2 * y)) > 40) < len(grid) // 2:
@@ -1365,10 +1386,10 @@ elif case in ("slots", "slots-hd"):
             errors.append("no name in slot 3")
 elif case == "goals-menu":
     # Goals in HD (src/port/goals.*): the Goals tab's icon green, the giver's portrait the touch
-    # screen's pixels 3x (DS 47,88 30 x 30 at 219,225), the focus ring on the first goal (the
+    # screen's pixels 3x (DS 47,88 30 x 30 at 219,225, its bevel keyed out), the focus ring on the first goal (the
     # game's selection), white text in the list; never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
-    piece("giver", 47, 88, 30, 30, 219, 225, 3, step=3)
+    piece("giver", 47, 88, 30, 30, 219, 225, 3, step=3, keyed=True)
     r, g, b = C(355, 240)
     if not (RINGED(355, 240)): errors.append("no focus ring around the first goal")
     if sum(1 for y in range(220, 400, 2) for x in range(390, 1000, 2) if min(C(x, y)) > 235) < 300:
@@ -1380,8 +1401,8 @@ elif case in ("rel-menu", "rel-menu-wide"):
     # (DS 84,37 69 x 84 at 474,222), the first row's portrait 2x (DS 43,28 28 x 28 at 214,220),
     # the focus ring on the first row (the game's selection), the mood in white.
     expect("panel outline", C(176, 300), OUTLINE)
-    piece("big portrait", 84, 37, 69, 84, 474, 222, 3, step=4)
-    piece("row 1 portrait", 43, 28, 28, 28, 214, 220, 2, step=3)
+    piece("big portrait", 84, 37, 69, 84, 474, 222, 3, step=4, keyed=True)
+    piece("row 1 portrait", 43, 28, 28, 28, 214, 220, 2, step=3, keyed=True)
     r, g, b = C(197, 248)
     if not (RINGED(197, 248)): errors.append("no focus ring around the first Sim")
     if (255, 255, 255) not in [C(x, y) for y in range(240, 280) for x in range(728, 900)]:

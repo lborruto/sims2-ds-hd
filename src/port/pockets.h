@@ -1,8 +1,8 @@
 // The panel's Pockets tab in HD (port/panelmenu.h's frame): the six pocket slots as a grid of the
 // game's own item icons (the record table's sprite, upscaled), the three key items (the
 // Vacuum, the Super Drencher, the Metal Detector: the game's tool buttons, coloured when owned,
-// a silhouette when not), the four counted items with their counts (their icons a live crop of
-// the game's buttons: their sprite is not one the port decodes), and the focused item's name and
+// a silhouette when not), the four counted items with their counts (their icons the record
+// table's, as the slots': GameState reads the rows of items 23-26), and the focused item's name and
 // description beside, with the hand ("Use") and the bin. Empty slots are drawn but never focused.
 // Everything from GameState::town.inventory and .pockets (RAM) and the game's strings.
 //
@@ -34,9 +34,6 @@ constexpr int kPkSlotX0 = 67, kPkSlotY0 = 89, kPkSlotDx = 39, kPkSlotDy = 37;  /
 constexpr int kPkKeyX = 234, kPkKeyY0 = 89, kPkKeyDy = 38;                       // key item k
 constexpr int kPkCountX0 = 110, kPkCountDx = 29, kPkCountY = 170;               // counted item i
 constexpr int kPkHandX = 191, kPkHandY = 107, kPkBinX = 67, kPkBinY = 167;
-// The counted items' icons on the touch screen (inside their buttons' dark well #51518A).
-constexpr Rect kPkCountIconFrom {99, 155, 23, 23}; // item i: x + 29i
-constexpr u32 kPkCountWell = 0xFF51518A;
 
 // The game's sprites (descriptor ids; tiles - 1, palette + 1): the hand and the bin, blue and
 // green (the game's pressed / armed look), and the tool buttons (frame 0 a silhouette, 1 owned).
@@ -82,6 +79,10 @@ void AddItemCell(Composition& c, Rect r, bool focused, bool selected, bool empty
 void AddSpriteIcon(Composition& c, IconCache* icons, int desc, int frame, int scale, Rect box, u32 opacity = 0);
 // The same from a slot item's own tiles / descriptor / palette (the Large Plant's palette is not 2484).
 void AddSpriteIcon(Composition& c, IconCache* icons, const ItemRec& item, int scale, Rect box, u32 opacity = 0);
+// The same at a tier (ui::kTierS, ui::kTierL; one per component), centred in box: icons' AddTiered
+// for a descriptor (SpriteRef::Of) or a slot item's own sprite triple.
+void AddTieredIcon(Composition& c, IconCache* icons, int desc, int frame, int tier, Rect box, u32 opacity = 0);
+void AddTieredIcon(Composition& c, IconCache* icons, const ItemRec& item, int tier, Rect box, u32 opacity = 0);
 
 // An item's description fitted to a box: the size shrunk from kPkDescSize to kPkDescMin until
 // its lines fit the height. fits: they did at kPkDescMin.

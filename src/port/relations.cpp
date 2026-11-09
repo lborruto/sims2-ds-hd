@@ -14,8 +14,8 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kLabel = 0xFFD6DAF6;      // a well's small label: a pale lavender
 constexpr u32 kPlateRim = 0xFFB2B2E3;
+constexpr u32 kRowWell = 0xFF51518A;     // a row's portrait well: the DS cell's inside
 constexpr int kRowPortrait = 68;        // a row's portrait well (the crop 2x inside)
 constexpr float kRowName = 24, kRowNameLine = 22, kRowNameMin = 18;
 
@@ -43,7 +43,7 @@ void AddPair(Composition& c, Rect r, const std::string& label, const std::string
     UiItem lt = TextItem({r.x + 18, r.y + 6, r.w - 36, 26}, l.text, l.size, Align::Left, Weight::Bold);
     lt.wrap = false;
     lt.middle = true;
-    lt.colour = kLabel;
+    lt.colour = kTextNote; // (white: the label shrinks to 18 px on the well)
     lt.layer = 1;
     c.ui.push_back(lt);
     const FittedText v = FitLine(value, 28, 20, r.w - 36, Weight::ExtraBold);
@@ -118,7 +118,7 @@ void BuildRelations(Composition& c, const MenuView& v, int focus, const GameStat
         c.ui.push_back(bar);
         UiItem well = PanelItem(RowPortrait(row));
         well.plain = true;
-        well.fill = th.frameDark;
+        well.fill = kRowWell; // (the DS cell's own inside: the portrait's background meets it)
         well.radius = 10;
         well.layer = 1;
         c.ui.push_back(well);
@@ -148,20 +148,19 @@ void BuildRelations(Composition& c, const MenuView& v, int focus, const GameStat
         c.ui.push_back(dt);
     }
 
-    // Images: the rows' portraits (2x) and the big one (3x), live.
+    // Images: the rows' portraits (28 x 28: kTierS) and the big one (3x, filled), live.
     if (bottom)
     {
         for (int i = 0; i < kRelRowsShown && r.first + i < n; i++)
         {
             const Rect from {kRelSimFrom.x, kRelSimFrom.y + kRelSimY[i] - kRelSimY[0], kRelSimFrom.w, kRelSimFrom.h};
             const Rect pw2 = RowPortrait(RowRect(i));
-            const int w = from.w * 2, h = from.h * 2;
-            c.ui.push_back(ImageItem({pw2.x + (pw2.w - w) / 2, pw2.y + (pw2.h - h) / 2, w, h}, bottom, SW, SH, from));
+            c.ui.push_back(KeyedCrop(bottom, from, pw2, kTierS));
         }
         if (sel)
         {
             const int w = kRelBigFrom.w * 3, h = kRelBigFrom.h * 3;
-            c.ui.push_back(ImageItem({kRelPortrait.x + (kRelPortrait.w - w) / 2, kRelPortrait.y + (kRelPortrait.h - h) / 2, w, h}, bottom, SW, SH, kRelBigFrom));
+            c.ui.push_back(KeyedCrop(bottom, kRelBigFrom, {kRelPortrait.x + (kRelPortrait.w - w) / 2, kRelPortrait.y + (kRelPortrait.h - h) / 2, w, h}));
         }
     }
 }

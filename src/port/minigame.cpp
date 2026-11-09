@@ -237,7 +237,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         const MooGooState& g = game.minigame.mooGoo;
         const HdHint quit {{C(Button::B)}, Words(rom, kStrMgQuit)}, startQuit {{C(Button::Start)}, Words(rom, kStrMgQuit)};
         const HdHint choose {{C(Button::DPadH)}, Own(rom, OwnWordId::MooGooChooseMonkey)};
-        if (!g.valid) return {{{C(Button::A)}, Own(rom, OwnWordId::CardsContinue)}, quit};
+        if (!g.valid) return {{{C(Button::A)}, Own(rom, OwnWordId::Continue)}, quit};
         if (g.intro) return {{{C(Button::A)}, Own(rom, OwnWordId::MooGooPlay)}, quit};
         if (g.quitAsk) return AskHints(rom, askFocus);
         const bool human = !g.players[std::clamp(g.current, 0, kMooGooPlayers - 1)].ai;
@@ -250,7 +250,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
             if (g.sub == 5) return {choose, {{C(Button::A)}, Own(rom, OwnWordId::MooGooPlayOn)}, {{C(Button::B)}, Own(rom, OwnWordId::MooGooTakeBack)}, startQuit};
         }
         if (g.phase == 0) return {{{C(Button::DPadH)}, Own(rom, OwnWordId::MooGooPlayers)}, {{C(Button::A)}, Own(rom, OwnWordId::MooGooConfirm)}, quit};
-        return {{{C(Button::A)}, Own(rom, OwnWordId::CardsContinue)}, quit};
+        return {{{C(Button::A)}, Own(rom, OwnWordId::Continue)}, quit};
     }
     case Screen::Drencher:
     {
@@ -291,7 +291,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     {
         const CardsState& k = game.minigame.cards;
         if (k.valid && k.quitAsk) return AskHints(rom, askFocus);
-        if (k.valid && k.message) return {{{C(Button::A)}, Own(rom, OwnWordId::CardsContinue)}};
+        if (k.valid && k.message) return {{{C(Button::A)}, Own(rom, OwnWordId::Continue)}};
         const HdHint quit {{C(Button::B)}, Words(rom, kStrMgQuit)};
         // The turn's step (what the game's line says): draw, then play or discard; the opponent's
         // turn and the game's animations take nothing but the quit.
@@ -1073,7 +1073,7 @@ bool BoxOf(Screen s, const GameState& game, const RomData& rom, MgBox& b)
             // "End of Turn." and whose turn comes, in the game's words (MooGoo's "@1's turn"): not its "Touch for…".
             const std::string next = m.cards.turn == 0 ? Words(rom, kStrMgOpponent) : m.cards.name.empty() ? Words(rom, kStrMgPlayer) : m.cards.name;
             b.text = MenuText(FirstLine(rom.String(kStrMgEndOfTurn))) + "\n" + MenuWordsWith(rom, kStrMgTurnOf, next);
-            b.buttons = {Btn(Button::A, Own(rom, OwnWordId::CardsContinue), Around(kCardsMessage, 20))};
+            b.buttons = {Btn(Button::A, Own(rom, OwnWordId::Continue), Around(kCardsMessage, 20))};
         }
         return true;
     }

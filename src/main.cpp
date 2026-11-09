@@ -901,7 +901,7 @@ relaunch:
             }
             for (bool portrait : {true, false})
             {
-                const DialogueLayout L = LayoutDialogue(text, portrait);
+                const DialogueLayout L = LayoutDialogue(text, portrait, app.rom.get());
                 const bool inside = L.fits && L.panel.y >= 0 && L.panel.y + L.panel.h <= kConsoleH;
                 if (!inside) bad++;
                 if (ids.size() == 1)
@@ -1343,7 +1343,7 @@ relaunch:
                         // reading; the line counts are for the box with the portrait's column).
                         if (app.rom && d.stringId < app.rom->StringCount())
                         {
-                            const DialogueLayout L = LayoutDialogue(DialogueText(app.rom->String(d.stringId), app.game.hud, app.rom->String(kDlgAmId), app.rom->String(kDlgPmId)), true);
+                            const DialogueLayout L = LayoutDialogue(DialogueText(app.rom->String(d.stringId), app.game.hud, app.rom->String(kDlgAmId), app.rom->String(kDlgPmId)), true, app.rom.get());
                             fprintf(stderr, "frame %ld: hd dialogue id=%d lines=%zu size=%g\n", frame, d.stringId, L.lines.size(), L.size);
                         }
                     }

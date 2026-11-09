@@ -5,6 +5,7 @@
 #include <cstdlib>
 
 #include "hotspots.h"
+#include "port/ownwords.h"
 #include "port/goals.h"
 #include "port/icons.h"
 #include "port/panelmenu.h"
@@ -351,14 +352,11 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
             const bool on = i == focus;
             if (on)
             {
-                // The game's highlight: a dark bar, its letters light; the focus's green halo.
-                UiItem halo = PanelItem({rr.x - 4, rr.y, rr.w + 8, rr.h});
-                halo.plain = true;
-                halo.fill = 0xFF309A41;
-                halo.radius = 14;
-                halo.layer = 1;
-                c.ui.push_back(halo);
-                UiItem bar = PanelItem({rr.x, rr.y + 4, rr.w, rr.h - 8});
+                // The game's highlight: a dark bar, its letters light, in the kit's focus ring (the
+                // green, then the line inside it: white on the dark bar).
+                const Rect br {rr.x, rr.y + 4, rr.w, rr.h - 8};
+                AddFocusRing(c, br, 10, 1, kBar);
+                UiItem bar = PanelItem(br);
                 bar.plain = true;
                 bar.fill = kBar;
                 bar.radius = 10;
@@ -383,7 +381,7 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
     // The hints, under the buttons.
     {
         const Rect hb {kPhPanel.x + 24, kPhPanel.y + kPhPanel.h - 46, kPhPanel.w - 48, 36};
-        std::vector<std::pair<Button, std::string>> hs = {{Button::DPadV, ""}, {Button::A, MenuFocusable(v, focus) ? FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, 270, Weight::ExtraBold).text : ""},
+        std::vector<std::pair<Button, std::string>> hs = {{Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose)}, {Button::A, MenuFocusable(v, focus) ? FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, 270, Weight::ExtraBold).text : ""},
                                                           {Button::B, MenuWords(rom, v.backCloses ? kStrClose : kStrPhExit)}};
         int total = 0;
         std::vector<Rect> rs;
@@ -406,11 +404,11 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
     AddMousePiece(c, {kPhoneClose.x - 8, kPhoneClose.y - 8, 16, 16}, kPhX);
 
     // Images: the signal bars, the buttons, the X; the game's own LCD when its page did not read.
-    AddSpriteIcon(c, icons, kSprPhSignal, 0, 2, {kPhHeader.x, kPhHeader.y, 64, kPhHeader.h});
+    AddTieredIcon(c, icons, kSprPhSignal, 0, kTierS, {kPhHeader.x, kPhHeader.y, 64, kPhHeader.h});
     AddSprite(c, icons, kSprPhUp, kPhUp);
     AddSprite(c, icons, kSprPhOk, kPhOk);
     AddSprite(c, icons, kSprPhDown, kPhDown);
-    AddSpriteIcon(c, icons, kSprPhX, 0, 2, kPhX);
+    AddTieredIcon(c, icons, kSprPhX, 0, kTierS, kPhX);
     if (pg.crop && bottom)
     {
         const int w = kPhLcdFrom.w * 2, h = kPhLcdFrom.h * 2;

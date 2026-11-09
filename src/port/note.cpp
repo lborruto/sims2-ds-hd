@@ -95,7 +95,7 @@ void BuildNote(Composition& c, const MenuView&, int focus, const GameState& game
     c.ui.push_back(bb);
 
     AddMousePiece(c, {kNoteCloseX - 14, kNoteCloseY - 14, 28, 28}, kNoteX);
-    AddSpriteIcon(c, icons, kSprNoteX, 0, 2, kNoteX);
+    AddTieredIcon(c, icons, kSprNoteX, 0, kTierS, kNoteX);
     SortUi(c.ui, first);
 }
 

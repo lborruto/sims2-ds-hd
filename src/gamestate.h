@@ -73,9 +73,9 @@ struct ItemRec
 {
     int id = -1;
     int nameId = -1, descId = -1;
-    int iconRes = -1;                 // slot items: the sprite descriptor resource (RecordRow::descRes); -1 for the others
+    int iconRes = -1;                 // slot and counted items: the sprite descriptor resource (RecordRow::descRes); -1 for the key items
     int count = 0;
-    int tilesRes = -1, palRes = -1;   // slot items: the record's own tiles and palette (the Large Plant's palette is not the descriptor's neighbour)
+    int tilesRes = -1, palRes = -1;   // slot and counted items: the record's own tiles and palette (the Large Plant's palette is not the descriptor's neighbour)
     bool operator==(const ItemRec&) const = default;
 };
 
