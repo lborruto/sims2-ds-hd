@@ -146,6 +146,10 @@ bool Settings::Load(const std::string& path)
     // by the owner's choice it starts in CONSOLE, once (the next save writes version 2 and the
     // file then says what the player chose).
     if (version < 2 && layout == Layout::Auto) layout = Layout::Console;
+    // Version 3 (the ux round): the game's pictures default to Pixel. Every file before it wrote
+    // game_pictures=smooth, the old default, whether chosen or not: it loads as Pixel, once (the
+    // next save writes version 3, so a Smooth chosen after that stays).
+    if (version < 3) smoothPictures = false;
     return true;
 }
 
@@ -155,7 +159,7 @@ bool Settings::Save(const std::string& path) const
     std::ofstream out(path);
     if (!out) return false;
     out << "# The Sims 2 DS, one screen: settings. Changed from the pause menu (Start + Back, or Esc).\n"
-        << "settings_version=2\n"
+        << "settings_version=3\n"
         << "mic=" << MicKey(mic) << "\n"
         << "layout=" << LayoutName(layout) << "\n"
         << "resolution_3d=" << resolution3D << "\n"

@@ -216,7 +216,7 @@ void ShellHost::SaveSettings(App& app, const Video& video, bool remember) const
     if (!app.settings.Save(settingsPath)) fprintf(stderr, "cannot write %s\n", settingsPath.c_str());
 }
 
-void ShellHost::ApplySetting(App& app, Video& video, int row)
+void ShellHost::ApplySetting(App& app, Video& video, int row, bool save)
 {
     const Settings& s = app.settings;
     switch ((shell::Row)row)
@@ -228,14 +228,14 @@ void ShellHost::ApplySetting(App& app, Video& video, int row)
             video.RememberSize(app.settings); // (the window's, before it fills the screen)
             video.SetFullscreen(s.fullscreen);
         }
-        SaveSettings(app, video, false);
+        if (save) SaveSettings(app, video, false);
         return;
     case shell::Row::Scaling: if (video.win) video.SetScaling(s.scaling); break;
     // (The language: the DS's firmware and the strings are chosen when the game starts; the row's
     // note says so. The battery saver, the volume, mute and the rest are read where they are used.)
     default: break; // (read where they are used, every frame)
     }
-    SaveSettings(app, video);
+    if (save) SaveSettings(app, video);
 }
 
 void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
@@ -339,7 +339,10 @@ void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
     case Act::ResetTab:
         // The tab's rows went back to their defaults: each applied (and saved) as if changed.
         log("reset tab", r.arg, true);
-        for (shell::Row row : shell::TabRows(r.arg).rows) ApplySetting(app, video, (int)row);
+        // (One write after them all, without the window's size: a fullscreen change may have just
+        // gone back to windowed.)
+        for (shell::Row row : shell::TabRows(r.arg).rows) ApplySetting(app, video, (int)row, false);
+        SaveSettings(app, video, false);
         break;
     default: break; // (the launch panel's: main.cpp's)
     }

@@ -86,8 +86,9 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - Clearer names: *Screen scaling* (was Picture filter), *Game icons* (was Game pictures), *Pause in
   the background* (was Run in background, the other way round), *Buzz on connect* (was Rumble),
   fast forward *Hold / Toggle*, and the real microphone reads "Real microphone".
-- The game's icons and portraits in the HD menus are drawn with the DS's own pixels by default
-  (Smooth stays a choice in *Game icons*; a settings file that says smooth keeps it).
+- The game's icons and portraits in the HD menus are drawn with the DS's own pixels by default.
+  Settings kept from an earlier version move to Pixels once (they all said Smooth, the old
+  default); Smooth stays a choice in *Game icons*, and once chosen again it stays.
 - CONSOLE is the default layout; AUTO, FOCUS, SIDE and STACKED stay in the pause menu's Settings
   (keys 0 to 4). Sharper 3D, widescreen and 60 fps are on by default; a settings file from before
   CONSOLE that still holds the old defaults is moved to the new ones once, and a file that names a

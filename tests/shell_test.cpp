@@ -83,7 +83,7 @@ static void CheckBuild(const Shell& sh, const Model& m, const char* what)
         if (!sh.Focusable(m, i)) continue;
         if (r[i].w <= 0 || r[i].x < 0 || r[i].y < 0 || r[i].x + r[i].w > kW || r[i].y + r[i].h > kH)
         {
-            if (sh.page == Page::Settings || sh.page == Page::Keys) continue; // (scrolled out)
+            if (sh.page == Page::Keys) continue; // (scrolled out; Settings never scrolls)
             fprintf(stderr, "%s: item %d has no place\n", what, i);
             failures++;
         }
@@ -292,6 +292,9 @@ static void settings_page()
         s2.tab = (int)Tab::Graphics;
         s2.focus = 1;
         g.s.resolution3D = 4; g.s.widescreen = false; g.s.batterySaver = true; g.s.volume = 30; g.s.layout = Layout::Side;
+        g.s.windowW = 1600; g.s.windowH = 900; g.s.windowX = 33; g.s.windowY = 44;
+        g.s.controls.SetPad(Controls::X, Controls::IN_LB);
+        const Controls::Bindings bindings = g.s.controls;
         CHECK(s2.Update(Press("y"), g.m).act == Act::None && s2.ask == Ask::ResetTab && s2.askFocus == 0);
         for (int lang = 1; lang <= 5; lang++) { g.m.language = lang; CheckBuild(s2, g.m, "reset question"); }
         g.m.language = 1;
@@ -308,6 +311,8 @@ static void settings_page()
         const Settings d;
         CHECK(g.s.resolution3D == d.resolution3D && g.s.widescreen == d.widescreen && g.s.batterySaver == d.batterySaver);
         CHECK(g.s.volume == 30 && g.s.layout == Layout::Side); // (other tabs untouched)
+        CHECK(g.s.windowW == 1600 && g.s.windowH == 900 && g.s.windowX == 33 && g.s.windowY == 44); // (nor the window)
+        CHECK(g.s.controls.Lines() == bindings.Lines());                                      // (nor the bindings)
     }
     // Every tab fits its list (no scrolling at 100 %), every word whole (no "…") and every note on
     // two lines at most, in every language; the note under the list for each row.
@@ -513,6 +518,17 @@ static void pad_fallback()
         CHECK(n.a && count(n) == 1);                    // the default: A on south
         CHECK(!ShellPadNav(b, press(IN_A), press(IN_A)).a); // held: no press
         CHECK(ShellPadNav(b, press(IN_B), none).b);
+        // LB / RB (the DS's L / R): the settings' tabs, one each.
+        const PadNav l = ShellPadNav(b, press(IN_LB), none), r = ShellPadNav(b, press(IN_RB), none);
+        CHECK(l.lb && !l.rb && !l.a && !l.b && r.rb && !r.lb && !r.a && !r.b);
+        CHECK(!ShellPadNav(b, press(IN_LB), press(IN_LB)).lb); // held: no press
+    }
+    // LB bound as accept (A's): it accepts, and is no tab change too (one press, one action).
+    {
+        Bindings c;
+        c.SetPad(A, IN_LB);
+        const PadNav n = ShellPadNav(c, press(IN_LB), none);
+        CHECK(n.a && !n.lb);
     }
     b.pad[A] = kNone;                                   // cleared
     CHECK(ShellPadNav(b, press(IN_A), none).a);         // south still accepts
@@ -827,7 +843,24 @@ static void platform()
         { std::ofstream(path) << "resolution_3d=0\ncursor_speed=190\n"; }
         r3.Load(path);
         CHECK(r3.resolution3D == 1 && r3.cursorSpeed == 200);
-        { std::ofstream(path) << "ui_scale=auto\ngame_pictures=smooth\n"; }
+        // Version 3: a file from before it (it always wrote the old default, smooth) loads as
+        // Pixel, once; saved, it says version 3, so a Smooth chosen afterwards sticks.
+        for (const char* old : {"settings_version=2\ngame_pictures=smooth\n", "game_pictures=smooth\n"})
+        {
+            { std::ofstream(path) << old; }
+            Settings o;
+            o.Load(path);
+            CHECK(!o.smoothPictures);
+            o.smoothPictures = true;
+            CHECK(o.Save(path));
+            Settings p;
+            p.Load(path);
+            CHECK(p.smoothPictures);
+            std::ifstream in(path);
+            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            CHECK(text.find("settings_version=3\n") != std::string::npos);
+        }
+        { std::ofstream(path) << "settings_version=3\nui_scale=auto\ngame_pictures=smooth\n"; }
         Settings w;
         w.uiScale = 90;
         w.Load(path);
