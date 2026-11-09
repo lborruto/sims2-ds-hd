@@ -751,10 +751,10 @@ def white_text(name, x0, y0, x1, y1):
 
 def minigame_frame(side_top):
     # side_top: the side panel's top less 68 (the secondary panel's top).
-    # The HD minigame frame (src/port/minigame.*): the prompt bar under the playfield (the kit's
-    # panel fill at its left end, white words), the side panel under the secondary one (its fill
+    # The HD minigame frame (src/port/minigame.*): the prompt bar under the playfield (a dark well,
+    # #3E4683, at its left end, white words), the side panel under the secondary one (its fill
     # just inside its top left), the title plate over the playfield (the cards' and the vacuum's).
-    expect("prompt bar fill", C(40, 686), FRAME)
+    expect("prompt bar fill", C(40, 686), hexrgb("3E4683"))
     bar = white_text("prompt bar", 40, 664, 1240, 708)
     if case in ("cards", "cards-ask", "cards-wide", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "detector-wide",
                 "art", "art-ask", "moogoo", "moogoo-2x", "drencher", "drencher-wide", "crime", "scratch", "mixer", "mixer-wide", "mixer-save",

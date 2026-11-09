@@ -107,6 +107,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   drawn arrow. DS Wireless's icon is drawn sharp, and the shop's greyed words are readable.
 - Every button hint says what it does: the D-pad's (Choose, Pages, Adjust), Create-a-Sim's (Turn,
   Select) and the concept art's (View).
+- The minigames' numbers and button bar sit on dark wells and are never smaller than 18 points:
+  the cards' line, MooGoo's players and the long German words fit without shrinking further.
 - The vacuum on a controller: A takes a find for you. The hand goes to the find in the green ring
   (the one nearest the hand; the right stick moves the hand), presses where no dust lies over it,
   carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is
