@@ -1,15 +1,20 @@
 #!/usr/bin/env bash
 # Checks 60 fps's in-between frames (src/melonds_ext/GPU3D_Wide.cpp, WideAccess::Pair) on the
-# walking Sim, from s7 with --wide --res3d 2 --interp and the pairing's log (SSR_PAIR_DEBUG):
-#   - a model (a run of polygons with one polygon ID; the Sim's is 7) moves in one piece or not
-#     at all: no in-between frame draws the Sim partly paired. Its log line says "N of N paired"
-#     or the model is "left whole" (one 30 fps step);
+# walking Sim, from s7 with --wide --res3d 2 --interp and the pairing's log (SSR_PAIR_DEBUG).
+# A model (a run of polygons with one non-scenery polygon ID; the Sim's is 7) is paired as a
+# unit: "whole", or "left whole" (drawn at its new pose: one 30 fps step), never partly.
+# The guards that hold whatever the build (steps()):
 #   - a straight walk (scripts/interp/walk-up.txt) keeps every in-between frame of the Sim;
-#   - the zigzag and the turn mid-walk (scripts/interp/zigzag.txt, walk-turn.txt) keep all but a
-#     few (at most 5 of their frames are 30 fps steps);
-#   - at the frames where the Sim used to tear (zigzag 104, 134, 193; walk-turn 154) the Sim's
-#     box is the same as with SSR_PAIR_LOOSE (which pairs every polygon it can: whole there,
-#     checked by eye).
+#   - the zigzag and the turn mid-walk (scripts/interp/zigzag.txt, walk-turn.txt) keep all but
+#     5 at most;
+#   - no other model is left whole more than 5 times in a run (other Sims: nothing judders
+#     beside the Sim; the scenery is never paired as a unit, so it never steps), the shadow
+#     volumes (id 256 in the log, translucent) not more than 8 (their order changes when two
+#     shadows cross).
+# Pinned pictures (same()): at the 4 frames where the Sim used to tear (zigzag 104, 134, 193;
+# walk-turn 154) the Sim's box must be the same as with SSR_PAIR_LOOSE (which pairs every
+# polygon it can; whole there, checked by eye). A change to the pairing may move these: look at
+# the frames before changing the check.
 # Needs the ROM, shots/s7.st and Pillow (not in CI):
 #   bash tests/interp_check.sh
 # Override with SIMS2WIDE (the program), ROM, SHOTS (the save states' folder), PYTHON and
@@ -57,18 +62,24 @@ steps() {
     "$python" -I - "$tmp/$1.log" "$1" "$2" <<'EOF'
 import re, sys
 log, name, most = sys.argv[1], sys.argv[2], int(sys.argv[3])
-frames = whole = left = partly = 0
+frames = whole = left = 0
+others = {}
 for line in open(log, errors="replace"):
     if line.startswith("[pair] ---"):
         frames += 1
-    m = re.match(r"\[pair\] model \d+-\d+ \(id 7\): (\d+) of (\d+) paired", line)
-    if m and m.group(1) == m.group(2):
-        whole += 1
-    if re.match(r"\[pair\] model \d+-\d+ \(id 7\) left whole", line):
-        left += 1
-print(f"{name}: {frames} in-between frames, the Sim whole in {whole}, left whole (30 fps) in {left}")
+    m = re.match(r"\[pair\] model \d+-\d+ \(id (\d+)\): (.*)", line)
+    if not m:
+        continue
+    if m.group(1) == "7":
+        whole += m.group(2).startswith("whole")
+        left += m.group(2) == "left whole"
+    elif m.group(2) == "left whole":
+        others[m.group(1)] = others.get(m.group(1), 0) + 1
+print(f"{name}: {frames} in-between frames, the Sim whole in {whole}, left whole (30 fps) in {left}; others left whole: {others or 'none'}")
 if frames < 100 or whole + left < frames - 2 or left > most:
     print(f"FAIL {name}: the Sim kept too few in-between frames"); sys.exit(1)
+if any(n > (8 if i == "256" else 5) for i, n in others.items()):
+    print(f"FAIL {name}: another model was left whole more than 5 times"); sys.exit(1)
 EOF
 }
 [ -f "$tmp/zigzag.ok" ] && { steps zigzag 5 || fail=1; }

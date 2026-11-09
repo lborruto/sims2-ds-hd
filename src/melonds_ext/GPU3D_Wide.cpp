@@ -326,10 +326,19 @@ struct WideAccess
             }
         }
 
-        // A model is a run of consecutive polygons with one polygon ID (the game gives each
-        // Sim its own, 7 and up; the scenery uses 0 and 50-63).
-        auto polygonId = [](const RawPolygon& p) { return (p.PolygonAttr >> 24) & 0x3F; };
-        auto sameRun = [&](size_t a, size_t b) { return polygonId(rawCur[a]) == polygonId(rawCur[b]); };
+        // A model is a run of consecutive polygons with one polygon ID: the game gives each Sim
+        // its own (7 and up); the scenery uses 0 and 50-63, many objects to an ID. A shadow
+        // volume (its mask with ID 0, then the shadow with its own) is one model: halves paired
+        // apart would cast it wrong.
+        auto polygonId = [](const RawPolygon& p) {
+            return ((p.PolygonAttr >> 4) & 0x3) == 3 ? 0x100u : (p.PolygonAttr >> 24) & 0x3F;
+        };
+        auto isScenery = [](u32 id) { return id == 0 || (id >= 50 && id < 64); };
+        auto runEnd = [&](const std::vector<RawPolygon>& list, size_t s) {
+            size_t e = s + 1;
+            while (e < list.size() && polygonId(list[e]) == polygonId(list[s])) e++;
+            return e;
+        };
         // Whether prev's polygon k can stand for this frame's polygon ci: the same kind, and no
         // vertex further off than an eighth of the screen.
         auto fits = [&](size_t ci, s64 k) {
@@ -369,15 +378,11 @@ struct WideAccess
             // lists run in step, and that also pairs what moves by itself (a windmill's
             // blades, a walking person) and what is so close to the camera that it moves
             // unlike the rest. A neighbouring tile or model is further off than this allows.
-            // Inside a model whose last polygon was paired just before, the offset holds
-            // however the polygon moved (a Sim turning swings an arm far from the scene's
-            // movement): leaving it there tore the model apart.
             if (ia < rawPrev.size() && !loose)
             {
-                const bool inStep = ci > 0 && lastPair >= 0 && (s64)ia == lastPair + 1 && sameRun(ci - 1, ci);
                 s64 mx, my;
                 if (sameKind(rawPrev[ia], cur) && movement(rawPrev[ia], cur, nverts, mx, my) &&
-                    (inStep || unlike(rawPrev[ia], cur, nverts, sceneX, sceneY) <= nverts * 40))
+                    unlike(rawPrev[ia], cur, nverts, sceneX, sceneY) <= nverts * 40)
                 {
                     bestMove = 0;
                     bestIndex = ia;
@@ -403,32 +408,15 @@ struct WideAccess
 
         if (!loose)
         {
-            // The gaps: a polygon left unpaired inside a model takes the offset the paired
-            // polygons nearest to it in the model use (the one before, else the one after),
-            // when the polygon there is of its kind and near enough.
-            s64 offset = INT64_MIN;
-            for (size_t ci = 0; ci < rawCur.size(); ci++)
-            {
-                if (ci > 0 && !sameRun(ci - 1, ci)) offset = INT64_MIN;
-                if (out.Partner[ci] >= 0)
-                    offset = (s64)out.Partner[ci] - (s64)ci;
-                else if (offset != INT64_MIN && fits(ci, (s64)ci + offset))
-                    out.Partner[ci] = (s32)((s64)ci + offset);
-            }
-            offset = INT64_MIN;
-            for (size_t ci = rawCur.size(); ci-- > 0;)
-            {
-                if (ci + 1 < rawCur.size() && !sameRun(ci, ci + 1)) offset = INT64_MIN;
-                if (out.Partner[ci] >= 0)
-                    offset = (s64)out.Partner[ci] - (s64)ci;
-                else if (offset != INT64_MIN && fits(ci, (s64)ci + offset))
-                    out.Partner[ci] = (s32)((s64)ci + offset);
-            }
-
-            // All or nothing: a model still partly paired would be drawn half at the
-            // in-between pose and half at the new one, torn apart for a frame. It is left
-            // whole at its new pose instead (one 30 fps step). Polygons that lie wholly
-            // outside the view (even the wide one) do not count.
+            // A model (not the scenery) is paired as a unit: with the previous frame's run of
+            // its ID and length, all its polygons at that one offset, each within an eighth of
+            // the screen, or none of them. Pairing it polygon by polygon paired some of a
+            // turning Sim's polygons and not their neighbours: half the mesh in between, half
+            // at the new pose, torn for a frame on every start, stop and turn. A model whose
+            // length changed keeps the pairs above, all or none. Left unpaired, a model is
+            // drawn whole at its new pose (one 30 fps step). The scenery keeps the pairs above.
+            // (A polygon wholly outside the view, even the wide one, is not seen: one that does
+            // not pair there is left at its new place, outside, and does not count.)
             auto outside = [](const RawPolygon& p) {
                 const int nverts = (p.PolygonMode & 0x1) ? 4 : 3;
                 bool l = true, r = true, b = true, t = true, behind = true;
@@ -443,28 +431,39 @@ struct WideAccess
                 }
                 return l || r || b || t || behind;
             };
-            for (size_t s = 0; s < rawCur.size();)
+            for (size_t s = 0, e; s < rawCur.size(); s = e)
             {
-                size_t e = s + 1;
-                while (e < rawCur.size() && sameRun(s, e)) e++;
-                bool anyPaired = false, anyLeft = false;
+                e = runEnd(rawCur, s);
+                const u32 id = polygonId(rawCur[s]);
+                if (isScenery(id)) continue;
+                const size_t n = e - s;
+                s64 from = -1;
+                for (size_t ps = 0, pe; ps < rawPrev.size(); ps = pe)
+                {
+                    pe = runEnd(rawPrev, ps);
+                    if (polygonId(rawPrev[ps]) == id && pe - ps == n &&
+                        (from < 0 || std::abs((s64)ps - (s64)s) < std::abs(from - (s64)s)))
+                        from = (s64)ps;
+                }
+                bool whole = true, seen = false;
                 for (size_t ci = s; ci < e; ci++)
                 {
-                    if (out.Partner[ci] >= 0) anyPaired = true;
-                    else if (!outside(rawCur[ci])) anyLeft = true;
+                    const s64 k = from >= 0 ? from + (s64)(ci - s) : out.Partner[ci];
+                    const bool in = !outside(rawCur[ci]);
+                    seen = seen || in;
+                    if (from >= 0 ? fits(ci, k) : k >= 0)
+                        out.Partner[ci] = (s32)k;
+                    else
+                    {
+                        out.Partner[ci] = -1;
+                        whole = whole && !in;
+                    }
                 }
-                if (dbgPair && e - s >= 50)
-                {
-                    u32 n = 0;
-                    for (size_t ci = s; ci < e; ci++) n += out.Partner[ci] >= 0;
-                    fprintf(stderr, "[pair] model %zu-%zu (id %u): %u of %zu paired\n", s, e - 1, polygonId(rawCur[s]), n, e - s);
-                }
-                if (anyPaired && anyLeft)
-                {
-                    if (dbgPair) fprintf(stderr, "[pair] model %zu-%zu (id %u) left whole\n", s, e - 1, polygonId(rawCur[s]));
+                if (!whole)
                     for (size_t ci = s; ci < e; ci++) out.Partner[ci] = -1;
-                }
-                s = e;
+                if (dbgPair)
+                    fprintf(stderr, "[pair] model %zu-%zu (id %u): %s\n", s, e - 1, id,
+                        !seen ? "outside" : !whole ? "left whole" : from >= 0 ? "whole" : "whole (length changed)");
             }
         }
 
