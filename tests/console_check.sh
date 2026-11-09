@@ -2184,6 +2184,28 @@ for b in bad[:4]: print("  cas-gate: " + b)
 sys.exit(1 if bad else 0)' "$tmp/cas-gate" "$tmp/cas-gate.log"
 }
 check_pad cas-gate cas_gate
+# The game's pictures fade with Create-a-Sim's veil (src/console.cpp): from s4, the tick
+# (scripts/console/cas-keep.txt) and the game's fade out: once the panel is under a third dark, the
+# chosen aspiration's picture (the ROM's, drawn above every still item) is darker than before too.
+cas_fade_run() {
+    cp "$complete_save" "$tmp/cas-fade.sav" || return
+    "$bin" "$rom" --headless --frames 136 --state-load "$shots/s4.st" --save "$tmp/cas-fade.sav" --layout console --compose \
+        "${town[@]}" --input "$repo/scripts/console/cas-keep.txt" --shot-at 100,134 --shot-dir "$tmp/cas-fade" > "$tmp/cas-fade.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/cas-fade.log" && touch "$tmp/cas-fade.ok"
+}
+cas_fade_run
+cas_fade() {
+    "$python" -I -c '
+import sys
+from PIL import Image
+a, b = (Image.open(f"{sys.argv[1]}/f{n:06d}.png").convert("RGB") for n in (100, 134))
+mean = lambda im, box: sum(im.crop(box).tobytes()) / (box[2] - box[0]) / (box[3] - box[1])
+panel, asp = (700, 560, 712, 700), (870, 200, 950, 290)
+p, q = mean(b, panel) / mean(a, panel), mean(b, asp) / mean(a, asp)
+if p > 0.75: print(f"  cas-fade: the panel not dark yet ({p:.2f})"); sys.exit(1)
+if q > (1 + p) / 2: print(f"  cas-fade: the aspiration {q:.2f} of its light, the panel {p:.2f}"); sys.exit(1)' "$tmp/cas-fade"
+}
+check_pad cas-fade cas_fade
 # The world's camera on the right stick (navigator.h, WorldKeys; from s7, the phone closed): held
 # left it turns (the DS's L), held up it zooms in (X): the world's picture differs from the same
 # run without it; LB held (the shoulders' default L) changes nothing there any more.
