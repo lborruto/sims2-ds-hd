@@ -326,6 +326,20 @@ struct WideAccess
             }
         }
 
+        // A model is a run of consecutive polygons with one polygon ID (the game gives each
+        // Sim its own, 7 and up; the scenery uses 0 and 50-63).
+        auto polygonId = [](const RawPolygon& p) { return (p.PolygonAttr >> 24) & 0x3F; };
+        auto sameRun = [&](size_t a, size_t b) { return polygonId(rawCur[a]) == polygonId(rawCur[b]); };
+        // Whether prev's polygon k can stand for this frame's polygon ci: the same kind, and no
+        // vertex further off than an eighth of the screen.
+        auto fits = [&](size_t ci, s64 k) {
+            if (k < 0 || k >= (s64)rawPrev.size()) return false;
+            const RawPolygon& cur = rawCur[ci];
+            const int nverts = (cur.PolygonMode & 0x1) ? 4 : 3;
+            s64 mx, my;
+            return sameKind(rawPrev[k], cur) && movement(rawPrev[k], cur, nverts, mx, my);
+        };
+
         out.Partner.assign(rawCur.size(), -1);
         out.KeepStrip.assign(rawCur.size(), 1);
         out.Matched = 0;
@@ -333,23 +347,15 @@ struct WideAccess
         s64 lastPair = -1;
         static const bool dbgPairOn = getenv("SSR_PAIR_DEBUG") != nullptr;
         const bool dbgPair = dbgPairOn && debug;
-        s64 dbgOff = 0;
         if (dbgPair) fprintf(stderr, "[pair] --- frame, scene motion %lld,%lld\n", (long long)sceneX, (long long)sceneY);
+        static const bool loose = getenv("SSR_PAIR_LOOSE") != nullptr;
         for (size_t ci = 0; ci < rawCur.size(); ci++)
         {
             const RawPolygon& cur = rawCur[ci];
             const int nverts = (cur.PolygonMode & 0x1) ? 4 : 3;
 
-            // Polygons of a strip share two corners with the one before, and the DS takes
-            // those from the polygon already built. That is only right here if both were
-            // moved the same way: both paired, with neighbours in the previous frame as
-            // well, or both left where they are. Otherwise this one is built on its own;
-            // sharing would give it two corners from the in-between position and the rest
-            // from the new one, which tore faces apart (seen where a model meets the edge
-            // of the picture and some of its polygons no longer pair).
             // Scenes are full of identical tiles and models, so of the candidates the one
             // that moved the way the scene did is taken.
-            const RawPolygon* prev = nullptr;
             s64 bestMove = -1;
             size_t bestIndex = 0;
             // A partner has to have moved roughly as the scene did (within a few DS
@@ -357,18 +363,21 @@ struct WideAccess
             // that move by themselves).
             // Without that limit, when a model leaves the picture the next model of the
             // same kind was paired with it and drawn halfway towards where it had been.
-            static const bool loose = getenv("SSR_PAIR_LOOSE") != nullptr;
             const s64 speed = (sceneX < 0 ? -sceneX : sceneX) + (sceneY < 0 ? -sceneY : sceneY);
             const s64 limit = loose ? INT64_MAX : nverts * (12 + speed / 2);
             // First the polygon that follows the last partner: within an object the two
             // lists run in step, and that also pairs what moves by itself (a windmill's
             // blades, a walking person) and what is so close to the camera that it moves
             // unlike the rest. A neighbouring tile or model is further off than this allows.
+            // Inside a model whose last polygon was paired just before, the offset holds
+            // however the polygon moved (a Sim turning swings an arm far from the scene's
+            // movement): leaving it there tore the model apart.
             if (ia < rawPrev.size() && !loose)
             {
+                const bool inStep = ci > 0 && lastPair >= 0 && (s64)ia == lastPair + 1 && sameRun(ci - 1, ci);
                 s64 mx, my;
                 if (sameKind(rawPrev[ia], cur) && movement(rawPrev[ia], cur, nverts, mx, my) &&
-                    unlike(rawPrev[ia], cur, nverts, sceneX, sceneY) <= nverts * 40)
+                    (inStep || unlike(rawPrev[ia], cur, nverts, sceneX, sceneY) <= nverts * 40))
                 {
                     bestMove = 0;
                     bestIndex = ia;
@@ -387,25 +396,102 @@ struct WideAccess
                     if (m <= nverts * 6) break; // within a pixel or so per vertex of the scene's movement
                 }
             }
-            if (bestMove >= 0)
+            if (bestMove >= 0) ia = bestIndex + 1;
+            lastPair = bestMove >= 0 ? (s64)bestIndex : -1;
+            out.Partner[ci] = (s32)lastPair;
+        }
+
+        if (!loose)
+        {
+            // The gaps: a polygon left unpaired inside a model takes the offset the paired
+            // polygons nearest to it in the model use (the one before, else the one after),
+            // when the polygon there is of its kind and near enough.
+            s64 offset = INT64_MIN;
+            for (size_t ci = 0; ci < rawCur.size(); ci++)
             {
-                prev = &rawPrev[bestIndex];
-                ia = bestIndex + 1;
+                if (ci > 0 && !sameRun(ci - 1, ci)) offset = INT64_MIN;
+                if (out.Partner[ci] >= 0)
+                    offset = (s64)out.Partner[ci] - (s64)ci;
+                else if (offset != INT64_MIN && fits(ci, (s64)ci + offset))
+                    out.Partner[ci] = (s32)((s64)ci + offset);
             }
-            const s64 pairIndex = prev ? (s64)bestIndex : -1;
+            offset = INT64_MIN;
+            for (size_t ci = rawCur.size(); ci-- > 0;)
+            {
+                if (ci + 1 < rawCur.size() && !sameRun(ci, ci + 1)) offset = INT64_MIN;
+                if (out.Partner[ci] >= 0)
+                    offset = (s64)out.Partner[ci] - (s64)ci;
+                else if (offset != INT64_MIN && fits(ci, (s64)ci + offset))
+                    out.Partner[ci] = (s32)((s64)ci + offset);
+            }
+
+            // All or nothing: a model still partly paired would be drawn half at the
+            // in-between pose and half at the new one, torn apart for a frame. It is left
+            // whole at its new pose instead (one 30 fps step). Polygons that lie wholly
+            // outside the view (even the wide one) do not count.
+            auto outside = [](const RawPolygon& p) {
+                const int nverts = (p.PolygonMode & 0x1) ? 4 : 3;
+                bool l = true, r = true, b = true, t = true, behind = true;
+                for (int i = 0; i < nverts; i++)
+                {
+                    const s64 x = p.Vertices[i].Position[0], y = p.Vertices[i].Position[1], w = p.Vertices[i].Position[3];
+                    l = l && x < -2 * w;
+                    r = r && x > 2 * w;
+                    b = b && y < -w;
+                    t = t && y > w;
+                    behind = behind && w <= 0;
+                }
+                return l || r || b || t || behind;
+            };
+            for (size_t s = 0; s < rawCur.size();)
+            {
+                size_t e = s + 1;
+                while (e < rawCur.size() && sameRun(s, e)) e++;
+                bool anyPaired = false, anyLeft = false;
+                for (size_t ci = s; ci < e; ci++)
+                {
+                    if (out.Partner[ci] >= 0) anyPaired = true;
+                    else if (!outside(rawCur[ci])) anyLeft = true;
+                }
+                if (dbgPair && e - s >= 50)
+                {
+                    u32 n = 0;
+                    for (size_t ci = s; ci < e; ci++) n += out.Partner[ci] >= 0;
+                    fprintf(stderr, "[pair] model %zu-%zu (id %u): %u of %zu paired\n", s, e - 1, polygonId(rawCur[s]), n, e - s);
+                }
+                if (anyPaired && anyLeft)
+                {
+                    if (dbgPair) fprintf(stderr, "[pair] model %zu-%zu (id %u) left whole\n", s, e - 1, polygonId(rawCur[s]));
+                    for (size_t ci = s; ci < e; ci++) out.Partner[ci] = -1;
+                }
+                s = e;
+            }
+        }
+
+        // Polygons of a strip share two corners with the one before, and the DS takes
+        // those from the polygon already built. That is only right here if both were
+        // moved the same way: both paired, with neighbours in the previous frame as
+        // well, or both left where they are. Otherwise this one is built on its own;
+        // sharing would give it two corners from the in-between position and the rest
+        // from the new one, which tore faces apart (seen where a model meets the edge
+        // of the picture and some of its polygons no longer pair).
+        lastPair = -1;
+        s64 dbgOff = 0;
+        for (size_t ci = 0; ci < rawCur.size(); ci++)
+        {
+            const s64 pairIndex = out.Partner[ci];
             const bool keepStrip = (pairIndex < 0 && lastPair < 0) || (pairIndex >= 0 && lastPair >= 0 && pairIndex == lastPair + 1);
             lastPair = pairIndex;
             if (dbgPair)
             {
                 const s64 off = pairIndex < 0 ? INT64_MIN : pairIndex - (s64)ci;
                 if (off != dbgOff)
-                    fprintf(stderr, "[pair] cur %zu/%zu -> prev %lld/%zu (mode %u, unlike %lld)\n", ci, rawCur.size(),
-                        (long long)pairIndex, rawPrev.size(), cur.PolygonMode, (long long)bestMove);
+                    fprintf(stderr, "[pair] cur %zu/%zu -> prev %lld/%zu (mode %u)\n", ci, rawCur.size(),
+                        (long long)pairIndex, rawPrev.size(), rawCur[ci].PolygonMode);
                 dbgOff = off;
             }
-            out.Partner[ci] = (s32)pairIndex;
             out.KeepStrip[ci] = keepStrip ? 1 : 0;
-            if (prev) out.Matched++;
+            if (pairIndex >= 0) out.Matched++;
         }
     }
 

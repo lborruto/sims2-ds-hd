@@ -81,6 +81,7 @@ that has played far ("the complete save") and Pillow. Each takes them from the e
     bash tests/screens_check.sh       # the bottom screen recognised by its pixels
     bash tests/hotspots_check.sh      # each touch target tapped in the game does what it says
     bash tests/romdata_check.sh       # the game's strings, resources and sprites (RESEARCH= optional)
+    bash tests/interp_check.sh        # 60 fps: the walking Sim never torn in an in-between frame
 
 `MAX_SIMS` caps how many emulators a script runs at once (4 by default; set it lower on a slow or
 hot machine). The save states the scripts use are your own (never in git): the list, and how each

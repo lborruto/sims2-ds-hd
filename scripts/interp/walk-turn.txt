@@ -1,0 +1,5 @@
+# From s7 (the phone closed by the tap at frame 5): a long walk up, the stick pushed right as
+# well from frame 150 (a turn mid-walk; tests/interp_check.sh).
+5 4 touch 237 15
+40 400 pad ly-
+150 60 pad lx+

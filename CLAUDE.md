@@ -41,7 +41,7 @@ writes RAM. The full per-module notes, traps and known limits are in
   (`SDL_VIDEODRIVER=dummy`). `ui_bench` is a measure, not a check.
 - Scripts (need the ROM, save states in `shots/`, a complete save and Pillow):
   `ROM=… SHOTS=… MORE_SHOTS=… COMPLETE_SAVE=… PYTHON=… MAX_SIMS=4 bash tests/console_check.sh`,
-  and `gamestate_check`, `hotspots_check`, `romdata_check`, `screens_check` the same way.
+  and `gamestate_check`, `hotspots_check`, `romdata_check`, `screens_check`, `interp_check` the same way.
   `MAX_SIMS` caps the emulators run at once (4; lower on a hot machine). Run long scripts in the
   background.
 - The identity check: with the looks off, `--layout auto` output from the 24-shot set (see
