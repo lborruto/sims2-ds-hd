@@ -177,11 +177,11 @@ static void upgrade_layout()
     write("layout=side\n");
     CHECK(c.Load(path));
     CHECK(c.layout == Layout::Side);
-    // the upgraded settings save as version 2, and reload as chosen
+    // the upgraded settings save as the current version (3), and reload as chosen
     CHECK(a.Save(path));
     std::ifstream in(path);
     std::string text((std::istreambuf_iterator<char>(in)), {});
-    CHECK(text.find("settings_version=2\n") != std::string::npos);
+    CHECK(text.find("settings_version=3\n") != std::string::npos);
     a.layout = Layout::Auto;
     CHECK(a.Save(path));
     Settings d;

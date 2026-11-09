@@ -1,7 +1,8 @@
 // The player's settings: one place for every option, whoever uses it. The comfort work loads and
 // saves them (settings.ini in SDL's per-user folder, settings.cpp) and shows them in the settings
 // page; the other parts only read them. Add a field here with its default, then its line in
-// settings.cpp's Load and Save and its row in shell.cpp; never a setting of your own elsewhere.
+// settings.cpp's Load and Save and its row in shell.cpp (in one tab: TabRows, with its note);
+// never a setting of your own elsewhere.
 #pragma once
 #include <string>
 
@@ -23,7 +24,7 @@ struct Settings
     // Looks: on by default, for CONSOLE; headless runs never load settings and start with them
     // off (main.cpp), so the checks' output stays the same.
     Layout layout = Layout::Console; // the window's layout (--layout overrides it for one run)
-    int resolution3D = 2;      // 1 = DS (192 lines), 2, 3… times sharper
+    int resolution3D = 2;      // 1 = DS (192 lines), 2, 3, 4 times sharper (the row's range; a file is held to it)
     bool widescreen = true;    // 16:9 world when the game's 3D allows it
     bool interpolate60 = true; // 60 fps in-between frames
 
@@ -33,9 +34,10 @@ struct Settings
     // The HD interface's size: 0 Auto (from the window's physical size, AutoUiScale), else 60 to
     // 150 percent by 5. Headless: 100 % unless --ui-scale (settings are not loaded there).
     int uiScale = 0;
-    // The game's pictures in the HD interface (icons, portraits): Smooth (the pixel-art scaler) or
-    // Pixel (nearest, as the DS's own). Headless: Pixel unless --game-pictures.
-    bool smoothPictures = true;
+    // The game's pictures in the HD interface (icons, portraits): Pixel (nearest, as the DS's own:
+    // the default, as the game's screens) or Smooth (the pixel-art scaler). Headless: Pixel unless
+    // --game-pictures.
+    bool smoothPictures = false;
     bool batterySaver = false;  // the looks at their lightest (3D 1x, 30 fps) without changing their settings
     int windowW = 1280, windowH = 720; // the window's size when it last closed
     bool windowKnown = false;   // (not saved) the file gave window=: else the size comes from the screen

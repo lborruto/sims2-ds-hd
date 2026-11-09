@@ -82,7 +82,7 @@ bool Settings::Load(const std::string& path)
             for (Layout l : {Layout::Console, Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked})
                 if (v == LayoutName(l)) layout = l;
         }
-        else if (k == "resolution_3d") resolution3D = std::clamp(atoi(v.c_str()), 1, 8);
+        else if (k == "resolution_3d") resolution3D = std::clamp(atoi(v.c_str()), 1, 4); // (the row's range: past it, Right went down)
         else if (k == "widescreen") widescreen = on;
         else if (k == "interpolate_60") interpolate60 = on;
         else if (k == "fullscreen") fullscreen = on;
@@ -102,7 +102,7 @@ bool Settings::Load(const std::string& path)
         else if (k == "fast_forward_toggle") fastToggle = on;
         else if (k == "fast_boot") fastBoot = on;
         else if (k == "hide_pointer") hidePointer = on;
-        else if (k == "cursor_speed") cursorSpeed = std::clamp(atoi(v.c_str()), 50, 200);
+        else if (k == "cursor_speed") cursorSpeed = std::clamp((atoi(v.c_str()) + 12) / 25 * 25, 50, 200); // (the row's steps of 25)
         else if (k == "left_handed") leftHanded = on;
         else if (k == "window_position")
         {
@@ -146,6 +146,10 @@ bool Settings::Load(const std::string& path)
     // by the owner's choice it starts in CONSOLE, once (the next save writes version 2 and the
     // file then says what the player chose).
     if (version < 2 && layout == Layout::Auto) layout = Layout::Console;
+    // Version 3 (the ux round): the game's pictures default to Pixel. Every file before it wrote
+    // game_pictures=smooth, the old default, whether chosen or not: it loads as Pixel, once (the
+    // next save writes version 3, so a Smooth chosen after that stays).
+    if (version < 3) smoothPictures = false;
     return true;
 }
 
@@ -155,7 +159,7 @@ bool Settings::Save(const std::string& path) const
     std::ofstream out(path);
     if (!out) return false;
     out << "# The Sims 2 DS, one screen: settings. Changed from the pause menu (Start + Back, or Esc).\n"
-        << "settings_version=2\n"
+        << "settings_version=3\n"
         << "mic=" << MicKey(mic) << "\n"
         << "layout=" << LayoutName(layout) << "\n"
         << "resolution_3d=" << resolution3D << "\n"

@@ -21,9 +21,13 @@ constexpr Rect kPanel {200, 32, 880, 656};
 constexpr Rect kContent {kPanel.x + 32, kPanel.y + 84, kPanel.w - 64, kPanel.h - 84 - 80};
 constexpr int kHintsY = kPanel.y + kPanel.h - 66, kHintsH = 44;
 constexpr float kHint = 24;
-constexpr int kRowH = 52, kRowStep = 56;     // Settings and Keys: a row
-int ListRows(Page p) { return p == Page::Keys ? 7 : 8; } // (Keys: its columns' heads above)
-int ListTop(Page p) { return p == Page::Keys ? 40 : 0; }
+constexpr int kRowH = 52, kRowStep = 56;     // Keys: a row
+int ListRows(Page) { return 7; }             // (Keys: its columns' heads above)
+int ListTop(Page) { return 40; }
+// Settings: a row, the Advanced heading, the list's height (every tab fits: no scrolling; the UI's
+// size zooms the whole panel, held to the canvas), the note under it, the tab bar in the title band.
+constexpr int kSetRowH = 50, kSetRowStep = 54, kSetHeadH = 32, kSetListH = 410;
+constexpr int kTabBarY = kPanel.y + 20, kTabBarH = 48;
 constexpr Rect kAskBox {280, 200, 720, 320};
 constexpr Rect kLaunchList {48, 104, 680, 600}, kLaunchCard {752, 104, 480, 600};
 
@@ -223,8 +227,63 @@ void ChangeRow(Row r, int dir, Settings& s)
     case Row::Rumble: s.rumble = !s.rumble; break;
     case Row::Mic: s.mic = (MicMode)cycle((int)s.mic, 3); break;
     case Row::Language: s.language = cycle(s.language, 6); break;
-    case Row::Count: break;
+    case Row::Keys: case Row::Count: break;
     }
+}
+
+const TabLayout& TabRows(int tab)
+{
+    static const TabLayout tabs[kTabs] = {
+        {{Row::Fullscreen, Row::UiSize, Row::Scaling, Row::Pictures, Row::HidePointer, Row::Layout}, 5},
+        {{Row::Battery, Row::Res3D, Row::Fps60, Row::Wide}, 3},
+        {{Row::Volume, Row::Mute, Row::Background, Row::FastSound}, 3},
+        {{Row::Keys, Row::StickCursor, Row::CursorSpeed, Row::LeftHanded, Row::DeadZone, Row::Trigger, Row::Rumble}, 4},
+        {{Row::Language, Row::Mic, Row::FastSpeed, Row::FastKey, Row::FastBoot}, 4},
+    };
+    return tabs[std::clamp(tab, 0, kTabs - 1)];
+}
+
+std::string TabName(int tab, int lang)
+{
+    static const W words[kTabs] = {W::TabDisplay, W::TabGraphics, W::TabSound, W::ShellControls, W::TabGame};
+    return tab >= 0 && tab < kTabs ? Wd(lang, words[tab]) : "";
+}
+
+bool RowHeld(Row r, const Settings& s) { return s.batterySaver && (r == Row::Res3D || r == Row::Fps60); }
+
+void ResetTabRows(int tab, Settings& s)
+{
+    const Settings d;
+    for (Row r : TabRows(tab).rows)
+        switch (r)
+        {
+        case Row::Layout: s.layout = d.layout; break;
+        case Row::Fullscreen: s.fullscreen = d.fullscreen; break;
+        case Row::Scaling: s.scaling = d.scaling; break;
+        case Row::UiSize: s.uiScale = d.uiScale; break;
+        case Row::Pictures: s.smoothPictures = d.smoothPictures; break;
+        case Row::Res3D: s.resolution3D = d.resolution3D; break;
+        case Row::Wide: s.widescreen = d.widescreen; break;
+        case Row::Fps60: s.interpolate60 = d.interpolate60; break;
+        case Row::Battery: s.batterySaver = d.batterySaver; break;
+        case Row::Volume: s.volume = d.volume; break;
+        case Row::Mute: s.mute = d.mute; break;
+        case Row::FastSound: s.fastSound = d.fastSound; break;
+        case Row::Background: s.runInBackground = d.runInBackground; break;
+        case Row::FastSpeed: s.fastSpeed = d.fastSpeed; break;
+        case Row::FastKey: s.fastToggle = d.fastToggle; break;
+        case Row::FastBoot: s.fastBoot = d.fastBoot; break;
+        case Row::HidePointer: s.hidePointer = d.hidePointer; break;
+        case Row::StickCursor: s.stickCursor = d.stickCursor; break;
+        case Row::CursorSpeed: s.cursorSpeed = d.cursorSpeed; break;
+        case Row::DeadZone: s.stickDeadZone = d.stickDeadZone; break;
+        case Row::LeftHanded: s.leftHanded = d.leftHanded; break;
+        case Row::Trigger: s.triggerThreshold = d.triggerThreshold; break;
+        case Row::Rumble: s.rumble = d.rumble; break;
+        case Row::Mic: s.mic = d.mic; break;
+        case Row::Language: s.language = d.language; break;
+        case Row::Keys: case Row::Count: break; // (the bindings keep their own reset)
+        }
 }
 
 std::string RowLabel(Row r, int lang)
@@ -233,23 +292,18 @@ std::string RowLabel(Row r, int lang)
                                    W::SetVolume, W::SetMute, W::SetFastSound, W::SetBackground,
                                    W::SetFastSpeed, W::SetFastKey, W::SetFastBoot,
                                    W::SetHidePointer, W::SetStickCursor, W::SetCursorSpeed, W::SetDeadZone, W::SetLeftHanded, W::SetTrigger, W::SetRumble,
-                                   W::SetMic, W::SetLanguage};
+                                   W::SetMic, W::SetLanguage, W::CtlKeys};
     return (int)r >= 0 && (int)r < kRows ? Wd(lang, words[(int)r]) : "";
 }
 
 int RowNote(Row r)
 {
-    switch (r)
-    {
-    case Row::Scaling: return (int)W::ScalingNote;
-    case Row::UiSize: return (int)W::UiSizeNote;
-    case Row::Pictures: return (int)W::PicturesNote;
-    case Row::Battery: return (int)W::BatteryNote;
-    case Row::Background: return (int)W::BackgroundNote;
-    case Row::FastBoot: return (int)W::FastBootNote;
-    case Row::Language: return (int)W::LangNote;
-    default: return (int)W::Count;
-    }
+    static const W notes[kRows] = {W::LayoutNote, W::FullscreenNote, W::ScalingNote, W::UiSizeNote, W::PicturesNote, W::Res3DNote, W::WideNote, W::Fps60Note, W::BatteryNote,
+                                   W::VolumeNote, W::MuteNote, W::FastSoundNote, W::BackgroundNote,
+                                   W::FastSpeedNote, W::FastKeyNote, W::FastBootNote,
+                                   W::HidePointerNote, W::StickCursorNote, W::CursorSpeedNote, W::DeadZoneNote, W::LeftHandedNote, W::TriggerNote, W::RumbleNote,
+                                   W::MicNote, W::LangNote, W::KeysNote};
+    return (int)r >= 0 && (int)r < kRows ? (int)notes[(int)r] : (int)W::Count;
 }
 
 std::string RowValue(Row r, const Settings& s, int lang)
@@ -268,14 +322,14 @@ std::string RowValue(Row r, const Settings& s, int lang)
     case Row::Scaling: return Wd(lang, s.scaling == Scaling::Smooth ? W::ScaleSmooth : s.scaling == Scaling::Nearest ? W::ScaleNearest : W::ScaleSharp);
     case Row::UiSize: return s.uiScale == 0 ? std::string(Wd(lang, W::UiAuto)) : std::to_string(s.uiScale) + " %";
     case Row::Pictures: return Wd(lang, s.smoothPictures ? W::ScaleSmooth : W::ScaleNearest);
-    case Row::Res3D: return std::to_string(s.resolution3D) + "\xC3\x97"; // "2×"
+    case Row::Res3D: return std::to_string(s.Res3D()) + "\xC3\x97"; // "2×" (Battery saver's 1× while it holds the row)
     case Row::Wide: return onOff(s.widescreen);
-    case Row::Fps60: return onOff(s.interpolate60);
+    case Row::Fps60: return onOff(s.Interpolate60());
     case Row::Battery: return onOff(s.batterySaver);
     case Row::Volume: return std::to_string(s.volume) + " %";
     case Row::Mute: return onOff(s.mute);
     case Row::FastSound: return onOff(s.fastSound);
-    case Row::Background: return onOff(s.runInBackground);
+    case Row::Background: return onOff(!s.runInBackground); // ("Pause in the background": the setting's opposite)
     case Row::FastSpeed: return s.fastSpeed >= 2 ? std::to_string(s.fastSpeed) + "\xC3\x97" : Wd(lang, W::FastMax);
     case Row::FastKey: return Wd(lang, s.fastToggle ? W::FastPress : W::FastHold);
     case Row::FastBoot: return onOff(s.fastBoot);
@@ -286,14 +340,14 @@ std::string RowValue(Row r, const Settings& s, int lang)
     case Row::LeftHanded: return onOff(s.leftHanded);
     case Row::Trigger: return std::to_string(s.triggerThreshold) + " %";
     case Row::Rumble: return onOff(s.rumble);
-    case Row::Mic: return s.mic == MicMode::Off ? Wd(lang, W::ShellOff) : s.mic == MicMode::Real ? Wd(lang, W::SetMic) : Wd(lang, W::MicBlowKey);
+    case Row::Mic: return s.mic == MicMode::Off ? Wd(lang, W::ShellOff) : s.mic == MicMode::Real ? Wd(lang, W::MicReal) : Wd(lang, W::MicBlowKey);
     case Row::Language:
     {
         // Each language by its own name.
         static const char* names[] = {"English", "Français", "Deutsch", "Italiano", "Español"};
         return s.language >= 1 && s.language <= 5 ? names[s.language - 1] : Wd(lang, W::LangAuto);
     }
-    case Row::Count: break;
+    case Row::Keys: case Row::Count: break;
     }
     return "";
 }
@@ -358,6 +412,8 @@ PadNav ShellPadNav(const Controls::Bindings& b, const bool* now, const bool* bef
     n.b = pressed(ins.back);
     n.x = own(X);
     n.y = own(Y);
+    n.lb = own(L);
+    n.rb = own(R);
     return n;
 }
 
@@ -379,7 +435,7 @@ int Shell::Count(const Model& m) const
     switch (page)
     {
     case Page::Main: return (int)MainEntries(m).size();
-    case Page::Settings: return kRows;
+    case Page::Settings: return (int)TabRows(tab).rows.size();
     case Page::Controls: return 1;
     case Page::Keys: return Controls::COUNT + 1;
     case Page::States: return kStateSlots + 1;
@@ -445,6 +501,15 @@ Result Shell::Update(const Input& in0, Model& m)
     // The mouse: a move onto another item focuses it, a click presses it (on a value row's left
     // third: Left, else Right); a click outside the panel is B.
     const std::vector<Rect>& rects = ask != Ask::None || !m.message.empty() ? askRects_ : rects_;
+    // A click on a tab of the settings' tab bar shows it.
+    if (in.click && page == Page::Settings && ask == Ask::None && m.message.empty())
+        for (int t = 0; t < (int)tabRects_.size(); t++)
+            if (Inside(tabRects_[t], in.mx, in.my))
+            {
+                tab = t;
+                focus = 0;
+                return res;
+            }
     if (in.hover || in.click)
     {
         int at = -1;
@@ -457,7 +522,7 @@ Result Shell::Update(const Input& in0, Model& m)
         {
             if (at >= 0)
             {
-                const bool valueRow = (page == Page::Settings && ask == Ask::None) ||
+                const bool valueRow = (page == Page::Settings && ask == Ask::None && at < Count(m) && TabRows(tab).rows[at] != Row::Keys) ||
                                       (page == Page::Launch && ask == Ask::None && at < (int)LaunchEntries(m).size() && LaunchEntries(m)[at].kind == LaunchItem::Language);
                 if (valueRow && m.message.empty()) (in.mx < rects[at].x + rects[at].w / 3 ? in.left : in.right) = true;
                 else in.a = true;
@@ -485,6 +550,11 @@ Result Shell::Update(const Input& in0, Model& m)
             if (was == Ask::Quit) res.act = Act::Quit;
             else if (was == Ask::Load) res = {Act::LoadSlot, askSlot};
             else if (was == Ask::Overwrite) res = {Act::SaveSlot, askSlot};
+            else if (was == Ask::ResetTab)
+            {
+                ResetTabRows(tab, *m.settings);
+                res = {Act::ResetTab, tab};
+            }
         }
         return res;
     }
@@ -517,19 +587,48 @@ Result Shell::Update(const Input& in0, Model& m)
         }
         break;
     case Page::Settings:
+    {
         if (in.b) { Go(Page::Main, 1); break; }
-        if (in.left || in.right || in.a)
+        if (in.lb != in.rb)
         {
-            ChangeRow((Row)focus, in.left ? -1 : 1, *m.settings);
-            res = {Act::Setting, focus};
+            // LB / RB: the tab before / after (wrapping), its first row focused.
+            tab = (tab + kTabs + (in.rb ? 1 : -1)) % kTabs;
+            focus = 0;
+            break;
+        }
+        const std::vector<Row>& rows = TabRows(tab).rows;
+        focus = std::clamp(focus, 0, (int)rows.size() - 1);
+        const Row r = rows[focus];
+        if (in.y) { ask = Ask::ResetTab; askFocus = 0; break; }
+        if (r == Row::Keys)
+        {
+            if (in.a) { keysFrom = Page::Settings; Go(Page::Keys, 0); }
+            break;
+        }
+        if ((in.left || in.right || in.a) && !RowHeld(r, *m.settings))
+        {
+            ChangeRow(r, in.left ? -1 : 1, *m.settings);
+            res = {Act::Setting, (int)r};
         }
         break;
+    }
     case Page::Controls:
         if (in.b) Go(Page::Main, 2);
-        else if (in.a) Go(Page::Keys, 0);
+        else if (in.a) { keysFrom = Page::Controls; Go(Page::Keys, 0); }
         break;
     case Page::Keys:
-        if (in.b) { Go(Page::Controls, 0); break; }
+        if (in.b)
+        {
+            // Back to the door it came by: the Controls page, or Settings' Controls tab on its row.
+            if (keysFrom == Page::Settings)
+            {
+                tab = (int)Tab::Controls;
+                const std::vector<Row>& rows = TabRows(tab).rows;
+                Go(Page::Settings, (int)(std::find(rows.begin(), rows.end(), Row::Keys) - rows.begin()));
+            }
+            else Go(Page::Controls, 0);
+            break;
+        }
         if (focus == Controls::COUNT)
         {
             if (in.a) res.act = Act::ResetBindings;
@@ -580,7 +679,7 @@ Result Shell::Update(const Input& in0, Model& m)
     }
     }
     // The list's scroll follows the focus.
-    if (page == Page::Settings || page == Page::Keys)
+    if (page == Page::Keys)
     {
         if (focus < scroll) scroll = focus;
         if (focus >= scroll + ListRows(page)) scroll = focus - ListRows(page) + 1;
@@ -610,6 +709,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
     const Theme& th = GameTheme();
     rects_.assign(Count(m), Rect {0, 0, 0, 0});
     askRects_.clear();
+    tabRects_.clear();
     const bool asking = ask != Ask::None || !m.message.empty() || m.capturing >= 0;
 
     if (page == Page::Launch)
@@ -730,7 +830,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         panel_ = kPanel;
         static const W titles[] = {W::ShellPaused, W::ShellSettings, W::ShellControls, W::KeysKeyboard, W::ShellStates};
         const std::string title = page == Page::Keys ? Wd(lang, W::CtlKeys) : Wd(lang, titles[(int)page]);
-        it.Add(0, Line({kPanel.x + 40, kPanel.y + 16, kPanel.w - 80, 56}, title, 36, 24, Align::Centre, Weight::ExtraBold));
+        if (page != Page::Settings) it.Add(0, Line({kPanel.x + 40, kPanel.y + 16, kPanel.w - 80, 56}, title, 36, 24, Align::Centre, Weight::ExtraBold));
         UiItem well = WellItem(kContent);
         well.radius = 16;
         it.Add(0, well);
@@ -773,6 +873,105 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             break;
         }
         case Page::Settings:
+        {
+            // The tab bar in the title band: LB, the five tabs (the shown one on a button), RB.
+            {
+                const Rect lb = ChipRect(0, 0, ui::Button::LB, "", 24, 0, Weight::ExtraBold);
+                const Rect rb = ChipRect(0, 0, ui::Button::RB, "", 24, 0, Weight::ExtraBold);
+                const int cy = kTabBarY + kTabBarH / 2;
+                it.Add(0, ChipItem(kPanel.x + 40, cy - lb.h / 2, ui::Button::LB, "", 24, 0, Weight::ExtraBold));
+                it.Add(0, ChipItem(kPanel.x + kPanel.w - 40 - rb.w, cy - rb.h / 2, ui::Button::RB, "", 24, 0, Weight::ExtraBold));
+                const int x0 = kPanel.x + 40 + lb.w + 16, x1 = kPanel.x + kPanel.w - 40 - rb.w - 16;
+                constexpr int pad = 18, gap = 6;
+                float size = 26;
+                auto total = [&](float sz) {
+                    float w = 0;
+                    for (int t = 0; t < kTabs; t++) w += TextWidth(TabName(t, lang), sz, Weight::ExtraBold) + 2 * pad;
+                    return w + gap * (kTabs - 1);
+                };
+                while (size > 16 && total(size) > x1 - x0) size -= 1;
+                float x = x0 + std::max(0.0f, (x1 - x0 - total(size)) / 2);
+                for (int t = 0; t < kTabs; t++)
+                {
+                    const std::string name = TabName(t, lang);
+                    const int w = (int)std::ceil(TextWidth(name, size, Weight::ExtraBold)) + 2 * pad;
+                    const Rect r {(int)x, kTabBarY, w, kTabBarH};
+                    if (t == tab) it.Add(0, Button(r, true));
+                    it.Add(0, Line(r, name, size, size, Align::Centre, Weight::ExtraBold));
+                    tabRects_.push_back(r);
+                    x += w + gap;
+                }
+            }
+            // The tab's rows, the Advanced heading above its group; no scrolling (every tab fits).
+            const TabLayout& tl = TabRows(tab);
+            const Settings& st = *m.settings;
+            int y = c.y;
+            for (int i = 0; i < (int)tl.rows.size(); i++)
+            {
+                if (i == tl.advanced)
+                {
+                    UiItem h = Line({c.x + 12, y, c.w - 24, kSetHeadH}, Wd(lang, W::SetAdvanced), 20, 16);
+                    h.colour = kDim;
+                    it.Add(1, h);
+                    y += kSetHeadH;
+                }
+                const Row row = tl.rows[i];
+                const Rect r {c.x, y, c.w, kSetRowH};
+                y += kSetRowStep;
+                const bool f = !asking && focus == i, held = RowHeld(row, st);
+                if (f) it.Add(1, Ring(r, 16));
+                UiItem b = Button(r, f, !held);
+                b.radius = 16;
+                it.Add(1, b);
+                rects_[i] = r;
+                const Rect pill {r.x + r.w - 14 - 250, r.y + 6, 250, r.h - 12};
+                const int tagW = row == Row::Language ? 200 : 0;
+                UiItem label = Line({r.x + 20, r.y, pill.x - 16 - tagW - (r.x + 20), r.h}, RowLabel(row, lang), 24, 17);
+                if (held) label.colour = kDim;
+                it.Add(1, label);
+                if (row == Row::Keys)
+                {
+                    // Opens a page: a "›" at the right, no pill.
+                    it.Add(1, Line({r.x + r.w - 60, r.y, 40, r.h}, "\xE2\x80\xBA", 40, 40, Align::Right, Weight::ExtraBold));
+                    continue;
+                }
+                if (tagW)
+                {
+                    // Language applies at the game's next start: said on the row.
+                    UiItem tag = Line({pill.x - 12 - tagW, r.y, tagW, r.h}, Wd(lang, W::NextStart), 17, 13, Align::Right);
+                    tag.colour = kWarm;
+                    it.Add(1, tag);
+                }
+                UiItem pl = PanelItem(pill);
+                pl.plain = true;
+                pl.fill = th.frameDark;
+                pl.radius = pill.h / 2.0f;
+                it.Add(1, pl);
+                if (!held)
+                {
+                    // ‹ › : Left / Right change it.
+                    it.Add(1, Line({pill.x + 6, pill.y, 26, pill.h}, "\xE2\x80\xB9", 34, 34, Align::Centre, Weight::ExtraBold));
+                    it.Add(1, Line({pill.x + pill.w - 32, pill.y, 26, pill.h}, "\xE2\x80\xBA", 34, 34, Align::Centre, Weight::ExtraBold));
+                }
+                UiItem v = Line({pill.x + 34, pill.y, pill.w - 68, pill.h}, RowValue(row, st, lang), 22, 15, Align::Centre);
+                if (held) v.colour = kDim;
+                it.Add(1, v);
+            }
+            // The focused row's note under the list (Battery saver's hold on a row it holds).
+            if (focus >= 0 && focus < (int)tl.rows.size())
+            {
+                const Row row = tl.rows[focus];
+                UiItem note = TextItem({c.x + 8, c.y + kSetListH, c.w - 16, c.h - kSetListH}, Wd(lang, RowHeld(row, st) ? W::SaverHolds : (W)RowNote(row)), 18);
+                note.middle = true;
+                note.colour = kDim;
+                it.Add(1, note);
+            }
+            const bool keysRow = focus >= 0 && focus < (int)tl.rows.size() && tl.rows[focus] == Row::Keys;
+            right = keysRow ? Hint(it, right, kHintsY, ui::Button::A, Wd(lang, W::ShellOpen)) : Hint(it, right, kHintsY, ui::Button::DPadH, Wd(lang, W::ShellChange));
+            right = Hint(it, right, kHintsY, ui::Button::Y, Wd(lang, W::ResetTab));
+            Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellBack));
+            break;
+        }
         case Page::Keys:
         {
             const int n = Count(m), kListRows = ListRows(page), top = c.y + ListTop(page);
@@ -785,18 +984,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 b.radius = 16;
                 it.Add(1, b);
                 rects_[i] = r;
-                if (page == Page::Settings)
-                {
-                    const Rect pill {r.x + r.w - 16 - 230, r.y + 7, 230, r.h - 14};
-                    it.Add(1, Line({r.x + 20, r.y, r.w - 290, r.h}, RowLabel((Row)i, lang), 26, 18));
-                    UiItem pl = PanelItem(pill);
-                    pl.plain = true;
-                    pl.fill = th.frameDark;
-                    pl.radius = pill.h / 2.0f;
-                    it.Add(1, pl);
-                    it.Add(1, Line({pill.x + 12, pill.y, pill.w - 24, pill.h}, RowValue((Row)i, *m.settings, lang), 24, 16, Align::Centre));
-                }
-                else if (i == Controls::COUNT)
+                if (i == Controls::COUNT)
                     it.Add(1, Line({r.x + 20, r.y, r.w - 40, r.h}, Wd(lang, W::KeysReset), 26, 18, Align::Left, Weight::ExtraBold));
                 else
                 {
@@ -835,21 +1023,8 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 thumb.radius = 4;
                 it.Add(1, thumb);
             }
-            if (page == Page::Settings)
             {
-                if (const int nw = focus >= 0 && focus < kRows ? RowNote((Row)focus) : (int)W::Count; nw != (int)W::Count)
-                {
-                    UiItem note = TextItem({c.x + 8, top + kListRows * kRowStep - 4, c.w - 16, 52}, Wd(lang, (W)nw), 18);
-                    note.middle = true;
-                    note.colour = kDim;
-                    it.Add(1, note);
-                }
-                right = Hint(it, right, kHintsY, ui::Button::DPadH, Wd(lang, W::ShellChange));
-                Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellBack));
-            }
-            else
-            {
-                // The columns' heads, under the list.
+                // The columns' heads, above the list.
                 UiItem kh = Line({c.x + 360, c.y, 180, 34}, Wd(lang, W::KeysKeyboard), 20, 16);
                 UiItem ph = Line({c.x + 550, c.y, 180, 34}, Wd(lang, W::KeysController), 20, 16);
                 kh.colour = ph.colour = kDim;
@@ -870,6 +1045,13 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         {
             AddCard(it, {c.x + 8, c.y + 4, c.w - 16, 5 * 56}, 2, m);
             const Rect r {c.x + 160, c.y + c.h - 76, c.w - 320, 64};
+            {
+                // What Keys and buttons can do (one button alone for the pause menu, too).
+                UiItem kn = TextItem({c.x + 8, r.y - 60, c.w - 16, 50}, Wd(lang, W::KeysNote), 18, Align::Centre);
+                kn.middle = true;
+                kn.colour = kDim;
+                it.Add(1, kn);
+            }
             const bool f = !asking && focus == 0;
             if (f) it.Add(1, Ring(r, 24));
             it.Add(1, Button(r, f));
@@ -965,6 +1147,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             if (askSlot >= 0 && askSlot < kStateSlots && !m.otherRom[askSlot].empty()) note = Fill(Wd(lang, W::StOtherRom), m.otherRom[askSlot]);
         }
         else if (ask == Ask::Overwrite) text = Fill(Wd(lang, W::StOverwriteAsk), std::to_string(askSlot + 1));
+        else if (ask == Ask::ResetTab) text = Fill(Wd(lang, W::ResetTabAsk), TabName(tab, lang));
         // The words, as large as the well holds them (30 down to 20).
         float size = 30;
         while (size > 20 && (float)Wrap(text, size, (float)textBox.w - 32).size() * size * 1.3f + (note.empty() ? 0 : 60) > textBox.h) size -= 1;
@@ -1051,6 +1234,7 @@ void Shell::Zoom(std::vector<UiItem>& items) const
     };
     for (Rect& r : rects_) zoom(r);
     for (Rect& r : askRects_) zoom(r);
+    for (Rect& r : tabRects_) zoom(r);
     zoom(panel_);
 }
 }

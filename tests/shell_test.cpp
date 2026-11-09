@@ -83,7 +83,7 @@ static void CheckBuild(const Shell& sh, const Model& m, const char* what)
         if (!sh.Focusable(m, i)) continue;
         if (r[i].w <= 0 || r[i].x < 0 || r[i].y < 0 || r[i].x + r[i].w > kW || r[i].y + r[i].h > kH)
         {
-            if (sh.page == Page::Settings || sh.page == Page::Keys) continue; // (scrolled out)
+            if (sh.page == Page::Keys) continue; // (scrolled out; Settings never scrolls)
             fprintf(stderr, "%s: item %d has no place\n", what, i);
             failures++;
         }
@@ -164,17 +164,66 @@ static void main_page()
     }
 }
 
+// The row's place in its tab (the tab, the index), for the tests.
+static std::pair<int, int> Where(Row r)
+{
+    for (int t = 0; t < kTabs; t++)
+        for (int i = 0; i < (int)TabRows(t).rows.size(); i++)
+            if (TabRows(t).rows[i] == r) return {t, i};
+    return {-1, -1};
+}
+
 static void settings_page()
 {
     Fixture f;
     Shell sh;
     sh.Open(Page::Settings);
-    CheckReach(sh, f.m, "settings");
-    // Every row changes and comes back; the values stay in range.
+    CHECK(sh.tab == 0 && sh.focus == 0);
+    // Every row in exactly one tab; Layout never a tab's first row (one stray A would leave CONSOLE).
+    {
+        std::multiset<int> seen;
+        for (int t = 0; t < kTabs; t++)
+        {
+            const TabLayout& tl = TabRows(t);
+            CHECK(!tl.rows.empty() && tl.advanced > 0 && tl.advanced <= (int)tl.rows.size());
+            CHECK(tl.rows[0] != Row::Layout);
+            for (Row r : tl.rows) seen.insert((int)r);
+        }
+        for (int r = 0; r < kRows; r++) CHECK(seen.count(r) == 1);
+    }
+    // LB / RB change the tab, wrapping, the first row focused; the D-pad reaches every row of each.
+    sh.focus = 2;
+    Input lb, rb;
+    lb.lb = true;
+    rb.rb = true;
+    sh.Update(lb, f.m);
+    CHECK(sh.tab == kTabs - 1 && sh.focus == 0 && sh.page == Page::Settings);
+    sh.Update(rb, f.m);
+    CHECK(sh.tab == 0);
+    for (int t = 0; t < kTabs; t++)
+    {
+        CHECK(sh.tab == t && sh.Count(f.m) == (int)TabRows(t).rows.size());
+        CheckReach(sh, f.m, "settings tab");
+        sh.Update(rb, f.m);
+    }
+    CHECK(sh.tab == 0);
+    // Every row changes by Right and comes back by Left, in its tab; the values stay in range.
     for (int r = 0; r < kRows; r++)
     {
-        const Settings before = f.s;
-        sh.focus = r;
+        const auto [t, i] = Where((Row)r);
+        sh.tab = t;
+        sh.focus = i;
+        if ((Row)r == Row::Keys)
+        {
+            // Keys and buttons opens the bindings; B comes back to its row.
+            CHECK(sh.Update(Press("right"), f.m).act == Act::None && sh.page == Page::Settings);
+            sh.Update(Press("a"), f.m);
+            CHECK(sh.page == Page::Keys);
+            sh.Update(Press("b"), f.m);
+            CHECK(sh.page == Page::Settings && sh.tab == (int)Tab::Controls && sh.focus == i);
+            CHECK(!RowLabel((Row)r, 1).empty());
+            continue;
+        }
         Result res = sh.Update(Press("right"), f.m);
         CHECK(res.act == Act::Setting && res.arg == r);
         for (int k = 0; k < 20; k++) sh.Update(Press("right"), f.m);
@@ -182,7 +231,6 @@ static void settings_page()
               f.s.stickDeadZone <= 60 && f.s.triggerThreshold >= 10 && f.s.triggerThreshold <= 90 && f.s.language >= 0 && f.s.language <= 5);
         CHECK(f.s.cursorSpeed >= 50 && f.s.cursorSpeed <= 200 && (f.s.fastSpeed == 0 || (f.s.fastSpeed >= 2 && f.s.fastSpeed <= 4)) &&
               (int)f.s.scaling >= 0 && (int)f.s.scaling <= 2);
-        // Every row's value changed by Right, and back by Left (cycles and toggles; a range from its middle).
         {
             Settings a;
             a.volume = 50; a.cursorSpeed = 100; a.resolution3D = 2; a.stickDeadZone = 25; a.triggerThreshold = 50;
@@ -195,37 +243,107 @@ static void settings_page()
         }
         for (int k = 0; k < 40; k++) sh.Update(Press("left"), f.m);
         CHECK(f.s.volume >= 0 && f.s.resolution3D >= 1);
-        (void)before;
+        if (f.s.batterySaver) { sh.Update(Press("left"), f.m); } // (Battery saver back off for the rows after it)
+        CHECK(!f.s.batterySaver);
     }
+    f.s = Settings();
     // The language cycles through automatic and the five.
     f.s.language = 0;
     std::set<std::string> names;
     for (int k = 0; k < 6; k++) { names.insert(RowValue(Row::Language, f.s, 1)); ChangeRow(Row::Language, 1, f.s); }
     CHECK(names.size() == 6 && f.s.language == 0);
-    // The list scrolls with the focus: the last row is shown.
-    sh.focus = 0;
-    sh.scroll = 0;
-    for (int k = 0; k < kRows - 1; k++) sh.Update(Press("down"), f.m);
-    CHECK(sh.focus == kRows - 1 && sh.scroll > 0);
+    // Wording: the real microphone says so (never "Microphone: Microphone"); Pause in the
+    // background shows the setting's opposite; the two filters have distinct labels.
+    f.s.mic = MicMode::Real;
+    CHECK(RowValue(Row::Mic, f.s, 1) == OwnWordIn(1, OwnWordId::MicReal));
+    f.s.mic = MicMode::BlowKey;
+    CHECK(RowValue(Row::Background, f.s, 1) == OwnWordIn(1, OwnWordId::ShellOn));
+    for (int lang = 1; lang <= 5; lang++) CHECK(RowLabel(Row::Scaling, lang) != RowLabel(Row::Pictures, lang));
+    // Battery saver holds 3D resolution and 60 fps: dimmed, the forced value, no change, its own note.
+    {
+        Fixture g;
+        g.s.batterySaver = true;
+        g.s.resolution3D = 3;
+        CHECK(RowHeld(Row::Res3D, g.s) && RowHeld(Row::Fps60, g.s) && !RowHeld(Row::Wide, g.s) && !RowHeld(Row::Battery, g.s));
+        CHECK(RowValue(Row::Res3D, g.s, 1) == "1\xC3\x97" && RowValue(Row::Fps60, g.s, 1) == OwnWordIn(1, OwnWordId::ShellOff));
+        Shell s2;
+        s2.Open(Page::Settings);
+        s2.tab = (int)Tab::Graphics;
+        s2.focus = Where(Row::Res3D).second;
+        for (const char* d : {"right", "left", "a"}) CHECK(s2.Update(Press(d), g.m).act == Act::None);
+        CHECK(g.s.resolution3D == 3);
+        bool dim = false, note = false;
+        for (const ui::UiItem& it : s2.Build(g.m))
+        {
+            if (it.text == "1\xC3\x97" && it.colour == 0xFFB8BCE0) dim = true;
+            if (it.text == OwnWordIn(1, OwnWordId::SaverHolds)) note = true;
+        }
+        CHECK(dim && note);
+        g.s.batterySaver = false;
+        CHECK(!RowHeld(Row::Res3D, g.s) && RowValue(Row::Res3D, g.s, 1) == "3\xC3\x97");
+        CHECK(s2.Update(Press("right"), g.m).act == Act::Setting && g.s.resolution3D == 4);
+    }
+    // Y resets the tab after asking, focus on No: A on No, or B, keeps everything; Yes puts the
+    // tab's rows back to their defaults and only those.
+    {
+        Fixture g;
+        Shell s2;
+        s2.Open(Page::Settings);
+        s2.tab = (int)Tab::Graphics;
+        s2.focus = 1;
+        g.s.resolution3D = 4; g.s.widescreen = false; g.s.batterySaver = true; g.s.volume = 30; g.s.layout = Layout::Side;
+        g.s.windowW = 1600; g.s.windowH = 900; g.s.windowX = 33; g.s.windowY = 44;
+        g.s.controls.SetPad(Controls::X, Controls::IN_LB);
+        const Controls::Bindings bindings = g.s.controls;
+        CHECK(s2.Update(Press("y"), g.m).act == Act::None && s2.ask == Ask::ResetTab && s2.askFocus == 0);
+        for (int lang = 1; lang <= 5; lang++) { g.m.language = lang; CheckBuild(s2, g.m, "reset question"); }
+        g.m.language = 1;
+        CHECK(s2.Update(Press("a"), g.m).act == Act::None && s2.ask == Ask::None && g.s.resolution3D == 4);
+        s2.Update(Press("y"), g.m);
+        CHECK(s2.Update(Press("b"), g.m).act == Act::None && s2.ask == Ask::None && g.s.resolution3D == 4);
+        s2.Update(Press("y"), g.m);
+        s2.Update(Press("a"), g.m); // (two quick A: No, never Yes)
+        CHECK(s2.ask == Ask::None && g.s.resolution3D == 4);
+        s2.Update(Press("y"), g.m);
+        s2.Update(Press("right"), g.m);
+        const Result res = s2.Update(Press("a"), g.m);
+        CHECK(res.act == Act::ResetTab && res.arg == (int)Tab::Graphics);
+        const Settings d;
+        CHECK(g.s.resolution3D == d.resolution3D && g.s.widescreen == d.widescreen && g.s.batterySaver == d.batterySaver);
+        CHECK(g.s.volume == 30 && g.s.layout == Layout::Side); // (other tabs untouched)
+        CHECK(g.s.windowW == 1600 && g.s.windowH == 900 && g.s.windowX == 33 && g.s.windowY == 44); // (nor the window)
+        CHECK(g.s.controls.Lines() == bindings.Lines());                                      // (nor the bindings)
+    }
+    // Every tab fits its list (no scrolling at 100 %), every word whole (no "…") and every note on
+    // two lines at most, in every language; the note under the list for each row.
     for (int lang = 1; lang <= 5; lang++)
     {
         f.m.language = lang;
-        for (int r = 0; r < kRows; r += 7)
+        for (int t = 0; t < kTabs; t++)
         {
-            sh.focus = r;
-            sh.scroll = std::max(0, r - 7);
-            CheckBuild(sh, f.m, "settings");
-        }
-        // Each row with a note: the note shown under the list, inside the canvas.
-        for (int r = 0; r < kRows; r++)
-            if (RowNote((Row)r) != (int)OwnWordId::Count)
+            sh.tab = t;
+            for (int i = 0; i < (int)TabRows(t).rows.size(); i++)
             {
-                sh.focus = r;
-                sh.scroll = std::max(0, r - 7);
-                CheckBuild(sh, f.m, "settings note");
+                sh.focus = i;
+                CheckBuild(sh, f.m, "settings");
+                for (const ui::UiItem& it : sh.Build(f.m))
+                    if (it.text.find("\xE2\x80\xA6") != std::string::npos) { fprintf(stderr, "settings: '%s' cut (language %d)\n", it.text.c_str(), lang); failures++; }
+                const Row r = TabRows(t).rows[i];
+                CHECK(RowNote(r) != (int)OwnWordId::Count);
+                const std::string note = OwnWordIn(lang, (OwnWordId)RowNote(r));
+                if (ui::Wrap(note, 18, 784 - 16).size() > 2) { fprintf(stderr, "settings: note of row %d over two lines (language %d)\n", (int)r, lang); failures++; }
+                if (ui::UiScale() == 1)
+                {
+                    const Rect& last = sh.Rects()[TabRows(t).rows.size() - 1];
+                    CHECK(last.y + last.h <= 132 + 410);
+                }
             }
+        }
     }
-    CHECK(sh.Update(Press("b"), f.m).act == Act::None && sh.page == Page::Main);
+    f.m.language = 1;
+    sh.tab = 0;
+    sh.focus = 0;
+    CHECK(sh.Update(Press("b"), f.m).act == Act::None && sh.page == Page::Main && sh.focus == 1);
 }
 
 static void keys_page()
@@ -400,6 +518,17 @@ static void pad_fallback()
         CHECK(n.a && count(n) == 1);                    // the default: A on south
         CHECK(!ShellPadNav(b, press(IN_A), press(IN_A)).a); // held: no press
         CHECK(ShellPadNav(b, press(IN_B), none).b);
+        // LB / RB (the DS's L / R): the settings' tabs, one each.
+        const PadNav l = ShellPadNav(b, press(IN_LB), none), r = ShellPadNav(b, press(IN_RB), none);
+        CHECK(l.lb && !l.rb && !l.a && !l.b && r.rb && !r.lb && !r.a && !r.b);
+        CHECK(!ShellPadNav(b, press(IN_LB), press(IN_LB)).lb); // held: no press
+    }
+    // LB bound as accept (A's): it accepts, and is no tab change too (one press, one action).
+    {
+        Bindings c;
+        c.SetPad(A, IN_LB);
+        const PadNav n = ShellPadNav(c, press(IN_LB), none);
+        CHECK(n.a && !n.lb);
     }
     b.pad[A] = kNone;                                   // cleared
     CHECK(ShellPadNav(b, press(IN_A), none).a);         // south still accepts
@@ -512,8 +641,9 @@ static void mouse()
     CHECK(sh.Update(in, f.m).act == Act::None && sh.page == Page::Settings);
     sh.Build(f.m);
     // A click on a value row's left third: Left; elsewhere Right.
-    // (the interface's size: a value row among the first eight shown)
-    const Rect v = sh.Rects()[(int)Row::UiSize];
+    // (the interface's size, on the Display tab)
+    CHECK(sh.tab == 0);
+    const Rect v = sh.Rects()[Where(Row::UiSize).second];
     f.s.uiScale = 100;
     in.mx = v.x + 10.0f;
     in.my = v.y + v.h / 2.0f;
@@ -521,6 +651,18 @@ static void mouse()
     in.mx = v.x + v.w - 10.0f;
     sh.Update(in, f.m);
     CHECK(f.s.uiScale == 100);
+    // A click on a tab shows it.
+    CHECK((int)sh.TabRects().size() == kTabs);
+    {
+        const Rect t = sh.TabRects()[2];
+        Input tc;
+        tc.click = true;
+        tc.mx = t.x + t.w / 2.0f;
+        tc.my = t.y + t.h / 2.0f;
+        CHECK(sh.Update(tc, f.m).act == Act::None && sh.tab == 2 && sh.page == Page::Settings);
+        sh.tab = 0;
+        sh.Build(f.m);
+    }
     in.mx = 5;
     in.my = 5;
     sh.Update(in, f.m);
@@ -683,13 +825,42 @@ static void platform()
         CHECK(e.scaling == Scaling::Sharp && e.fastSpeed == 4 && e.cursorSpeed == 50);
         // Task 10: the interface's size (auto or 60-150 by 5) and the game's pictures.
         Settings u;
-        CHECK(u.uiScale == 0 && u.smoothPictures);
+        // (The game's pictures: Pixel by default since the ux round; a file's smooth stays smooth.)
+        CHECK(u.uiScale == 0 && !u.smoothPictures);
         u.uiScale = 135;
-        u.smoothPictures = false;
+        u.smoothPictures = true;
         CHECK(u.Save(path));
         Settings v;
-        CHECK(v.Load(path) && v.uiScale == 135 && !v.smoothPictures);
-        { std::ofstream(path) << "ui_scale=auto\ngame_pictures=smooth\n"; }
+        CHECK(v.Load(path) && v.uiScale == 135 && v.smoothPictures);
+        // 3D resolution held to the row's 1-4 (a 6 read as 6 went down on Right); the cursor's
+        // speed to its steps of 25.
+        { std::ofstream(path) << "resolution_3d=6\ncursor_speed=110\n"; }
+        Settings r3;
+        r3.Load(path);
+        CHECK(r3.resolution3D == 4 && r3.cursorSpeed == 100);
+        ChangeRow(Row::Res3D, 1, r3);
+        CHECK(r3.resolution3D == 4);
+        { std::ofstream(path) << "resolution_3d=0\ncursor_speed=190\n"; }
+        r3.Load(path);
+        CHECK(r3.resolution3D == 1 && r3.cursorSpeed == 200);
+        // Version 3: a file from before it (it always wrote the old default, smooth) loads as
+        // Pixel, once; saved, it says version 3, so a Smooth chosen afterwards sticks.
+        for (const char* old : {"settings_version=2\ngame_pictures=smooth\n", "game_pictures=smooth\n"})
+        {
+            { std::ofstream(path) << old; }
+            Settings o;
+            o.Load(path);
+            CHECK(!o.smoothPictures);
+            o.smoothPictures = true;
+            CHECK(o.Save(path));
+            Settings p;
+            p.Load(path);
+            CHECK(p.smoothPictures);
+            std::ifstream in(path);
+            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            CHECK(text.find("settings_version=3\n") != std::string::npos);
+        }
+        { std::ofstream(path) << "settings_version=3\nui_scale=auto\ngame_pictures=smooth\n"; }
         Settings w;
         w.uiScale = 90;
         w.Load(path);

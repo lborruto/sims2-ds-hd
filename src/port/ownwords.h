@@ -91,6 +91,14 @@ enum class OwnWordId : int
     SaveMovedBack,
     // The interface's size and the game's pictures (task 10): the rows, Auto, their notes.
     SetUiSize, UiAuto, UiSizeNote, SetPictures, PicturesNote,
+    // Settings in five tabs (ux task 5): the tabs' names (Controls: ShellControls), the Advanced
+    // heading, a note for every row that had none, the real microphone, Language's next-start tag,
+    // Battery saver's hold on its rows, the reset question (@1 the tab) and its hint.
+    TabDisplay, TabGraphics, TabSound, TabGame, SetAdvanced,
+    LayoutNote, FullscreenNote, Res3DNote, WideNote, Fps60Note, VolumeNote, MuteNote, FastSoundNote, FastSpeedNote,
+    FastKeyNote, HidePointerNote, StickCursorNote, CursorSpeedNote, DeadZoneNote, LeftHandedNote, TriggerNote,
+    RumbleNote, MicNote, KeysNote,
+    MicReal, NextStart, SaverHolds, ResetTabAsk, ResetTab,
     // The world's prompt (port/prompt.*): A held shows the other actions, Up / Down choose one
     // while it is held, Left / Right switch to the next target near the hero.
     PromptMore, PromptChoose, PromptOther,

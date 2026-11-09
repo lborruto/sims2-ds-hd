@@ -144,6 +144,8 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
             else if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE || a == B) nav.b = true;
             else if (k == SDLK_DELETE || a == X) nav.x = true;
             else if (a == Y) nav.y = true;
+            else if (a == L) { if (!ev.key.repeat) nav.lb = true; } // (Q / W: the settings' tabs, one per press)
+            else if (a == R) { if (!ev.key.repeat) nav.rb = true; }
             else if (a == MENU && !ev.key.repeat) wantMenu = true;
             return;
         }
@@ -327,6 +329,8 @@ void Input::Poll(const App& app, bool menuOpen)
         nav.b |= pn.b;
         nav.x |= pn.x;
         nav.y |= pn.y;
+        nav.lb |= pn.lb;
+        nav.rb |= pn.rb;
         return;
     }
     if (PadPressed(s, SAVESTATE)) wantSave = true;
