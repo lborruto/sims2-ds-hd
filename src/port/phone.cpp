@@ -381,7 +381,7 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
     // The hints, under the buttons.
     {
         const Rect hb {kPhPanel.x + 24, kPhPanel.y + kPhPanel.h - 46, kPhPanel.w - 48, 36};
-        std::vector<std::pair<Button, std::string>> hs = {{Button::DPadV, OwnWord(&rom, OwnWordId::PromptChoose)}, {Button::A, MenuFocusable(v, focus) ? FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, 270, Weight::ExtraBold).text : ""},
+        std::vector<std::pair<Button, std::string>> hs = {{Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose)}, {Button::A, MenuFocusable(v, focus) ? FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, 270, Weight::ExtraBold).text : ""},
                                                           {Button::B, MenuWords(rom, v.backCloses ? kStrClose : kStrPhExit)}};
         int total = 0;
         std::vector<Rect> rs;

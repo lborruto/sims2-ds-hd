@@ -145,7 +145,7 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
     if (focus == kSlots) AddFocusRing(c, kGiftBow, 24);
     {
         UiItem b = PanelItem(kGiftBow);
-        b.fill = th.fill; // (the game's panel colour: the live button's corners meet it)
+        b.fill = canGive ? th.fill : 0xFF444A85; // (inactive: the shops' sunk plate, ui::kTextInactive words on it, 5.8:1)
         b.borderArgb = th.frameDark;
         b.border = 3;
         b.radius = 24;
@@ -156,7 +156,7 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
         UiItem wt = TextItem({kGiftBow.x + 104, kGiftBow.y, kGiftBow.w - 120, kGiftBow.h}, w.text, w.size, Align::Left, Weight::ExtraBold);
         wt.wrap = false;
         wt.middle = true;
-        if (!canGive) { wt.colour = 0x80FFFFFF; wt.shadowArgb = 0x40383869; }
+        if (!canGive) wt.colour = kTextInactive;
         wt.layer = 1;
         c.ui.push_back(wt);
         AddMousePiece(c, hs[6].area, kGiftBow);

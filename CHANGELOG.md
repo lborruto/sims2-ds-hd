@@ -99,15 +99,16 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The D-pad chips that mean Up / Down or Left / Right show two arrowheads (˄ ˅, ‹ ›) instead of a
   bar that read as a plus or a minus.
 - The town's menus, Give Gift, notes and the phone: the game's small pictures at two sizes only
-  (buttons and arrows smaller, items larger), each pixel a whole block of screen pixels at any
-  window size; the tabs and the rows' arrows now match. The counted items in Pockets and the
-  phone button are the game's own pictures (no more dark squares or blue band around them).
-- Portraits (Interact, Give Gift, Goals, Relationships, conversations) without the DS's square and
-  bevelled corners around them.
+  (buttons and arrows smaller, items and the menu's tabs larger), each pixel a whole block of
+  screen pixels at any window size. The counted items in Pockets and the phone button are the
+  game's own pictures (no more dark squares or blue band around them).
+- Portraits (Interact, Give Gift, Goals, Relationships, conversations, the hotel's Registry and
+  room page) without the DS's bevelled corners around them.
 - Every button hint says what it does: Up / Down "Choose" (Goals, Relationships, the phone), Left /
-  Right "Change" on a volume and "Other target" on Interact, A "Continue" in a conversation.
+  Right "Adjust" on a volume and "Other target" on Interact, A "Continue" in a conversation.
 - The phone's highlighted row has the same focus ring as every other menu; the world's prompt,
-  Relationships' labels and Interact's neighbouring names are easier to read.
+  Relationships' labels and Interact's neighbouring names are easier to read, and buttons that do
+  nothing now (Use, Trash, Give Gift) look like the shops' greyed ones.
 - The shops, the hotel, the front end, Create-a-Sim and the stat panel draw the game's small
   pictures at one of two sizes, the same for every item of a kind: a shop's items no longer mix
   big and small ones, and they stay crisp at any window size.

@@ -32,7 +32,7 @@ struct Hint { Button button; std::string label; };
 std::vector<Hint> HintsOf(const WorldPrompt& p, const RomData* rom)
 {
     std::vector<Hint> h;
-    if (p.more) h.push_back(p.held ? Hint {Button::DPadV, OwnWord(rom, OwnWordId::PromptChoose)} : Hint {Button::A, OwnWord(rom, OwnWordId::PromptMore)});
+    if (p.more) h.push_back(p.held ? Hint {Button::DPadV, OwnWord(rom, OwnWordId::HintChoose)} : Hint {Button::A, OwnWord(rom, OwnWordId::PromptMore)});
     // (Left / Right switch targets with A held; without it the D-pad walks the hero.)
     if (p.others && p.held) h.push_back({Button::DPadH, OwnWord(rom, OwnWordId::PromptOther)});
     return h;
@@ -203,7 +203,7 @@ void MeasurePrompt(const RomData& rom, BlockMeasure& m)
         if (f.size < kPromptNameSize) m.shrunk++;
         if (!f.fits) m.namesCut++;
     }
-    for (OwnWordId w : {OwnWordId::PromptMore, OwnWordId::PromptChoose, OwnWordId::PromptOther})
+    for (OwnWordId w : {OwnWordId::PromptMore, OwnWordId::HintChoose, OwnWordId::PromptOther})
         me.Note(9000 + (int)w, false, ChipRect(0, 0, Button::A, OwnWord(&rom, w), kPromptHintSize).w <= kHintMaxW);
 }
 }

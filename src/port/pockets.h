@@ -79,8 +79,8 @@ void AddItemCell(Composition& c, Rect r, bool focused, bool selected, bool empty
 void AddSpriteIcon(Composition& c, IconCache* icons, int desc, int frame, int scale, Rect box, u32 opacity = 0);
 // The same from a slot item's own tiles / descriptor / palette (the Large Plant's palette is not 2484).
 void AddSpriteIcon(Composition& c, IconCache* icons, const ItemRec& item, int scale, Rect box, u32 opacity = 0);
-// The same at a tier (ui::kTierS, ui::kTierL; one per component): every sprite pixel a block of
-// whole output pixels at any size (IconCache::Tiered), centred in box.
+// The same at a tier (ui::kTierS, ui::kTierL; one per component), centred in box: icons' AddTiered
+// for a descriptor (SpriteRef::Of) or a slot item's own sprite triple.
 void AddTieredIcon(Composition& c, IconCache* icons, int desc, int frame, int tier, Rect box, u32 opacity = 0);
 void AddTieredIcon(Composition& c, IconCache* icons, const ItemRec& item, int tier, Rect box, u32 opacity = 0);
 

@@ -26,8 +26,8 @@ enum class OwnWordId : int
     ArtPencil, ArtEraser, ArtLine, ArtBucket, ArtRectangle, ArtFilledRectangle,
     ArtSmall, ArtMedium, ArtLarge,
     ArtColourOf, ArtPage,
-    // Keelhaulin' Cards.
-    CardsContinue, CardsChoose, CardsPickUp, CardsDraw, CardsDiscard,
+    // Keelhaulin' Cards (Continue: generic, a conversation's A too).
+    Continue, CardsChoose, CardsPickUp, CardsDraw, CardsDiscard,
     // The vacuum.
     VacuumDrive, VacuumHand, VacuumGrab, VacuumBlow, VacuumBlowNow,
     VacuumTake, VacuumTaking, VacuumNoFind,
@@ -107,7 +107,7 @@ enum class OwnWordId : int
     MicReal, NextStart, SaverHolds, ResetTabAsk, ResetTab,
     // The world's prompt (port/prompt.*): A held shows the other actions, Up / Down choose one
     // while it is held, Left / Right switch to the next target near the hero.
-    PromptMore, PromptChoose, PromptOther,
+    PromptMore, PromptOther,
     Count
 };
 

@@ -496,7 +496,6 @@ constexpr const char* kWords[][5] = {
     {"Reset", "Rétablir", "Zurücksetzen", "Ripristina", "Restablecer"},
     // The world's prompt
     {"Hold for more", "Maintenir : plus", "Halten: mehr", "Tieni premuto: altro", "Mantén: más"},
-    {"Choose", "Choisir", "Wählen", "Scegli", "Elegir"},
     {"Other target", "Autre cible", "Anderes Ziel", "Altro obiettivo", "Otro objetivo"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");

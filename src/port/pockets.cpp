@@ -20,7 +20,9 @@ constexpr int kSlots = 6, kKeys = 3, kCounted = 4;
 // The game's light lavender (a selection the game holds: its ring) and a cell's colours.
 constexpr u32 kSelRim = 0xFFB2B2E3, kRedRim = 0xFFE03030; // (red: a key item the game's ring marks not owned)
 constexpr u32 kEmptyFill = 0xFF7078BC, kCellFill = 0xFF5961A2;
-constexpr u32 kDim = 0x80FFFFFF, kDimShadow = 0x40383869;
+// A button that does nothing now (the hand, the bin; Give Gift's bow): the shops' inactive look, a
+// sunk plate with ui::kTextInactive words on it (5.8:1), never a faded white.
+constexpr u32 kInactivePlate = 0xFF444A85;
 
 Rect SlotRect(int i) { return {kPkGridX + (i % 3) * (kPkCell + kPkGap), kPkGridY + (i / 3) * (kPkCell + kPkGap), kPkCell, kPkCell}; }
 Rect KeyRect(int k)
@@ -82,24 +84,16 @@ void AddSpriteIcon(Composition& c, IconCache* icons, const ItemRec& item, int sc
     AddSpriteIcon(c, icons, item.tilesRes >= 0 && item.palRes >= 0 ? SpriteRef {item.tilesRes, item.iconRes, item.palRes} : SpriteRef::Of(item.iconRes), 0, scale, box, opacity);
 }
 
-static void AddTieredIcon(Composition& c, IconCache* icons, SpriteRef ref, int frame, int tier, Rect box, u32 opacity)
-{
-    if (!icons || !icons->Frame(ref, frame)) return;
-    UiItem a = icons->Tiered(ref, frame, tier, box);
-    a.fill = opacity;
-    c.ui.push_back(a);
-}
-
 void AddTieredIcon(Composition& c, IconCache* icons, int desc, int frame, int tier, Rect box, u32 opacity)
 {
-    if (desc >= 0) AddTieredIcon(c, icons, SpriteRef::Of(desc), frame, tier, box, opacity);
+    if (desc >= 0) AddTiered(c.ui, icons, SpriteRef::Of(desc), frame, tier, box, opacity);
 }
 
 void AddTieredIcon(Composition& c, IconCache* icons, const ItemRec& item, int tier, Rect box, u32 opacity)
 {
     if (item.iconRes < 0) return;
-    AddTieredIcon(c, icons, item.tilesRes >= 0 && item.palRes >= 0 ? SpriteRef {item.tilesRes, item.iconRes, item.palRes} : SpriteRef::Of(item.iconRes), 0, tier,
-                  box, opacity);
+    AddTiered(c.ui, icons, item.tilesRes >= 0 && item.palRes >= 0 ? SpriteRef {item.tilesRes, item.iconRes, item.palRes} : SpriteRef::Of(item.iconRes), 0, tier,
+              box, opacity);
 }
 
 bool PocketsItemText(const InventoryState& inv, int item, int& nameId, int& descId)
@@ -242,7 +236,7 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
         UiItem n = TextItem({r.x, r.y + r.h - 44, r.w, 36}, std::to_string(inv.counted[i].count), 28, Align::Centre, Weight::ExtraBold);
         n.wrap = false;
         n.middle = true;
-        if (inv.counted[i].count == 0) { n.colour = kDim; n.shadowArgb = kDimShadow; }
+        if (inv.counted[i].count == 0) n.colour = kTextInactive; // (none: inactive, never a faded white)
         n.layer = 1;
         c.ui.push_back(n);
         AddMousePiece(c, hs[11 + i].area, r);
@@ -275,7 +269,7 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
     const bool armed = canBin && v.armed != 0 && v.armed == v.items[focus].id;
     auto button = [&](Rect r, const std::string& label, bool on, bool green) {
         UiItem b = PanelItem(r);
-        b.fill = green ? 0xFF8ACB9A : th.frame;
+        b.fill = green ? 0xFF8ACB9A : on ? th.frame : kInactivePlate;
         b.borderArgb = green ? 0xFF309A41 : th.frameDark;
         b.border = 3;
         b.radius = r.h / 2.0f;
@@ -286,7 +280,7 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
         UiItem t = TextItem({r.x + 82, r.y, r.w - 92, r.h}, f.text, f.size, Align::Left, Weight::ExtraBold);
         t.wrap = false;
         t.middle = true;
-        if (!on) { t.colour = kDim; t.shadowArgb = kDimShadow; }
+        if (!on) t.colour = kTextInactive; // (5.8:1 on the sunk plate)
         t.layer = 1;
         c.ui.push_back(t);
     };

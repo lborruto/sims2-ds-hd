@@ -199,7 +199,12 @@ int PhoneButtonFrame(IconCache& icons, const u32* bottom)
         return n;
     };
     const SpriteFrame* f0 = icons.Frame(ref, 0);
-    if (f0 && f0->w > 0 && misses(*f0, kPmPhoneSprX, kPmPhoneSprY, 1) == 0) return 0; // (at rest: the usual case, one pass)
+    if (!f0 || f0->w <= 0) return 0;
+    int opaque0 = 0;
+    for (u32 q : f0->argb) opaque0 += (q >> 24) != 0;
+    const int rest = misses(*f0, kPmPhoneSprX, kPmPhoneSprY, opaque0 / 2 + 1);
+    if (rest == 0) return 0;              // (at rest: the usual case, one pass)
+    if (rest > opaque0 / 2) return 0;     // (not even half of it there: no button on screen, no search)
     int best = 0;
     double bestShare = 1;
     for (int k = 0; k < frames; k++)
@@ -241,13 +246,13 @@ bool PanelDPadHint(const MenuView& v, int focus, const RomData& rom, Button& b, 
 {
     if (MenuFocusable(v, focus) && (!v.items[focus].left.empty() || !v.items[focus].right.empty()))
     {
-        b = Button::DPadH; // (a slider: the shell's own hint for its values)
-        word = OwnWord(&rom, OwnWordId::ShellChange);
+        b = Button::DPadH; // (a slider: "Adjust", as every slider's hint)
+        word = OwnWord(&rom, OwnWordId::HintAdjust);
     }
     else if (MenuFocusable(v, v.selected) && focus == v.selected && (!v.scrollUp.empty() || !v.scrollDown.empty()))
     {
         b = Button::DPadV; // (a selection the game owns, moved by its own arrows: Goals, Relationships)
-        word = OwnWord(&rom, OwnWordId::PromptChoose);
+        word = OwnWord(&rom, OwnWordId::HintChoose);
     }
     else if (!v.buttons[(int)MenuButton::Left].empty() || !v.buttons[(int)MenuButton::Right].empty())
     {

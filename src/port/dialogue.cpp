@@ -88,7 +88,7 @@ std::string DialogueText(const std::string& raw, const HudState& hud, const std:
     return Tidy(out, dropped);
 }
 
-std::string DialogueChipWord(const RomData* rom) { return OwnWord(rom, OwnWordId::CardsContinue); }
+std::string DialogueChipWord(const RomData* rom) { return OwnWord(rom, OwnWordId::Continue); }
 
 DialogueLayout LayoutDialogue(const std::string& text, bool portrait, const RomData* rom)
 {
