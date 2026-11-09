@@ -21,8 +21,10 @@ using namespace ui;
 constexpr int kPad = 22, kGap = 28, kChipGap = 12;
 constexpr int kNameY = 8, kNameH = 30, kVerbY = 40, kVerbH = 42;
 constexpr int kHintMaxW = 340;               // a hint chip with its words, at most
-constexpr u32 kNameColour = 0xFFE6E6FA;      // the target's name: a light lavender, under the verb's white
-constexpr u32 kHintColour = 0xFFDCDCF5;
+// The target's name and the hints in white: on the panel's fill (#828ACB, white 3.26:1) only text
+// at 18.67 px bold or larger reads (kPromptNameMin, kPromptHintSize).
+constexpr u32 kNameColour = 0xFFFFFFFF;
+constexpr u32 kHintColour = 0xFFFFFFFF;
 
 bool HasStrings(const RomData* rom) { return rom && rom->StringCount() > 0; }
 

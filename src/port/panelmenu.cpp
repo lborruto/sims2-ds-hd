@@ -235,6 +235,27 @@ int AddHint(Composition& c, int right, Button b, const std::string& label)
     return right - r.w - 28;
 }
 
+bool PanelDPadHint(const MenuView& v, int focus, const RomData& rom, Button& b, std::string& word)
+{
+    if (MenuFocusable(v, focus) && (!v.items[focus].left.empty() || !v.items[focus].right.empty()))
+    {
+        b = Button::DPadH; // (a slider: the shell's own hint for its values)
+        word = OwnWord(&rom, OwnWordId::ShellChange);
+    }
+    else if (MenuFocusable(v, v.selected) && focus == v.selected && (!v.scrollUp.empty() || !v.scrollDown.empty()))
+    {
+        b = Button::DPadV; // (a selection the game owns, moved by its own arrows: Goals, Relationships)
+        word = OwnWord(&rom, OwnWordId::PromptChoose);
+    }
+    else if (!v.buttons[(int)MenuButton::Left].empty() || !v.buttons[(int)MenuButton::Right].empty())
+    {
+        b = Button::DPadH; // (Interact: the previous / next target, as the world's prompt says it)
+        word = OwnWord(&rom, OwnWordId::PromptOther);
+    }
+    else return false;
+    return true;
+}
+
 MenuView PanelMenuView(ScreenState s, const GameState* game, const RomData* rom)
 {
     if (!game || !rom || rom->StringCount() <= kStrClose) return {};
@@ -350,12 +371,18 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     else if (s.tab == Tab::Relationships) BuildRelations(c, v, focus, game, rom, bottom);
     else if (s.tab == Tab::Options) BuildOptions(c, v, focus, game, rom);
 
-    // The hints: A (the focused item's own word when it has one), B closes.
+    // The hints: A (the focused item's own word when it has one), B closes, X, and the D-pad's
+    // (one, always with its word: PanelDPadHint) at the left of them; A's and X's words fit the
+    // room the D-pad's leaves.
+    Button dpad = Button::DPad;
+    std::string dword;
+    const bool hasDpad = PanelDPadHint(v, focus, rom, dpad, dword);
+    const int dpadW = hasDpad ? ChipRect(0, 0, dpad, dword, kPmHintSize, 0, Weight::ExtraBold).w + 28 : 0;
     int right = kPmHints.x + kPmHints.w - 8;
     right = AddHint(c, right, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) // (nothing to perform: no A)
     {
-        const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+        const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60 - dpadW, Weight::ExtraBold);
         right = AddHint(c, right, Button::A, a.text);
     }
     if (MenuFocusable(v, focus) && !v.items[focus].buttonX.empty())
@@ -363,12 +390,10 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
         // An asking X armed (Pockets' bin): the hint says what the second X does.
         const bool armed = v.items[focus].xAsks && v.armed != 0 && v.armed == v.items[focus].id;
         const std::string word = armed ? OwnWord(&rom, OwnWordId::TrashAgain) : v.items[focus].xWord;
-        const FittedText x = FitLine(word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+        const FittedText x = FitLine(word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60 - dpadW, Weight::ExtraBold);
         right = AddHint(c, right, Button::X, x.text);
     }
-    // The D-pad's Up / Down (its vertical arms lit: the game has no word for its arrows) while they
-    // move a selection the game owns (Goals, Relationships: the game's own arrows).
-    if (MenuFocusable(v, v.selected) && focus == v.selected && (!v.scrollUp.empty() || !v.scrollDown.empty())) AddHint(c, right, Button::DPadV, "");
+    if (hasDpad) AddHint(c, right, dpad, dword);
 
     // The icons (images: drawn above the still layers): the five tabs, the selected one green.
     if (icons)

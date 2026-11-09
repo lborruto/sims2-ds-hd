@@ -34,7 +34,7 @@ constexpr int kPromptLayer = 7;
 constexpr int kPromptShadow = 7;
 constexpr int kPromptBottom = 640, kPromptH = 88, kPromptMaxW = 1000;
 // The texts: the verb beside the A chip, the name above it, the hints at the right.
-constexpr float kPromptVerbSize = 30, kPromptVerbMin = 22, kPromptNameSize = 22, kPromptNameMin = 18, kPromptHintSize = 20;
+constexpr float kPromptVerbSize = 30, kPromptVerbMin = 22, kPromptNameSize = 22, kPromptNameMin = 19, kPromptHintSize = 20;
 constexpr int kPromptVerbW = 440, kPromptNameW = 520;
 
 // How long the Interact target and its actions have been the same (App::consolePrompt, updated

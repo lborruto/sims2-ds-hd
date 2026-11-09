@@ -72,13 +72,7 @@ void AddSlider(Composition& c, Rect well, const std::string& label, int notch, b
     vt.colour = kLabel;
     vt.layer = 1;
     c.ui.push_back(vt);
-    if (focused)
-    {   // The D-pad's chip: Left / Right move the knob.
-        const Rect dp = ChipRect(0, 0, Button::DPadH, "", 24);
-        UiItem chip = ChipItem(well.x + well.w - 28 - pw - 16 - dp.w, well.y + 10 + (44 - dp.h) / 2, Button::DPadH, "", 24);
-        chip.layer = 1;
-        c.ui.push_back(chip);
-    }
+    // (Left / Right move the knob: the hints' D-pad chip says so, "Change", as the shell's values.)
     const int ty = TrackY(well);
     UiItem track = PanelItem({kOptTrackX - 6, ty - 7, kOptTrackW + 12, 14});
     track.plain = true;

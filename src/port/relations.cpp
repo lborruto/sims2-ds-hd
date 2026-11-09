@@ -14,7 +14,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kLabel = 0xFFD6DAF6;      // a well's small label: a pale lavender
 constexpr u32 kPlateRim = 0xFFB2B2E3;
 constexpr int kRowPortrait = 68;        // a row's portrait well (the crop 2x inside)
 constexpr float kRowName = 24, kRowNameLine = 22, kRowNameMin = 18;
@@ -43,7 +42,7 @@ void AddPair(Composition& c, Rect r, const std::string& label, const std::string
     UiItem lt = TextItem({r.x + 18, r.y + 6, r.w - 36, 26}, l.text, l.size, Align::Left, Weight::Bold);
     lt.wrap = false;
     lt.middle = true;
-    lt.colour = kLabel;
+    lt.colour = kTextNote; // (white: the label shrinks to 18 px on the well)
     lt.layer = 1;
     c.ui.push_back(lt);
     const FittedText v = FitLine(value, 28, 20, r.w - 36, Weight::ExtraBold);

@@ -121,6 +121,10 @@ void AddFocusRing(Composition& c, Rect r, float radius, int layer = 1, u32 behin
 // whose opaque pixels match the screen's at the button's place (a ringing frame within 8 pixels
 // of it, as the game shakes it), the closest one; 0 (at rest) when none comes near.
 int PhoneButtonFrame(IconCache& icons, const u32* bottom);
+// The panel's D-pad hint for the focus (the chip and its word; false: none): a slider's Left /
+// Right (DPadH, "Change", as the shell's values), the game's own selection's Up / Down (DPadV,
+// "Choose"), the view's Left / Right (DPadH, "Other target": Interact's targets).
+bool PanelDPadHint(const MenuView& v, int focus, const RomData& rom, ui::Button& b, std::string& word);
 // A hint chip right-aligned at `right` in the hints band; returns the next right edge.
 int AddHint(Composition& c, int right, ui::Button b, const std::string& label);
 }

@@ -18,26 +18,22 @@ using namespace ui;
 // The rows' look: the game's row bar (its frame colour), lighter when focused; the arrow is the
 // game's own ▶ (the Interact tab's icon, frame 0: blue, green when focused, as the game lights
 // the highlighted row's arrow).
-constexpr u32 kGreyText = 0x80FFFFFF, kGreyShadow = 0x40383869;
+constexpr u32 kGreyShadow = 0x40383869;
 constexpr int kArrowIcon = 48;      // the ▶, 2x
-constexpr u32 kStripDim = 0xC0FFFFFF;
 constexpr u32 kPlateRim = 0xFFB2B2E3; // the game's light lavender
 
 Rect RowRect(int i) { return {kInteractRowX, kInteractRowY + i * (kInteractRowH + kInteractRowGap), kInteractRowW, kInteractRowH}; }
 
 // The strip's boxes: the current target's plate in the middle, the previous / next names beside
-// it (after the D-pad's chip at the left).
+// it (the hints' D-pad chip says Left / Right switch: "Other target").
 constexpr int kStripCurW = 340;
-struct StripBoxes { Rect cur, prev, next; int chipX, chipY; };
+struct StripBoxes { Rect cur, prev, next; };
 StripBoxes Strip()
 {
-    const Rect dp = ChipRect(0, 0, Button::DPad, "", 24);
     const int cx = kInteractStrip.x + kInteractStrip.w / 2, sy = kInteractStrip.y, sh = kInteractStrip.h;
     StripBoxes b;
-    b.chipX = kInteractStrip.x + 14;
-    b.chipY = sy + (sh - dp.h) / 2;
     b.cur = {cx - kStripCurW / 2, sy, kStripCurW, sh};
-    const int lx = b.chipX + dp.w + 12;
+    const int lx = kInteractStrip.x + 18;
     b.prev = {lx, sy, cx - kStripCurW / 2 - 16 - lx, sh};
     const int rx = cx + kStripCurW / 2 + 16;
     b.next = {rx, sy, kInteractStrip.x + kInteractStrip.w - 18 - rx, sh};
@@ -138,7 +134,7 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
         UiItem label = TextItem({textX, r.y, textW, r.h}, t.text, t.size, Align::Left, Weight::ExtraBold);
         label.wrap = false;
         label.middle = true;
-        if (greyed) { label.colour = kGreyText; label.shadowArgb = kGreyShadow; }
+        if (greyed) { label.colour = kTextInactive; label.shadowArgb = kGreyShadow; } // (3.23:1 on the row: inactive)
         label.layer = 1;
         c.ui.push_back(label);
         AddMousePiece(c, {kInteractArrowFrom.x, kInteractArrowFrom.y + i * kInteractArrowStep, kInteractArrowFrom.w, kInteractArrowFrom.h}, r);
@@ -148,12 +144,11 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
     if (n == 0)
     {
         const Rect area {RowRect(0).x, RowRect(0).y, RowRect(0).w, RowRect(kInteractRows - 1).y + RowRect(0).h - RowRect(0).y};
-        PanelText(c, area, OwnWord(&rom, OwnWordId::NoActions), kPmTextSize, kPmTextMin, Align::Centre, Weight::ExtraBold, 0xFFE6E6FA);
+        PanelText(c, area, OwnWord(&rom, OwnWordId::NoActions), kPmTextSize, kPmTextMin, Align::Centre, Weight::ExtraBold, 0xFFFFFFFF);
     }
 
     // The strip: the previous target at the left, the current one in the middle (on a plate with
-    // a thin light rim), the next at the right; the D-pad's chip when
-    // Left / Right switch.
+    // a thin light rim), the next at the right.
     const StripBoxes sb = Strip();
     if (in.target.kind != TargetRef::None)
     {
@@ -174,16 +169,13 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
     }
     if (in.prev.kind != TargetRef::None || in.next.kind != TargetRef::None)
     {
-        UiItem chip = ChipItem(sb.chipX, sb.chipY, Button::DPad, "", 24);
-        chip.layer = 1;
-        c.ui.push_back(chip);
         auto name = [&](const TargetRef& t, Rect box, Align a, Rect from) {
             if (t.kind == TargetRef::None) return;
             const SideName f = FitSide(MenuWords(rom, t.nameId), box.w);
             UiItem it = TextItem(box, f.text, f.size, a, Weight::Bold);
             it.wrap = f.wrap;
             it.middle = true;
-            it.colour = kStripDim;
+            it.colour = kTextNote; // (small text on the strip's well: white, 4.58:1)
             it.layer = 1;
             c.ui.push_back(it);
             AddMousePiece(c, from, box);
@@ -236,9 +228,11 @@ MenuMeasure MeasureInteract(const RomData& rom)
             if (std::find(m.cutIds.begin(), m.cutIds.end(), id) == m.cutIds.end()) m.cutIds.push_back(id);
         }
     };
-    // The A hint's room: the hints' band less the B hint (as BuildPanelMenu lays them out).
+    // The A hint's room: the hints' band less the B hint and the D-pad's "Other target" (as
+    // BuildPanelMenu lays them out with a previous / next target).
     const Rect b = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold);
-    const int hintW = kPmHints.w - 8 - b.w - 28 - 60;
+    const Rect d = ChipRect(0, 0, Button::DPadH, OwnWord(&rom, OwnWordId::PromptOther), kPmHintSize, 0, Weight::ExtraBold);
+    const int hintW = kPmHints.w - 8 - b.w - 28 - 60 - d.w - 28;
     for (int id = 1845; id <= 1951; id++)
     {
         if (unused(id)) continue;

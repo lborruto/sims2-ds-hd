@@ -104,6 +104,10 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   phone button are the game's own pictures (no more dark squares or blue band around them).
 - Portraits (Interact, Give Gift, Goals, Relationships, conversations) without the DS's square and
   bevelled corners around them.
+- Every button hint says what it does: Up / Down "Choose" (Goals, Relationships, the phone), Left /
+  Right "Change" on a volume and "Other target" on Interact, A "Continue" in a conversation.
+- The phone's highlighted row has the same focus ring as every other menu; the world's prompt,
+  Relationships' labels and Interact's neighbouring names are easier to read.
 - The vacuum on a controller: A takes a find for you. The hand goes to the find in the green ring
   (the one nearest the hand; the right stick moves the hand), presses where no dust lies over it,
   carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is

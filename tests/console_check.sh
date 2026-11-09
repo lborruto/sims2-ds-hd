@@ -827,10 +827,12 @@ def hd_menu(rows, focus, wide=False):
     if counts[0] < 200 or any(counts[1:]):
         errors.append(f"tab icons' green pixels {counts} (want Interact's only)")
     piece("portrait 3x", 63, 47, 65, 81, 220, 230, 3, step=4, keyed=True)
+    if rows == 0 and (255, 255, 255) not in [C(x, y) for y in range(214, 498) for x in range(470, 1070)]:
+        errors.append("no rows: the port's words (NoActions) missing")
     for i in range(4):
         row = [C(x, y) for y in range(214 + 76 * i, 268 + 76 * i) for x in range(488, 900)]
         white = (255, 255, 255) in row
-        if white != (i < rows):
+        if rows > 0 and white != (i < rows):  # (no rows: the port's white words lie across them)
             errors.append(f"row {i}: label {'missing' if i < rows else 'drawn'}")
         r, g, b = C(456, 241 + 76 * i)
         ring = RINGED(456, 241 + 76 * i)  # the ring's green (its edge softened by the row's shadow)
