@@ -121,6 +121,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   the screen's edge.
 - AUTO no longer flashes the touch screen big at the hotel's doors.
 - Widescreen: no more thin cracks of light across the curtain in Create-a-Sim.
+- 60 fps: a Sim no longer tears apart for a frame when they start, stop or turn; a model moves
+  in one piece, or, the rare time it cannot be followed, takes that one step at 30 fps.
 - A failed state load puts back the game as it was a moment before; save states and the place
   kept on quitting are written safely (a failed write keeps the old one).
 

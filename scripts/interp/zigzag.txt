@@ -1,0 +1,11 @@
+# From s7 (the phone closed by the tap at frame 5), the left stick in a zigzag: up, right, up,
+# left, down, up, right, left. Every start, stop and turn of the walking Sim (tests/interp_check.sh).
+5 4 touch 237 15
+40 60 pad ly-
+100 30 pad lx+
+130 40 pad ly-
+170 20 pad lx-
+190 40 pad ly+
+240 30 pad ly-
+270 30 pad lx+
+300 30 pad lx-
