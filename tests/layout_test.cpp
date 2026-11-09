@@ -3052,6 +3052,7 @@ int main()
             c.simName = "Sim";
             c.skin = 1;
             c.hairColour = 3;
+            c.drawn = true;
             return g;
         };
         // The game's target box of an item (the picture or box its tap lies in), by its id.
@@ -3129,6 +3130,13 @@ int main()
                         if (q.src == Src::Top) { tops++; CHECK(q.touch && q.from.w == topW && q.to.x + q.to.w <= kCasPanel.x); }
                     CHECK(tops == 1);
                     if (topW != 256 || focus != MenuFirst(v)) continue;
+                    {   // The touch screen's pictures only once they are the page's (CasState::drawn).
+                        GameState u = g;
+                        u.front.cas.drawn = false;
+                        Composition cu {kConsoleW, kConsoleH, {}, {}};
+                        BuildCas(cu, v, focus, u, rom, nullptr, bottom.data(), topW, 192);
+                        for (const ui::UiItem& it : cu.ui) CHECK(!(it.kind == ui::UiItem::Image && it.src == bottom.data()));
+                    }
                     if (g.front.cas.switching)
                     {
                         for (const Piece& q : comp.pieces) CHECK(q.src != Src::Bottom);   // (nothing to click)
@@ -3277,6 +3285,27 @@ int main()
             check(g, "switching");
         }
         for (int page = 5; page < 8; page++) CHECK(!CasViewOf(cas, state(page)).valid);
+        {   // Clothes' cells: a sprite read hidden is an empty cell (nothing drawn); one that did not
+            // read, or past the list, keeps the touch screen's picture (the gated crop)
+            GameState g = state(3);
+            CasState& c = g.front.cas;
+            c.clothesKnown = true;
+            c.category = 0; c.clothesPage = 0; c.item = 0;
+            c.spriteCount = 15;
+            for (int i = 0; i < 15; i++) c.sprites[i] = {true, true, 0, -1, -1, -1};
+            c.sprites[9] = {true, false, 0, -1, -1, -1};   // cell 0: read, hidden
+            c.sprites[10] = {};                           // cell 1: did not read
+            const MenuView v = CasViewOf(cas, g);
+            Composition comp {1280, 720, {}, {}};
+            BuildCas(comp, v, -1, g, rom, nullptr, bottom.data(), 256, 192);
+            auto crops = [&](int cell) {
+                int n = 0;
+                for (const ui::UiItem& it : comp.ui)
+                    if (it.kind == ui::UiItem::Image && it.src == bottom.data() && it.from.x == kCasClothFrom.x + kCasClothDx * (cell % 3) && it.from.y == kCasClothFrom.y + kCasClothDy * (cell / 3)) n++;
+                return n;
+            };
+            CHECK(crops(0) == 0 && crops(1) == 1 && crops(2) == 1);   // (no ROM here: a readable sprite falls back too)
+        }
         // A page whose fields do not read yet (its object being filled): the page's tabs, nothing to press.
         for (int page = 0; page < 5; page++)
         {

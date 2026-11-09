@@ -300,13 +300,17 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             b = ConsoleBranch::CasFade;
             if (brightest < kCasFadeBlack) return c;
             b = ConsoleBranch::Cas;
-            BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH);
-            if (brightest < kCasFadeWhite)
+            // The veil lies over every still item; the pictures lie above it, so the ROM's are drawn
+            // as dark as the veil makes the rest (their colour, never their opacity: nothing under
+            // them shows through); the touch screen's own are already as dark as the game's fade.
+            const int dark = brightest < kCasFadeWhite ? 255 * (kCasFadeWhite - brightest) / kCasFadeWhite : 0;
+            BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH, 255 - dark);
+            if (dark > 0)
             {
                 ui::UiItem veil = ui::PanelItem(kCanvas);
                 veil.plain = true;
                 veil.radius = 0;
-                veil.fill = (u32)(255 * (kCasFadeWhite - brightest) / kCasFadeWhite) << 24;
+                veil.fill = (u32)dark << 24;
                 veil.layer = kCasFadeLayer;
                 c.ui.push_back(veil);
                 SortUi(c.ui);

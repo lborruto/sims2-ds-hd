@@ -1283,6 +1283,11 @@ relaunch:
                 if (ld.valid)
                     ld.loading = (before.front.load.valid && before.front.load.loading) || (p.valid && p.kind == 3 && p.state >= 1 && p.state <= 3);
             }
+            {   // Create-a-Sim: the page's own pictures on the touch screen (no switching nor loading since the frame before)
+                CasState& cs = app.game.front.cas;
+                const CasState& b = before.front.cas;
+                if (cs.valid) cs.drawn = !cs.switching && !cs.loading && b.valid && b.page == cs.page && !b.switching && !b.loading;
+            }
             {   // room info's hint: which line the stylus opened it on (not in RAM), kept while it is up
                 RoomInfoState& ri = app.game.roomInfo;
                 // (a touch before the room info rose opened it, or something else: never a line's)
@@ -1629,6 +1634,8 @@ relaunch:
                             if (c.clothesKnown) fprintf(stderr, " category=%d clothespage=%d item=%d", c.category, c.clothesPage, c.item);
                             if (c.keepKnown) fprintf(stderr, " aspiration=%d answer=%d", c.aspiration, c.answer);
                             if (c.switching) fprintf(stderr, " switching");
+                            if (c.loading) fprintf(stderr, " loading");
+                            if (c.valid && !c.drawn) fprintf(stderr, " undrawn");
                             fprintf(stderr, "\n");
                             if (c.arrowsKnown) fprintf(stderr, "frame %ld: cas-sprites left=%d right=%d cell=%d pos=%d\n", frame, c.canLeft ? 1 : 0, c.canRight ? 1 : 0, c.clothesCell, c.hairPos);
                         }

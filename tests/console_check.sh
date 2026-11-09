@@ -486,30 +486,45 @@ def front_cas(page, focus, raw_top=True):
     expect("top frame", C(12, 300), OUTLINE)
     expect("backdrop", C(5, 5), BACKDROP)
     expect("panel", C(704, 640), FRAME)
+    # The tabs: round kit buttons, the page's green, the others the cells' blue.
     for i in range(5):
-        x0, y0 = 780 + 80 * i + 6, 34 + 4
-        for dy in range(0, 30, 5):
-            for dx in range(0, 34, 5):
-                expect(f"tab {i} DS {1 + dx},{8 + 37 * i + dy}", C(x0 + 2 * dx + 1, y0 + 2 * dy + 1), bottom(1 + dx, 8 + 37 * i + dy))
-        if len(errors) > 4:
-            return
-    # One live crop of the page: DS x, y, w, h, its scale, its HD box (Keep this Sim?: the game's
-    # aspiration pictures, sprite 362, their blue splash in each cell).
+        r, g, b = C(820 + 80 * i, 46)
+        lit = g > r + 40 and g > b
+        if lit != (i == page): errors.append(f"tab {i}: {(r, g, b)} {'not ' if i == page else ''}green")
+    # One picture of the page: DS x, y, w, h, its scale, its HD box (Keep this Sim?: the game's
+    # aspiration pictures, sprite 362, 2x, their blue splash in the chosen one, dimmed in the others;
+    # the Name page: the game's ♀ green (chosen), ♂ grey; Clothes: a cell's sprite from the ROM, the
+    # same pixel art as the touch screen's where it is opaque).
+    green = lambda x0, y0, w, h: sum(1 for yy in range(y0, y0 + h, 2) for xx in range(x0, x0 + w, 2) if C(xx, yy)[1] > C(xx, yy)[0] + 60)
+    near = 0
     if page == 4:
         for j in range(4):
-            blue = sum(1 for yy in range(190, 294, 2) for xx in range(750 + 120 * j, 850 + 120 * j, 2) if C(xx, yy)[2] > 200 and C(xx, yy)[0] < 140)
-            if blue < 100: errors.append(f"aspiration {j}: no picture ({blue})")
+            blue = sum(1 for yy in range(186, 306, 2) for xx in range(722 + 132 * j, 842 + 132 * j, 2) if C(xx, yy)[2] > 200 and C(xx, yy)[0] < 140)
+            if (blue >= 100) != (j == 0): errors.append(f"aspiration {j}: {'no picture' if j == 0 else 'not dimmed'} ({blue})")
         fw = fh = 0
+    elif page == 0:
+        if green(750, 188, 84, 84) < 150: errors.append(f"no green ♀ ({green(750, 188, 84, 84)})")
+        if green(844, 188, 84, 84) > 10: errors.append(f"♂ not grey ({green(844, 188, 84, 84)})")
+        # (and a live crop, gated on the page being drawn: the first skin figure 2x)
+        fx, fy, fw, fh, s, ox, oy = 134, 4, 21, 42, 2, 963, 188
+    elif page == 3:
+        fx, fy, fw, fh, s, ox, oy = 188, 109, 38, 54, 3, 1084, 387
+        near = 1
     else:
         fx, fy, fw, fh, s, (bx, by, bw, bh) = {
-            0: (47, 7, 37, 37, 2, (750, 188, 84, 84)), 1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129)),
-            3: (188, 109, 38, 54, 3, (1084, 384, 120, 174))}[page]
+            1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129))}[page]
         ox, oy = bx + (bw - fw * s) // 2, by + (bh - fh * s) // 2
+    same = total = 0
     for dy in range(0, fh, 4):
         for dx in range(0, fw, 4):
+            total += 1
+            if near:
+                same += C(ox + s * dx + s // 2, oy + s * dy + s // 2) == bottom(fx + dx, fy + dy)
+                continue
             expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), bottom(fx + dx, fy + dy))
             if len(errors) > 4:
                 return
+    if near and same < total * 0.6: errors.append(f"the cell's sprite: {same} of {total} pixels the touch screen's")
     x, y, w, h = focus
     r, g, b = C(x + w // 2, y - 3)
     if not (g > r + 80 and g > b + 60): errors.append(f"no focus halo above {focus}: {(r, g, b)}")
@@ -1285,7 +1300,7 @@ elif case == "s3-res2":
         expect(f"turn pill {name} covered", C(16 + int(dx * k), 87 + int(150 * k)), hexrgb("5961A2"))
         expect(f"turn pill {name} covered (its end)", C(16 + int((dx + 23) * k), 87 + int(146 * k)), hexrgb("5961A2"))
 elif case == "s4":
-    front_cas(4, (746, 186, 108, 112))
+    front_cas(4, (718, 182, 128, 128))
 elif case == "s4-it":
     front_cas(4, (756, 544, 210, 88))
 elif case == "cas-hair":
@@ -2115,6 +2130,89 @@ check_pad hold-phone hold_phone
 check_pad hold-gift hold_gift
 check_pad hold-registry hold_registry
 check_pad hold-load-slot hold_load_slot
+# Create-a-Sim's pictures through every page change (src/port/cas.cpp, CasState::drawn): from s3,
+# RB, LB and Start (scripts/console/cas-walk.txt), each of the 9 frames from a change on: every
+# cell and tab of the page either empty (one colour: the game's last page never shows in it) or
+# the page's own picture (as 8 frames after the change).
+cas_gate_run() {
+    local frames
+    frames=$(for b in 20 70 120 170 220 270 320 370 420 470 520 570; do for d in 0 1 2 3 4 5 6 7 8; do printf '%s,' $((b + d)); done; done)
+    cp "$complete_save" "$tmp/cas-gate.sav" || return
+    "$bin" "$rom" --headless --frames 580 --state-load "$shots/s3.st" --save "$tmp/cas-gate.sav" --layout console --compose \
+        --print-front "${town[@]}" --input "$repo/scripts/console/cas-walk.txt" --shot-at "${frames%,}" --shot-dir "$tmp/cas-gate" > "$tmp/cas-gate.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/cas-gate.log" && touch "$tmp/cas-gate.ok"
+}
+cas_gate_run
+cas_gate() {
+    "$python" -I -c '
+import sys
+from PIL import Image
+d = sys.argv[1]
+# Each change: its first frame and the page it goes to (cas-walk: RB x4, LB x4, Start x4).
+changes = [(20, 1), (70, 2), (120, 3), (170, 4), (220, 3), (270, 2), (320, 1), (370, 0), (420, 1), (470, 2), (520, 3), (570, 4)]
+tabs = [(780 + 80 * i + 6, 38, 68, 60) for i in range(5)]
+cells = {0: [(750 + 94 * g, 188, 84, 84) for g in range(2)] + [(956 + 66 * i, 184, 56, 92) for i in range(4)],
+         1: [(728 + 64 * i, 186, 56, 56) for i in range(8)] + [(822 + 166 * (c & 1), 258 + 183 * (c >> 1), 150, 171) for c in range(4)],
+         2: [(754 + 155 * (i % 3), 190 + 141 * (i // 3), 141, 129) for i in range(9)],
+         3: [(716, 190 + 70 * i, 64, 64) for i in range(6)] + [(824 + 130 * (c % 3), 200 + 184 * (c // 3), 120, 174) for c in range(6)],
+         4: []}
+# The page at each frame (--print-front): a change lands a frame after its press or on it.
+at, cur = {}, -1
+for line in open(sys.argv[2]):
+    if line.startswith("frame ") and ": cas page=" in line:
+        n = int(line.split()[1].rstrip(":"))
+        at[n] = int(line.split("page=")[1].split()[0])
+pages = []
+for n in range(600):
+    cur = at.get(n, cur)
+    pages.append(cur)
+FILLS = [(0x6A, 0x72, 0xB8), (0x9A, 0xA2, 0xE3)]                       # (a cell, a focused cell)
+bad = []
+for f0, page in changes:
+    final = Image.open(f"{d}/f{f0 + 8:06d}.png").convert("RGB")
+    for f in range(f0, f0 + 8):
+        if pages[f] != page: continue                                     # (the last page still: its own pictures)
+        im = Image.open(f"{d}/f{f:06d}.png").convert("RGB")
+        for (x, y, w, h) in tabs + cells[page]:
+            box = (x + w // 4, y + h // 4, x + w - w // 4, y + h - h // 4)   # (its middle: the well s bevel aside)
+            a = im.crop(box)
+            if len(a.getcolors(1 << 16) or [0, 0]) == 1: continue          # empty
+            # the page s own: as 8 frames later but for the cells fill under a picture s
+            # transparent pixels (the focus lands a frame late) and the game s brief dimming
+            fa, fb, n, off = a.tobytes(), final.crop(box).tobytes(), a.size[0] * a.size[1], 0
+            for k in range(0, 3 * n, 3):
+                pa, pb = fa[k:k + 3], fb[k:k + 3]
+                if max(abs(pa[c] - pb[c]) for c in range(3)) <= 8: continue
+                if any(max(abs(q[c] - f[c]) for c in range(3)) <= 10 for q in (pa, pb) for f in FILLS): continue
+                off += 1
+            if off <= n // 10: continue
+            bad.append(f"frame {f} page {page}: box {x},{y} neither empty nor the page s picture")
+for b in bad[:4]: print("  cas-gate: " + b)
+sys.exit(1 if bad else 0)' "$tmp/cas-gate" "$tmp/cas-gate.log"
+}
+check_pad cas-gate cas_gate
+# The game's pictures fade with Create-a-Sim's veil (src/console.cpp): from s4, the tick
+# (scripts/console/cas-keep.txt) and the game's fade out: once the panel is under a third dark, the
+# chosen aspiration's picture (the ROM's, drawn above every still item) as dark as the panel (within 0.1).
+cas_fade_run() {
+    cp "$complete_save" "$tmp/cas-fade.sav" || return
+    "$bin" "$rom" --headless --frames 136 --state-load "$shots/s4.st" --save "$tmp/cas-fade.sav" --layout console --compose \
+        "${town[@]}" --input "$repo/scripts/console/cas-keep.txt" --shot-at 100,134 --shot-dir "$tmp/cas-fade" > "$tmp/cas-fade.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/cas-fade.log" && touch "$tmp/cas-fade.ok"
+}
+cas_fade_run
+cas_fade() {
+    "$python" -I -c '
+import sys
+from PIL import Image
+a, b = (Image.open(f"{sys.argv[1]}/f{n:06d}.png").convert("RGB") for n in (100, 134))
+mean = lambda im, box: sum(im.crop(box).tobytes()) / (box[2] - box[0]) / (box[3] - box[1])
+panel, asp = (700, 560, 712, 700), (870, 200, 950, 290)
+p, q = mean(b, panel) / mean(a, panel), mean(b, asp) / mean(a, asp)
+if p > 0.75: print(f"  cas-fade: the panel not dark yet ({p:.2f})"); sys.exit(1)
+if q > p + 0.1: print(f"  cas-fade: the aspiration {q:.2f} of its light, the panel {p:.2f}"); sys.exit(1)' "$tmp/cas-fade"
+}
+check_pad cas-fade cas_fade
 # The world's camera on the right stick (navigator.h, WorldKeys; from s7, the phone closed): held
 # left it turns (the DS's L), held up it zooms in (X): the world's picture differs from the same
 # run without it; LB held (the shoulders' default L) changes nothing there any more.

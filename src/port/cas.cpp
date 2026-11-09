@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <map>
+#include <tuple>
 
 #include "console.h"
 #include "port/front.h"
@@ -22,6 +24,8 @@ constexpr u32 kChosenRim = 0xFFB2B2E3;   // the game's choice (the focus alone i
 constexpr u32 kDim = 0x80FFFFFF;          // a key that would do nothing (the name is full)
 constexpr u32 kWarm = 0xFFFFF2D6;         // the chosen aspiration's name
 constexpr u32 kSlotFill = 0xFF51518A, kSlotNext = 0xFFB2B2E3;
+constexpr u32 kTabLit = 0xFF309A41, kTabLitRim = 0xFF8AE38A;   // the page's tab: the game's lit green
+constexpr int kCasTabButton = 56;                              // its round button
 
 bool CasScreen(ScreenState s) { return s.screen == Screen::CreateASim; }
 
@@ -82,6 +86,41 @@ int HintChip(Composition& c, int right, Button b, const std::string& label)
     return right - r.w - 28;
 }
 int Slot(int aspiration) { for (int j = 0; j < 4; j++) if (kCasAspOfSlot[j] == aspiration) return j; return -1; }
+
+// The game's pictures from the ROM, as the game's sprite list names them (CasState::sprites), in a
+// look of their own (IconCache::Look): as they are, mirrored (the left arrow: the game's right one
+// turned), grey (♀ / ♂ not chosen: the game's button without its colour) or dimmed (the
+// aspirations not chosen); all at the fade's light (BuildCas's `light`).
+using Look = SpriteLook;
+// Frame `frame` of s at `scale` times its size, centred in box (the game's pictures at a whole
+// factor: never a fraction), in `look`; false when it does not read (nothing drawn).
+bool AddLook(std::vector<UiItem>& images, IconCache* icons, SpriteRef s, int frame, int scale, Rect box, int light, Look look = Look::Plain, u32 opacity = 0)
+{
+    const SpriteFrame* big = icons ? icons->Look(s, frame, look, scale, light) : nullptr;
+    if (!big) return false;
+    const Rect to {box.x + (box.w - big->w) / 2, box.y + (box.h - big->h) / 2, big->w, big->h};
+    // Smooth: the frame at its own size, for the kit's pixel-art scaler; Pixel: the copy at its size.
+    const SpriteFrame* one = ui::SmoothPictures() ? icons->Look(s, frame, look, 1, light) : nullptr;
+    const SpriteFrame& src = one ? *one : *big;
+    images.push_back(ImageItem(to, src.argb.data(), src.w, src.h, {0, 0, src.w, src.h}));
+    images.back().fill = opacity;
+    return true;
+}
+// A sprite of the page's list as the game names it (its own palette; `pal` for one the game sets
+// at run time); null-ref when it does not read.
+SpriteRef ListRef(const CasState& cs, int i, int pal = -1)
+{
+    if (i < 0 || i >= cs.spriteCount || cs.sprites[i].desc < 0) return {};
+    const CasSprite& s = cs.sprites[i];
+    return {s.tiles, s.desc, s.pal >= 0 ? s.pal : pal};
+}
+// A page's arrow (sprite i of its list: the game's frame, lit while pressed), the left one the
+// right one mirrored, 2x in `to`; the touch screen's pixels when the ROM's do not read.
+void Arrow(std::vector<UiItem>& images, IconCache* icons, const CasState& cs, int i, bool left, Rect to, const u32* live, Rect from, int light)
+{
+    const int frame = i < cs.spriteCount ? cs.sprites[i].frame : 0;
+    if (!AddLook(images, icons, SpriteRef::Of(kSprCasArrow), frame, 2, to, light, left ? Look::Flip : Look::Plain)) Crop(images, live, from, 2, to);
+}
 }
 
 std::string CasKeyText(const RomData& rom, int page, int i)
@@ -293,13 +332,18 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
 }
 
 void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons, const u32* bottom,
-              int topW, int topH)
+              int topW, int topH, int light)
 {
+    light = std::clamp(light, 0, 255);
     const Theme& th = GameTheme();
     const CasState& cs = game.front.cas;
     if (!cs.valid || cs.page < 0 || cs.page >= kCasPages) return;
     const size_t first = c.ui.size();
     std::vector<UiItem> images;
+    // The touch screen's pictures only once they are the page's own (CasState::drawn): through a
+    // page change (and the Clothes page's next cells) the game's screen still shows the last
+    // page's, or nothing, for a frame or two: the cells stay empty meanwhile.
+    const u32* live = cs.drawn ? bottom : nullptr;
 
     // The model: the top screen at its shape, framed; the camera for the mouse (its right drag turns it).
     const Rect top = FrontFit(kCasTopBox, topW, topH);
@@ -358,7 +402,8 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     title.radius = 14;
     c.ui.push_back(title);
 
-    // The tabs: the game's own (live), the page's on a raised plate; the mouse onto the game's.
+    // The tabs: round buttons as the game's (its digits, the tick for Keep this Sim?), the page's
+    // green on a raised plate; the mouse onto the game's.
     for (int i = 0; i < kCasPages; i++)
     {
         const Rect cell {kCasTabsX + i * kCasTabCell, kCasTabBar.y + 4, kCasTabCell, kCasTabBar.h - 8};
@@ -372,7 +417,16 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             plate.layer = 1;
             c.ui.push_back(plate);
         }
-        Crop(images, bottom, Plus(kCasTabFrom, 0, kCasTabDy * i), 2, cell);
+        const Rect b {cell.x + (cell.w - kCasTabButton) / 2, cell.y + (cell.h - kCasTabButton) / 2, kCasTabButton, kCasTabButton};
+        UiItem button = PanelItem(b);
+        button.fill = i == cs.page ? kTabLit : kCellFill;
+        button.borderArgb = i == cs.page ? kTabLitRim : th.frame;
+        button.border = 3;
+        button.radius = b.h / 2.0f;
+        button.layer = 1;
+        c.ui.push_back(button);
+        if (i < 4) Text(c, {b.x, b.y - 1, b.w, b.h}, std::to_string(i + 1), 30);
+        else if (!AddLook(images, icons, SpriteRef::Of(kSprCasTabTick[i == cs.page]), 0, 2, b, light)) Text(c, b, "?", 30);
         if (!cs.switching) AddMousePiece(c, Plus(kCasTabFrom, 0, kCasTabDy * i), cell);
     }
     if (!v.title.empty()) PanelText(c, {kCasTitle.x + 20, kCasTitle.y, kCasTitle.w - 40, kCasTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Centre, Weight::ExtraBold);
@@ -421,14 +475,16 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         for (int g = 0; g < 2; g++)
         {
             Cell(c, v.items[g].rect, focused(g), cs.gender == g, 42);
-            Crop(images, bottom, kCasGenderFrom[g], 2, v.items[g].rect);
+            // The game's ♀ / ♂ button (its sprite), the one not chosen grey (the game draws it plain).
+            if (!AddLook(images, icons, SpriteRef::Of(kSprCasGender[g]), 0, 2, v.items[g].rect, light, cs.gender == g ? Look::Plain : Look::Grey))
+                Crop(images, live, kCasGenderFrom[g], 2, v.items[g].rect);
             mouse(g, kCasGenderFrom[g]);
         }
         for (int i = 0; i < 4; i++)
         {
             const int k = 2 + i;
             Cell(c, v.items[k].rect, focused(k), cs.skin == i);
-            Crop(images, bottom, Plus(kCasSkinFrom, kCasSkinDx * i, 0), 2, v.items[k].rect);
+            Crop(images, live, Plus(kCasSkinFrom, kCasSkinDx * i, 0), 2, v.items[k].rect);
             mouse(k, Plus(kCasSkinFrom, kCasSkinDx * i, 0));
         }
         // The keyboard's pages (the game's labels) and X's chip: the next one.
@@ -462,7 +518,16 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         // Backspace: the game's ← (live) and Y's chip.
         const int k = 9 + kCasKeys;
         Cell(c, kCasBackRect, focused(k), false, 12);
-        Crop(images, bottom, kCasBackFrom, 2, {kCasBackRect.x, kCasBackRect.y, kCasBackRect.w - 40, kCasBackRect.h});
+        {   // The backspace's arrow ←, the kit's: the font's ‹ as its head on a bar.
+            const int cx = kCasBackRect.x + (kCasBackRect.w - 40) / 2, cy = kCasBackRect.y + kCasBackRect.h / 2;
+            UiItem bar = PanelItem({cx - 12, cy - 3, 30, 6});
+            bar.plain = true;
+            bar.fill = cs.name.empty() ? kDim : 0xFFFFFFFF;
+            bar.radius = 3;
+            bar.layer = 1;
+            c.ui.push_back(bar);
+            Text(c, {cx - 30, cy - 24, 30, 44}, "\xE2\x80\xB9", 44, Align::Right, cs.name.empty() ? kDim : 0xFFFFFFFF);
+        }
         {
             const Rect yr = ChipRect(0, 0, Button::Y, "", 24);
             UiItem y = ChipItem(kCasBackRect.x + kCasBackRect.w - 12 - yr.w, kCasBackRect.y + (kCasBackRect.h - yr.h) / 2, Button::Y, "", 24);
@@ -478,7 +543,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         for (int i = 0; i < 8; i++)
         {
             Cell(c, v.items[i].rect, focused(i), cs.hairColour == i, 12);
-            Crop(images, bottom, Plus(kCasSwatchFrom, kCasSwatchDx * i, 0), 2, v.items[i].rect);
+            Crop(images, live, Plus(kCasSwatchFrom, kCasSwatchDx * i, 0), 2, v.items[i].rect);
             mouse(i, Plus(kCasSwatchFrom, kCasSwatchDx * i, 0));
         }
         for (int cell = 0; cell < 4; cell++)
@@ -487,12 +552,17 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             const bool chosen = cs.hairPos / 9 == row && cs.hairPos % 9 - cs.hairScroll == col;
             const Rect from = Plus(kCasHairFrom, kCasHairDx * col, kCasHairDy * row);
             Cell(c, v.items[k].rect, focused(k), chosen, 16);
-            Crop(images, bottom, from, 3, v.items[k].rect);
+            Crop(images, live, from, 3, v.items[k].rect);
             mouse(k, from);
         }
         // The game's arrows, where it shows them.
-        if (cs.canLeft) { Crop(images, bottom, kCasHairLeftFrom, 2, kCasHairLeft); AddMousePiece(c, kCasHairLeftFrom, kCasHairLeft); }
-        if (cs.canRight) { Crop(images, bottom, kCasHairRightFrom, 2, kCasHairRight); AddMousePiece(c, kCasHairRightFrom, kCasHairRight); }
+        for (int k = 0; k < 2; k++)
+        {
+            if (!(k == 0 ? cs.canLeft : cs.canRight)) continue;
+            const Rect to = k == 0 ? kCasHairLeft : kCasHairRight, from = k == 0 ? kCasHairLeftFrom : kCasHairRightFrom;
+            Arrow(images, icons, cs, kCasHairArrowSpr[k], k == 0, to, live, from, light);
+            AddMousePiece(c, from, to);
+        }
         break;
     }
     case 2:
@@ -501,7 +571,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         {
             const Rect from = Plus(kCasFaceFrom, kCasFaceDx * (i % 3), kCasFaceDy * (i / 3));
             Cell(c, v.items[i].rect, focused(i), cs.face == i, 16);
-            Crop(images, bottom, from, 3, v.items[i].rect);
+            Crop(images, live, from, 3, v.items[i].rect);
             mouse(i, from);
         }
         break;
@@ -512,7 +582,10 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         {
             const Rect from {kCasCatFrom.x, kCasCatFromY[i], kCasCatFrom.w, kCasCatFrom.h};
             Cell(c, v.items[i].rect, focused(i), cs.category == i, 14);
-            Crop(images, bottom, from, 2, v.items[i].rect);
+            // The game's category sprite (frame 1 its lit one: the game's choice), its palette 1076.
+            const int si = kCasCatSpr0 + i;
+            if (!AddLook(images, icons, ListRef(cs, si, kCasCatPal), si < cs.spriteCount ? cs.sprites[si].frame : 0, 2, v.items[i].rect, light))
+                Crop(images, live, from, 2, v.items[i].rect);
             mouse(i, from);
         }
         for (int cell = 0; cell < 6; cell++)
@@ -520,7 +593,10 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             const int k = 6 + cell;
             const Rect from = Plus(kCasClothFrom, kCasClothDx * (cell % 3), kCasClothDy * (cell / 3));
             Cell(c, v.items[k].rect, focused(k), cs.clothesCell == cell, 16);
-            Crop(images, bottom, from, 3, v.items[k].rect);
+            // The item's picture (the cell's sprite, its own resources); a cell the game leaves empty: none.
+            const int si = kCasClothSpr0 + cell;
+            if (si < cs.spriteCount && cs.sprites[si].read && !cs.sprites[si].shown) {}
+            else if (!AddLook(images, icons, ListRef(cs, si), 0, 3, v.items[k].rect, light)) Crop(images, live, from, 3, v.items[k].rect);
             mouse(k, from);
         }
         for (int k = 12; k < 14 && k < (int)v.items.size(); k++)
@@ -528,7 +604,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             if (!v.items[k].enabled) continue;
             const Rect from = k == 12 ? kCasClothLeftFrom : kCasClothRightFrom;
             Cell(c, v.items[k].rect, focused(k), false, 12);
-            Crop(images, bottom, from, 2, v.items[k].rect);
+            Arrow(images, icons, cs, kCasClothArrowSpr[k - 12], k == 12, v.items[k].rect, live, from, light);
             mouse(k, from);
         }
         break;
@@ -542,14 +618,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             Cell(c, v.items[j].rect, focused(j), cs.aspiration == kCasAspOfSlot[j], 16);
             // The game's aspiration picture (362, its frames in this order), 1.5x; the others dimmed,
             // as the game shows them as silhouettes.
-            if (icons)
-                if (const SpriteFrame* f = icons->Scaled(SpriteRef::Of(kSprCasAsp), j, kCasAspIcon, kCasAspIcon))
-                {
-                    const Rect r = v.items[j].rect;
-                    UiItem im = icons->Image(SpriteRef::Of(kSprCasAsp), j, *f, {r.x + (r.w - f->w) / 2, r.y + (r.h - f->h) / 2, f->w, f->h});
-                    im.fill = cs.aspiration == kCasAspOfSlot[j] ? 0 : 0xA0000000;
-                    images.push_back(im);
-                }
+            AddLook(images, icons, SpriteRef::Of(kSprCasAsp), j, kCasAspScale, v.items[j].rect, light, cs.aspiration == kCasAspOfSlot[j] ? Look::Plain : Look::Dim);
             mouse(j, from);
         }
         // The chosen aspiration's name and what it gives.
@@ -578,7 +647,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             b.radius = r.h / 2.0f;
             b.layer = 1;
             c.ui.push_back(b);
-            AddSpriteIcon(c, icons, k == 4 ? kSprCasTick : kSprCasCross, 0, 2, {r.x + 18, r.y + (r.h - 48) / 2, 48, 48}, it.enabled ? 0 : 0x80000000);
+            AddLook(images, icons, SpriteRef::Of(k == 4 ? kSprCasTick : kSprCasCross), 0, 2, {r.x + 18, r.y + (r.h - 48) / 2, 48, 48}, light, Look::Plain, it.enabled ? 0 : 0x80000000);
             PanelText(c, {r.x + 76, r.y, r.w - 92, r.h}, it.word, 32, 22, Align::Left, Weight::ExtraBold, it.enabled ? 0 : kDim);
             mouse(k, {(k == 4 ? kCasTickX : kCasCrossX) - 16, kCasAnswerY - 16, 32, 32});
         }

@@ -97,6 +97,9 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - Alien Autopsy on a controller: with the hand, A takes a freed organ to the tray by itself; with
   the tweezers, A takes the nearest parasite (an eating one first) to the flask. The laser still
   cuts with A held.
+- Create-a-Sim draws the game's own pictures from your copy of the game: the page tabs as round
+  buttons, ♀ / ♂ (the one not chosen grey), the arrows, the clothes and their categories, and the
+  aspirations twice their size, the ones not chosen properly dimmed.
 - CONSOLE is the default layout; AUTO, FOCUS, SIDE and STACKED stay in the pause menu's Settings
   (keys 0 to 4). Sharper 3D, widescreen and 60 fps are on by default; a settings file from before
   CONSOLE that still holds the old defaults is moved to the new ones once, and a file that names a
@@ -123,6 +126,9 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 - A settings file with a 3D resolution above 4 showed it, and Right then lowered it to 4: it is
   now read as 4.
+- Create-a-Sim: changing page no longer flashes the last page's pictures in the new page's cells
+  (letters in the hair styles, text over the clothes); they stay empty until the game has drawn them.
+- Create-a-Sim: the aspirations' pictures fade out with the screen instead of staying bright.
 - The HD menus no longer lag on a 4K screen: a tab change takes about 10 ms instead of 150, a
   focus move about 3 instead of 38.
 - The HD screens never flash the DS's own pictures while the game swaps its screens (tabs, the
