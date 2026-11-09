@@ -27,7 +27,6 @@ namespace
 constexpr u32 kHeadColour = 0xFFD2D6F4;    // the board's column heads: a dim lavender white
 constexpr u32 kValueColour = 0xFFFFE9A0;   // a warm white (the money's, room info's values)
 constexpr u32 kLitFill = 0xFFB8323A;       // a hint the game asks for now (the vacuum's clog): the game's red, deepened
-constexpr u32 kRowFill = 0xFF6A72B8;       // the board's rows (Interact's)
 constexpr u32 kNowFill = 0xFF8C5FB8;       // MooGoo: the row of the player whose turn it is
 constexpr u32 kMarkColour = 0xFF309A41;    // MooGoo's focus: the game's selection green
 constexpr u32 kMooPlate = 0xFF5A2038;      // MooGoo's line: a plate in its table's maroon
@@ -337,7 +336,7 @@ int CardsValues(Composition& c, int y, const CardsState& k, const RomData& rom, 
     const int lineId = CardsLineId(k);
     const int lineH = lineId >= 0 ? 40 : 0;
     if (lineId >= 0)
-        PanelText(c, {kMgInnerX + 4, y, kMgInnerW - 8, lineH - 6}, Words(rom, lineId), 26, kMgValueMin, Align::Centre, Weight::ExtraBold,
+        PanelTextAny(c, {kMgInnerX + 4, y, kMgInnerW - 8, lineH - 6}, Words(rom, lineId), 26, kMgValueMin, Align::Centre, Weight::ExtraBold,
                   k.turn != 0 ? kHeadColour : kValueColour);
     y += lineH;
     const int x = kMgInnerX, w = kMgInnerW, head = 24, row = 34, last = 40, h = 10 + head + 2 * row + 6 + last + 10;
@@ -345,8 +344,8 @@ int CardsValues(Composition& c, int y, const CardsState& k, const RomData& rom, 
     c.ui.push_back(well);
     const int ix = x + 12, iw = w - 24, cx = ix + iw - 2 * kColW, sx = ix + iw - kColW;
     int yy = y + 10;
-    PanelText(c, {cx, yy, kColW - 8, head}, Words(rom, kStrMgCardsCount), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
-    PanelText(c, {sx, yy, kColW - 8, head}, Words(rom, kStrMgScore), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
+    PanelTextAny(c, {cx, yy, kColW - 8, head}, Words(rom, kStrMgCardsCount), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
+    PanelTextAny(c, {sx, yy, kColW - 8, head}, Words(rom, kStrMgScore), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
     yy += head;
     const std::string names[2] = {k.name.empty() ? Words(rom, kStrMgPlayer) : k.name, Words(rom, kStrMgOpponent)};
     const int cards[2] = {k.hand, k.opponent}, scores[2] = {k.score, k.opponentScore};
@@ -354,24 +353,24 @@ int CardsValues(Composition& c, int y, const CardsState& k, const RomData& rom, 
     {
         UiItem bar = PanelItem({ix - 4, yy + 2, iw + 8, row - 4});
         bar.plain = true;
-        bar.fill = kRowFill;
+        bar.fill = kFillRow;
         bar.radius = 8;
         bar.layer = 0;
         c.ui.push_back(bar);
-        PanelText(c, {ix + 6, yy, cx - ix - 12, row}, names[i], kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
-        PanelText(c, {cx, yy, kColW - 8, row}, std::to_string(cards[i]), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, 0xFFFFFFFF);
-        PanelText(c, {sx, yy, kColW - 8, row}, std::to_string(scores[i]), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, kValueColour);
+        PanelTextAny(c, {ix + 6, yy, cx - ix - 12, row}, names[i], kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+        PanelTextAny(c, {cx, yy, kColW - 8, row}, std::to_string(cards[i]), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, 0xFFFFFFFF);
+        PanelTextAny(c, {sx, yy, kColW - 8, row}, std::to_string(scores[i]), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, kValueColour);
     }
     yy += 6;
     // The deck: the game's own card back, a thumbnail, and how many are left.
     const int tw = 24, th = 35;
     // (Not while a box of the game's lies over it: the help, the question, the message.)
     if (bottom && !k.box) c.ui.push_back(ImageItem({ix + 4, yy + (last - th) / 2, tw, th}, bottom, SW, SH, kMgDeckFrom));
-    PanelText(c, {ix + 4 + tw + 10, yy, 70, last}, std::to_string(k.deck), kMgValueSize, kMgValueSize, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix + 4 + tw + 10, yy, 70, last}, std::to_string(k.deck), kMgValueSize, kMgValueSize, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
     // The treasure chest's points.
     const int tx = ix + 4 + tw + 10 + 70;
-    PanelText(c, {tx, yy, sx - tx - 4, last}, Words(rom, kStrMgTreasure), kMgHeadSize + 2, 13, Align::Right, Weight::Bold, kHeadColour);
-    PanelText(c, {sx, yy, kColW - 8, last}, std::to_string(k.treasure), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, kValueColour);
+    PanelTextAny(c, {tx, yy, sx - tx - 4, last}, Words(rom, kStrMgTreasure), kMgHeadSize + 2, 13, Align::Right, Weight::Bold, kHeadColour);
+    PanelTextAny(c, {sx, yy, kColW - 8, last}, std::to_string(k.treasure), kMgValueSize, kMgValueSize, Align::Right, Weight::ExtraBold, kValueColour);
     return lineH + h;
 }
 
@@ -387,15 +386,15 @@ int EarningsValues(Composition& c, int y, int index, int amount, const RomData& 
     (index == 3 ? st.metal : st.vacuum) = amount;
     std::string label, value;
     StatStatsLine(st, rom, index, label, value);
-    const FittedText vf = FitLine(value, kMgValueSize, kMgValueMin, w / 2, Weight::ExtraBold);
+    const FittedText vf = FitLineAny(value, kMgValueSize, kMgValueMin, w / 2, Weight::ExtraBold);
     const int vw = (int)std::ceil(TextWidth(vf.text, vf.size, Weight::ExtraBold)) + 2;
     // The label beside the value; when it does not fit there (Italian's long one), above it.
-    const bool beside = FitLine(label, kMgValueSize - 2, kMgValueMin, w - 28 - vw - 10).fits;
+    const bool beside = FitLineAny(label, kMgValueSize - 2, kMgValueMin, w - 28 - vw - 10).fits;
     const int h = beside ? 48 : 80;
     c.ui.push_back(WellItem({x, y, w, h}));
-    if (beside) PanelText(c, {x + 14, y, w - 28 - vw - 10, h}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    else PanelText(c, {x + 14, y + 6, w - 28, 34}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    PanelText(c, {x + w - 14 - vw, beside ? y : y + 40, vw, beside ? h : 34}, vf.text, vf.size, vf.size, Align::Right, Weight::ExtraBold, kValueColour);
+    if (beside) PanelTextAny(c, {x + 14, y, w - 28 - vw - 10, h}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    else PanelTextAny(c, {x + 14, y + 6, w - 28, 34}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {x + w - 14 - vw, beside ? y : y + 40, vw, beside ? h : 34}, vf.text, vf.size, vf.size, Align::Right, Weight::ExtraBold, kValueColour);
     return h;
 }
 
@@ -427,9 +426,9 @@ constexpr int kArtLabelW = 124;   // the painting's "Tool" label
 void MeterRow(Composition& c, int x, int y, int w, const std::string& label, float frac, u32 colour, const std::string& value, u32 valueColour)
 {
     const int vw = 96;
-    PanelText(c, {x, y, kMgLabelW - 8, kMgRow}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {x, y, kMgLabelW - 8, kMgRow}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
     if (frac >= 0) Meter(c, {x + kMgLabelW, y + 7, w - kMgLabelW - vw - 8, kMgRow - 14}, frac, colour);
-    PanelText(c, {x + w - vw, y, vw, kMgRow}, value, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, valueColour);
+    PanelTextAny(c, {x + w - vw, y, vw, kMgRow}, value, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, valueColour);
 }
 
 // A percentage as shown.
@@ -444,8 +443,8 @@ int AutopsyValues(Composition& c, int y, const AutopsyState& a, const RomData& r
     const int x = kMgInnerX, wd = kMgInnerW, ix = x + 12, iw = wd - 24;
     c.ui.push_back(WellItem({x, y, wd, h}));
     int yy = y + 10;
-    PanelText(c, {ix, yy, iw - 110, kMgRow}, With(w.specimen, a.specimen + 1), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
-    PanelText(c, {ix + iw - 110, yy, 110, kMgRow}, MenuWords(rom, kStrMgMoney, a.earnings), kMgValueSize, kMgValueMin, Align::Right, Weight::ExtraBold, kValueColour);
+    PanelTextAny(c, {ix, yy, iw - 110, kMgRow}, With(w.specimen, a.specimen + 1), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix + iw - 110, yy, 110, kMgRow}, MenuWords(rom, kStrMgMoney, a.earnings), kMgValueSize, kMgValueMin, Align::Right, Weight::ExtraBold, kValueColour);
     yy += kMgRow;
     for (int i = 0; i < organs; i++, yy += kMgRow)
     {
@@ -458,8 +457,8 @@ int AutopsyValues(Composition& c, int y, const AutopsyState& a, const RomData& r
     int eating = 0;
     for (const AutopsyParasite& p : a.parasites) eating += p.eating;
     const std::string pv = std::to_string(a.parasites.size()) + (eating ? " (" + With(w.eating, eating) + ")" : "");
-    PanelText(c, {ix, yy, kMgLabelW + 20, kMgRow}, w.parasites, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    PanelText(c, {ix + kMgLabelW + 20, yy, iw - kMgLabelW - 20, kMgRow}, pv, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
+    PanelTextAny(c, {ix, yy, kMgLabelW + 20, kMgRow}, w.parasites, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix + kMgLabelW + 20, yy, iw - kMgLabelW - 20, kMgRow}, pv, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
          eating ? kBadColour : 0xFFFFFFFF);
     return h;
 }
@@ -494,8 +493,8 @@ int DetectorValues(Composition& c, int y, const DetectorState& d, const RomData&
     yy += kMgRow;
     // The game's card: "Found:" and the find (while it is up).
     const std::string found = d.card ? FindName(rom, d.findType) : "";
-    PanelText(c, {ix, yy, kMgLabelW - 8, kMgRow}, Words(rom, kStrMgFound), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    PanelText(c, {ix + kMgLabelW, yy, iw - kMgLabelW, kMgRow}, found.empty() ? "\xE2\x80\x94" : found, kMgValueSize - 2, kMgValueMin, Align::Right,
+    PanelTextAny(c, {ix, yy, kMgLabelW - 8, kMgRow}, Words(rom, kStrMgFound), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix + kMgLabelW, yy, iw - kMgLabelW, kMgRow}, found.empty() ? "\xE2\x80\x94" : found, kMgValueSize - 2, kMgValueMin, Align::Right,
          Weight::ExtraBold, found.empty() ? kHeadColour : kValueColour);
     return h + 8 + EarningsValues(c, y + h + 8, 3, d.earnings, rom);
 }
@@ -526,8 +525,8 @@ int ArtValues(Composition& c, int y, const ArtState& a, const RomData& rom)
     int yy = y + 10;
     std::string tool = w.tools[std::clamp(a.tool, 0, 5)];
     if (a.tool == 0 || a.tool == 1) tool += std::string(" (") + w.sizes[std::clamp(a.brush, 0, 2)] + ")";
-    PanelText(c, {ix, yy, kArtLabelW, kMgRow}, w.tool, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    PanelText(c, {ix + kArtLabelW, yy, iw - kArtLabelW, kMgRow}, tool, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, kValueColour);
+    PanelTextAny(c, {ix, yy, kArtLabelW, kMgRow}, w.tool, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix + kArtLabelW, yy, iw - kArtLabelW, kMgRow}, tool, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, kValueColour);
     yy += kMgRow;
     // The colour: the page's colour swatch + 1 (resource 6028: 16 pages of 16).
     const std::vector<u32>& pal = ArtPalette(rom);
@@ -545,10 +544,10 @@ int ArtValues(Composition& c, int y, const ArtState& a, const RomData& rom)
         c.ui.push_back(sw);
         sx = ix + 52;
     }
-    PanelText(c, {sx, yy, ix + iw - sx, kMgRow}, With(w.colourOf, std::clamp(a.swatch, 0, 14) + 1), kMgValueSize - 2, kMgValueMin, Align::Left,
+    PanelTextAny(c, {sx, yy, ix + iw - sx, kMgRow}, With(w.colourOf, std::clamp(a.swatch, 0, 14) + 1), kMgValueSize - 2, kMgValueMin, Align::Left,
          Weight::ExtraBold, 0xFFFFFFFF);
     yy += kMgRow;
-    PanelText(c, {ix, yy, iw, kMgRow}, With(w.page, std::clamp(a.page, 0, 15) + 1), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold,
+    PanelTextAny(c, {ix, yy, iw, kMgRow}, With(w.page, std::clamp(a.page, 0, 15) + 1), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold,
          0xFFFFFFFF);
     return h;
 }
@@ -583,10 +582,10 @@ int MooGooValues(Composition& c, int y, const MooGooState& g, const RomData& rom
     c.ui.push_back(WellItem({x, y, wd, h}));
     int yy = y + 10;
     const std::string round = g.round >= 1 && g.round <= 3 ? With(Own(rom, OwnWordId::MooGooRound), g.round) : Words(rom, kStrMgMooGoo);
-    PanelText(c, {ix, yy, iw, kMgRow}, round, kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix, yy, iw, kMgRow}, round, kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
     yy += kMgRow;
     const int scoreW = 150;
-    PanelText(c, {ix + iw - scoreW, yy, scoreW - 8, head}, Words(rom, kStrMgMooScore), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
+    PanelTextAny(c, {ix + iw - scoreW, yy, scoreW - 8, head}, Words(rom, kStrMgMooScore), kMgHeadSize, 13, Align::Right, Weight::Bold, kHeadColour);
     yy += head;
     for (int p = 0; p < kMooGooPlayers; p++, yy += row)
     {
@@ -594,20 +593,20 @@ int MooGooValues(Composition& c, int y, const MooGooState& g, const RomData& rom
         const bool now = p == g.current && g.phase >= 4 && g.phase != 0x12 && g.phase != 0x13;
         UiItem bar = PanelItem({ix - 4, yy + 2, iw + 8, row - 4});
         bar.plain = true;
-        bar.fill = now ? kNowFill : kRowFill;
+        bar.fill = now ? kNowFill : kFillRow;
         bar.radius = 8;
         bar.layer = 0;
         c.ui.push_back(bar);
         const std::string name = SafeWords(rom, pl.nameId);
-        PanelText(c, {ix + 6, yy, iw - scoreW - 12, row}, name.empty() ? Words(rom, kStrMgMooPlayer1 + p) : name, kMgValueSize - 2, kMgValueMin, Align::Left,
+        PanelTextAny(c, {ix + 6, yy, iw - scoreW - 12, row}, name.empty() ? Words(rom, kStrMgMooPlayer1 + p) : name, kMgValueSize - 2, kMgValueMin, Align::Left,
              Weight::ExtraBold, 0xFFFFFFFF);
         // The score and its fruit (the game's words: coconuts, watermelons, pineapples).
-        PanelText(c, {ix + iw - scoreW, yy, scoreW - 8, row}, std::to_string(pl.score) + " " + Fruit(rom, p, pl.score), kMgValueSize - 4,
+        PanelTextAny(c, {ix + iw - scoreW, yy, scoreW - 8, row}, std::to_string(pl.score) + " " + Fruit(rom, p, pl.score), kMgValueSize - 4,
              kMgValueMin - 2, Align::Right, Weight::ExtraBold, kValueColour);
     }
     yy += 6;
-    PanelText(c, {ix, yy, iw - 80, kMgRow}, Own(rom, OwnWordId::MooGooCardsLeft), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    PanelText(c, {ix + iw - 80, yy, 80, kMgRow}, std::to_string(std::max(0, g.deckSize - g.deckNext)), kMgValueSize - 2, kMgValueMin, Align::Right,
+    PanelTextAny(c, {ix, yy, iw - 80, kMgRow}, Own(rom, OwnWordId::MooGooCardsLeft), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix + iw - 80, yy, 80, kMgRow}, std::to_string(std::max(0, g.deckSize - g.deckNext)), kMgValueSize - 2, kMgValueMin, Align::Right,
          Weight::ExtraBold, 0xFFFFFFFF);
     return h;
 }
@@ -626,9 +625,9 @@ int DrencherValues(Composition& c, int y, const DrencherState& d, const RomData&
     yy += kMgRow;
     const std::string target = DrencherTargetName(rom, d);
     // (The target's name on a line of its own: objects' names are long.)
-    PanelText(c, {ix, yy, iw, kMgRow}, Own(rom, OwnWordId::DrencherTarget), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix, yy, iw, kMgRow}, Own(rom, OwnWordId::DrencherTarget), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
     yy += kMgRow;
-    PanelText(c, {ix, yy, iw, kMgRow}, target.empty() ? Own(rom, OwnWordId::DrencherNone) : target, kMgValueSize - 2, kMgValueMin,
+    PanelTextAny(c, {ix, yy, iw, kMgRow}, target.empty() ? Own(rom, OwnWordId::DrencherNone) : target, kMgValueSize - 2, kMgValueMin,
          Align::Right, Weight::ExtraBold, target.empty() ? kHeadColour : kValueColour);
     return h;
 }
@@ -645,14 +644,14 @@ int CrimeValues(Composition& c, int y, const CrimeState& k, const RomData& rom)
     const bool on[3] = {k.canScare, k.armed, k.canSubdue};
     for (int i = 0; i < 3; i++, yy += kMgRow)
     {
-        PanelText(c, {ix, yy, iw - 110, kMgRow}, labels[i], kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-        PanelText(c, {ix + iw - 110, yy, 110, kMgRow}, on[i] ? ready : dash, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
+        PanelTextAny(c, {ix, yy, iw - 110, kMgRow}, labels[i], kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+        PanelTextAny(c, {ix + iw - 110, yy, 110, kMgRow}, on[i] ? ready : dash, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
              on[i] ? kGoodColour : kHeadColour);
     }
     const bool aiming = k.phase == 1 || k.phase == 2;
-    PanelText(c, {ix, yy, iw - 110, kMgRow}, Own(rom, OwnWordId::CrimeAimLabel), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix, yy, iw - 110, kMgRow}, Own(rom, OwnWordId::CrimeAimLabel), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
     const std::string aim = aiming ? std::to_string(std::clamp(k.angle, -90, 90)) + "\xC2\xB0" : k.hit ? std::string(Own(rom, OwnWordId::CrimeHit)) : dash;
-    PanelText(c, {ix + iw - 110, yy, 110, kMgRow}, aim, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
+    PanelTextAny(c, {ix + iw - 110, yy, 110, kMgRow}, aim, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold,
          aiming ? kValueColour : k.hit ? kGoodColour : kHeadColour);
     return h;
 }
@@ -667,11 +666,11 @@ int ScratchValues(Composition& c, int y, const ScratchState& t, const RomData& r
     const int h = 10 + 2 * kMgRow + 6 + 2 * cell + (result ? 6 + 2 * kMgRow : 0) + 10;
     c.ui.push_back(WellItem({x, y, wd, h}));
     int yy = y + 10;
-    PanelText(c, {ix, yy, iw - 130, kMgRow}, Own(rom, OwnWordId::ScratchTopPrize), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-    PanelText(c, {ix + iw - 130, yy, 130, kMgRow}, MenuWords(rom, kStrMgMoney, std::max(0, t.prize)), kMgValueSize, kMgValueMin, Align::Right,
+    PanelTextAny(c, {ix, yy, iw - 130, kMgRow}, Own(rom, OwnWordId::ScratchTopPrize), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix + iw - 130, yy, 130, kMgRow}, MenuWords(rom, kStrMgMoney, std::max(0, t.prize)), kMgValueSize, kMgValueMin, Align::Right,
               Weight::ExtraBold, kValueColour);
     yy += kMgRow;
-    PanelText(c, {ix, yy, iw, kMgRow}, With(Own(rom, OwnWordId::ScratchOpened), std::clamp(t.revealed, 0, 5)), kMgValueSize - 2, kMgValueMin,
+    PanelTextAny(c, {ix, yy, iw, kMgRow}, With(Own(rom, OwnWordId::ScratchOpened), std::clamp(t.revealed, 0, 5)), kMgValueSize - 2, kMgValueMin,
               Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
     yy += kMgRow + 6;
     // The boxes as the ticket lays them out: two rows of four.
@@ -705,8 +704,8 @@ int MixerValues(Composition& c, int y, const MixerState& m, const RomData& rom)
     c.ui.push_back(WellItem({x, y, wd, h}));
     int yy = y + 10;
     auto row = [&](const std::string& label, const std::string& value, u32 colour) {
-        PanelText(c, {ix, yy, kMgLabelW + 20, kMgRow}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
-        PanelText(c, {ix + kMgLabelW + 24, yy, iw - kMgLabelW - 24, kMgRow}, value, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, colour);
+        PanelTextAny(c, {ix, yy, kMgLabelW + 20, kMgRow}, label, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+        PanelTextAny(c, {ix + kMgLabelW + 24, yy, iw - kMgLabelW - 24, kMgRow}, value, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, colour);
         yy += kMgRow;
     };
     const std::string dash = "\xE2\x80\x94";
@@ -717,7 +716,7 @@ int MixerValues(Composition& c, int y, const MixerState& m, const RomData& rom)
     row(Own(rom, OwnWordId::MixerOctave), (m.octave > 0 ? "+" : "") + std::to_string(std::clamp(m.octave, -1, 1)) +
         (m.sustain ? std::string(" \xC2\xB7 ") + Own(rom, OwnWordId::MixerSustain) : std::string()), 0xFFFFFFFF);
     // The tracks: eight lights, lit while audible (the game's red lights).
-    PanelText(c, {ix, yy, kMgLabelW + 20, kMgRow}, Words(rom, kStrMgMixTracks), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
+    PanelTextAny(c, {ix, yy, kMgLabelW + 20, kMgRow}, Words(rom, kStrMgMixTracks), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
     for (int t = 0; t < 8; t++)
     {
         UiItem l = PanelItem({ix + iw - 8 * 22 + t * 22 + 3, yy + 9, 16, kMgRow - 18});
@@ -733,7 +732,7 @@ int MixerValues(Composition& c, int y, const MixerState& m, const RomData& rom)
     const std::string now = p == 1 ? Own(rom, OwnWordId::MixerPlaying) : p == 2 ? Own(rom, OwnWordId::MixerRecording) : p == 5 ? Words(rom, kStrMgMixMic)
                           : p == 7 ? Words(rom, kStrMgMixSelect) : p == 8 || p == 9 ? Own(rom, OwnWordId::MixerHelp) : p == 0xA ? Words(rom, kStrMgMixSaveAsk)
                                                                                                                    : Own(rom, OwnWordId::MixerReady);
-    PanelText(c, {ix, yy, iw, kMgRow}, now, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold, p == 2 || p == 5 ? kBadColour : p == 1 ? kGoodColour : kValueColour);
+    PanelTextAny(c, {ix, yy, iw, kMgRow}, now, kMgValueSize - 2, kMgValueMin, Align::Left, Weight::ExtraBold, p == 2 || p == 5 ? kBadColour : p == 1 ? kGoodColour : kValueColour);
     return h;
 }
 
@@ -744,24 +743,24 @@ int MixerSaveValues(Composition& c, int y, const MixerSaveState& v, const RomDat
     const int x = kMgInnerX, wd = kMgInnerW, ix = x + 12, iw = wd - 24, row = 36, h = 10 + 2 * kMgRow + 6 + kMixerSaveSlots * row + 10;
     c.ui.push_back(WellItem({x, y, wd, h}));
     int yy = y + 10;
-    PanelText(c, {ix, yy, iw, kMgRow}, Words(rom, kStrMgSongTitle), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, kHeadColour);
+    PanelTextAny(c, {ix, yy, iw, kMgRow}, Words(rom, kStrMgSongTitle), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, kHeadColour);
     yy += kMgRow;
     const std::string name = GameTextToUtf8(v.name);
-    PanelText(c, {ix, yy, iw, kMgRow}, name.empty() ? "\xE2\x80\x94" : name, kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold,
+    PanelTextAny(c, {ix, yy, iw, kMgRow}, name.empty() ? "\xE2\x80\x94" : name, kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold,
               name.empty() ? kHeadColour : kValueColour);
     yy += kMgRow + 6;
     for (int j = 0; j < kMixerSaveSlots; j++, yy += row)
     {
         UiItem bar = PanelItem({ix - 4, yy + 2, iw + 8, row - 4});
         bar.plain = true;
-        bar.fill = j == focusSlot ? (asked ? kLitFill : kNowFill) : kRowFill;
+        bar.fill = j == focusSlot ? (asked ? kLitFill : kNowFill) : kFillRow;
         bar.radius = 8;
         bar.layer = 0;
         c.ui.push_back(bar);
-        PanelText(c, {ix + 6, yy, 130, row}, With(Own(rom, OwnWordId::SaveSlot), j + 1), kMgValueSize - 4, kMgValueMin - 2, Align::Left, Weight::Bold,
+        PanelTextAny(c, {ix + 6, yy, 130, row}, With(Own(rom, OwnWordId::SaveSlot), j + 1), kMgValueSize - 4, kMgValueMin - 2, Align::Left, Weight::Bold,
                   0xFFFFFFFF);
         const std::string n = v.used[j] ? GameTextToUtf8(v.slotName[j]) : Words(rom, kStrMgNoData);
-        PanelText(c, {ix + 140, yy, iw - 146, row}, n, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, v.used[j] ? kValueColour : kHeadColour);
+        PanelTextAny(c, {ix + 140, yy, iw - 146, row}, n, kMgValueSize - 2, kMgValueMin, Align::Right, Weight::ExtraBold, v.used[j] ? kValueColour : kHeadColour);
     }
     return h;
 }
@@ -818,7 +817,7 @@ void AddPointer(Composition& c, const PointerView& p)
 int SocialAnswers(Composition& c, int y, const u32* bottom, const RomData& rom)
 {
     const int x = kMgInnerX, w = kMgInnerW;
-    PanelText(c, {x + 4, y, w - 8, 34}, Own(rom, OwnWordId::SocialMatch), kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+    PanelTextAny(c, {x + 4, y, w - 8, 34}, Own(rom, OwnWordId::SocialMatch), kMgValueSize, kMgValueMin, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
     int yy = y + 38;
     const Button dir[3] = {Button::DPadL, Button::DPadU, Button::DPadR};
     for (int i = 0; i < 3; i++, yy += kMgAnswerRow)
@@ -882,14 +881,14 @@ void AddPrompts(Composition& c, const std::vector<HdHint>& hints)
             else
             {
                 const int sw = (int)std::ceil(TextWidth(t.sep, size, Weight::ExtraBold));
-                PanelText(c, {x, y, sw + 2, h}, t.sep, size, size, Align::Left, Weight::ExtraBold, kHeadColour);
+                PanelTextAny(c, {x, y, sw + 2, h}, t.sep, size, size, Align::Left, Weight::ExtraBold, kHeadColour);
                 x += sw + 6;
             }
         }
         if (!hint.text.empty())
         {
             const int tw = (int)std::ceil(TextWidth(hint.text, size, Weight::ExtraBold));
-            PanelText(c, {x + 4, y, tw + 2, h}, hint.text, size, size, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
+            PanelTextAny(c, {x + 4, y, tw + 2, h}, hint.text, size, size, Align::Left, Weight::ExtraBold, 0xFFFFFFFF);
             x += 4 + tw;
         }
         x += kMgPromptGap;
@@ -1123,7 +1122,7 @@ void AddMooGooLine(Composition& c, const std::string& line)
     plate.radius = 14;
     plate.layer = 1;
     c.ui.push_back(plate);
-    PanelText(c, {r.x + 16, r.y, r.w - 32, r.h}, line, 30, 20, Align::Centre, Weight::ExtraBold, 0xFFFFFFFF, 1);
+    PanelTextAny(c, {r.x + 16, r.y, r.w - 32, r.h}, line, 30, 20, Align::Centre, Weight::ExtraBold, 0xFFFFFFFF, 1);
 }
 
 // MooGoo's turn banner ("@1's turn", the game's words) in HD over the game's.
@@ -1137,7 +1136,7 @@ void AddMooGooBanner(Composition& c, const MooGooState& g, const RomData& rom)
     box.radius = 18;
     box.layer = 1;
     c.ui.push_back(box);
-    PanelText(c, {r.x + 20, r.y, r.w - 40, r.h}, MenuWordsWith(rom, kStrMgTurnOf, name), 32, 20, Align::Centre, Weight::ExtraBold, 0xFFFFFFFF, 1);
+    PanelTextAny(c, {r.x + 20, r.y, r.w - 40, r.h}, MenuWordsWith(rom, kStrMgTurnOf, name), 32, 20, Align::Centre, Weight::ExtraBold, 0xFFFFFFFF, 1);
 }
 }
 
@@ -1235,10 +1234,10 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
     // The title plate, over the playfield's frame.
     if (const std::string title = Title(s.screen, game, rom); !title.empty())
     {
-        const FittedText t = FitLine(title, kMgTitleSize, kMgTitleMin, kMgTitleMaxW - 48, Weight::ExtraBold);
+        const FittedText t = FitLineAny(title, kMgTitleSize, kMgTitleMin, kMgTitleMaxW - 48, Weight::ExtraBold);
         const int w = std::min(kMgTitleMaxW, (int)std::ceil(TextWidth(t.text, t.size, Weight::ExtraBold)) + 48);
         c.ui.push_back(PanelItem({kMgTitleX, kMgTitleY, w, kMgTitleH}));
-        PanelText(c, {kMgTitleX + 24, kMgTitleY, w - 48, kMgTitleH}, t.text, t.size, t.size, Align::Left, Weight::ExtraBold, 0xFFFFFFFF, 0);
+        PanelTextAny(c, {kMgTitleX + 24, kMgTitleY, w - 48, kMgTitleH}, t.text, t.size, t.size, Align::Left, Weight::ExtraBold, 0xFFFFFFFF, 0);
     }
 
     int y = topTo.y + topTo.h + 6;
@@ -1384,66 +1383,66 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     // The side panels' own words (their boxes as the Build functions give them).
     const float vs = kMgValueSize - 2;
     const int iw = kMgInnerW - 24;
-    for (int i = 1; i <= 2; i++) me.Line(id(OwnWordId::AutopsySpecimen), With(Own(rom, OwnWordId::AutopsySpecimen), i), vs, kMgValueMin, iw - 110);
-    me.Line(id(OwnWordId::AutopsyOrgan), With(Own(rom, OwnWordId::AutopsyOrgan), 3), vs, kMgValueMin, kMgLabelW - 8, Weight::Bold);
+    for (int i = 1; i <= 2; i++) me.LineAny(id(OwnWordId::AutopsySpecimen), With(Own(rom, OwnWordId::AutopsySpecimen), i), vs, kMgValueMin, iw - 110);
+    me.LineAny(id(OwnWordId::AutopsyOrgan), With(Own(rom, OwnWordId::AutopsyOrgan), 3), vs, kMgValueMin, kMgLabelW - 8, Weight::Bold);
     for (OwnWordId w : {OwnWordId::AutopsyFreed, OwnWordId::AutopsyRemoved, OwnWordId::AutopsyDestroyed, OwnWordId::DetectorNone})
-        me.Line(id(w), Own(rom, w), vs, kMgValueMin, 96);
-    me.Line(id(OwnWordId::AutopsyParasites), Own(rom, OwnWordId::AutopsyParasites), vs, kMgValueMin, kMgLabelW + 20, Weight::Bold);
-    me.Line(id(OwnWordId::AutopsyEating), "8 (" + With(Own(rom, OwnWordId::AutopsyEating), 8) + ")", vs, kMgValueMin, iw - kMgLabelW - 20);
+        me.LineAny(id(w), Own(rom, w), vs, kMgValueMin, 96);
+    me.LineAny(id(OwnWordId::AutopsyParasites), Own(rom, OwnWordId::AutopsyParasites), vs, kMgValueMin, kMgLabelW + 20, Weight::Bold);
+    me.LineAny(id(OwnWordId::AutopsyEating), "8 (" + With(Own(rom, OwnWordId::AutopsyEating), 8) + ")", vs, kMgValueMin, iw - kMgLabelW - 20);
     for (OwnWordId w : {OwnWordId::DetectorCharge, OwnWordId::DetectorSignal, OwnWordId::DetectorDepth})
-        me.Line(id(w), Own(rom, w), vs, kMgValueMin, kMgLabelW - 8, Weight::Bold);
-    me.Line(id(OwnWordId::ArtTool), Own(rom, OwnWordId::ArtTool), vs, kMgValueMin, kArtLabelW, Weight::Bold);
+        me.LineAny(id(w), Own(rom, w), vs, kMgValueMin, kMgLabelW - 8, Weight::Bold);
+    me.LineAny(id(OwnWordId::ArtTool), Own(rom, OwnWordId::ArtTool), vs, kMgValueMin, kArtLabelW, Weight::Bold);
     for (int t = 0; t < 6; t++)
     {
         std::string tool = Own(rom, OwnWordId::ArtPencil, t);
         if (t < 2) tool += std::string(" (") + Own(rom, OwnWordId::ArtMedium) + ")";
-        me.Line(id(OwnWordId::ArtPencil) + t, tool, vs, kMgValueMin, iw - kArtLabelW);
+        me.LineAny(id(OwnWordId::ArtPencil) + t, tool, vs, kMgValueMin, iw - kArtLabelW);
     }
-    me.Line(id(OwnWordId::ArtColourOf), With(Own(rom, OwnWordId::ArtColourOf), 15), vs, kMgValueMin, iw - 52);
-    me.Line(id(OwnWordId::ArtPage), With(Own(rom, OwnWordId::ArtPage), 16), vs, kMgValueMin, iw);
-    me.Line(id(OwnWordId::SocialMatch), Own(rom, OwnWordId::SocialMatch), kMgValueSize, kMgValueMin, kMgInnerW - 8);
+    me.LineAny(id(OwnWordId::ArtColourOf), With(Own(rom, OwnWordId::ArtColourOf), 15), vs, kMgValueMin, iw - 52);
+    me.LineAny(id(OwnWordId::ArtPage), With(Own(rom, OwnWordId::ArtPage), 16), vs, kMgValueMin, iw);
+    me.LineAny(id(OwnWordId::SocialMatch), Own(rom, OwnWordId::SocialMatch), kMgValueSize, kMgValueMin, kMgInnerW - 8);
     // The timing games' panels: MooGoo's round, the players' names (the AI's are Sims' names) and
     // their fruit, the deck; the Drencher's labels and every name a target can have; the crime
     // game's moves and their state.
-    me.Line(id(OwnWordId::MooGooRound), With(Own(rom, OwnWordId::MooGooRound), 3), kMgValueSize, kMgValueMin, iw);
-    for (int n = kStrMgSimName0; n < kStrMgSimName0 + 56; n++) me.Line(n, Words(rom, n), vs, kMgValueMin, iw - 150 - 12);
+    me.LineAny(id(OwnWordId::MooGooRound), With(Own(rom, OwnWordId::MooGooRound), 3), kMgValueSize, kMgValueMin, iw);
+    for (int n = kStrMgSimName0; n < kStrMgSimName0 + 56; n++) me.LineAny(n, Words(rom, n), vs, kMgValueMin, iw - 150 - 12);
     for (int p = 0; p < kMooGooPlayers; p++)
     {
-        me.Line(kStrMgMooPlayer1 + p, Words(rom, kStrMgMooPlayer1 + p), vs, kMgValueMin, iw - 150 - 12);
-        me.Line(kStrMgMooFruit + p, "99 " + Words(rom, kStrMgMooFruit + p), kMgValueSize - 4, kMgValueMin - 2, 150 - 8);
+        me.LineAny(kStrMgMooPlayer1 + p, Words(rom, kStrMgMooPlayer1 + p), vs, kMgValueMin, iw - 150 - 12);
+        me.LineAny(kStrMgMooFruit + p, "99 " + Words(rom, kStrMgMooFruit + p), kMgValueSize - 4, kMgValueMin - 2, 150 - 8);
     }
-    me.Line(kStrMgMooScore, Words(rom, kStrMgMooScore), kMgHeadSize, 13, 150 - 8, Weight::Bold);
-    me.Line(id(OwnWordId::MooGooCardsLeft), Own(rom, OwnWordId::MooGooCardsLeft), vs, kMgValueMin, iw - 80, Weight::Bold);
+    me.LineAny(kStrMgMooScore, Words(rom, kStrMgMooScore), kMgHeadSize, 13, 150 - 8, Weight::Bold);
+    me.LineAny(id(OwnWordId::MooGooCardsLeft), Own(rom, OwnWordId::MooGooCardsLeft), vs, kMgValueMin, iw - 80, Weight::Bold);
     for (OwnWordId w : {OwnWordId::DrencherWater, OwnWordId::DrencherPressure})
-        me.Line(id(w), Own(rom, w), vs, kMgValueMin, kMgLabelW - 8, Weight::Bold);
-    for (OwnWordId w : {OwnWordId::DrencherTarget, OwnWordId::DrencherNone}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, iw);
+        me.LineAny(id(w), Own(rom, w), vs, kMgValueMin, kMgLabelW - 8, Weight::Bold);
+    for (OwnWordId w : {OwnWordId::DrencherTarget, OwnWordId::DrencherNone}) me.LineAny(id(w), Own(rom, w), vs, kMgValueMin, iw);
     // (An object's name may end in an ellipsis, as in Pockets: the Italian table has a sentence at
     // the first one, 463; counted apart.)
     for (int n = kStrMgObjectName0; n < kStrMgDrencherObjectEnd; n++)
     {
-        const FittedText f = FitLine(Words(rom, n), vs, kMgValueMin, iw, Weight::ExtraBold);
+        const FittedText f = FitLineAny(Words(rom, n), vs, kMgValueMin, iw, Weight::ExtraBold);
         m.checked++;
         if (f.size < vs) m.shrunk++;
         if (!f.fits) { m.namesCut++; if (std::find(m.cutIds.begin(), m.cutIds.end(), n) == m.cutIds.end()) m.cutIds.push_back(n); }
     }
-    for (OwnWordId w : {OwnWordId::CrimeScare, OwnWordId::CrimeSubdue, OwnWordId::CrimeAimLabel}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, iw - 110, Weight::Bold);
-    me.Line(kStrMgRatARang, Words(rom, kStrMgRatARang), vs, kMgValueMin, iw - 110, Weight::Bold);
-    for (OwnWordId w : {OwnWordId::CrimeReady, OwnWordId::CrimeHit}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, 110);
+    for (OwnWordId w : {OwnWordId::CrimeScare, OwnWordId::CrimeSubdue, OwnWordId::CrimeAimLabel}) me.LineAny(id(w), Own(rom, w), vs, kMgValueMin, iw - 110, Weight::Bold);
+    me.LineAny(kStrMgRatARang, Words(rom, kStrMgRatARang), vs, kMgValueMin, iw - 110, Weight::Bold);
+    for (OwnWordId w : {OwnWordId::CrimeReady, OwnWordId::CrimeHit}) me.LineAny(id(w), Own(rom, w), vs, kMgValueMin, 110);
     // The lottery's, the mixer's, its save page's and the lobby's panels.
-    me.Line(id(OwnWordId::ScratchTopPrize), Own(rom, OwnWordId::ScratchTopPrize), vs, kMgValueMin, iw - 130, Weight::Bold);
-    me.Line(id(OwnWordId::ScratchOpened), With(Own(rom, OwnWordId::ScratchOpened), 5), vs, kMgValueMin, iw);
+    me.LineAny(id(OwnWordId::ScratchTopPrize), Own(rom, OwnWordId::ScratchTopPrize), vs, kMgValueMin, iw - 130, Weight::Bold);
+    me.LineAny(id(OwnWordId::ScratchOpened), With(Own(rom, OwnWordId::ScratchOpened), 5), vs, kMgValueMin, iw);
     for (OwnWordId w : {OwnWordId::MixerSong, OwnWordId::MixerInstrument, OwnWordId::MixerOctave})
-        me.Line(id(w), Own(rom, w), vs, kMgValueMin, kMgLabelW + 20, Weight::Bold);
-    for (int k : {kStrMgMixTempo, kStrMgMixTracks}) me.Line(k, Words(rom, k), vs, kMgValueMin, kMgLabelW + 20, Weight::Bold);
-    for (int sg = 0; sg < kMixerSongs; sg++) me.Line(kStrMgMixSong0 + sg, Words(rom, kStrMgMixSong0 + sg), vs, kMgValueMin, iw - kMgLabelW - 24);
-    me.Line(kStrMgMixVox, "4 (" + Words(rom, kStrMgMixVox) + ")", vs, kMgValueMin, iw - kMgLabelW - 24);
-    me.Line(id(OwnWordId::MixerSustain), std::string("+1 \xC2\xB7 ") + Own(rom, OwnWordId::MixerSustain), vs, kMgValueMin, iw - kMgLabelW - 24);
-    for (OwnWordId w : {OwnWordId::MixerPlaying, OwnWordId::MixerRecording, OwnWordId::MixerHelp, OwnWordId::MixerReady}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, iw);
-    for (int k : {kStrMgMixMic, kStrMgMixSelect, kStrMgMixSaveAsk}) me.Line(k, Words(rom, k), vs, kMgValueMin, iw);
-    me.Line(kStrMgSongTitle, Words(rom, kStrMgSongTitle), vs, kMgValueMin, iw, Weight::Bold);
-    me.Line(-1, "WWWWWWWWWWWWWWW", kMgValueSize, kMgValueMin, iw);   // (a title of 15 letters, the page's longest)
-    me.Line(id(OwnWordId::SaveSlot), With(Own(rom, OwnWordId::SaveSlot), 3), kMgValueSize - 4, kMgValueMin - 2, 130, Weight::Bold);
-    me.Line(kStrMgNoData, Words(rom, kStrMgNoData), vs, kMgValueMin, iw - 146);
+        me.LineAny(id(w), Own(rom, w), vs, kMgValueMin, kMgLabelW + 20, Weight::Bold);
+    for (int k : {kStrMgMixTempo, kStrMgMixTracks}) me.LineAny(k, Words(rom, k), vs, kMgValueMin, kMgLabelW + 20, Weight::Bold);
+    for (int sg = 0; sg < kMixerSongs; sg++) me.LineAny(kStrMgMixSong0 + sg, Words(rom, kStrMgMixSong0 + sg), vs, kMgValueMin, iw - kMgLabelW - 24);
+    me.LineAny(kStrMgMixVox, "4 (" + Words(rom, kStrMgMixVox) + ")", vs, kMgValueMin, iw - kMgLabelW - 24);
+    me.LineAny(id(OwnWordId::MixerSustain), std::string("+1 \xC2\xB7 ") + Own(rom, OwnWordId::MixerSustain), vs, kMgValueMin, iw - kMgLabelW - 24);
+    for (OwnWordId w : {OwnWordId::MixerPlaying, OwnWordId::MixerRecording, OwnWordId::MixerHelp, OwnWordId::MixerReady}) me.LineAny(id(w), Own(rom, w), vs, kMgValueMin, iw);
+    for (int k : {kStrMgMixMic, kStrMgMixSelect, kStrMgMixSaveAsk}) me.LineAny(k, Words(rom, k), vs, kMgValueMin, iw);
+    me.LineAny(kStrMgSongTitle, Words(rom, kStrMgSongTitle), vs, kMgValueMin, iw, Weight::Bold);
+    me.LineAny(-1, "WWWWWWWWWWWWWWW", kMgValueSize, kMgValueMin, iw);   // (a title of 15 letters, the page's longest)
+    me.LineAny(id(OwnWordId::SaveSlot), With(Own(rom, OwnWordId::SaveSlot), 3), kMgValueSize - 4, kMgValueMin - 2, 130, Weight::Bold);
+    me.LineAny(kStrMgNoData, Words(rom, kStrMgNoData), vs, kMgValueMin, iw - 146);
     me.Block(id(OwnWordId::TradingNote), Own(rom, OwnWordId::TradingNote), kMgValueSize, kMgValueMin, {0, 0, kMgInnerW - 28, 100});
 }
 
@@ -1458,7 +1457,7 @@ static void MeasureGameBoxes(const RomData& rom, BlockMeasure& m)
         const Rect well = buttons > 0 ? Rect {b.x + 28, b.y + 42, b.w - 56, b.h - 162} : Rect {b.x + 28, b.y + 42, b.w - 56, b.h - 70};
         me.Block(id, text, 30, 20, {well.x + 24, well.y + 10, well.w - 48, well.h - 20});
         // (the plate widens when the title does not hold on it: BoxBase)
-        if (!title.empty()) me.Line(id, title, 30, 22, FitLine(title, 30, 22, b.w - 240 - 40, Weight::ExtraBold).fits ? b.w - 240 - 40 : b.w - 80 - 40);
+        if (!title.empty()) me.LineAny(id, title, 30, 22, FitLineAny(title, 30, 22, b.w - 240 - 40, Weight::ExtraBold).fits ? b.w - 240 - 40 : b.w - 80 - 40);
     };
     // The quit questions (the cards', MooGoo's), the end of a turn (the longest name), the mixer's
     // save question and its microphone, the help texts (the Drencher's, the crime game's, the mixer's
@@ -1472,10 +1471,10 @@ static void MeasureGameBoxes(const RomData& rom, BlockMeasure& m)
     for (int id = kStrMgDrHelp0; id < kStrMgCrHelp0 + 3; id++) box(id, kMgHelpBox, 1, "", MenuText(rom.String(id)));
     for (int id = kStrMgMixHelp0; id + 1 < kStrMgMixHelpEnd; id += 2) box(id, kMgHelpBox, 1, Words(rom, id), MenuText(rom.String(id + 1)));
     // The cards' turn line over the board (CardsValues) and MooGoo's on its plate (AddMooGooLine).
-    for (int id = kStrMgCardsLine0; id <= kStrMgCardsOther; id++) me.Line(id, Words(rom, id), 26, kMgValueMin, kMgInnerW - 8);
+    for (int id = kStrMgCardsLine0; id <= kStrMgCardsOther; id++) me.LineAny(id, Words(rom, id), 26, kMgValueMin, kMgInnerW - 8);
     const int plateW = ToCanvas(kMgMooLineFrom, 0).w - 32;
-    for (int id : {kStrMgMooShuffling, kStrMgMooDealing, kStrMgMooPlayCard, kStrMgMooTarget}) me.Line(id, Words(rom, id), 30, 20, plateW);
-    me.Line(9000 + (int)OwnWordId::MooGooBetLine, Own(rom, OwnWordId::MooGooBetLine), 30, 20, plateW);
+    for (int id : {kStrMgMooShuffling, kStrMgMooDealing, kStrMgMooPlayCard, kStrMgMooTarget}) me.LineAny(id, Words(rom, id), 30, 20, plateW);
+    me.LineAny(9000 + (int)OwnWordId::MooGooBetLine, Own(rom, OwnWordId::MooGooBetLine), 30, 20, plateW);
 }
 
 void MeasureMinigames(const RomData& rom, BlockMeasure& m)
@@ -1483,45 +1482,45 @@ void MeasureMinigames(const RomData& rom, BlockMeasure& m)
     const Measurer me {m};
     for (int id : {kStrMgCards, kStrMgVacuum, kStrMgAutopsy, kStrMgDetector, kStrMgArtGallery, kStrMgMooGoo, kStrMgDrencher, kStrMgRatARang,
                    kStrMgTicket0, kStrMgTicket0 + 1, kStrMgTicket0 + 2, kStrMgMixer, kStrMgBurn, kStrMgWireless})
-        me.Line(id, Words(rom, id), kMgTitleSize, kMgTitleMin, kMgTitleMaxW - 48);
+        me.LineAny(id, Words(rom, id), kMgTitleSize, kMgTitleMin, kMgTitleMaxW - 48);
     // The lottery's prize and result (the widest prize, 100), as its panel fits them.
-    me.Line(kStrMgMoney, MenuWords(rom, kStrMgMoney, 100), kMgValueSize, kMgValueMin, 130);
+    me.LineAny(kStrMgMoney, MenuWords(rom, kStrMgMoney, 100), kMgValueSize, kMgValueMin, 130);
     me.Block(kStrMgWon, MenuWords(rom, kStrMgWon, 100), kMgValueSize - 2, kMgValueMin, {0, 0, kMgInnerW - 24, 2 * kMgRow});
     me.Block(kStrMgLost, Words(rom, kStrMgLost), kMgValueSize - 2, kMgValueMin, {0, 0, kMgInnerW - 24, 2 * kMgRow});
     // The pointing games: the autopsy's money (the reader's widest), the detector's "Found:" and
     // every find's name beside it, its earnings' line; every prompt bar fitting at its smallest.
-    me.Line(kStrMgMoney, MenuWords(rom, kStrMgMoney, 99999999), kMgValueSize, kMgValueMin, 110);
-    me.Line(kStrMgFound, Words(rom, kStrMgFound), kMgValueSize - 2, kMgValueMin, kMgLabelW - 8, Weight::Bold);
-    for (int t = 0; t < kMgFindTypes; t++) me.Line(kStrMgFind0 + 2 * t, FindName(rom, t), kMgValueSize - 2, kMgValueMin, kMgInnerW - 24 - kMgLabelW);
+    me.LineAny(kStrMgMoney, MenuWords(rom, kStrMgMoney, 99999999), kMgValueSize, kMgValueMin, 110);
+    me.LineAny(kStrMgFound, Words(rom, kStrMgFound), kMgValueSize - 2, kMgValueMin, kMgLabelW - 8, Weight::Bold);
+    for (int t = 0; t < kMgFindTypes; t++) me.LineAny(kStrMgFind0 + 2 * t, FindName(rom, t), kMgValueSize - 2, kMgValueMin, kMgInnerW - 24 - kMgLabelW);
     {
         StatState mt;
         mt.metal = 99999999;
         std::string label, value;
         StatStatsLine(mt, rom, 3, label, value);
         const int vw = (int)std::ceil(TextWidth(value, kMgValueSize, Weight::ExtraBold)) + 2;
-        me.Line(kStrMgDetector, value, kMgValueSize, kMgValueMin, kMgInnerW / 2, Weight::ExtraBold);
-        if (!FitLine(label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28 - std::min(vw, kMgInnerW / 2) - 10).fits)
-            me.Line(kStrMgDetector, label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28, Weight::Bold);
+        me.LineAny(kStrMgDetector, value, kMgValueSize, kMgValueMin, kMgInnerW / 2, Weight::ExtraBold);
+        if (!FitLineAny(label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28 - std::min(vw, kMgInnerW / 2) - 10).fits)
+            me.LineAny(kStrMgDetector, label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28, Weight::Bold);
         else m.checked++;
     }
-    for (int id : {kStrMgCardsCount, kStrMgScore}) me.Line(id, Words(rom, id), kMgHeadSize, 13, kColW - 8, Weight::Bold);
+    for (int id : {kStrMgCardsCount, kStrMgScore}) me.LineAny(id, Words(rom, id), kMgHeadSize, 13, kColW - 8, Weight::Bold);
     // The names' column (the player's own name is at most 7 letters: the game's keyboard).
     const int nameW = kMgInnerW - 24 - 2 * kColW - 12;
-    for (int id : {kStrMgPlayer, kStrMgOpponent}) me.Line(id, Words(rom, id), kMgValueSize, kMgValueMin, nameW);
-    me.Line(-1, "WWWWWWW", kMgValueSize, kMgValueMin, nameW);
+    for (int id : {kStrMgPlayer, kStrMgOpponent}) me.LineAny(id, Words(rom, id), kMgValueSize, kMgValueMin, nameW);
+    me.LineAny(-1, "WWWWWWW", kMgValueSize, kMgValueMin, nameW);
     // The treasure's label between the deck's count and the score column.
     const int tx = 12 + 4 + 24 + 10 + 70;
-    me.Line(kStrMgTreasure, Words(rom, kStrMgTreasure), kMgHeadSize + 2, 13, kMgInnerW - 24 - kColW - tx - 4, Weight::Bold);
+    me.LineAny(kStrMgTreasure, Words(rom, kStrMgTreasure), kMgHeadSize + 2, 13, kMgInnerW - 24 - kColW - tx - 4, Weight::Bold);
     // "Vacuum Earnings:" beside the widest value the reader lets through.
     StatState st;
     st.vacuum = 99999999;
     std::string label, value;
     StatStatsLine(st, rom, 2, label, value);
     const int vw = (int)std::ceil(TextWidth(value, kMgValueSize, Weight::ExtraBold)) + 2;
-    me.Line(kStrMgVacuumEarnings, value, kMgValueSize, kMgValueMin, kMgInnerW / 2, Weight::ExtraBold);
+    me.LineAny(kStrMgVacuumEarnings, value, kMgValueSize, kMgValueMin, kMgInnerW / 2, Weight::ExtraBold);
     // (Beside the value, or above it on a line of its own.)
-    if (!FitLine(label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28 - std::min(vw, kMgInnerW / 2) - 10).fits)
-        me.Line(kStrMgVacuumEarnings, label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28, Weight::Bold);
+    if (!FitLineAny(label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28 - std::min(vw, kMgInnerW / 2) - 10).fits)
+        me.LineAny(kStrMgVacuumEarnings, label, kMgValueSize - 2, kMgValueMin, kMgInnerW - 28, Weight::Bold);
     else m.checked++;
     MeasureOwnWords(rom, m);
     MeasureGameBoxes(rom, m);

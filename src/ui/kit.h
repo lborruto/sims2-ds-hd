@@ -22,6 +22,21 @@ struct Theme
 };
 const Theme& GameTheme();
 
+// The HD screens' shared palette, measured with WCAG's contrast formula (research checklist B1-B4;
+// XAG 102: 4.5:1 for text, 3:1 for inactive text): a row, button or well kFillRow (white text on it
+// 4.58:1; GameTheme().fillDark is the same), the focused row kFillFocus (white 7.15:1), notes and
+// subtitles kTextNote (white: 4.58:1 on a well), inactive text kTextInactive (3.23:1 on kFillRow).
+// The panel's own fill (#828ACB, the game's) takes white at 3.26:1: large text only (titles).
+constexpr u32 kFillRow = 0xFF6870B6, kFillFocus = 0xFF4A5296, kTextNote = 0xFFFFFFFF, kTextInactive = 0xFFD4D7F2;
+// The focus ring: the game's green outside (kFocusOuterW wide around the item), a white line
+// inside it (kFocusInnerW): it reads without its colour (white against the panel 3.26:1, against a
+// well 4.58:1, a focused fill against an unfocused one besides).
+constexpr u32 kFocusOuter = 0xFF309A41, kFocusInner = 0xFFFFFFFF;
+constexpr int kFocusOuterW = 7, kFocusInnerW = 4;
+// The smallest text at 100 % (canvas pixels, a shrunk-to-fit line and a chip's glyph included):
+// 27 px at 1080p full screen, past the console's minimum of 26 (XAG 101; the PC's is 18).
+constexpr float kMinText = 18;
+
 enum class Align { Left, Centre, Right };
 // The controller's buttons a chip can show: A, B, X, Y as round chips, the others as pills
 // (the D-pad as a cross).
@@ -125,6 +140,10 @@ constexpr int kTierS = 2, kTierL = 3;
 int TierFactor(int tier, float s);
 
 UiItem PanelItem(Rect to, const Theme& t = GameTheme());          // the light panel (fill, frame)
+// The focus ring around `r` (`radius` its corners'): the green, then the white line inside it, two
+// plain boxes to give before the item they ring (the item covers their middle).
+struct FocusRingItems { UiItem outer, inner; };
+FocusRingItems FocusRing(Rect r, float radius);
 UiItem WellItem(Rect to, const Theme& t = GameTheme());           // a darker inset box inside a panel
 UiItem TextItem(Rect to, const std::string& utf8, float size, Align align = Align::Left, Weight w = Weight::Bold);
 // A chip at (x, y) with its label, printed as the current ChipLook says; its rectangle is the

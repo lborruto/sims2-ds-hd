@@ -14,7 +14,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kRowFill = 0xFF6A72B8, kRowSelFill = 0xFF9AA2E3;
 constexpr u32 kLabel = 0xFFD6DAF6;      // a well's small label: a pale lavender
 constexpr u32 kPlateRim = 0xFFB2B2E3;
 constexpr int kRowPortrait = 68;        // a row's portrait well (the crop 2x inside)
@@ -110,7 +109,7 @@ void BuildRelations(Composition& c, const MenuView& v, int focus, const GameStat
         const bool selected = r.first + i == r.selected;
         if (i == focus) AddFocusRing(c, row, 16);
         UiItem bar = PanelItem(row);
-        bar.fill = selected ? kRowSelFill : kRowFill;
+        bar.fill = selected ? kFillFocus : kFillRow;
         bar.borderArgb = selected ? th.fill : th.frame;
         bar.border = 2;
         bar.radius = 16;

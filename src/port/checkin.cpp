@@ -15,7 +15,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kRowFill = 0xFF6A72B8, kRowFocusFill = 0xFF9AA2E3;   // (Interact's rows)
 constexpr u32 kSubColour = 0xFFD8DAF4;                             // a pale lavender (Build Rooms' places)
 constexpr u32 kPinkPlate = 0xE0302F5C;                             // the pink names' plate: dark, the rows' hue
 constexpr u32 kScoreColour = 0xFFFFE9A0;                           // a warm white (the money's)
@@ -176,7 +175,7 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
         const bool focused = focus == i;
         if (focused) AddFocusRing(c, rr, 22);
         UiItem row = PanelItem(rr);
-        row.fill = focused ? kRowFocusFill : kRowFill;
+        row.fill = focused ? kFillFocus : kFillRow;
         row.borderArgb = th.frame;
         row.border = 3;
         row.radius = 22;

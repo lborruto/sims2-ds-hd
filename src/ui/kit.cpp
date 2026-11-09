@@ -20,7 +20,9 @@ const Theme& GameTheme()
 {
     // The game's own colours (CLAUDE.md, the console's frames): frame #6171B2 / #5961A2, fills
     // #828ACB, the dark outline and text shadow #383869, the backdrop #101218.
-    static const Theme t {0xFF6171B2, 0xFF5961A2, 0xFF828ACB, 0xFF6A72B8, 0xFFFFFFFF, 0xFF383869, 0xFF101218, 18, 5};
+    // (The wells: kFillRow, #6870B6, one shade darker than the game's #6A72B8 so white text on
+    // them reaches 4.5:1.)
+    static const Theme t {0xFF6171B2, 0xFF5961A2, 0xFF828ACB, kFillRow, 0xFFFFFFFF, 0xFF383869, 0xFF101218, 18, 5};
     return t;
 }
 
@@ -30,7 +32,11 @@ namespace
 float ChipHeight(float size) { return std::round(size * 1.3f); }
 bool Cross(Button b) { return b == Button::DPad || b == Button::DPadV || b == Button::DPadH || b == Button::DPadL || b == Button::DPadU ||
                         b == Button::DPadR || b == Button::DPadD; }
-float PillText(float size) { return size * 0.56f; }
+// A chip's glyph text, `f` of the chip's text size: at least kMinText for a chip at the hints'
+// size (24) or larger (its glyph three quarters of it then); a chip shrunk below it (a crowded
+// prompt bar's fallback) keeps its proportion.
+float GlyphText(float size, float f) { return size >= kMinText / 0.75f ? std::max(size * f, kMinText) : size * f; }
+float PillText(float size) { return GlyphText(size, 0.56f); }
 
 // What a chip's face shows, from its button, face and glyph (UiItem::face / glyph).
 enum class Mark { Letter, Pill, Key, Stick, Cross, PsCross, PsCircle, PsSquare, PsTriangle };
@@ -90,7 +96,7 @@ Resolved Resolve(Button b, Face face, const std::string& glyph)
 }
 Resolved Resolve(const UiItem& it) { return Resolve(it.button, it.face, it.glyph); }
 bool RoundMark(Mark m) { return m != Mark::Pill && m != Mark::Key; }
-float KeyText(float size, const std::string& t) { return t.size() <= 2 ? size * 0.62f : PillText(size); }
+float KeyText(float size, const std::string& t) { return t.size() <= 2 ? GlyphText(size, 0.62f) : PillText(size); }
 float ChipWidth(const Resolved& r, float size)
 {
     const float h = ChipHeight(size);
@@ -517,7 +523,7 @@ Prepared Prepare(const UiItem& it, float s0, float ox0, float oy0, int W, int H)
         const float x1 = x0 + cw * s, y1 = y0 + h * s;
         if (rv.mark != Mark::Cross && !PsMarkOf(rv.mark))
         {
-            const float ts = rv.mark == Mark::Stick ? size * 0.6f : rv.mark == Mark::Letter ? size * 0.82f
+            const float ts = rv.mark == Mark::Stick ? GlyphText(size, 0.6f) : rv.mark == Mark::Letter ? GlyphText(size, 0.82f)
                            : rv.mark == Mark::Key   ? KeyText(size, rv.text) : PillText(size);
             const LineMetrics m = Metrics(ts, Weight::ExtraBold);
             // Centred on the cap height (about 0.7 em).
@@ -1027,6 +1033,18 @@ UiItem ImageItem(Rect to, const u32* src, int srcW, int srcH, Rect from)
     it.srcH = srcH;
     it.from = from;
     return it;
+}
+
+FocusRingItems FocusRing(Rect r, float radius)
+{
+    auto box = [&](int t, u32 c) {
+        UiItem g = PanelItem({r.x - t, r.y - t, r.w + 2 * t, r.h + 2 * t});
+        g.plain = true;
+        g.fill = c;
+        g.radius = radius + t;
+        return g;
+    };
+    return {box(kFocusOuterW, kFocusOuter), box(kFocusInnerW, kFocusInner)};
 }
 
 UiItem TierImage(Rect box, const u32* src, int srcW, int srcH, Rect from, int tier)

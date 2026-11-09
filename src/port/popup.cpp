@@ -28,7 +28,7 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kBtnFill = 0xFF6A72B8, kBtnFocusFill = 0xFF9AA2E3, kBtnPressed = 0xFF309A41; // the game's green while held
+constexpr u32 kBtnPressed = 0xFF309A41; // the game's green while held (the fills: ui::kFillRow, kFillFocus)
 constexpr u32 kVeil = 0x8C181C38;
 constexpr Rect kCanvas {0, 0, 1280, 720};
 
@@ -239,11 +239,10 @@ void BoxButton(Composition& c, Rect r, bool pressed, bool focused, const std::ve
     auto add = [&](UiItem u) { u.layer = kPopLayer; c.ui.push_back(u); };
     if (focused)
     {
-        AddFocusRing(c, r, r.h / 2.0f);
-        c.ui.back().layer = kPopLayer;
+        AddFocusRing(c, r, r.h / 2.0f, kPopLayer);
     }
     UiItem bt = PanelItem(r);
-    bt.fill = pressed ? kBtnPressed : focused ? kBtnFocusFill : kBtnFill;
+    bt.fill = pressed ? kBtnPressed : focused ? kFillFocus : kFillRow;
     bt.borderArgb = th.frame;
     bt.border = 3;
     bt.radius = r.h / 2.0f;

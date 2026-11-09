@@ -18,7 +18,6 @@ using namespace ui;
 // The rows' look: the game's row bar (its frame colour), lighter when focused; the arrow is the
 // game's own ▶ (the Interact tab's icon, frame 0: blue, green when focused, as the game lights
 // the highlighted row's arrow).
-constexpr u32 kRowFill = 0xFF6A72B8, kRowFocusFill = 0xFF9AA2E3;
 constexpr u32 kGreyText = 0x80FFFFFF, kGreyShadow = 0x40383869;
 constexpr int kArrowIcon = 48;      // the ▶, 2x
 constexpr u32 kStripDim = 0xC0FFFFFF;
@@ -127,7 +126,7 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
         const bool focused = i == focus && v.items[i].enabled, greyed = !v.items[i].enabled;
         if (focused) AddFocusRing(c, r, r.h / 2.0f);
         UiItem row = PanelItem(r);
-        row.fill = focused ? kRowFocusFill : kRowFill;
+        row.fill = focused ? kFillFocus : kFillRow;
         row.borderArgb = th.frame;
         row.border = 3;
         row.radius = r.h / 2.0f;

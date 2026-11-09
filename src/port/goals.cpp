@@ -16,7 +16,6 @@ using namespace ui;
 
 constexpr u32 kMissionMark = 0xFF6BD36B;  // the game's bullet: a light green dot
 constexpr u32 kRequestMark = 0xFFB2B2E3;  // the game's light lavender
-constexpr u32 kBarFill = 0xFF6A72B8, kBarSelFill = 0xFF9AA2E3;
 constexpr u32 kTrack = 0xFF51518A, kThumb = 0xFFB2B2E3;
 
 // The goals' texts and heights as the HD list lays them out (at kGoalsSize, shrunk all together
@@ -171,7 +170,7 @@ void BuildGoals(Composition& c, const MenuView& v, int focus, const GameState& g
         const bool sel = i == g.selected;
         if (k == focus) AddFocusRing(c, r, 14);
         UiItem bar = PanelItem(r);
-        bar.fill = sel ? kBarSelFill : kBarFill;
+        bar.fill = sel ? kFillFocus : kFillRow;
         bar.borderArgb = sel ? th.fill : th.frame;
         bar.border = 2;
         bar.radius = 14;

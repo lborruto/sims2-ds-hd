@@ -17,7 +17,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kButtonFill = 0xFF6A72B8, kButtonFocusFill = 0xFF9AA2E3;   // (the HD rows' lavender)
 constexpr u32 kChipPlate = 0xB0202436;
 constexpr u32 kWirelessText = 0xFFB8BCE0;                                 // DS Wireless's label, greyed                                   // the title's chip plate: dark, see-through
 
@@ -192,7 +191,7 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
             if (focused) AddFocusRing(c, r, r.h / 2.0f);
             const bool wireless = i == kFrWireless; // greyed: a second DS is needed
             UiItem b = PanelItem(r);
-            b.fill = wireless ? GameTheme().fillDark : focused ? kButtonFocusFill : kButtonFill;
+            b.fill = wireless ? GameTheme().fillDark : focused ? kFillFocus : kFillRow;
             b.borderArgb = GameTheme().frame;
             b.border = 3;
             b.radius = r.h / 2.0f;

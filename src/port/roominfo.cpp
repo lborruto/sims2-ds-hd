@@ -16,7 +16,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kLineFill = 0xFF6A72B8, kLineFocusFill = 0xFF9AA2E3;   // (Interact's rows)
 constexpr u32 kValueColour = 0xFFFFE9A0;                              // a warm white (the money's)
 constexpr u32 kPortraitWell = 0xFF5961A2;
 
@@ -209,7 +208,7 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
             if (focused)
             {
                 UiItem pl = PanelItem(r);
-                pl.fill = kLineFocusFill;
+                pl.fill = kFillFocus;
                 pl.border = 0;
                 pl.radius = r.h / 2.0f;
                 pl.layer = 1;
@@ -221,7 +220,7 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
         {
             if (focused) AddFocusRing(c, r, 18);
             UiItem row = PanelItem(r);
-            row.fill = focused ? kLineFocusFill : kLineFill;
+            row.fill = focused ? kFillFocus : kFillRow;
             row.borderArgb = th.frame;
             row.border = 2;
             row.radius = 18;

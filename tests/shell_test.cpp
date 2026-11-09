@@ -275,7 +275,7 @@ static void settings_page()
         bool dim = false, note = false;
         for (const ui::UiItem& it : s2.Build(g.m))
         {
-            if (it.text == "1\xC3\x97" && it.colour == 0xFFB8BCE0) dim = true;
+            if (it.text == "1\xC3\x97" && it.colour == ui::kTextInactive) dim = true;
             if (it.text == OwnWordIn(1, OwnWordId::SaverHolds)) note = true;
         }
         CHECK(dim && note);
@@ -497,6 +497,24 @@ static void launch_panel()
     }
     f.m.hasSuspend = false;
     CheckBuild(sh, f.m, "launch without a suspend state");
+    // Inside the TV's safe area (research C1: nothing in the outer 5 %, x 64-1216, y 36-684), with
+    // and without recents (the backdrop and the title's line box, the canvas's width, apart).
+    for (bool recents : {false, true})
+    {
+        f.m.recents = recents ? std::vector<std::string> {"sims2.nds", "other.nds", "third.nds"} : std::vector<std::string> {};
+        f.m.hasSuspend = recents;
+        sh.Open(Page::Launch);
+        for (const ui::UiItem& it : sh.Build(f.m))
+        {
+            if (it.to.w >= 1280) continue;
+            const Rect p = ui::Placed(it);
+            if (p.x < 64 || p.y < 36 || p.x + p.w > 1216 || p.y + p.h > 684)
+            {
+                fprintf(stderr, "launch: item at %d,%d %dx%d outside the safe area\n", p.x, p.y, p.w, p.h);
+                failures++;
+            }
+        }
+    }
 }
 
 // A cleared or moved A / B never locks the menu: the pad's own south / east then, and one press
