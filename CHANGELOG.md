@@ -96,6 +96,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   its colour, notes and headings are white, and no text is smaller than 18 points at 100 % (27
   pixels on a 1080p TV), the buttons' names in their chips (START + BACK, LB, keys) included.
 - The launch panel keeps out of the screen's outer edge, where some TVs cut the picture.
+- The D-pad chips that mean Up / Down or Left / Right show two arrowheads (˄ ˅, ‹ ›) instead of a
+  bar that read as a plus or a minus.
 - The vacuum on a controller: A takes a find for you. The hand goes to the find in the green ring
   (the one nearest the hand; the right stick moves the hand), presses where no dust lies over it,
   carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is

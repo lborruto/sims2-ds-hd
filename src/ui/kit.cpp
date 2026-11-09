@@ -663,12 +663,40 @@ void DrawChip(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const 
     // The D-pad's look: the button's own, or the direction a glyph names.
     Button d = it.button;
     if (!Cross(d)) d = it.glyph == "up" ? Button::DPadU : it.glyph == "down" ? Button::DPadD : it.glyph == "left" ? Button::DPadL : Button::DPadR;
-    if (rv.mark == Mark::Cross && (d == Button::DPad || d == Button::DPadV || d == Button::DPadH))
+    if (rv.mark == Mark::Cross && d == Button::DPad)
     {
-        // A cross: two rounded bars (one faint when only the other's directions do something).
+        // A cross: two rounded bars.
         const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
-        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, d == Button::DPadV ? 0x59FFFFFF : 0xFFFFFFFF);
-        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, d == Button::DPadH ? 0x59FFFFFF : 0xFFFFFFFF);
+        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0xFFFFFFFF);
+        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0xFFFFFFFF);
+    }
+    else if (rv.mark == Mark::Cross && (d == Button::DPadV || d == Button::DPadH))
+    {
+        // The cross faint, an arrowhead at each end of the lit arm, pointing out: ‹ › (Left /
+        // Right), ˄ ˅ (Up / Down): it reads as two directions, not as a plus or a bar.
+        const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
+        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0x38FFFFFF);
+        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0x38FFFFFF);
+        const float tip = a * 1.12f, base = a * 0.22f, half = a * 0.62f;
+        for (int sign : {-1, 1})
+        {
+            // A filled triangle: its apex `tip` out along the arm, its base `base` from the centre.
+            const bool v = d == Button::DPadV;
+            const float ax = v ? cx : cx + sign * tip, ay = v ? cy + sign * tip : cy;
+            const float b1x = v ? cx - half : cx + sign * base, b1y = v ? cy + sign * base : cy - half;
+            const float b2x = v ? cx + half : cx + sign * base, b2y = v ? cy + sign * base : cy + half;
+            auto edge = [](float px, float py, float x1, float y1, float x2, float y2, float ix, float iy) {
+                // Signed distance to the line through (x1, y1)-(x2, y2), negative on (ix, iy)'s side.
+                const float nx = y2 - y1, ny = x1 - x2, n = std::sqrt(nx * nx + ny * ny);
+                const float dd = ((px - x1) * nx + (py - y1) * ny) / n, di = ((ix - x1) * nx + (iy - y1) * ny) / n;
+                return di < 0 ? dd : -dd;
+            };
+            const float gx = (ax + b1x + b2x) / 3, gy = (ay + b1y + b2y) / 3;
+            FillDistance(L, std::min({ax, b1x, b2x}), std::min({ay, b1y, b2y}), std::max({ax, b1x, b2x}), std::max({ay, b1y, b2y}), 0xFFFFFFFF,
+                         [&](float x, float y) {
+                             return std::max({edge(x, y, ax, ay, b1x, b1y, gx, gy), edge(x, y, b1x, b1y, b2x, b2y, gx, gy), edge(x, y, b2x, b2y, ax, ay, gx, gy)});
+                         });
+        }
     }
     else if (rv.mark == Mark::Cross)
     {
