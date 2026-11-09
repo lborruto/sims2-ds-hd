@@ -409,6 +409,7 @@ static UiItem RandomItem(Rng& g, const u32* pic, const u32* icon)
         static const float zooms[] = {0.75f, 0.8f, 0.85f, 1.05f, 1.35f, 1.5f};
         if (g.In(0, 2)) ZoomItem(it, zooms[g.In(0, 5)], (float)g.In(0, 1280), (float)g.In(0, 720));
         if (it.kind == UiItem::Image) it.smooth = g.In(0, 1);
+        if (it.kind == UiItem::Image && g.In(0, 2) == 0) it.tier = g.In(1, 3);
     }
     return it;
 }
@@ -673,6 +674,104 @@ static void ui_scale_and_smooth()
     ClearEnlarged();
 }
 
+// Tiers (UiItem::tier): a picture pixel is TierFactor(tier, scale x zoom) whole output pixels,
+// never resampled, centred on `to`; at 100 % the same bytes as the untiered picture `tier` times
+// its size; the layer has room for blocks that pass `to`; the GPU may draw a tiered crop.
+static void tiers()
+{
+    CHECK(TierFactor(kTierS, 1) == 2 && TierFactor(kTierL, 1) == 3);
+    CHECK(TierFactor(kTierS, 1.5f) == 3 && TierFactor(kTierL, 1.5f) == 4); // (4.5: a half down)
+    CHECK(TierFactor(kTierL, 1.6f) == 5 && TierFactor(kTierL, 3) == 9 && TierFactor(kTierS, 0.3f) == 1);
+    CHECK(TierFactor(kTierS, 1.3f * 1.111f) == 3 && TierFactor(0, 2) == 1);
+    // Two colours, a transparent corner.
+    std::vector<u32> icon(16 * 16);
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 16; x++) icon[y * 16 + x] = x + y < 4 ? 0 : x > y ? 0xFFF0E0A0u : 0xFF203060u;
+    const UiItem t = TierImage({100, 100, 60, 60}, icon.data(), 16, 16, {0, 0, 16, 16}, kTierS);
+    CHECK(t.tier == kTierS && t.to.x == 114 && t.to.y == 114 && t.to.w == 32 && t.to.h == 32);
+    UiItem plain = t;
+    plain.tier = 0;
+    CHECK(HashImage(plain) != HashImage(t));
+    {   // 100 %: the untiered picture's bytes.
+        std::vector<u32> a(300 * 300), b(300 * 300);
+        Rasterise({t}, 1, a.data(), 300, 300);
+        Rasterise({plain}, 1, b.data(), 300, 300);
+        CHECK(a == b);
+    }
+    auto colours = [](const std::vector<u32>& v) {
+        std::vector<u32> u(v);
+        std::sort(u.begin(), u.end());
+        return (int)(std::unique(u.begin(), u.end()) - u.begin());
+    };
+    for (float s : {1.5f, 1.6f, 2.25f, 3.0f})
+    {
+        const int k = TierFactor(kTierL, s);
+        UiItem l = TierImage({100, 100, 60, 60}, icon.data(), 16, 16, {0, 0, 16, 16}, kTierL);
+        const Rect r = TierRect(l, s, 0, 0);
+        CHECK(r.w == 16 * k && r.h == 16 * k);
+        // Centred on `to` (canvas 100 + 6 .. + 48: its centre 130) within a pixel.
+        CHECK(std::abs(r.x + r.w / 2.0f - 130 * s) <= 1 && std::abs(r.y + r.h / 2.0f - 130 * s) <= 1);
+        const int W = (int)(400 * s), H = W;
+        std::vector<u32> a((size_t)W * H);
+        Rasterise({l}, s, a.data(), W, H);
+        // Three values (transparent, two colours), each picture pixel a whole k x k block.
+        CHECK(colours(a) == 3);
+        bool blocks = true;
+        int drawn = 0;
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+            {
+                const u32 v = a[(size_t)y * W + x];
+                const bool in = x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h;
+                if (!in) { blocks &= v == 0; continue; }
+                drawn += v != 0;
+                const int i = (x - r.x) / k, j = (y - r.y) / k;
+                blocks &= v == icon[j * 16 + i];
+            }
+        CHECK(blocks && drawn == (16 * 16 - 10) * k * k);
+        // Its layer holds every block (5 x 16 = 80 output pixels where `to` is 76.8 at 1.6), drawn as the whole raster.
+        const std::vector<LayerAt> at = LayersAt({l}, s, 0.25f, 0.5f);
+        CHECK(at.size() == 1);
+        std::vector<u32> lp((size_t)at[0].w * at[0].h);
+        Rasterise(at[0].items, s, lp.data(), at[0].w, at[0].h, at[0].ox, at[0].oy);
+        int n = 0;
+        for (u32 v : lp) n += v != 0;
+        CHECK(n == drawn);
+        // Smooth at exactly k (9: the scaler's 3, then 3 x 3 blocks); the same on any number of threads.
+        UiItem sm = l;
+        sm.smooth = true;
+        std::vector<u32> b((size_t)W * H), c((size_t)W * H);
+        SetRasterThreads(1);
+        Rasterise({sm}, s, b.data(), W, H);
+        SetRasterThreads(0);
+        Rasterise({sm}, s, c.data(), W, H);
+        CHECK(b == c && (k == 7 ? b == a : colours(b) > 3)); // (7: no scaler divides it, nearest alone)
+        bool inside = true;
+        for (int y = 0; y < H; y++)
+            for (int x = 0; x < W; x++)
+                if (b[(size_t)y * W + x] && !(x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h)) inside = false;
+        CHECK(inside);
+        if (k == 9)
+        {
+            const auto e3 = Enlarge(sm, 3);
+            CHECK(e3 && b[(size_t)(r.y + 4) * W + r.x + 40] == e3->px[(size_t)1 * e3->w + 13]);
+        }
+    }
+    // Zoomed: the factor of scale x zoom.
+    UiItem z = TierImage({100, 100, 60, 60}, icon.data(), 16, 16, {0, 0, 16, 16}, kTierS);
+    ZoomItem(z, 1.5f, 0, 0);
+    CHECK(TierRect(z, 1, 0, 0).w == 48 && TierRect(z, 2, 0, 0).w == 96);
+    // An opaque tiered crop is the GPU's at any scale, at TierRect; transparent pixels are not.
+    std::vector<u32> pic(256 * 192);
+    for (size_t i = 0; i < pic.size(); i++) pic[i] = 0xFF000000u | (u32)(i * 2654435761u >> 8);
+    const std::vector<UiItem> crop = {TierImage({10, 10, 90, 60}, pic.data(), 256, 192, {5, 5, 30, 20}, kTierL)};
+    const LayerAt at = LayersAt(crop, 1.6f, 0, 0)[0];
+    CHECK(WholeFactorCrop(crop[0], at, 1.6f));
+    const Rect cr = CropRect(crop[0], 1.6f, at.x, at.y, at.ox, at.oy);
+    CHECK(cr.w == 150 && cr.h == 100 && cr.x >= at.x && cr.x + cr.w <= at.x + at.w);
+    CHECK(!WholeFactorCrop(t, LayersAt({t}, 1.5f, 0, 0)[0], 1.5f));
+}
+
 int main()
 {
     wrap_cases();
@@ -686,6 +785,7 @@ int main()
     raster_ways(false);
     raster_ways(true);
     ui_scale_and_smooth();
+    tiers();
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }
     printf("uikit_test: all passed\n");
     return 0;

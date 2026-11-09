@@ -89,6 +89,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The game's icons and portraits in the HD menus are drawn with the DS's own pixels by default.
   Settings kept from an earlier version move to Pixels once (they all said Smooth, the old
   default); Smooth stays a choice in *Game icons*, and once chosen again it stays.
+- With *Game icons* on Pixels, the game's icons stay crisp at any window size: they are enlarged
+  from the DS's own pixels, never from a copy already enlarged and then blurred again.
 - The vacuum on a controller: A takes a find for you. The hand goes to the find in the green ring
   (the one nearest the hand; the right stick moves the hand), presses where no dust lies over it,
   carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is

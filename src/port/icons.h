@@ -47,10 +47,14 @@ public:
     // scale x scale block); null as above, or for an empty size or one past kMaxScaled (4096) either way.
     const SpriteFrame* Scaled(SpriteRef s, int frame, int w, int h);
     const SpriteFrame* Scaled(SpriteRef s, int frame, int scale);
-    // The image item that draws frame `frame` of s at `to` from its copy `scaled` (Scaled's, the
-    // size `to` has): Pixel (ui::SmoothPictures false) that copy itself, as always; Smooth the
-    // frame as it is, so the kit enlarges it with the pixel-art scaler at the window's own size.
+    // The image item that draws frame `frame` of s at `to` (`scaled`: Scaled's copy, the size `to`
+    // has, drawn only when the frame does not read): the frame as it is, in both looks, so the kit
+    // enlarges it at the window's own size (Pixel nearest by the whole factor, Smooth the pixel-art
+    // scaler): never a pre-scaled copy blurred again at a fractional window scale.
     ui::UiItem Image(SpriteRef s, int frame, const SpriteFrame& scaled, Rect to);
+    // Frame `frame` of s at tier `tier` (ui::kTierS, ui::kTierL: one per component), centred in
+    // `box` (ui::TierImage of the frame as it is); an item that draws nothing when it does not read.
+    ui::UiItem Tiered(SpriteRef s, int frame, int tier, Rect box);
     // Frame `frame` of s `scale` times its size (nearest: every pixel a block; 1-8) in `look`, its
     // colour times light / 255 (a fade: 0-255, the alpha kept); null when it does not read. The
     // copies at full light are kept for the cache's life, the others only for the light last asked
