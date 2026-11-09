@@ -2792,6 +2792,34 @@ sys.exit(1 if bad else 0)
 PYEOF
 then echo "ok   shell pictures: the pause menu's pages and the launch panel"
 else echo "FAIL shell pictures"; fails=$((fails + 1)); fi
+# The settings' five tabs (scripts/shell/settings-tabs.txt, --shell settings): RB through every tab
+# and round (wrapping), LB wraps back, A on Battery saver (Graphics) dims 3D resolution and 60 fps,
+# Y asks to reset the tab (No first), B keeps it. Pictures of each tab: all different, the panel's
+# fill at its foot; Graphics with the saver on differs from Graphics without it.
+"$bin" "$rom" --headless --frames 122 --state-load "$shots/s7.st" --save "$tmp/shell-tabs.sav" --compose --print-shell \
+    --shell settings --shell-at 60 --input "$repo/scripts/shell/settings-tabs.txt" --shot-at 63,67,73,79,85,91,115 \
+    --shot-dir "$tmp/shell-tabs" "${town[@]}" > "$tmp/shell-tabs.log" 2>&1 && grep -q '^clock: ' "$tmp/shell-tabs.log" && touch "$tmp/shell-tabs.ok"
+shell_tabs() {
+    in_order shell-tabs 'shell open page=settings' 'page=settings tab=1 focus=0' 'shell setting 8 ok' 'tab=2' 'tab=3' 'tab=4' \
+        'page=settings tab=0' 'page=settings tab=4' 'page=settings tab=0' 'ask=reset \(no\)' 'page=settings tab=0 focus=0 ask=none' || return 1
+    ! grep -q 'reset tab' "$tmp/shell-tabs.log" || { echo "  shell-tabs: reset without a Yes"; return 1; }
+    "$python" -I - "$tmp/shell-tabs" <<'PYEOF'
+import sys
+from PIL import Image
+d = sys.argv[1]
+f = {n: Image.open(f"{d}/f{n:06d}.png").convert("RGB") for n in (63, 67, 73, 79, 85, 91, 115)}
+tabs = [f[n].tobytes() for n in (63, 67, 79, 85, 91)]
+bad = []
+if len(set(tabs)) != 5: bad.append("two tabs look the same")
+if f[67].tobytes() == f[73].tobytes(): bad.append("Battery saver changed nothing on Graphics")
+for n in (63, 67, 79, 85, 91):
+    p = f[n].getpixel((220, 650))
+    if max(abs(a - b) for a, b in zip(p, (0x82, 0x8A, 0xCB))) > 8: bad.append(f"frame {n}: no panel fill {p}")
+for b in bad: print("  shell-tabs: " + b)
+sys.exit(1 if bad else 0)
+PYEOF
+}
+check_pad shell-tabs shell_tabs
 # Platform (task 5). The game's language: --game-language 2 sets the DS firmware's, so the boot's
 # last splash (frame 900, a fresh boot) says the game's French words: its touch screen differs from
 # English's and the strings load in French; fast boot (--fast-boot, the window's rule, logged) ends

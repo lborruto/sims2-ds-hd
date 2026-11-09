@@ -239,8 +239,9 @@ what you won beside the status bar.
 or **Esc** pauses the game and opens the pause menu, in the game's look and your language:
 
 - **Resume** (or B).
-- **Settings**: every option in one list, below.
-- **Controls**: what each button does, and *Keys and buttons* to change them: A on an action,
+- **Settings**: every option, in five tabs, below.
+- **Controls**: what each button does, and *Keys and buttons* to change them (the pause menu
+  too: one button alone can open it): A on an action,
   then the key or button you want (Esc, or Start + Back together, keeps what it had; Backspace
   leaves it no key); X clears it, Y sets them all one after another; the last row resets them all.
 - **Save states**: four slots, each with a picture and the date. A on a used slot loads it (it
@@ -263,39 +264,67 @@ F5 and F7 save and load one more quick state, without the menu.
 
 ## Settings
 
-In the pause menu's Settings, Left / Right (or A) change the highlighted row. They are kept
-between runs.
+The pause menu's Settings has five tabs: **LB / RB** (Q / W on the keyboard) go from one to the
+next, Up / Down move in the tab, Left / Right (or A) change the highlighted row, whose `‹ ›`
+arrows say it can change. The line under the list says what the highlighted row does. Each tab
+puts the rarely needed rows last, under *Advanced*. **Y** puts the tab's rows back to their
+defaults (it asks first, on No); window size and place and your keys and buttons are not touched.
+Everything is kept between runs.
 
 <p align="center">
-  <img src="screenshots/settings.webp" alt="The pause menu's settings: Layout, Fullscreen, Picture filter, Interface size, Game pictures, 3D resolution, Widescreen world, 60 fps" width="700">
+  <img src="screenshots/settings.webp" alt="The pause menu's settings on the Display tab: Fullscreen, Interface size, Screen scaling, Game icons, Hide the idle pointer, and Layout under Advanced" width="700">
 </p>
+
+**Display**
 
 | Setting | What it does |
 |---|---|
-| Layout | Console (the default) or one of the older layouts ([below](#layouts-and-looks)) |
 | Fullscreen | also F11 |
-| Picture filter | how the game's pictures are scaled to your window: Sharp (crisp, evenly sized pixels at any size: the default), Smooth or Pixels |
 | Interface size | the size of the HD menus, conversations and hints. Auto (the default) follows your screen's size and the window's, so they are not huge on a big monitor nor tiny on a handheld; or 60 to 150 % by hand. The game's world keeps its size |
-| Game pictures | the game's icons and portraits in the menus: Smooth (redrawn with soft edges by the xBRZ scaler: the default) or Pixels (the DS's own) |
-| 3D resolution | the 3D world 1 to 4 times sharper (default 2) |
-| Widescreen world | more of the town left and right, 16:9 instead of 4:3 (default on) |
-| 60 fps | in-between frames for the 3D, which the game draws at 30 a second (default on) |
-| Battery saver | the 3D at 1x and 30 fps whatever the two above say: lighter on a laptop's battery and fans |
-| Volume, Mute | by 5 % |
-| Sound in fast forward | muted, or at normal pitch skipping ahead |
-| Run in background | off (the default): the game pauses and goes quiet while its window is not in front |
-| Fast forward speed | 2×, 3×, 4× or as fast as it goes |
-| Fast forward key | held, or pressed once on and once off |
-| Fast boot | the boot's splashes at full speed (default on) |
+| Screen scaling | how the game's pictures are scaled to your window: Sharp (crisp, evenly sized pixels at any size: the default), Smooth or Pixels |
+| Game icons | the game's icons and portraits in the HD menus: Pixels (the DS's own, the default) or Smooth (redrawn with soft edges by the xBRZ scaler) |
 | Hide the idle pointer | the mouse pointer hides after a few seconds still over the game |
+| *Advanced:* Layout | Console (the default) or one of the older layouts ([below](#layouts-and-looks)) |
+
+**Graphics**
+
+| Setting | What it does |
+|---|---|
+| Battery saver | the 3D at 1x and 30 fps whatever the two rows below say: lighter on a laptop's battery and fans. While it is on, those two rows are dimmed and show what it holds them at |
+| 3D resolution | the 3D world 1 to 4 times sharper (default 2) |
+| 60 fps | in-between frames for the 3D, which the game draws at 30 a second (default on) |
+| *Advanced:* Widescreen world | more of the town left and right, 16:9 instead of 4:3 (default on) |
+
+**Sound**
+
+| Setting | What it does |
+|---|---|
+| Volume | all the game's sound, by 5 %. Music and effects have their own volumes in the game's own options |
+| Mute | silence without losing the volume |
+| Pause in the background | on (the default): the game pauses and goes quiet while its window is not in front |
+| *Advanced:* Sound in fast forward | muted, or at normal pitch skipping ahead |
+
+**Controls**
+
+| Setting | What it does |
+|---|---|
+| Keys and buttons | opens the page that changes them (the same as the pause menu's Controls). The pause menu can have one button of its own there instead of Start + Back |
 | Stick cursor | the right stick as a cursor on the touch screen where one is needed |
 | Cursor speed | 50 to 200 %: the cursor's and the minigames' pointer |
-| Stick dead zone | raise it if your Sim walks on its own |
 | Swap the sticks | left-handed: the camera and the cursor go to the left stick, walking to the right |
-| Trigger press at | how far a trigger goes down to count |
-| Rumble | a short buzz when a controller connects |
+| *Advanced:* Stick dead zone | raise it if your Sim walks on its own |
+| *Advanced:* Trigger press at | how far a trigger goes down to count |
+| *Advanced:* Buzz on connect | a short buzz when a controller connects (the game itself has no rumble) |
+
+**Game**
+
+| Setting | What it does |
+|---|---|
+| Language | the game's language and the HD screens' ([above](#starting)); applies at the next start, as the row says |
 | Microphone | what the DS hears when the game listens (the vacuum, the music mixer): off, the blow key (M) or your real microphone; in Console the vacuum's Y blows whatever this says |
-| Language | the game's language and the HD screens' ([above](#starting)); applies at the next start |
+| Fast forward speed | 2×, 3×, 4× or as fast as it goes |
+| Fast forward key | Hold, or Toggle (pressed once on and once off) |
+| *Advanced:* Fast boot | the boot's splashes at full speed (default on) |
 
 ## Controllers
 

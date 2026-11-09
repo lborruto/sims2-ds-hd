@@ -98,15 +98,15 @@ from another emulator or a flash cart works if you put it there. If that folder 
 the save goes to the settings folder and the pause menu says where.
 
 **The menus are too big, or too small.**
-Pause, *Settings*, *Interface size*: Auto follows your screen, or pick 60 to 150 %.
+Pause, *Settings > Display > Interface size*: Auto follows your screen, or pick 60 to 150 %.
 
 **It's blurry, or slow.**
-Pause, then *Settings*: *3D resolution* sets how sharp the 3D is, and widescreen and 60 fps can be
-switched off (*Battery saver* does both on a laptop). If it runs too fast, check you aren't holding
+Pause, then *Settings > Graphics*: *3D resolution* sets how sharp the 3D is, and widescreen and 60 fps can be
+switched off (*Battery saver* lowers both on a laptop). If it runs too fast, check you aren't holding
 fast forward.
 
 **It pauses when I click another window.**
-On purpose: *Settings > Run in background* changes it. The Steam overlay does not pause it.
+On purpose: *Settings > Sound > Pause in the background* changes it. The Steam overlay does not pause it.
 
 **Is DS Wireless supported?**
 No. Trading and wireless games need a second DS; the game's screen says so and B leaves it.

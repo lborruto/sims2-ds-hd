@@ -82,7 +82,7 @@ bool Settings::Load(const std::string& path)
             for (Layout l : {Layout::Console, Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked})
                 if (v == LayoutName(l)) layout = l;
         }
-        else if (k == "resolution_3d") resolution3D = std::clamp(atoi(v.c_str()), 1, 8);
+        else if (k == "resolution_3d") resolution3D = std::clamp(atoi(v.c_str()), 1, 4); // (the row's range: past it, Right went down)
         else if (k == "widescreen") widescreen = on;
         else if (k == "interpolate_60") interpolate60 = on;
         else if (k == "fullscreen") fullscreen = on;
@@ -102,7 +102,7 @@ bool Settings::Load(const std::string& path)
         else if (k == "fast_forward_toggle") fastToggle = on;
         else if (k == "fast_boot") fastBoot = on;
         else if (k == "hide_pointer") hidePointer = on;
-        else if (k == "cursor_speed") cursorSpeed = std::clamp(atoi(v.c_str()), 50, 200);
+        else if (k == "cursor_speed") cursorSpeed = std::clamp((atoi(v.c_str()) + 12) / 25 * 25, 50, 200); // (the row's steps of 25)
         else if (k == "left_handed") leftHanded = on;
         else if (k == "window_position")
         {

@@ -426,6 +426,8 @@ int main(int argc, char** argv)
         in.b = edge(p.b, q.b);
         in.x = edge(p.x, q.x);
         in.y = edge(p.y, q.y);
+        in.lb = edge(p.lb, q.lb);
+        in.rb = edge(p.rb, q.rb);
         return in;
     };
     // The window's mouse in output pixels -> the shell's 1280 x 720 canvas.

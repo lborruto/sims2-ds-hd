@@ -77,6 +77,17 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Changed
 
+- The pause menu's Settings in five tabs (Display, Graphics, Sound, Controls, Game), changed with
+  LB / RB (Q / W), the rarely needed rows under *Advanced*, a line saying what every row does,
+  `‹ ›` arrows on what Left / Right change, and Y to put a tab back to its defaults (it asks
+  first, on No). Layout is no longer the first row. Battery saver dims the two rows it holds and
+  shows what it holds them at; Language says it applies at the next start. Keys and buttons is
+  in the Controls tab too, and says the pause menu can have one button of its own.
+- Clearer names: *Screen scaling* (was Picture filter), *Game icons* (was Game pictures), *Pause in
+  the background* (was Run in background, the other way round), *Buzz on connect* (was Rumble),
+  fast forward *Hold / Toggle*, and the real microphone reads "Real microphone".
+- The game's icons and portraits in the HD menus are drawn with the DS's own pixels by default
+  (Smooth stays a choice in *Game icons*; a settings file that says smooth keeps it).
 - CONSOLE is the default layout; AUTO, FOCUS, SIDE and STACKED stay in the pause menu's Settings
   (keys 0 to 4). Sharper 3D, widescreen and 60 fps are on by default; a settings file from before
   CONSOLE that still holds the old defaults is moved to the new ones once, and a file that names a
@@ -101,6 +112,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Fixed
 
+- A settings file with a 3D resolution above 4 showed it, and Right then lowered it to 4: it is
+  now read as 4.
 - The HD menus no longer lag on a 4K screen: a tab change takes about 10 ms instead of 150, a
   focus move about 3 instead of 38.
 - The HD screens never flash the DS's own pictures while the game swaps its screens (tabs, the

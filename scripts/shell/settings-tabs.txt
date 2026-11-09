@@ -1,0 +1,14 @@
+# The settings' five tabs (run with --shell settings --shell-at 60, from s7): RB to Graphics, A on
+# Battery saver (its two rows dimmed), RB through Sound, Controls and Game, back to Display
+# (wrapping), LB to Game (wrapping the other way), RB to Display, Y asks to reset Display (No
+# first), B keeps it.
+64 2 pad rb
+70 2 pad a
+76 2 pad rb
+82 2 pad rb
+88 2 pad rb
+94 2 pad rb
+100 2 pad lb
+106 2 pad rb
+112 2 pad y
+118 2 pad b
