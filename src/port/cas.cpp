@@ -8,6 +8,7 @@
 #include "console.h"
 #include "port/front.h"
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -92,17 +93,14 @@ int Slot(int aspiration) { for (int j = 0; j < 4; j++) if (kCasAspOfSlot[j] == a
 // turned), grey (♀ / ♂ not chosen: the game's button without its colour) or dimmed (the
 // aspirations not chosen); all at the fade's light (BuildCas's `light`).
 using Look = SpriteLook;
-// Frame `frame` of s at `scale` times its size, centred in box (the game's pictures at a whole
-// factor: never a fraction), in `look`; false when it does not read (nothing drawn).
-bool AddLook(std::vector<UiItem>& images, IconCache* icons, SpriteRef s, int frame, int scale, Rect box, int light, Look look = Look::Plain, u32 opacity = 0)
+// Frame `frame` of s at tier `tier` (ui::kTierS, kTierL: one per component), centred in box (its
+// pixels whole blocks of the window's, never a fraction), in `look`; false when it does not read
+// (nothing drawn).
+bool AddLook(std::vector<UiItem>& images, IconCache* icons, SpriteRef s, int frame, int tier, Rect box, int light, Look look = Look::Plain, u32 opacity = 0)
 {
-    const SpriteFrame* big = icons ? icons->Look(s, frame, look, scale, light) : nullptr;
-    if (!big) return false;
-    const Rect to {box.x + (box.w - big->w) / 2, box.y + (box.h - big->h) / 2, big->w, big->h};
-    // Smooth: the frame at its own size, for the kit's pixel-art scaler; Pixel: the copy at its size.
-    const SpriteFrame* one = ui::SmoothPictures() ? icons->Look(s, frame, look, 1, light) : nullptr;
-    const SpriteFrame& src = one ? *one : *big;
-    images.push_back(ImageItem(to, src.argb.data(), src.w, src.h, {0, 0, src.w, src.h}));
+    const SpriteFrame* one = icons ? icons->Look(s, frame, look, 1, light) : nullptr;
+    if (!one || one->w <= 0 || one->h <= 0) return false;
+    images.push_back(TierImage(box, one->argb.data(), one->w, one->h, {0, 0, one->w, one->h}, tier));
     images.back().fill = opacity;
     return true;
 }
@@ -119,7 +117,7 @@ SpriteRef ListRef(const CasState& cs, int i, int pal = -1)
 void Arrow(std::vector<UiItem>& images, IconCache* icons, const CasState& cs, int i, bool left, Rect to, const u32* live, Rect from, int light)
 {
     const int frame = i < cs.spriteCount ? cs.sprites[i].frame : 0;
-    if (!AddLook(images, icons, SpriteRef::Of(kSprCasArrow), frame, 2, to, light, left ? Look::Flip : Look::Plain)) Crop(images, live, from, 2, to);
+    if (!AddLook(images, icons, SpriteRef::Of(kSprCasArrow), frame, kTierS, to, light, left ? Look::Flip : Look::Plain)) Crop(images, live, from, 2, to);
 }
 }
 
@@ -352,15 +350,27 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         // What turns it: the right stick (RStick); off the Name page X (left) and Y (right) too, either side of it.
         // The keyboard (the device used last) has no stick: its X / Y keys alone, off the Name page (on
         // it, the mouse's right drag; its L / R keys are the pages here).
+        // The row centred under the model, its word ("Turn") after its last chip.
         const bool keys = ui::ChipLookNow().face == Face::Keyboard;
-        const Rect rs = ChipRect(0, 0, Button::RStick, "", 28), xr = ChipRect(0, 0, Button::X, "", 28);
-        const int y = top.y + top.h + 22, cx = top.x + top.w / 2;
-        const int half = keys ? 0 : rs.w / 2;
-        if (!keys) c.ui.push_back(ChipItem(cx - rs.w / 2, y, Button::RStick, "", 28));
-        if (v.xyTurns)
+        std::vector<Button> row;
+        if (v.xyTurns) row.push_back(Button::X);
+        if (!keys) row.push_back(Button::RStick);
+        if (v.xyTurns) row.push_back(Button::Y);
+        if (!row.empty())
         {
-            c.ui.push_back(ChipItem(cx - half - (keys ? 8 : 16) - xr.w, y + (rs.h - xr.h) / 2, Button::X, "", 28));
-            c.ui.push_back(ChipItem(cx + half + (keys ? 8 : 16), y + (rs.h - xr.h) / 2, Button::Y, "", 28));
+            const std::string turn = OwnWord(&rom, OwnWordId::HintTurn);
+            const Rect rs = ChipRect(0, 0, Button::RStick, "", 28);
+            const int y = top.y + top.h + 22, gap = keys ? 8 : 16;
+            int total = 0;
+            for (size_t k = 0; k < row.size(); k++) total += ChipRect(0, 0, row[k], k + 1 == row.size() ? turn : "", 28).w + (k ? gap : 0);
+            int x = top.x + (top.w - total) / 2;
+            for (size_t k = 0; k < row.size(); k++)
+            {
+                const std::string label = k + 1 == row.size() ? turn : "";
+                const Rect r = ChipRect(0, 0, row[k], label, 28);
+                c.ui.push_back(ChipItem(x, y + (rs.h - r.h) / 2, row[k], label, 28));
+                x += r.w + gap;
+            }
         }
         // The game's own "L" / "R" pills on its arrows (the DS's shoulder buttons: LB / RB are the
         // pages here) covered by the pad's turn chips: X / Y off the Name page, else the right stick.
@@ -426,7 +436,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         button.layer = 1;
         c.ui.push_back(button);
         if (i < 4) Text(c, {b.x, b.y - 1, b.w, b.h}, std::to_string(i + 1), 30);
-        else if (!AddLook(images, icons, SpriteRef::Of(kSprCasTabTick[i == cs.page]), 0, 2, b, light)) Text(c, b, "?", 30);
+        else if (!AddLook(images, icons, SpriteRef::Of(kSprCasTabTick[i == cs.page]), 0, kTierS, b, light)) Text(c, b, "?", 30);
         if (!cs.switching) AddMousePiece(c, Plus(kCasTabFrom, 0, kCasTabDy * i), cell);
     }
     if (!v.title.empty()) PanelText(c, {kCasTitle.x + 20, kCasTitle.y, kCasTitle.w - 40, kCasTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Centre, Weight::ExtraBold);
@@ -476,7 +486,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         {
             Cell(c, v.items[g].rect, focused(g), cs.gender == g, 42);
             // The game's ♀ / ♂ button (its sprite), the one not chosen grey (the game draws it plain).
-            if (!AddLook(images, icons, SpriteRef::Of(kSprCasGender[g]), 0, 2, v.items[g].rect, light, cs.gender == g ? Look::Plain : Look::Grey))
+            if (!AddLook(images, icons, SpriteRef::Of(kSprCasGender[g]), 0, kTierS, v.items[g].rect, light, cs.gender == g ? Look::Plain : Look::Grey))
                 Crop(images, live, kCasGenderFrom[g], 2, v.items[g].rect);
             mouse(g, kCasGenderFrom[g]);
         }
@@ -584,7 +594,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             Cell(c, v.items[i].rect, focused(i), cs.category == i, 14);
             // The game's category sprite (frame 1 its lit one: the game's choice), its palette 1076.
             const int si = kCasCatSpr0 + i;
-            if (!AddLook(images, icons, ListRef(cs, si, kCasCatPal), si < cs.spriteCount ? cs.sprites[si].frame : 0, 2, v.items[i].rect, light))
+            if (!AddLook(images, icons, ListRef(cs, si, kCasCatPal), si < cs.spriteCount ? cs.sprites[si].frame : 0, kTierS, v.items[i].rect, light))
                 Crop(images, live, from, 2, v.items[i].rect);
             mouse(i, from);
         }
@@ -596,7 +606,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             // The item's picture (the cell's sprite, its own resources); a cell the game leaves empty: none.
             const int si = kCasClothSpr0 + cell;
             if (si < cs.spriteCount && cs.sprites[si].read && !cs.sprites[si].shown) {}
-            else if (!AddLook(images, icons, ListRef(cs, si), 0, 3, v.items[k].rect, light)) Crop(images, live, from, 3, v.items[k].rect);
+            else if (!AddLook(images, icons, ListRef(cs, si), 0, kTierL, v.items[k].rect, light)) Crop(images, live, from, 3, v.items[k].rect);
             mouse(k, from);
         }
         for (int k = 12; k < 14 && k < (int)v.items.size(); k++)
@@ -618,7 +628,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             Cell(c, v.items[j].rect, focused(j), cs.aspiration == kCasAspOfSlot[j], 16);
             // The game's aspiration picture (362, its frames in this order), 1.5x; the others dimmed,
             // as the game shows them as silhouettes.
-            AddLook(images, icons, SpriteRef::Of(kSprCasAsp), j, kCasAspScale, v.items[j].rect, light, cs.aspiration == kCasAspOfSlot[j] ? Look::Plain : Look::Dim);
+            AddLook(images, icons, SpriteRef::Of(kSprCasAsp), j, kCasAspTier, v.items[j].rect, light, cs.aspiration == kCasAspOfSlot[j] ? Look::Plain : Look::Dim);
             mouse(j, from);
         }
         // The chosen aspiration's name and what it gives.
@@ -647,7 +657,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             b.radius = r.h / 2.0f;
             b.layer = 1;
             c.ui.push_back(b);
-            AddLook(images, icons, SpriteRef::Of(k == 4 ? kSprCasTick : kSprCasCross), 0, 2, {r.x + 18, r.y + (r.h - 48) / 2, 48, 48}, light, Look::Plain, it.enabled ? 0 : 0x80000000);
+            AddLook(images, icons, SpriteRef::Of(k == 4 ? kSprCasTick : kSprCasCross), 0, kTierS, {r.x + 18, r.y + (r.h - 48) / 2, 48, 48}, light, Look::Plain, it.enabled ? 0 : 0x80000000);
             PanelText(c, {r.x + 76, r.y, r.w - 92, r.h}, it.word, 32, 22, Align::Left, Weight::ExtraBold, it.enabled ? 0 : kDim);
             mouse(k, {(k == 4 ? kCasTickX : kCasCrossX) - 16, kCasAnswerY - 16, 32, 32});
         }
@@ -668,7 +678,9 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         if (!v.back.empty()) right = HintChip(c, right, Button::B, MenuWords(rom, kStrCasNo));
         if (MenuFocusable(v, focus) && !v.items[focus].action.empty())
         {
-            const FittedText w = FitLine(v.items[focus].word, kPmHintSize, 18, std::max(0, right - kCasHints.x - 60), Weight::ExtraBold);
+            // (an item without a word of its own, a key, a swatch, a cell: Select)
+            const std::string word = v.items[focus].word.empty() ? std::string(OwnWord(&rom, OwnWordId::Select)) : v.items[focus].word;
+            const FittedText w = FitLine(word, kPmHintSize, 18, std::max(0, right - kCasHints.x - 60), Weight::ExtraBold);
             HintChip(c, right, Button::A, w.text);
         }
     }

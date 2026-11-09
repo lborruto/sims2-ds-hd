@@ -108,6 +108,19 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   Right "Change" on a volume and "Other target" on Interact, A "Continue" in a conversation.
 - The phone's highlighted row has the same focus ring as every other menu; the world's prompt,
   Relationships' labels and Interact's neighbouring names are easier to read.
+- The shops, the hotel, the front end, Create-a-Sim and the stat panel draw the game's small
+  pictures at one of two sizes, the same for every item of a kind: a shop's items no longer mix
+  big and small ones, and they stay crisp at any window size.
+- The stat panel's pages sit on white paper, as the game drew its pictures for, in dark ink; its
+  tabs name the pages and its X sits beside the title.
+- One look for every list's arrows (the shop, Build Rooms, the music panel): round buttons with a
+  drawn arrow. DS Wireless's icon is drawn sharp, and the shop's greyed words are readable.
+- Every button hint says what it does: the D-pad's (Choose, Scroll, Pages, Adjust), Create-a-Sim's
+  (Turn, Select) and the concept art's (View).
+- The front end's Settings name their four pages in the tab bar, as the stat panel does; the concept
+  art's cells show the art without the DS's frame; DS Wireless is greyed the way the shop greys.
+- The minigames' numbers and button bar sit on dark wells and are never smaller than 18 points:
+  the cards' line, MooGoo's players and the long German words fit without shrinking further.
 - The vacuum on a controller: A takes a find for you. The hand goes to the find in the green ring
   (the one nearest the hand; the right stick moves the hand), presses where no dust lies over it,
   carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is

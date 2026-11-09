@@ -85,6 +85,10 @@ struct UiItem
     float radius = 0, border = 0;
     bool raised = true;
     bool plain = false;  // just the rounded box in `fill`: no outline, band, bevel or shadow (a meter's fill)
+    // Panel: a sign the kit draws in its middle, in `colour` (Sign::None: none): a scroll arrow's
+    // triangle (Up, Down, Left, Right), the wireless sign (a dot and two arcs). ScrollArrowItem.
+    enum class Sign : u8 { None, Up, Down, Left, Right, Wireless };
+    Sign sign = Sign::None;
 
     // Text (and a chip's label): UTF-8, size in canvas pixels per em, wrapped to to.w when
     // `wrap`, aligned in `to`; a shadow one canvas pixel down and right, softened when scaled.
@@ -157,6 +161,10 @@ FocusRingItems FocusRing(Rect r, float radius, u32 behind = kFillRow);
 // WCAG's contrast ratio between two colours (alpha ignored): 1 to 21.
 float Contrast(u32 a, u32 b);
 UiItem WellItem(Rect to, const Theme& t = GameTheme());           // a darker inset box inside a panel
+// The kit's scroll arrow (every list's, one look): a round button in `to` (kFillRow, the frame's
+// band), its triangle pointing `dir` in white; off (the list cannot go that way): sunk, the
+// triangle faint.
+UiItem ScrollArrowItem(Rect to, UiItem::Sign dir, bool on);
 UiItem TextItem(Rect to, const std::string& utf8, float size, Align align = Align::Left, Weight w = Weight::Bold);
 // A chip at (x, y) with its label, printed as the current ChipLook says; its rectangle is the
 // chip and the label together.

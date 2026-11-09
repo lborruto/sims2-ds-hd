@@ -114,11 +114,7 @@ std::string MenuTitle(const RomData& rom, int tab, const std::string& name)
 FittedText FitLine(const std::string& text, float size, float minSize, int width, Weight w)
 {
     minSize = std::max(minSize, kMinText); // (never below the smallest text: ui::kMinText)
-    return FitLineAny(text, std::max(size, minSize), minSize, width, w);
-}
-
-FittedText FitLineAny(const std::string& text, float size, float minSize, int width, Weight w)
-{
+    size = std::max(size, minSize);
     FittedText f {text, size, true};
     for (float s = size; s >= minSize - 1e-3f; s -= 1)
         if (TextWidth(text, s, w) <= width) { f.size = s; return f; }
@@ -422,12 +418,7 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
 
 void PanelText(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour, int layer)
 {
-    PanelTextAny(c, r, s, std::max(size, kMinText), std::max(minSize, kMinText), a, w, colour, layer);
-}
-
-void PanelTextAny(Composition& c, Rect r, const std::string& s, float size, float minSize, ui::Align a, ui::Weight w, u32 colour, int layer)
-{
-    const FittedText f = FitLineAny(s, size, minSize, r.w, w);
+    const FittedText f = FitLine(s, size, minSize, r.w, w);
     ui::UiItem t = ui::TextItem(r, f.text, f.size, a, w);
     t.wrap = false;
     t.middle = true;
@@ -446,11 +437,6 @@ void Measurer::Note(int id, bool shrunk, bool fits, int lines) const
 void Measurer::Line(int id, const std::string& text, float size, float minSize, int width, ui::Weight w) const
 {
     const FittedText f = FitLine(text, size, minSize, width, w);
-    Note(id, f.size < size, f.fits);
-}
-void Measurer::LineAny(int id, const std::string& text, float size, float minSize, int width, ui::Weight w) const
-{
-    const FittedText f = FitLineAny(text, size, minSize, width, w);
     Note(id, f.size < size, f.fits);
 }
 void Measurer::Block(int id, const std::string& text, float size, float minSize, Rect box) const

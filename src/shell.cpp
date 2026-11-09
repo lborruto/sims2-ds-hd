@@ -815,7 +815,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             const W aw = k == LaunchItem::Continue ? W::LaunchContinue : k == LaunchItem::Language ? W::ShellChange
                        : k == LaunchItem::Quit ? W::ShellQuit : k == LaunchItem::Choose ? W::ShellOpen : W::LaunchStart;
             right = Hint(it, right, hy, ui::Button::A, Wd(lang, aw));
-            Hint(it, right, hy, ui::Button::DPadV, "");
+            Hint(it, right, hy, ui::Button::DPadV, Wd(lang, W::HintChoose));
         }
     }
     else

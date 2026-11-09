@@ -5,6 +5,8 @@
 
 #include "console.h"
 #include "port/front.h"
+#include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -16,7 +18,8 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kTabPlateFill = 0xFF9AA2E3; // (behind the game's tab pictures; the rows: ui::kFillRow, kFillFocus)
+constexpr u32 kTabPlateFill = 0xFF9AA2E3, kTabInk = 0xFF2E3063; // (the page's tab: its plate, its name in ink, 5:1; the rows: ui::kFillRow, kFillFocus)
+constexpr float kSeTabSize = 22, kSeTabMin = 18;
 constexpr u32 kTrackFill = 0xFF51518A, kTrackOn = 0xFFB2B2E3, kNotch = 0xFF383869;
 constexpr u32 kCurrent = 0xFF6BD36B;   // the game's green for its current slot's number
 constexpr u32 kLabel = 0xFFD6DAF6;
@@ -27,6 +30,25 @@ bool FrontScreenState(ScreenState s) { return s.screen == Screen::FrontEnd || s.
 
 int TabTapY(int i) { return kSeTabY0 + i * kSeTabDy; }
 Rect CellFrom(int i) { return {kSeCellX0 + (i & 3) * kSeCellDx, kSeCellY0 + (i >> 2) * kSeCellDy, kSeCellW, kSeCellH}; }
+// A tab's name in `box`, two lines at most: the largest size from `size` down to `minSize` at which
+// no word is wider than the box (a word is never broken) and the lines fit.
+FittedBlock TabName(const std::string& name, float size, float minSize, Rect box)
+{
+    for (float s = size; s > minSize; s -= 1)
+    {
+        bool words = true;
+        size_t a = 0;
+        while (words && a <= name.size())
+        {
+            const size_t b = std::min(name.find(' ', a), name.size());
+            words = TextWidth(name.substr(a, b - a), s, Weight::ExtraBold) <= box.w;
+            a = b + 1;
+        }
+        if (words)
+            if (const FittedBlock f = FitBlock(name, s, s, box); f.fits) return f;
+    }
+    return FitBlock(name, minSize, minSize, box);
+}
 int SliderY(int page) { return page == 0 ? kSeMusicY : kSeSfxY; }
 int HdKnobX(int volume) { return kSeHdTrackX + kSeHdTrackW * std::clamp(volume, 0, 4096) / 4096; }
 int Percent(int volume) { return std::clamp((volume * 100 + 2048) / 4096, 0, 100); }
@@ -214,16 +236,16 @@ void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState
     bar.radius = 16;
     c.ui.push_back(bar);
     {
-        const Rect lb = ChipRect(0, 0, Button::LB, "", 24);
-        c.ui.push_back(ChipItem(kSeTabsX - 10 - lb.w, kSeTabBar.y + (kSeTabBar.h - lb.h) / 2, Button::LB, "", 24));
-        c.ui.push_back(ChipItem(kSeTabsX + kSeTabs * kSeTabCell + 10, kSeTabBar.y + (kSeTabBar.h - lb.h) / 2, Button::RB, "", 24));
+        const Rect lb = ChipRect(0, 0, Button::LB, "", 24), rb = ChipRect(0, 0, Button::RB, "", 24);
+        c.ui.push_back(ChipItem(kSeTabsX - 4 - lb.w, kSeTabBar.y + (kSeTabBar.h - lb.h) / 2, Button::LB, "", 24));
+        c.ui.push_back(ChipItem(kSeTabsX + 2 * kSeTabW + 4, kSeTabBar.y + (kSeTabBar.h - rb.h) / 2, Button::RB, "", 24));
     }
 
-    // Layer 1: the title, the page's plate, the page's name, the page, the hints.
+    // Layer 1: the title, the page's plate, the pages' names, the page, the hints.
     PanelText(c, {kSeTitle.x + 20, kSeTitle.y, kSeTitle.w - 40, kSeTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Centre, Weight::ExtraBold);
     {
         const Rect cell = SettingsTabRect(st.page);
-        UiItem plate = PanelItem({cell.x + 1, cell.y, cell.w - 2, cell.h});
+        UiItem plate = PanelItem(cell);
         plate.fill = kTabPlateFill;
         plate.borderArgb = th.fill;
         plate.border = 3;
@@ -231,18 +253,28 @@ void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState
         plate.layer = 1;
         c.ui.push_back(plate);
     }
-    PanelText(c, kSeLabel, MenuWords(rom, kStrSePage0 + st.page), 30, 20, Align::Centre, Weight::ExtraBold, kLabel);
+    // (one size for every tab: the largest at which each name holds, words whole)
+    float tabSize = kSeTabSize;
+    for (int q = 0; q < kSeTabs; q++)
+    {
+        const Rect r = SettingsTabRect(q);
+        tabSize = std::min(tabSize, TabName(MenuWords(rom, kStrSePage0 + q), kSeTabSize, kSeTabMin, {r.x + 4, r.y + 2, r.w - 8, r.h - 4}).size);
+    }
+    for (int i = 0; i < kSeTabs; i++)
+    {
+        // The pages by their names (the game's tab pictures are crops of its screen, framed): the
+        // page's own in ink on its plate.
+        const Rect r = SettingsTabRect(i), in {r.x + 4, r.y + 2, r.w - 8, r.h - 4};
+        const FittedBlock f = TabName(MenuWords(rom, kStrSePage0 + i), tabSize, tabSize, in);
+        UiItem t = TextItem(in, f.text, f.size, Align::Centre, Weight::ExtraBold);
+        t.middle = true;
+        if (i == st.page) { t.colour = kTabInk; t.shadowArgb = 0; }
+        t.layer = 1;
+        c.ui.push_back(t);
+        AddMousePiece(c, {kSeTabX - 12, TabTapY(i) - 12, 24, 24}, r);
+    }
 
     std::vector<UiItem> images;
-    // The game's own tabs, live (its selected one on its green plate).
-    for (int i = 0; i < kSeTabs && bottom; i++)
-    {
-        const Rect cell = SettingsTabRect(i);
-        const int w = kSeTabFrom.w * 2 - 4, h = kSeTabFrom.h * 2 - 4; // (2x less a pixel a side: the cell's rim stays)
-        images.push_back(ImageItem({cell.x + (cell.w - w) / 2, cell.y + (cell.h - h) / 2, w, h}, bottom, SW, SH,
-                                   {kSeTabFrom.x + 1, kSeTabFrom.y + i * kSeTabDy + 1, kSeTabFrom.w - 2, kSeTabFrom.h - 2}));
-        AddMousePiece(c, {kSeTabX - 12, TabTapY(i) - 12, 24, 24}, cell);
-    }
 
     if (st.page <= 1 && !v.items.empty())
     {
@@ -259,13 +291,6 @@ void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState
         pct.middle = true;
         pct.layer = 1;
         c.ui.push_back(pct);
-        if (focused)
-        {   // The D-pad's chip: Left / Right move the knob.
-            const Rect dp = ChipRect(0, 0, Button::DPadH, "", 26);
-            UiItem chip = ChipItem(w.x + 28, w.y + 18 + (64 - dp.h) / 2, Button::DPadH, "", 26);
-            chip.layer = 1;
-            c.ui.push_back(chip);
-        }
         const int ty = w.y + 124;
         UiItem track = PanelItem({kSeHdTrackX - 6, ty - 7, kSeHdTrackW + 12, 14});
         track.plain = true;
@@ -310,8 +335,12 @@ void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState
             cell.radius = 12;
             cell.layer = 1;
             c.ui.push_back(cell);
-            const Rect f = CellFrom(i);
-            if (bottom) images.push_back(ImageItem({r.x + (r.w - 2 * f.w) / 2, r.y + (r.h - 2 * f.h) / 2, 2 * f.w, 2 * f.h}, bottom, SW, SH, f));
+            // An unlocked picture: the game's button less its frame (a bevel 4 DS pixels wide), 2x (a
+            // whole factor); a locked one: the game's lock from the ROM at tier S (its button's
+            // fill and frame left out).
+            const Rect f = CellFrom(i), art {f.x + kSeCellInset, f.y + kSeCellInset, f.w - 2 * kSeCellInset, f.h - 2 * kSeCellInset};
+            if (st.conceptKnown && !(st.conceptBits & (1u << i))) AddTiered(images, icons, SpriteRef::Of(kSprLock), 0, kTierS, r);
+            else if (bottom) images.push_back(ImageItem({r.x + (r.w - 2 * art.w) / 2, r.y + (r.h - 2 * art.h) / 2, 2 * art.w, 2 * art.h}, bottom, SW, SH, art));
             AddMousePiece(c, f, r);
         }
     }
@@ -343,13 +372,15 @@ void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState
         }
     }
 
-    // The hints: A (an unlocked picture), B "Close" (the title).
+    // The hints: A (an unlocked picture: View), B "Close" (the title); a volume's D-pad (Left /
+    // Right move the knob: Adjust).
     int right = kSeHints.x + kSeHints.w - 8;
     SeHint(c, right, Button::B, MenuWords(rom, kStrClose));
-    if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) SeHint(c, right, Button::A, "");
+    if (st.page <= 1 && focus == 0 && !v.items.empty()) SeHint(c, right, Button::DPadH, OwnWord(&rom, OwnWordId::HintAdjust));
+    if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) SeHint(c, right, Button::A, OwnWord(&rom, OwnWordId::HintView));
     for (UiItem& im : images) c.ui.push_back(im);
     // The game's X (B), the mouse onto its own.
-    AddSpriteIcon(c, icons, kSprX, 0, 2, kSeX);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprX), 0, kTierS, kSeX);
     AddMousePiece(c, {kSeCloseX - 14, kSeCloseY - 14, 28, 28}, kSeX);
     SortUi(c.ui, first);
 }
@@ -487,7 +518,7 @@ void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& ga
     // The game's X (B, while no popup is up), the mouse onto its own.
     if (!popup)
     {
-        AddSpriteIcon(c, icons, kSprX, 0, 2, kLdX);
+        AddTiered(c.ui, icons, SpriteRef::Of(kSprX), 0, kTierS, kLdX);
         AddMousePiece(c, {kLdCloseX - 14, kLdCloseY - 14, 28, 28}, kLdX);
     }
     SortUi(c.ui, first);
@@ -497,7 +528,20 @@ void MeasureFrontMenus(const RomData& rom, BlockMeasure& m)
 {
     const Measurer tally {m};
     tally.Line(kStrSeTitle, MenuWords(rom, kStrSeTitle), kPmTitleSize, kPmTextMin, kSeTitle.w - 40);
-    for (int p = 0; p < kSeTabs; p++) tally.Line(kStrSePage0 + p, MenuWords(rom, kStrSePage0 + p), 30, 20, kSeLabel.w);
+    for (int p = 0; p < kSeTabs; p++)
+    {
+        // The tab's name on two lines at most, no word broken (each word alone on a line fits).
+        const Rect r = SettingsTabRect(p);
+        const std::string name = MenuWords(rom, kStrSePage0 + p);
+        tally.Block(kStrSePage0 + p, name, kSeTabSize, kSeTabMin, {0, 0, r.w - 8, r.h - 4});
+        size_t a = 0;
+        while (a <= name.size())
+        {
+            const size_t b = std::min(name.find(' ', a), name.size());
+            tally.Line(kStrSePage0 + p, name.substr(a, b - a), kSeTabMin, kSeTabMin, r.w - 8);
+            a = b + 1;
+        }
+    }
     for (int l = 1; l <= kCreditsLines; l++)
     {
         u32 colour = 0;
