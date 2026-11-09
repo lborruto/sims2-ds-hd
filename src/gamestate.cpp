@@ -1808,6 +1808,7 @@ CasState ReadCas(const Reader& m, u32 S)
                 if (k >= (u32)kCasSprites) continue;
                 c.spriteCount = (int)k + 1;
                 CasSprite& s = c.sprites[k];
+                s.read = true;
                 s.shown = flags & 1;
                 u32 fr, t, a, b, p;
                 if (m.R8(sp + f.sprFrame, fr) && fr < 64) s.frame = (int)fr;

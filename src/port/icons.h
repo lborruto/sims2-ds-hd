@@ -23,6 +23,10 @@ struct SpriteRef
     bool operator<(const SpriteRef& o) const { return std::tie(tiles, desc, pal) < std::tie(o.tiles, o.desc, o.pal); }
 };
 
+// A sprite's frame in a look of its own (IconCache::Look): as it is, mirrored, grey (the colour
+// taken out, lifted), dimmed (two fifths of its light).
+enum class SpriteLook { Plain, Flip, Grey, Dim };
+
 // The largest w or h IconCache::Scaled makes (a bad size is refused, not allocated).
 constexpr int kMaxScaled = 4096;
 
@@ -47,6 +51,11 @@ public:
     // size `to` has): Pixel (ui::SmoothPictures false) that copy itself, as always; Smooth the
     // frame as it is, so the kit enlarges it with the pixel-art scaler at the window's own size.
     ui::UiItem Image(SpriteRef s, int frame, const SpriteFrame& scaled, Rect to);
+    // Frame `frame` of s `scale` times its size (nearest: every pixel a block; 1-8) in `look`, its
+    // colour times light / 255 (a fade: 0-255, the alpha kept); null when it does not read. The
+    // copies at full light are kept for the cache's life, the others only for the light last asked
+    // (a fade asks a new one every frame).
+    const SpriteFrame* Look(SpriteRef s, int frame, SpriteLook look, int scale, int light = 255);
 
     const RomData* Rom() const { return rom; }
 
@@ -54,5 +63,8 @@ private:
     const RomData* rom;
     std::map<std::tuple<SpriteRef, int>, SpriteFrame> frames;            // w == 0: does not read
     std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> scaled;  // (sprite, frame, w, h)
+    std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> looks;   // (sprite, frame, look, scale) at full light
+    std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> faded;   // the same at fadedLight
+    int fadedLight = -1;
 };
 }

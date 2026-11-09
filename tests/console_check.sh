@@ -503,7 +503,8 @@ def front_cas(page, focus, raw_top=True):
     elif page == 0:
         if green(750, 188, 84, 84) < 150: errors.append(f"no green ♀ ({green(750, 188, 84, 84)})")
         if green(844, 188, 84, 84) > 10: errors.append(f"♂ not grey ({green(844, 188, 84, 84)})")
-        fw = fh = 0
+        # (and a live crop, gated on the page being drawn: the first skin figure 2x)
+        fx, fy, fw, fh, s, ox, oy = 134, 4, 21, 42, 2, 963, 188
     elif page == 3:
         fx, fy, fw, fh, s, ox, oy = 188, 109, 38, 54, 3, 1084, 387
         near = 1
@@ -2186,7 +2187,7 @@ sys.exit(1 if bad else 0)' "$tmp/cas-gate" "$tmp/cas-gate.log"
 check_pad cas-gate cas_gate
 # The game's pictures fade with Create-a-Sim's veil (src/console.cpp): from s4, the tick
 # (scripts/console/cas-keep.txt) and the game's fade out: once the panel is under a third dark, the
-# chosen aspiration's picture (the ROM's, drawn above every still item) is darker than before too.
+# chosen aspiration's picture (the ROM's, drawn above every still item) as dark as the panel (within 0.1).
 cas_fade_run() {
     cp "$complete_save" "$tmp/cas-fade.sav" || return
     "$bin" "$rom" --headless --frames 136 --state-load "$shots/s4.st" --save "$tmp/cas-fade.sav" --layout console --compose \
@@ -2203,7 +2204,7 @@ mean = lambda im, box: sum(im.crop(box).tobytes()) / (box[2] - box[0]) / (box[3]
 panel, asp = (700, 560, 712, 700), (870, 200, 950, 290)
 p, q = mean(b, panel) / mean(a, panel), mean(b, asp) / mean(a, asp)
 if p > 0.75: print(f"  cas-fade: the panel not dark yet ({p:.2f})"); sys.exit(1)
-if q > (1 + p) / 2: print(f"  cas-fade: the aspiration {q:.2f} of its light, the panel {p:.2f}"); sys.exit(1)' "$tmp/cas-fade"
+if q > p + 0.1: print(f"  cas-fade: the aspiration {q:.2f} of its light, the panel {p:.2f}"); sys.exit(1)' "$tmp/cas-fade"
 }
 check_pad cas-fade cas_fade
 # The world's camera on the right stick (navigator.h, WorldKeys; from s7, the phone closed): held

@@ -47,6 +47,43 @@ const SpriteFrame* IconCache::Scaled(SpriteRef s, int frame, int w, int h)
     return it->second.w > 0 ? &it->second : nullptr;
 }
 
+const SpriteFrame* IconCache::Look(SpriteRef s, int frame, SpriteLook look, int scale, int light)
+{
+    if (scale < 1 || scale > 8 || light < 0 || light > 255) return nullptr;
+    if (look == SpriteLook::Plain && light == 255) return scale == 1 ? Frame(s, frame) : Scaled(s, frame, scale);
+    if (light != 255 && light != fadedLight) { faded.clear(); fadedLight = light; }
+    auto& cache = light == 255 ? looks : faded;
+    const auto key = std::make_tuple(s, frame, (int)look, scale);
+    auto it = cache.find(key);
+    if (it == cache.end())
+    {
+        SpriteFrame out;
+        if (const SpriteFrame* f = Frame(s, frame))
+        {
+            out.w = f->w * scale;
+            out.h = f->h * scale;
+            out.argb.resize((size_t)out.w * out.h);
+            for (int y = 0; y < out.h; y++)
+                for (int x = 0; x < out.w; x++)
+                {
+                    const int sx = look == SpriteLook::Flip ? f->w - 1 - x / scale : x / scale;
+                    const u32 c = f->argb[(size_t)(y / scale) * f->w + sx];
+                    u32 r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF;
+                    if (look == SpriteLook::Grey)
+                    {
+                        const u32 l = (r * 77 + g * 150 + b * 29) >> 8;
+                        r = g = b = 0x40 + l * 3 / 4;   // (lifted: a grey button, not a black one)
+                    }
+                    else if (look == SpriteLook::Dim) { r = r * 2 / 5; g = g * 2 / 5; b = b * 2 / 5; }
+                    r = r * (u32)light / 255; g = g * (u32)light / 255; b = b * (u32)light / 255;
+                    out.argb[(size_t)y * out.w + x] = (c & 0xFF000000) | r << 16 | g << 8 | b;
+                }
+        }
+        it = cache.emplace(key, std::move(out)).first;
+    }
+    return it->second.w > 0 ? &it->second : nullptr;
+}
+
 const SpriteFrame* IconCache::Scaled(SpriteRef s, int frame, int scale)
 {
     const SpriteFrame* f = Frame(s, frame);

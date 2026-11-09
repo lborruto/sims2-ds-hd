@@ -780,6 +780,7 @@ constexpr int kCasName = 7;           // the game's name limit
 // A sprite of a Create-a-Sim page's list (CActorSprite): what the game draws there, from the ROM.
 struct CasSprite
 {
+    bool read = false;                // the list's entry read as a sprite (else nothing below is known)
     bool shown = false;               // +0x4 bit 0
     int frame = 0;                    // +0x1A: the frame shown (a category's, an arrow's: 1 lit)
     int tiles = -1, desc = -1, pal = -1;   // *(+0x20): the resources (pal -1: the game's palette at run time)

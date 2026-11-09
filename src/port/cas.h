@@ -167,8 +167,10 @@ constexpr int kCasTypeWait = 6; // frames after a tap before the next character 
 MenuView CasView(ScreenState s, const GameState* game, const RomData* rom);
 MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);
 // The screen drawn into c (empty: the whole canvas is this screen's), the focus on item `focus`.
+// light (0-255): the game's fade, the ROM's pictures that much darker (the touch screen's own
+// already are; the veil over the still items is the caller's).
 void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons, const u32* bottom,
-              int topW, int topH);
+              int topW, int topH, int light = 255);
 // (A check, --measure-menu) the pages' titles, the aspirations' names and texts, Yes / No, the
 // hints' words and every key's character, in their boxes.
 void MeasureCas(const RomData& rom, BlockMeasure& m);

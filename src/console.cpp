@@ -300,29 +300,18 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             b = ConsoleBranch::CasFade;
             if (brightest < kCasFadeBlack) return c;
             b = ConsoleBranch::Cas;
-            BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH);
-            if (brightest < kCasFadeWhite)
+            // The veil lies over every still item; the pictures lie above it, so the ROM's are drawn
+            // as dark as the veil makes the rest (their colour, never their opacity: nothing under
+            // them shows through); the touch screen's own are already as dark as the game's fade.
+            const int dark = brightest < kCasFadeWhite ? 255 * (kCasFadeWhite - brightest) / kCasFadeWhite : 0;
+            BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH, 255 - dark);
+            if (dark > 0)
             {
                 ui::UiItem veil = ui::PanelItem(kCanvas);
                 veil.plain = true;
                 veil.radius = 0;
-                const u32 dark = (u32)(255 * (kCasFadeWhite - brightest) / kCasFadeWhite);
-                veil.fill = dark << 24;
+                veil.fill = (u32)dark << 24;
                 veil.layer = kCasFadeLayer;
-                // The pictures lie above every still item, the veil too: the ROM's fade with it (their
-                // opacity times the light left; the touch screen's own are already as dark as the game's).
-                std::vector<ui::UiItem> kept;
-                for (ui::UiItem& it : c.ui)
-                {
-                    if (it.kind == ui::UiItem::Image && it.src != bottom)
-                    {
-                        const u32 a = (it.fill ? it.fill >> 24 : 255) * (255 - dark) / 255;
-                        if (a == 0) continue;
-                        it.fill = a << 24;
-                    }
-                    kept.push_back(std::move(it));
-                }
-                c.ui = std::move(kept);
                 c.ui.push_back(veil);
                 SortUi(c.ui);
             }
