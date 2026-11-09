@@ -19,7 +19,7 @@
 #   act-social, act-vacuum, act-cards: the HD minigame frame (src/port/minigame.*): the touch
 #   screen 3x at the left, the world small at the top right, the title plate (none for the social
 #   game), the side panel, the prompt bar's words (cards-ask: B's quit question, A and B alone;
-#   vacuum-clog: the blow's hint lit red; cards-wide, social-wide, vacuum-2x); cards-m1
+#   vacuum-clog: the blow's hint lit red, the ring on the find A takes; cards-wide, social-wide, vacuum-2x); cards-m1
 #   (--no-romdata): milestone 1's hints' box; s2 (the main menu), title, boot: the HD front end (src/port/front.*);
 #   s3-m1 (Create-a-Sim with --no-romdata: no HUD): milestone 1's front end view, the top screen framed at the left at its shape and the touch screen
 #   2.5x framed at the right, the buttons' hint below, never SIDE; s3, s4, cas-hair, cas-face, cas-clothes (and s3 at 2x and
@@ -333,9 +333,11 @@ def expect(what, got, want):
         errors.append(f"{what}: {got} (want {want})")
 
 # Canvas points the pointing minigames' pointer covers (its ring, 15 around its point): not compared.
-SKIP = [(421, 356)] if case.split("-")[0] in ("autopsy", "art", "scratch") or case in ("mixer", "mixer-wide") else []
-# DS rectangles a ring is drawn around (MooGoo's focus: the first monkey, 56,32 24 x 32): not compared.
-SKIP_DS = [(50, 26, 86, 70)] if case.split("-")[0] == "moogoo" else [(0, 68, 31, 110)] if case == "mixer-save" else []
+SKIP = [(421, 356)] if case.split("-")[0] in ("autopsy", "art", "scratch", "vacuum") or case in ("mixer", "mixer-wide") else []
+# DS rectangles a ring is drawn around (MooGoo's focus: the first monkey, 56,32 24 x 32; the vacuum's
+# ring on the find A takes, the gold ring at 130,70 on vacuum-clog's frame 119): not compared.
+SKIP_DS = ([(50, 26, 86, 70)] if case.split("-")[0] == "moogoo" else [(0, 68, 31, 110)] if case == "mixer-save"
+           else [(114, 54, 146, 86)] if case == "vacuum-clog" else [])
 
 def piece(what, fx, fy, fw, fh, tx, ty, scale, step=5):
     """A piece of the bottom screen drawn whole-number times bigger: each DS pixel's block."""
@@ -1234,6 +1236,10 @@ elif case == "social":
 elif case in ("vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",
               "moogoo", "moogoo-2x", "drencher", "crime", "scratch", "mixer", "mixer-save", "trading"):
     activity(176)
+    if case == "vacuum-clog":
+        # The ring on the find A takes (the gold ring, DS 130,70: canvas 36 + 3 x, 68 + 3 y), the game's selection green.
+        if not any(C(x, y) == RING for y in range(68 + 3 * 58, 68 + 3 * 82) for x in range(36 + 3 * 118, 36 + 3 * 142)):
+            errors.append("no ring on the vacuum's find")
 elif case in ("cards", "cards-ask", "cards-m1"):
     # The card game has no HUD: its world whole, no status bar.
     expect("canvas", comp.size, (1280, 720))
@@ -2156,6 +2162,9 @@ pad_mg mg-autopsy-quit G-X-autopsy autopsy-quit 150 &
 pad_mg mg-autopsy-stay G-X-autopsy autopsy-quit-once 200 &
 pad_mg mg-autopsy-payout G-A-payout-base autopsy-wait 120 &
 wait
+pad_mg mg-autopsy-take-organ G-A-autopsy-nopara autopsy-take-organ 1000 &
+pad_mg mg-autopsy-take-parasite G-A-para autopsy-take-parasite 200 &
+wait
 pad_mg mg-detector-dig G-A-md-walk detector-dig 220 &
 pad_mg mg-detector-quit G-X-metal detector-quit 120 &
 pad_mg mg-art-play G-X-artgal art-play 200 &
@@ -2170,6 +2179,19 @@ autopsy_bank() {
         'minigame autopsy .*sub=3 .*dragged=0' 'minigame autopsy .*sub=4 ' 'minigame autopsy .*earnings=84 .*organs=5:'
 }
 check_pad mg-autopsy-bank autopsy_bank
+# A alone takes (activities.h's AutopsyTarget): the hand's freed organ (the pointer from the middle to
+# 77,93, pressed, dragged, carried to the tray and let go there: §84 banked, the slot removed); the
+# tweezers' nearest eating parasite (followed, held, carried to the flask: into it, sub 7).
+autopsy_take_organ() {
+    in_order mg-autopsy-take-organ 'minigame autopsy .*organs=0:[0-9]+:freed' 'minigame autopsy phase=1 .*tool=1 ' 'pointer down at 77,93' \
+        'minigame autopsy .*sub=3 .*dragged=0' 'pointer up at 236,36' 'minigame autopsy .*sub=4 ' 'minigame autopsy .*earnings=84 .*organs=5:'
+}
+check_pad mg-autopsy-take-organ autopsy_take_organ
+autopsy_take_parasite() {
+    in_order mg-autopsy-take-parasite 'minigame autopsy .*tool=2 ' 'pointer down' 'minigame autopsy .*sub=6 .*held=[0-7] ' 'pointer up at 236,156' \
+        'minigame autopsy .*sub=7 '
+}
+check_pad mg-autopsy-take-parasite autopsy_take_parasite
 autopsy_quit() { in_order mg-autopsy-quit 'game Autopsy' 'game Panel/Interact'; }
 check_pad mg-autopsy-quit autopsy_quit
 autopsy_stay() {
@@ -2352,12 +2374,16 @@ then echo "ok   mg-crime-buttons"; else echo "FAIL mg-crime-buttons"; fails=$((f
 # last splash takes Start and A at frames where a 3-frame touch fell between its slow polls.
 pad_t1() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 clock=$5
+    shift 5
     cp "$complete_save" "$tmp/$name.sav" || return
     "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
-        --print-game --print-town --print-minigame --print-front --print-hotel --clock "$clock" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        --print-game --print-town --print-minigame --print-front --print-hotel --clock "$clock" --input "$input" "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
 pad_t1 mg-vacuum-leave act-vacuum vacuum-leave 120 "2026-01-01 14:00" &
+pad_t1 mg-vacuum-pick act-vacuum vacuum-pick 420 "2026-01-01 14:00" --print-vacuum &
+pad_t1 mg-vacuum-none act-vacuum vacuum-none 120 "2026-01-01 14:00" --print-vacuum &
+wait
 pad_t1 mg-art-palette G-X-artgal art-palette 200 "2026-11-05 12:05" &
 pad_t1 mg-drencher-help G-C-wg-pump drencher-help 240 "2026-11-05 12:05" &
 pad_t1 mg-crime-help G-X-crime crime-help 240 "2026-11-05 12:05" &
@@ -2369,6 +2395,21 @@ pad_t1 pad-boot-late-a F-boot-900 boot-late-a 220 "2026-11-05 12:05" &
 wait
 vacuum_leave() { in_order mg-vacuum-leave 'game Vacuum' 'minigame none' 'game Panel/Interact'; }
 check_pad mg-vacuum-leave vacuum_leave
+# The vacuum's A (activities.h): the gold ring (kind 196) held, carried to the funnel, let go there,
+# the keep animation run and the ring gone from the bowl; never a clog.
+vacuum_pick() {
+    in_order mg-vacuum-pick 'vacuum bowl .*:196@' 'pointer down' 'vacuum bowl held=[0-8] .*:196@[0-9-]*,[0-9-]*/[0-9]*H' 'pointer up at 127,150' \
+        'vacuum bowl held=-1 keeping=1' || return 1
+    ! grep -q 'clogged=1' "$tmp/mg-vacuum-pick.log" || { echo "  mg-vacuum-pick: a clog"; return 1; }
+    last_before mg-vacuum-pick 400 'vacuum bowl' | grep -qv ':196@' || { echo "  mg-vacuum-pick: the ring still in the bowl"; return 1; }
+}
+check_pad mg-vacuum-pick vacuum_pick
+# A with no find in the bowl: the stylus stays up (no press, no clog).
+vacuum_none() {
+    in_order mg-vacuum-none 'vacuum bowl held=-1 keeping=0 items=-' || return 1
+    ! grep -q -E 'pointer down|clogged=1' "$tmp/mg-vacuum-none.log" || { echo "  mg-vacuum-none: pressed"; return 1; }
+}
+check_pad mg-vacuum-none vacuum_none
 art_palette() {
     in_order mg-art-palette 'minigame art .*swatch=3 page=0 ' 'minigame art .*page=1 ' 'minigame art .*page=2 ' 'minigame art .*swatch=4 page=2 ' \
         'popup state=2 kind=2 .*done painting'

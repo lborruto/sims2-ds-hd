@@ -191,13 +191,15 @@ have a pointer on the sticks (LT slows it).
 | | Y | A | discard the chosen card |
 | | B | Z | quit (it asks: No first) |
 | Vacuum | left stick (or D-pad) | Arrows | drive |
-| | right stick (or X + D-pad) | S + arrows | move the hand over the bowl |
-| | A (hold) | X (hold) | grab a find and drag it to the box |
+| | right stick | S + arrows (or drag with the mouse) | move the hand over the bowl (a green ring shows the find nearest it) |
+| | A | X | take the ringed find to the funnel at the bowl's bottom (kept; dust left alone) |
 | | Y | A | blow: clears a clogged filter |
 | | B | Z | put the vacuum away |
 | Alien Autopsy, painting | either stick (LT: slow), D-pad | Arrows | move the pointer (the D-pad a pixel at a time, faster held) |
 | | A (hold) | X (hold) | the stylus down: cut, lift an organ, pick a parasite, paint |
 | Alien Autopsy | X / Y / RB | S / A / W | laser / hand / tweezers |
+| | A (the hand, an organ cut free) | X | take the freed organ to the tray by itself |
+| | A (the tweezers) | X | take the nearest parasite (an eating one first) to the flask by itself |
 | | LB | Q | carry the organ to the tray (the parasite to the flask) |
 | | B twice | Z twice | quit (the game pays nothing then) |
 | Metal Detector | left stick or D-pad | Arrows | walk |

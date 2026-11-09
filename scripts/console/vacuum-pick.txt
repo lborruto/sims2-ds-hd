@@ -1,0 +1,7 @@
+# From act-vacuum (the vacuum just switched on in the lobby), CONSOLE: the hero drives over the
+# lobby's rug (left, then up) until a find swirls in the bowl (the gold ring, about frame 244),
+# then A: the find nearest the hand taken (the stylus pressed where no dust lies over it), carried
+# to the funnel and let go once its keep animation is idle: kept, no clog.
+10 60 pad left
+70 200 pad up
+300 2 pad a

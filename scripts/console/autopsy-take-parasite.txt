@@ -1,0 +1,4 @@
+# From G-A-para (CONSOLE, eight parasites, one eating): RB takes the tweezers and A alone takes the
+# nearest eating parasite (the pointer goes to it, presses, follows it, and carries it to the flask).
+10 2 pad rb
+40 2 pad a

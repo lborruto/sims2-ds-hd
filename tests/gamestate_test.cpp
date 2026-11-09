@@ -1319,6 +1319,48 @@ static void cards_and_vacuum()
     CHECK(v.minigame.vacuum.clogged && MinigameLine(v) == "vacuum clogged=1 earnings=120");
     { Ram q = r; q.W8(kS + 0x158, 2); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
     { Ram q = r; q.W32(kMg + 0x7C, (u32)-5); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
+    // The bowl: nine slots of 0x1C at S+0x28 (+0 the sprite, its x / y 20.12 at +0x50 / +0x54; +0x14 the scale; +0x18 active,
+    // +0x19 held, +0x1A the kind), S+0x26 the slot held (0xA none), S+0x162 / S+0x170 the keep animation.
+    {
+        Ram q = r;
+        q.W16(kS + 0x26, 0xA);
+        auto item = [&](int i, u32 sprite, float x, float y, float scale, u32 type, bool held) {
+            const u32 e = kS + 0x28 + 0x1C * (u32)i;
+            q.W32(e, sprite); q.W32(e + 0x14, (u32)(int)(scale * 4096)); q.W8(e + 0x18, 1); q.W8(e + 0x19, held); q.W16(e + 0x1A, type);
+            q.W32(sprite + 0x50, (u32)(int)(x * 4096)); q.W32(sprite + 0x54, (u32)(int)(y * 4096));
+        };
+        item(1, kS + 0x400, 120.5f, 80, 0.5f, 0x186, false);
+        item(4, kS + 0x480, -10, 150, 0.75f, 0x196, false);
+        GameState w = ReadGameState(q.View());
+        const VacuumState& b = w.minigame.vacuum;
+        CHECK(b.valid && b.bowl && b.heldSlot == -1 && !b.keeping && b.items.size() == 2);
+        CHECK(b.items[0].slot == 1 && b.items[0].x == 120.5f && b.items[0].y == 80 && b.items[0].half == 10 && b.items[0].Dust() && !b.items[0].held);
+        CHECK(b.items[1].slot == 4 && b.items[1].x == -10 && b.items[1].half == 15 && !b.items[1].Dust());
+        CHECK(VacuumBowlLine(w) == "bowl held=-1 keeping=0 items=1:186@120,80/10,4:196@-10,150/15");
+        CHECK(MinigameLine(w) == "vacuum clogged=1 earnings=120");   // (the bowl its own line: --print-vacuum)
+        // Held, the keep animation running.
+        q.W16(kS + 0x26, 4); q.W8(kS + 0x28 + 0x1C * 4 + 0x19, 1); q.W8(kS + 0x170, 3);
+        w = ReadGameState(q.View());
+        CHECK(w.minigame.vacuum.bowl && w.minigame.vacuum.heldSlot == 4 && w.minigame.vacuum.items[1].held && w.minigame.vacuum.keeping);
+        q.W8(kS + 0x170, 0); q.W8(kS + 0x162, 1);
+        CHECK(ReadGameState(q.View()).minigame.vacuum.keeping);
+        // Garbage makes the bowl unread, never the clog and the earnings: a held slot past 8, a held flag past 1, a kind
+        // out of range, a sprite outside RAM, a place far off the screen, a scale past 4.
+        for (auto [off, val, w2] : {std::tuple<u32, u32, int>{0x26, 9, 2}, {0x26, 0xB, 2}, {0x28 + 0x1C + 0x19, 2, 1}, {0x28 + 0x1C + 0x1A, 0x50, 2},
+                                    {0x28 + 0x1C + 0x1A, 0x400, 2}, {0x28 + 0x1C, 0x01000000, 4}, {0x28 + 0x1C + 0x14, 5 * 4096, 4},
+                                    {0x400 + 0x50, (u32)(400 * 4096), 4}, {0x480 + 0x54, (u32)(-100 * 4096), 4}})
+        {
+            Ram g2 = q;
+            if (w2 == 1) g2.W8(kS + off, val); else if (w2 == 2) g2.W16(kS + off, val); else g2.W32(kS + off, val);
+            const VacuumState bad = ReadGameState(g2.View()).minigame.vacuum;
+            CHECK(!bad.bowl && bad.items.empty() && bad.valid && bad.clogged);
+        }
+        // An inactive slot is skipped whatever it holds.
+        { Ram g2 = q; g2.W8(kS + 0x28 + 0x1C + 0x18, 0); g2.W32(kS + 0x28 + 0x1C, 0x01000000); g2.W8(kS + 0x28 + 0x1C + 0x19, 7); CHECK(ReadGameState(g2.View()).minigame.vacuum.items.size() == 1); }
+        // The bowl reads without the clog's part (and the other way round).
+        { Ram g2 = q; g2.W8(kS + 0x158, 2); const VacuumState v2 = ReadGameState(g2.View()).minigame.vacuum; CHECK(!v2.valid && v2.bowl); }
+        CHECK(VacuumBowlLine(ReadGameState(mg_ram(0x0212F98C, -1).View())).empty());
+    }
     // Each part only on its own screen.
     CHECK(!ReadGameState(mg_ram(0x0214C658, 17).View()).minigame.cards.valid && !ReadGameState(mg_ram(0x0212F98C, -1).View()).minigame.vacuum.valid);
 }

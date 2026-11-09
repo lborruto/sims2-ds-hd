@@ -135,29 +135,63 @@ void Cards(const PadState& pad, TouchScript& touch, ActivityState& st, bool canT
     else if (pressed(&PadState::b)) quit();
 }
 
+bool Pressed(const PadState& pad, const ActivityState& st, bool PadState::*b);
+
 void Vacuum(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st, bool canTap)
 {
+    st.pointer = true;
     // B: the bowl's X, the game's only way out (its own B does nothing here).
     if (pad.b && !st.prev.b && canTap) touch.Tap(kVacuumX.x, kVacuumX.y);
     // A tap on Y is 4-6 frames and the game wants 7: a press holds the blow for 8.
     if (pad.y && !st.prev.y) st.blowFrames = 8;
     st.blow = pad.y || st.blowFrames > 0;
     if (st.blowFrames > 0) st.blowFrames--;
-    st.grab = pad.a;
-    // The D-pad moves the hand while X or A is held, and drives otherwise; the stick always drives.
-    const bool hand = pad.x || pad.a;
-    if (hand)
-    {
-        st.handDx = kHandStep * ((pad.right ? 1 : 0) - (pad.left ? 1 : 0));
-        st.handDy = kHandStep * ((pad.down ? 1 : 0) - (pad.up ? 1 : 0));
-    }
+    // The D-pad and the left stick drive (the game's own D-pad); L / R its own camera. The keyboard's
+    // X action held: its arrows move the hand instead.
+    const bool keyHand = pad.keyX;
     auto set = [&](bool on, int key) { if (on) dsKeys |= 1u << key; };
-    set((pad.up && !hand) || pad.ly < -kStick, kUp);
-    set((pad.down && !hand) || pad.ly > kStick, kDown);
-    set((pad.left && !hand) || pad.lx < -kStick, kLeft);
-    set((pad.right && !hand) || pad.lx > kStick, kRight);
+    set((pad.up && !keyHand) || pad.ly < -kStick, kUp);
+    set((pad.down && !keyHand) || pad.ly > kStick, kDown);
+    set((pad.left && !keyHand) || pad.lx < -kStick, kLeft);
+    set((pad.right && !keyHand) || pad.lx > kStick, kRight);
+    auto keyMove = [&] {
+        if (!keyHand) return;
+        st.px = std::clamp(st.px + kHandStep * pad.keyDx, 0.0f, (float)(SW - 1));
+        st.py = std::clamp(st.py + kHandStep * pad.keyDy, 0.0f, (float)(SH - 1));
+    };
     set(pad.lb, kL);
     set(pad.rb, kR);
+    // The hand: the right stick alone (the left one drives).
+    PadState aim = pad;
+    aim.lx = aim.ly = 0;
+    if (!st.ram.vacuumBowl && st.take.phase == 0)
+    {
+        // The bowl unread: A held is the stylus down at the hand (grab, drag to the funnel by hand).
+        MovePointer(aim, st, pad.a ? kPtrDrag : kPtrMax, false);
+        keyMove();
+        st.down = pad.a && canTap;
+        return;
+    }
+    if (st.take.phase == 0) { MovePointer(aim, st, kPtrMax, false); keyMove(); }
+    const VacuumStylus v = VacuumTake(st.ram, st.px, st.py, Pressed(pad, st, &PadState::a) && canTap, st.take);
+    st.px = std::clamp(v.x, 0.0f, (float)(SW - 1));
+    st.py = std::clamp(v.y, 0.0f, (float)(SH - 1));
+    st.down = v.down;
+    // The ring: on the find taken, else on the one A would take.
+    const std::vector<VacuumThing>& th = st.ram.vacuumThings;
+    int i = -1;
+    if (st.take.phase != 0)
+    {
+        for (int j = 0; j < (int)th.size(); j++)
+            if (th[j].slot == st.take.slot) i = j;
+    }
+    else i = VacuumTarget(th, st.px, st.py);
+    if (i >= 0)
+    {
+        const int h = std::max(8, (int)std::lround(th[i].half));
+        const int cx = (int)std::lround(th[i].x), cy = (int)std::lround(th[i].y);
+        st.mark = {cx - h, cy - h, 2 * h, 2 * h};
+    }
 }
 
 bool Pressed(const PadState& pad, const ActivityState& st, bool PadState::*b) { return pad.*b && !(st.prev.*b); }
@@ -221,6 +255,59 @@ void Autopsy(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState
         if (!st.down) { st.gliding = false; st.latch = true; }
         return;
     }
+    // A's take (the hand's freed organ, the tweezers' parasite): to it, pressed, followed until held.
+    if (st.seek)
+    {
+        if (st.ram.autopsy && ((st.seek == 1 && st.ram.autopsySub == 3) || (st.seek == 2 && st.ram.autopsySub == 6)))
+        {
+            // Held: carried to the tray / the flask as LB does.
+            st.gliding = true;
+            st.glideRest = 0;
+            st.glideTo = st.seek == 1 ? kAutopsyTray : kAutopsyFlask;
+            st.glideByA = true;
+            st.seek = 0;
+            st.down = true;
+            return;
+        }
+        float tx = 0, ty = 0;
+        bool there = st.ram.autopsy && st.ram.autopsyTool == st.seek && st.ram.autopsySub == 0;
+        if (there && st.seek == 1 && st.seekWhich >= 0 && st.seekWhich < 3 && st.ram.autopsyFreed[st.seekWhich])
+        { tx = (float)kAutopsyOrgan[st.seekWhich].x; ty = (float)kAutopsyOrgan[st.seekWhich].y; }
+        else if (there && st.seek == 2)
+        {
+            there = false;
+            for (const ActivityRam::Parasite& p : st.ram.autopsyParasites)
+                if (p.slot == st.seekWhich) { tx = p.x; ty = p.y; there = true; }
+        }
+        else there = false;
+        // Gone (eaten up, flicked off, the tool changed), or not held in time: given up, the stylus up.
+        if (!there || ++st.seekFrames > 4 * kSeekMax || st.seekPressed > kSeekMax)
+        {
+            st.seek = 0;
+            st.latch = pad.a;   // (A still held: not a press at the pointer until let go)
+            st.down = false;
+            return;
+        }
+        const float dx = tx - st.px, dy = ty - st.py, d = std::sqrt(dx * dx + dy * dy);
+        const float cap = st.seekPressed > kSeekSettle ? kPtrDrag : kPtrMax;
+        if (d > cap) { st.px += dx * cap / d; st.py += dy * cap / d; }
+        else { st.px = tx; st.py = ty; }
+        if (st.seekPressed > 0 || d <= cap) st.seekPressed++;   // (there: a frame still, then pressed)
+        st.down = st.seekPressed > kSeekSettle;
+        return;
+    }
+    if (Pressed(pad, st, &PadState::a) && canTap)
+    {
+        int which = -1;
+        if (const int k = AutopsyTarget(st.ram, st.px, st.py, which))
+        {
+            st.seek = k;
+            st.seekWhich = which;
+            st.seekPressed = st.seekFrames = 0;
+            st.down = false;
+            return;
+        }
+    }
     const bool laser = st.ram.autopsy && st.ram.autopsyTool == 0;
     MovePointer(pad, st, pad.a ? (laser ? kPtrLaser : kPtrDrag) : kPtrMax, true);
     PressPointer(pad, st, canTap);
@@ -229,6 +316,7 @@ void Autopsy(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState
         st.gliding = true;
         st.glideRest = 0;
         st.glideTo = st.ram.autopsySub == 3 ? kAutopsyTray : kAutopsyFlask;
+        st.glideByA = false;
         st.down = true;
         return;
     }
@@ -682,7 +770,7 @@ bool IsPointing(Screen s) { return s == Screen::Autopsy || s == Screen::Detector
 bool IsTiming(Screen s) { return s == Screen::MooGoo || s == Screen::Drencher || s == Screen::Crime; }
 bool OwnScheme(Screen s)
 {
-    return IsPointing(s) || IsTiming(s) || s == Screen::Scratch || s == Screen::Mixer || s == Screen::MixerSave || s == Screen::Trading;
+    return IsPointing(s) || IsTiming(s) || s == Screen::Vacuum || s == Screen::Scratch || s == Screen::Mixer || s == Screen::MixerSave || s == Screen::Trading;
 }
 
 Point ScratchCentre(int tier, int i)
@@ -746,12 +834,163 @@ void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad)
     st.py = std::clamp(st.py, 0.0f, (float)(SH - 1));
 }
 
+int AutopsyTarget(const ActivityRam& ram, float px, float py, int& which)
+{
+    which = -1;
+    if (!ram.autopsy || ram.autopsySub != 0 || ram.autopsyPhase > 2) return 0;
+    float bd = 0;
+    auto near = [&](float x, float y, int w, bool better) {
+        const float d = (x - px) * (x - px) + (y - py) * (y - py);
+        if (which < 0 || better || d < bd) { which = w; bd = d; }
+    };
+    if (ram.autopsyTool == 1)
+    {
+        for (int i = 0; i < 3; i++)
+            if (ram.autopsyFreed[i]) near((float)kAutopsyOrgan[i].x, (float)kAutopsyOrgan[i].y, i, false);
+        return which >= 0 ? 1 : 0;
+    }
+    if (ram.autopsyTool == 2)
+    {
+        // An eating one first (it does the harm), the nearest; one walking in off the screen is not taken.
+        bool eating = false;
+        for (const ActivityRam::Parasite& p : ram.autopsyParasites)
+        {
+            if (p.x < 0 || p.x > SW - 1 || p.y < 0 || p.y > SH - 1) continue;
+            if (eating && !p.eating) continue;
+            near(p.x, p.y, p.slot, p.eating && !eating);
+            eating = eating || p.eating;
+        }
+        return which >= 0 ? 2 : 0;
+    }
+    return 0;
+}
+
+int VacuumTarget(const std::vector<VacuumThing>& things, float hx, float hy)
+{
+    int best = -1;
+    float bd = 0;
+    for (int i = 0; i < (int)things.size(); i++)
+    {
+        if (things[i].dust) continue;
+        const float dx = things[i].x - hx, dy = things[i].y - hy, d = dx * dx + dy * dy;
+        if (best < 0 || d < bd) { best = i; bd = d; }
+    }
+    return best;
+}
+
+bool VacuumSafePoint(const std::vector<VacuumThing>& things, int i, float& x, float& y)
+{
+    if (i < 0 || i >= (int)things.size()) return false;
+    const VacuumThing& f = things[i];
+    const float h = std::max(0.0f, f.half - 1);
+    bool ok = false;
+    float bd = 0;
+    for (float oy = -h; oy <= h; oy += 2)
+        for (float ox = -h; ox <= h; ox += 2)
+        {
+            const float px = f.x + ox, py = f.y + oy;
+            if (px < 0 || px > SW - 1 || py < 0 || py > SH - 1) continue;   // (off the touch screen: no touch there)
+            bool clear = true;
+            for (const VacuumThing& d : things)
+                if (d.dust && d.slot < f.slot && std::fabs(px - d.x) <= d.half + 1 && std::fabs(py - d.y) <= d.half + 1) { clear = false; break; }
+            if (clear && (!ok || ox * ox + oy * oy < bd)) { ok = true; bd = ox * ox + oy * oy; x = px; y = py; }
+        }
+    return ok;
+}
+
+static VacuumStylus TakeStep(const ActivityRam& ram, float px, float py, bool start, ActivityState::Take& t)
+{
+    VacuumStylus s {px, py, false};
+    const std::vector<VacuumThing>& th = ram.vacuumThings;
+    auto find = [&](int slot) {
+        for (int i = 0; i < (int)th.size(); i++)
+            if (th[i].slot == slot) return i;
+        return -1;
+    };
+    if (!ram.vacuumBowl)
+    {
+        // A misread mid-take: the last point held a few frames (letting go drops the find), then given up.
+        if (t.phase != 0 && ++t.missed <= kVacuumMissMax) return {t.x, t.y, t.down};
+        t = {};
+        return s;
+    }
+    t.missed = 0;
+    if (start && t.phase == 0)
+    {
+        const int i = VacuumTarget(th, px, py);
+        if (i < 0) return s;   // no find: the stylus stays up (a bare press only grabs dust)
+        t = {};
+        t.phase = 1;
+        t.slot = th[i].slot;
+    }
+    if (t.phase == 0) return s;
+    if (++t.frames > kVacuumTakeMax) { t = {}; return s; }
+    if (t.phase == 1)
+    {
+        int held = -1;
+        for (int i = 0; i < (int)th.size(); i++)
+            if (th[i].held) held = i;
+        if (held >= 0 && t.pressed > 1)
+        {
+            // Held (the game's tick took it): a find goes to the funnel; dust (a clog) is let go.
+            if (th[held].dust) { t = {}; return s; }
+            t.phase = 2;
+            t.slot = th[held].slot;
+        }
+        else
+        {
+            const int i = find(t.slot);
+            if (i < 0) { t = {}; return s; }   // gone (down the hole)
+            float x = 0, y = 0;
+            const bool ok = VacuumSafePoint(th, i, x, y);
+            if (t.pressed == 0)
+            {
+                // The stylus up until a point of the find is clear, then there; the press the frame after.
+                if (!ok) { if (t.frames > kVacuumReachMax) t = {}; return s; }
+                t.pressed = 1;
+                s.x = x; s.y = y;
+                return s;
+            }
+            if (++t.pressed > kVacuumReachMax) { t = {}; return s; }
+            // Down, on a clear point of the find as it swirls (none this frame: its middle; a press
+            // let go and pressed again would drop it).
+            s.x = ok ? x : th[i].x;
+            s.y = ok ? y : th[i].y;
+            s.down = true;
+            return s;
+        }
+    }
+    // Carrying: to the funnel, held; let go there once the keep animation is idle.
+    const int i = find(t.slot);
+    if (i < 0 || !th[i].held) { t = {}; return s; }   // dropped (or kept already)
+    const float dx = kVacuumFunnel.x - px, dy = kVacuumFunnel.y - py, d = std::sqrt(dx * dx + dy * dy);
+    s.down = true;
+    if (d > kVacuumCarry)
+    {
+        s.x = px + dx / d * kVacuumCarry;
+        s.y = py + dy / d * kVacuumCarry;
+        t.rest = 0;
+        return s;
+    }
+    s.x = (float)kVacuumFunnel.x;
+    s.y = (float)kVacuumFunnel.y;
+    if (ram.vacuumKeeping) t.rest = 0;
+    else if (++t.rest > kVacuumRest) { t = {}; s.down = false; }
+    return s;
+}
+
+VacuumStylus VacuumTake(const ActivityRam& ram, float px, float py, bool start, ActivityState::Take& t)
+{
+    const VacuumStylus s = TakeStep(ram, px, py, start, t);
+    if (t.phase != 0 && ram.vacuumBowl) { t.x = s.x; t.y = s.y; t.down = s.down; }
+    return s;
+}
+
 bool IsActivity(Screen s) { return s == Screen::Social || s == Screen::Cards || s == Screen::Vacuum || OwnScheme(s); }
 
 void ActivityInput(Screen s, const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& st)
 {
-    st.blow = st.grab = false;
-    st.handDx = st.handDy = 0;
+    st.blow = false;
     st.pointer = st.down = false;
     st.mark = {0, 0, 0, 0};
     st.voice = false;
@@ -792,8 +1031,7 @@ std::vector<Hint> ActivityHints(Screen s)
     case Screen::Cards:
         return {{"D-PAD", "CHOOSE A CARD"}, {"A", "PICK UP, AGAIN\nTO PLAY"}, {"X", "DRAW A CARD"}, {"Y", "DISCARD"}, {"B", "QUIT"}};
     case Screen::Vacuum:
-        return {{"L-STICK", "DRIVE"}, {"R-STICK", "MOVE THE HAND"}, {"X+D-PAD", "MOVE THE HAND"},
-                {"A", "GRAB, DRAG TO\nTHE BOX"}, {"Y", "BLOW: UNCLOG"}};
+        return {{"L-STICK", "DRIVE"}, {"R-STICK", "MOVE THE HAND"}, {"A", "HOLD: GRAB,\nDROP IN FUNNEL"}, {"Y", "BLOW: UNCLOG"}};
     case Screen::Autopsy:
         return {{"STICK", "POINT (LT SLOW)"}, {"A", "HOLD: USE TOOL"}, {"X Y RB", "LASER, HAND,\nTWEEZERS"},
                 {"LB", "TO TRAY/FLASK"}, {"B B", "QUIT (NO PAY)"}};

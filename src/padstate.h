@@ -19,6 +19,10 @@ struct PadState
     // A stick cursor exists (a controller and the setting on): Unknown gives A to it. Without one
     // A stays the DS's there (the keyboard alone must still answer a Save or a Quit question).
     bool cursor = false;
+    // The keyboard alone (no pad, no script): its X action held and its arrows (-1, 0, 1). The
+    // vacuum moves its hand with them (a keyboard has no right stick).
+    bool keyX = false;
+    int keyDx = 0, keyDy = 0;
     // The pointer's speed (Settings::cursorSpeed: 1 the port's own); never the stylus's drags' cap.
     float speed = 1.0f;
 };

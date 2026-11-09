@@ -74,9 +74,17 @@ constexpr const char* kWords[][5] = {
     // The vacuum
     {"Drive", "Conduire", "Fahren", "Guida", "Conducir"},
     {"Move the hand", "Bouger la main", "Hand bewegen", "Muovi la mano", "Mover la mano"},
-    {"Grab, drag to the box", "Saisir, glisser dans la boîte", "Greifen, in die Box ziehen", "Prendi, trascina nella scatola", "Coger, llevar a la caja"},
+    {"Hold: grab, drop in the funnel", "Maintenir : saisir, lâcher dans l'entonnoir", "Halten: greifen, in den Trichter", "Tieni: prendi, lascia nell'imbuto",
+     "Mantener: coger, soltar en el embudo"},
     {"Blow: unclog", "Souffler : déboucher", "Pusten: frei machen", "Soffia: sblocca", "Soplar: desatascar"},
     {"Blow: unclog!", "Souffler : déboucher !", "Pusten: frei machen!", "Soffia: sblocca!", "Soplar: ¡desatascar!"},
+    {"Take a find to the funnel", "Porter une trouvaille à l'entonnoir", "Fund zum Trichter bringen", "Porta un oggetto all'imbuto", "Llevar un hallazgo al embudo"},
+    {"Taking it to the funnel", "En route vers l'entonnoir", "Wird zum Trichter gebracht", "Verso l'imbuto", "Llevándolo al embudo"},
+    {"No find in the bowl yet", "Pas encore de trouvaille", "Noch kein Fund", "Ancora nessun oggetto", "Aún no hay hallazgos"},
+    // Alien Autopsy: A's take (the hand, the tweezers)
+    {"Take a freed organ to the tray", "Porter un organe libéré au plateau", "Freies Organ zur Schale", "Porta un organo libero al vassoio",
+     "Llevar un órgano libre a la bandeja"},
+    {"Take a parasite to the flask", "Porter un parasite au bocal", "Parasit ins Glas bringen", "Porta un parassita al barattolo", "Llevar un parásito al frasco"},
     // The social games
     {"Answer", "Répondre", "Antworten", "Rispondi", "Responder"},
     {"The chosen answer again", "La même réponse", "Dieselbe Antwort", "La stessa risposta", "La misma respuesta"},

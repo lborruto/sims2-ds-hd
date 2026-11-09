@@ -30,6 +30,8 @@ enum class OwnWordId : int
     CardsContinue, CardsChoose, CardsPickUp, CardsDraw, CardsDiscard,
     // The vacuum.
     VacuumDrive, VacuumHand, VacuumGrab, VacuumBlow, VacuumBlowNow,
+    VacuumTake, VacuumTaking, VacuumNoFind,
+    AutopsyTakeOrgan, AutopsyTakeParasite,
     // The social reaction games.
     SocialAnswer, SocialAgain, SocialMatch,
     // MooGoo Monkey: the hints, the round and the deck.

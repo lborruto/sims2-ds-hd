@@ -1,0 +1,4 @@
+# From act-vacuum (the bowl empty: nothing sucked up yet), CONSOLE: A presses nothing (no find to
+# take; a bare press would only grab dust), so no clog.
+20 2 pad a
+60 30 pad a

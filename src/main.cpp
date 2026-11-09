@@ -107,6 +107,7 @@ static void Usage()
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
         "  --print-hotel                 print the hotel block (rooms, score, guests, songs) and the hotel's and shops' screens (registry, room info, music, build rooms, placement, catalogue, stat panel), read from RAM, when they change\n"
         "  --print-minigame              print the minigame the bottom screen shows (Alien Autopsy, Metal Detector, MooGoo Monkey, scratch lottery, Super Drencher, Crime, Music Mixer and its save menu, Art Gallery), read from RAM, when it changes\n"
+        "  --print-vacuum                print the vacuum's bowl (its things, the one held, the funnel's keep animation), read from RAM, when it changes\n"
         "  --print-front                 print the front end (title, Settings, Load-a-Sim, Create-a-Sim, boot screens, video), read from RAM, when it changes\n"
         "  --print-console               print CONSOLE's composition (which branch; milestone 1's marked m1, a held picture) when it changes, and the counts at the end\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
@@ -178,7 +179,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, printConsole = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printVacuum = false, printFront = false, printConsole = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
     int uiScaleArg = 0;     // --ui-scale N (60-150): the HD interface's size for this run; 0 the settings' (headless 100)
@@ -239,6 +240,7 @@ int main(int argc, char** argv)
         else if (a == "--print-town") printTown = true;
         else if (a == "--print-hotel") printHotel = true;
         else if (a == "--print-minigame") printMinigame = true;
+        else if (a == "--print-vacuum") printVacuum = true;
         else if (a == "--print-front") printFront = true;
         else if (a == "--print-console") printConsole = true;
         else if (a == "--record-dir") recordDir = next();
@@ -1458,6 +1460,11 @@ relaunch:
                     if (t.note.valid) fprintf(stderr, "frame %ld: note text=%d playername=%d\n", frame, t.note.textId, t.note.playerName ? 1 : 0);
                     else fprintf(stderr, "frame %ld: note none\n", frame);
                 }
+            }
+            if (app.portSupported && printVacuum)
+            {   // the vacuum's bowl (gamestate.h): one line when it changes
+                const std::string now = VacuumBowlLine(app.game), was = VacuumBowlLine(before);
+                if (now != was || frame == 0) fprintf(stderr, "frame %ld: vacuum %s\n", frame, now.empty() ? "none" : now.c_str());
             }
             if (app.portSupported && printMinigame)
             {   // the minigames (gamestate.h): one line when the screen's part changes

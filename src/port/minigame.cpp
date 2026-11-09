@@ -138,7 +138,8 @@ std::vector<HdHint> AskHints(const RomData& rom, int askFocus, bool preview = fa
     return h;
 }
 
-std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, bool quitArmed = false, int focus = -1, int askFocus = -1)
+std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, bool quitArmed = false, int focus = -1, int askFocus = -1,
+                          bool taking = false)
 {
     auto own = [&](OwnWordId w) { return std::string(Own(rom, w)); };
     switch (s)
@@ -185,11 +186,16 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         if (quitArmed) return {{{C(Button::B)}, w.quitAgain, true}};
         const int tool = a.valid ? std::clamp(a.tool, 0, 2) : 0;
         std::vector<HdHint> h {PointHint(rom), SlowHint(rom)};
+        // What A does now: a freed organ or a parasite to take (the hand, the tweezers: activities.h), else held the tool.
+        bool organ = false, parasite = false;
+        for (int i = 0; a.valid && i < kAutopsyOrgans; i++) organ = organ || (a.organs[i].freed && a.organs[i].present());
+        for (const AutopsyParasite& p : a.parasites) parasite = parasite || (p.x >= 0 && p.x < SW && p.y >= 0 && p.y < SH);
         if (a.valid && (a.phase == 5 || a.phase == 6)) h.push_back({{C(Button::A)}, w.tear});
-        else if (a.valid && (a.sub == 3 || a.sub == 6)) h.push_back({{C(Button::LB)}, w.carry[a.sub == 3 ? 0 : 1], true});
+        else if (a.valid && (a.sub == 3 || a.sub == 6)) h.push_back({{C(taking ? Button::A : Button::LB)}, w.carry[a.sub == 3 ? 0 : 1], true});
         else
         {
-            h.push_back({{C(Button::A)}, w.use[tool]});
+            const bool take = a.valid && a.sub == 0 && a.phase <= 2 && ((tool == 1 && organ) || (tool == 2 && parasite));
+            h.push_back({{C(Button::A)}, take ? Own(rom, tool == 1 ? OwnWordId::AutopsyTakeOrgan : OwnWordId::AutopsyTakeParasite) : w.use[tool]});
             // The other tools (the one the game flashes for lit: an organ freed, a parasite eating).
             const Button key[3] = {Button::X, Button::Y, Button::RB};
             const bool alert[3] = {false, a.valid && a.handAlert, a.valid && a.tweezersAlert};
@@ -286,9 +292,15 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     }
     case Screen::Vacuum:
     {
-        const bool clog = game.minigame.vacuum.valid && game.minigame.vacuum.clogged;
-        return {{{C(Button::LStick)}, Own(rom, OwnWordId::VacuumDrive)}, {{C(Button::RStick), Sep("/"), C(Button::X), Sep("+"), C(Button::DPad)}, Own(rom, OwnWordId::VacuumHand)},
-                {{C(Button::A)}, Own(rom, OwnWordId::VacuumGrab)}, {{C(Button::Y)}, Own(rom, clog ? OwnWordId::VacuumBlowNow : OwnWordId::VacuumBlow), clog},
+        const VacuumState& v = game.minigame.vacuum;
+        const bool clog = v.valid && v.clogged;
+        // A: what it does now (activities.h): take a find (one is in the bowl), its take running, nothing
+        // (no find yet); the bowl unread: the stylus held at the hand.
+        bool find = false;
+        for (const VacuumItem& t : v.items) find = find || !t.Dust();
+        const OwnWordId a = !v.bowl ? OwnWordId::VacuumGrab : taking ? OwnWordId::VacuumTaking : find ? OwnWordId::VacuumTake : OwnWordId::VacuumNoFind;
+        return {{{C(Button::LStick)}, Own(rom, OwnWordId::VacuumDrive)}, {{C(Button::RStick)}, Own(rom, OwnWordId::VacuumHand)},
+                {{C(Button::A)}, Own(rom, a)}, {{C(Button::Y)}, Own(rom, clog ? OwnWordId::VacuumBlowNow : OwnWordId::VacuumBlow), clog},
                 {{C(Button::B)}, Own(rom, OwnWordId::DrencherPutAway)}};
     }
     case Screen::Social:
@@ -1135,7 +1147,15 @@ ActivityRam MinigameRam(const GameState* game)
     if (!game || !game->valid) return r;
     const MinigameState& m = game->minigame;
     if (game->screen == GScreen::Cards && m.cards.valid) { r.cards = true; r.quitAsk = m.cards.quitAsk; r.message = m.cards.message; }
-    if (game->screen == GScreen::Autopsy && m.autopsy.valid) { r.autopsy = true; r.autopsyTool = m.autopsy.tool; r.autopsySub = m.autopsy.sub; }
+    if (game->screen == GScreen::Autopsy && m.autopsy.valid)
+    {
+        r.autopsy = true;
+        r.autopsyTool = m.autopsy.tool;
+        r.autopsySub = m.autopsy.sub;
+        r.autopsyPhase = m.autopsy.phase;
+        for (int i = 0; i < kAutopsyOrgans && i < 3; i++) r.autopsyFreed[i] = m.autopsy.organs[i].freed && m.autopsy.organs[i].present();
+        for (const AutopsyParasite& p : m.autopsy.parasites) r.autopsyParasites.push_back({p.slot, (float)p.x, (float)p.y, p.eating});
+    }
     if (game->screen == GScreen::Detector && m.detector.valid) { r.detector = true; r.detectorSlider = m.detector.slider; }
     if (game->screen == GScreen::ArtGallery && m.art.valid) { r.art = true; r.artButton = m.art.button; r.artSwatch = m.art.swatch; }
     if (game->screen == GScreen::MooGoo && m.mooGoo.valid)
@@ -1172,6 +1192,12 @@ ActivityRam MinigameRam(const GameState* game)
     {
         r.mixerSave = true;
         for (int j = 0; j < kMixerSaveSlots; j++) r.mixerSaveUsed[j] = m.mixerSave.used[j];
+    }
+    if (game->screen == GScreen::Vacuum && m.vacuum.bowl)
+    {
+        r.vacuumBowl = true;
+        r.vacuumKeeping = m.vacuum.keeping;
+        for (const VacuumItem& t : m.vacuum.items) r.vacuumThings.push_back({t.slot, t.x, t.y, t.half, t.Dust(), t.held});
     }
     const PopupState& p = game->town.popup;
     if (p.valid && p.kind == 2 && p.state >= 1 && p.state <= 3)
@@ -1244,7 +1270,7 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
     if (content > 0) c.ui[panel].to.h = std::min(content + 2 * kMgPad, kMgSideBottom - y);
     else c.ui.erase(c.ui.begin() + (long)panel);
     // The prompt bar: the controller's hints.
-    AddPrompts(c, Hints(s.screen, game, rom, pointer && pointer->quitArmed, focus, pointer ? pointer->askFocus : -1));
+    AddPrompts(c, Hints(s.screen, game, rom, pointer && pointer->quitArmed, focus, pointer ? pointer->askFocus : -1, pointer && pointer->taking));
     // MooGoo's line and turn banner in HD over the game's (its letters 1x: "Touch a Monkey!").
     if (s.screen == Screen::MooGoo && game.minigame.mooGoo.valid && !game.minigame.mooGoo.intro && !game.minigame.mooGoo.quitAsk)
     {
@@ -1294,6 +1320,11 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     add(Screen::Cards, [](GameState& g) { g.minigame.cards.valid = g.minigame.cards.message = true; });
     add(Screen::Vacuum, [](GameState&) {});
     add(Screen::Vacuum, [](GameState& g) { g.minigame.vacuum.valid = g.minigame.vacuum.clogged = true; });
+    add(Screen::Vacuum, [](GameState& g) { g.minigame.vacuum.valid = g.minigame.vacuum.clogged = g.minigame.vacuum.bowl = true; });
+    add(Screen::Vacuum, [](GameState& g) {
+        g.minigame.vacuum.valid = g.minigame.vacuum.clogged = g.minigame.vacuum.bowl = true;
+        g.minigame.vacuum.items.push_back({0, 100, 100, 13, 0x196, false});
+    });
     add(Screen::Social, [](GameState&) {});
     for (int tool = 0; tool < 3; tool++)
         add(Screen::Autopsy, [tool](GameState& g) {
@@ -1303,6 +1334,15 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     add(Screen::Autopsy, [](GameState& g) { g.minigame.autopsy.valid = true; g.minigame.autopsy.phase = 5; });
     add(Screen::Autopsy, [](GameState& g) { g.minigame.autopsy.valid = true; g.minigame.autopsy.sub = 3; });
     add(Screen::Autopsy, [](GameState& g) { g.minigame.autopsy.valid = true; g.minigame.autopsy.sub = 6; });
+    for (int tool = 1; tool < 3; tool++)   // (A's take: a freed organ, a parasite on the body)
+        add(Screen::Autopsy, [tool](GameState& g) {
+            AutopsyState& a = g.minigame.autopsy;
+            a.valid = a.handAlert = a.tweezersAlert = true;
+            a.tool = a.phase = tool;
+            a.organs[0].kind = 0;
+            a.organs[0].freed = true;
+            a.parasites.push_back({0, 100, 100, 0, true});
+        });
     add(Screen::Detector, [](GameState& g) { g.minigame.detector.valid = g.minigame.detector.inRange = true; });
     add(Screen::Art, [](GameState& g) { g.minigame.art.valid = true; });
     add(Screen::Art, [](GameState& g) { g.town.popup.valid = true; g.town.popup.state = 2; g.town.popup.kind = 2; });
@@ -1329,6 +1369,15 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     for (const auto& [sc, g] : states) bars.push_back(Hints(sc, g, rom));
     bars.push_back(Hints(Screen::Autopsy, states.back().second, rom, true));   // the autopsy's quit asked
     bars.push_back(Hints(Screen::Scratch, states.back().second, rom, true));   // the lottery's
+    {
+        GameState g;
+        g.valid = g.minigame.vacuum.valid = g.minigame.vacuum.clogged = g.minigame.vacuum.bowl = true;
+        bars.push_back(Hints(Screen::Vacuum, g, rom, false, -1, -1, true));   // the vacuum's take running
+        g.screen = GScreen::Autopsy;
+        g.minigame.autopsy.valid = true;
+        g.minigame.autopsy.sub = 3;
+        bars.push_back(Hints(Screen::Autopsy, g, rom, false, -1, -1, true));   // the autopsy's take carrying
+    }
     for (int f : {0, 30}) bars.push_back(Hints(Screen::MixerSave, states.back().second, rom, false, f));   // a key, a slot
     bars.push_back(Hints(Screen::MixerSave, states.back().second, rom, true, 30));   // a slot's overwrite asked
     for (const std::vector<HdHint>& hs : bars) me.Note(kOwn, total(hs, kMgHintSize) > avail, total(hs, kMgHintMin) <= avail);

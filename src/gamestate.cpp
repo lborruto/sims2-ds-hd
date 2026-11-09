@@ -156,6 +156,9 @@ struct EUTable
         u32 cdPhase, cdTurn;   // u8: the turn's step (the top screen's line), whose turn (0 the player, 1 the opponent)
         // The vacuum (u8 clog; the earnings are the stat panel's hotel.stVacuum, from G)
         u32 vcClog, vcSize;
+        // Its bowl: nine slots {+0 sprite pointer (its x / y at vcSpriteX / Y, 20.12), +0x14 scale (20.12), +0x18 u8 active,
+        // +0x19 u8 held, +0x1A u16 kind}; u16 the slot held (vcNone none); u8 the keep animation's two flags
+        u32 vcItems, vcItemStride, vcSpriteX, vcSpriteY, vcSpriteSize, vcScale, vcActive, vcHeld, vcType, vcHeldSlot, vcNone, vcKeepA, vcKeepB;
     } mg;
     // Milestone 5: the front end (research m5-front-end §0-§5). T = *(P+topObj) the top slot's object, S the bottom's.
     struct
@@ -300,6 +303,7 @@ constexpr EUTable kEU = {
         0x2CC, 0x2D0, 0x2E4, 9999,
         0x2F0, 0x2F1,
         0x158, 0x194,
+        0x28, 0x1C, 0x50, 0x54, 0x58, 0x14, 0x18, 0x19, 0x1A, 0x26, 0xA, 0x162, 0x170,
     },
     {
         0xDA8,
@@ -1602,9 +1606,39 @@ CardsState ReadCards(const Reader& m, u32 S)
     return v;
 }
 
+// The vacuum's bowl into v (bowl false on garbage: the rest of v stays as read).
+void ReadVacuumBowl(const Reader& m, u32 S, VacuumState& v)
+{
+    const auto& q = kEU.mg;
+    u32 held, keepA, keepB;
+    if (!m.In(S, q.vcSize) || !m.R16(S + q.vcHeldSlot, held) || (held >= (u32)kVacuumSlots && held != q.vcNone) || !m.R8(S + q.vcKeepA, keepA) ||
+        !m.R8(S + q.vcKeepB, keepB))
+        return;
+    std::vector<VacuumItem> items;
+    for (int i = 0; i < kVacuumSlots; i++)
+    {
+        const u32 e = S + q.vcItems + q.vcItemStride * (u32)i;
+        u32 active, hold, type, sp, scale, x, y;
+        if (!m.R8(e + q.vcActive, active) || !m.R8(e + q.vcHeld, hold) || !m.R16(e + q.vcType, type) || !m.R32(e, sp)) return;
+        if (active == 0) continue;   // (an empty slot keeps what it held last: unchecked)
+        if (hold > 1 || type < 0x100 || type > 0x2FF || !m.In(sp, q.vcSpriteSize) || !m.R32(e + q.vcScale, scale) || !m.R32(sp + q.vcSpriteX, x) ||
+            !m.R32(sp + q.vcSpriteY, y))
+            return;
+        const float fx = (int)x / 4096.0f, fy = (int)y / 4096.0f, fs = (int)scale / 4096.0f;
+        // (the bowl is the touch screen, its rim a little past it; a scale 0..4)
+        if (fx < -64 || fx > 320 || fy < -64 || fy > 256 || fs < 0 || fs > 4) return;
+        items.push_back({i, fx, fy, 20 * fs, (int)type, hold == 1});
+    }
+    v.items = std::move(items);
+    v.heldSlot = held == q.vcNone ? -1 : (int)held;
+    v.keeping = keepA != 0 || keepB != 0;
+    v.bowl = true;
+}
+
 VacuumState ReadVacuum(const Reader& m, u32 S)
 {
     VacuumState v;
+    ReadVacuumBowl(m, S, v);
     u32 G, clog;
     if (!m.In(S, kEU.mg.vcSize) || !m.R8(S + kEU.mg.vcClog, clog) || clog > 1 || !m.R32(kEU.gameBlock, G)) return v;
     const int earnings = m.S32(G + kEU.hotel.stVacuum);
@@ -1997,6 +2031,22 @@ GameState ReadGameState(RamView ram)
     }
     ReadMinigame(m, S, vt, g);
     return g;
+}
+
+std::string VacuumBowlLine(const GameState& g)
+{
+    const VacuumState& v = g.minigame.vacuum;
+    if (g.screen != GScreen::Vacuum || !v.bowl) return "";
+    std::string r = "bowl held=" + std::to_string(v.heldSlot) + " keeping=" + std::to_string(v.keeping ? 1 : 0) + " items=";
+    char b[64];
+    for (size_t i = 0; i < v.items.size(); i++)
+    {
+        const VacuumItem& t = v.items[i];
+        snprintf(b, sizeof b, "%s%d:%x@%.0f,%.0f/%.0f%s", i ? "," : "", t.slot, t.type, t.x, t.y, t.half, t.held ? "H" : "");
+        r += b;
+    }
+    if (v.items.empty()) r += "-";
+    return r;
 }
 
 std::string MinigameLine(const GameState& g)

@@ -418,4 +418,15 @@ front_want F-boot-900 boot '^boot mode=0 ' "front: touch to continue under the v
 front_want F-title0 settings '^settings none$' "front: no Settings on the title"
 front_want F-cas-a-30 title '^title none$' "front: no title in Create-a-Sim"
 
+# The vacuum's bowl (--print-vacuum, its first line): empty on act-vacuum (just switched on), and on
+# act-vacuum-clog two dust piles and the gold ring (kind 196) swirling, nothing held, the funnel idle.
+vac_want() { # STATE PATTERN LABEL
+    local log=$tmp/vac-$1.log
+    "$bin" "$rom" --headless --frames 10 --state-load "$shots/$1.st" --save "$tmp/vac-$1.sav" --print-vacuum "${hotel[@]}" > "$log" 2>&1
+    if grep -q '^clock: ' "$log" && grep -m 1 -E '^frame [0-9]+: vacuum ' "$log" | sed 's/^frame [0-9]*: vacuum //' | grep -q -E "$2"; then echo "ok   $3"
+    else echo "FAIL $3: got '$(grep -m 1 -E '^frame [0-9]+: vacuum ' "$log" | cut -c1-300)'"; fail=1; fi
+}
+vac_want act-vacuum '^bowl held=-1 keeping=0 items=-$' "vacuum: the bowl empty"
+vac_want act-vacuum-clog '^bowl held=-1 keeping=0 items=0:186@[0-9]+,[0-9]+/[0-9]+,1:196@[0-9]+,[0-9]+/[0-9]+,4:186@' "vacuum: dust and the gold ring in the bowl"
+
 exit $fail
