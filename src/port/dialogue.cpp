@@ -1,4 +1,5 @@
 #include "port/dialogue.h"
+#include "port/panelmenu.h"
 
 #include <algorithm>
 #include <cctype>
@@ -214,7 +215,7 @@ void BuildDialogue(Composition& c, const GameState& game, const RomData& rom, co
         const Rect frame {P.x + P.w - kDlgPad - portraitW, wellY, portraitW, wellH};
         c.ui.push_back(PortraitFrame(frame));
         const int iw = kDlgPortraitFrom.w * kDlgPortraitScale, ih = kDlgPortraitFrom.h * kDlgPortraitScale;
-        if (picture) c.ui.push_back(ImageItem({frame.x + (frame.w - iw) / 2, frame.y + (frame.h - ih) / 2, iw, ih}, bottom, SW, SH, kDlgPortraitFrom));
+        if (picture) c.ui.push_back(KeyedCrop(bottom, kDlgPortraitFrom, {frame.x + (frame.w - iw) / 2, frame.y + (frame.h - ih) / 2, iw, ih}));
     }
     for (size_t i = textAt; i < textEnd; i++) c.ui[i].layer = 1;
     SortUi(c.ui, uiFirst);

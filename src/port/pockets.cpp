@@ -33,12 +33,12 @@ Rect CountRect(int i)
     const int w = (kPkCounted.w - 3 * kPkGap) / 4;
     return {kPkCounted.x + i * (w + kPkGap), kPkCounted.y, w, kPkCounted.h};
 }
-// A counted item's icon, 2x, near the top of its cell.
+// A counted item's icon (its record's sprite, 32 x 32 at ui::kTierS: the row's cells are narrower
+// than the slots'), above the count.
 Rect CountIconRect(int i)
 {
     const Rect r = CountRect(i);
-    const int w = kPkCountIconFrom.w * 2, h = kPkCountIconFrom.h * 2;
-    return {r.x + (r.w - w) / 2, r.y + 16, w, h};
+    return {r.x, r.y + 8, r.w, 72};
 }
 struct DsPoint { int x, y; };
 DsPoint SlotPoint(int i) { return {kPkSlotX0 + (i % 3) * kPkSlotDx, kPkSlotY0 + (i / 3) * kPkSlotDy}; }
@@ -80,6 +80,26 @@ void AddSpriteIcon(Composition& c, IconCache* icons, const ItemRec& item, int sc
 {
     if (item.iconRes < 0) return;
     AddSpriteIcon(c, icons, item.tilesRes >= 0 && item.palRes >= 0 ? SpriteRef {item.tilesRes, item.iconRes, item.palRes} : SpriteRef::Of(item.iconRes), 0, scale, box, opacity);
+}
+
+static void AddTieredIcon(Composition& c, IconCache* icons, SpriteRef ref, int frame, int tier, Rect box, u32 opacity)
+{
+    if (!icons || !icons->Frame(ref, frame)) return;
+    UiItem a = icons->Tiered(ref, frame, tier, box);
+    a.fill = opacity;
+    c.ui.push_back(a);
+}
+
+void AddTieredIcon(Composition& c, IconCache* icons, int desc, int frame, int tier, Rect box, u32 opacity)
+{
+    if (desc >= 0) AddTieredIcon(c, icons, SpriteRef::Of(desc), frame, tier, box, opacity);
+}
+
+void AddTieredIcon(Composition& c, IconCache* icons, const ItemRec& item, int tier, Rect box, u32 opacity)
+{
+    if (item.iconRes < 0) return;
+    AddTieredIcon(c, icons, item.tilesRes >= 0 && item.palRes >= 0 ? SpriteRef {item.tilesRes, item.iconRes, item.palRes} : SpriteRef::Of(item.iconRes), 0, tier,
+                  box, opacity);
 }
 
 bool PocketsItemText(const InventoryState& inv, int item, int& nameId, int& descId)
@@ -223,13 +243,6 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
         n.wrap = false;
         n.middle = true;
         if (inv.counted[i].count == 0) { n.colour = kDim; n.shadowArgb = kDimShadow; }
-        // The live icon's own dark well (the game's button colour around it).
-        UiItem well = PanelItem(CountIconRect(i));
-        well.plain = true;
-        well.fill = kPkCountWell;
-        well.radius = 8;
-        well.layer = 1;
-        c.ui.push_back(well);
         n.layer = 1;
         c.ui.push_back(n);
         AddMousePiece(c, hs[11 + i].area, r);
@@ -283,17 +296,12 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
     AddMousePiece(c, hs[10].area, kPkBinBtn);
 
     // Images: the items, the tools, the counted items (live), the hand and the bin.
-    for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++) AddSpriteIcon(c, icons, inv.slots[i], 3, SlotRect(i));
-    for (int k = 0; k < kKeys; k++) AddSpriteIcon(c, icons, kSprTool[k], inv.keys[k].count > 0 ? 1 : 0, 3, KeyRect(k));
-    if (bottom)
-        for (int i = 0; i < kCounted; i++)
-        {
-            const Rect from {kPkCountIconFrom.x + i * kPkCountDx, kPkCountIconFrom.y, kPkCountIconFrom.w, kPkCountIconFrom.h};
-            c.ui.push_back(ImageItem(CountIconRect(i), bottom, SW, SH, from));
-        }
+    for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++) AddTieredIcon(c, icons, inv.slots[i], kTierL, SlotRect(i));
+    for (int k = 0; k < kKeys; k++) AddTieredIcon(c, icons, kSprTool[k], inv.keys[k].count > 0 ? 1 : 0, kTierL, KeyRect(k));
+    for (int i = 0; i < kCounted; i++) AddTieredIcon(c, icons, inv.counted[i], kTierS, CountIconRect(i));
     const Rect handIcon {kPkHandBtn.x + 10, kPkHandBtn.y, 64, kPkHandBtn.h}, binIcon {kPkBinBtn.x + 10, kPkBinBtn.y, 64, kPkBinBtn.h};
-    AddSpriteIcon(c, icons, kSprHand, 0, 2, handIcon, canUse ? 0 : 0x60000000);
-    AddSpriteIcon(c, icons, armed ? kSprBinGreen : kSprBin, 0, 2, binIcon, canBin ? 0 : 0x60000000);
+    AddTieredIcon(c, icons, kSprHand, 0, kTierS, handIcon, canUse ? 0 : 0x60000000);
+    AddTieredIcon(c, icons, armed ? kSprBinGreen : kSprBin, 0, kTierS, binIcon, canBin ? 0 : 0x60000000);
 }
 
 BlockMeasure MeasurePockets(const RomData& rom)

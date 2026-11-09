@@ -156,12 +156,12 @@ void BuildRelations(Composition& c, const MenuView& v, int focus, const GameStat
             const Rect from {kRelSimFrom.x, kRelSimFrom.y + kRelSimY[i] - kRelSimY[0], kRelSimFrom.w, kRelSimFrom.h};
             const Rect pw2 = RowPortrait(RowRect(i));
             const int w = from.w * 2, h = from.h * 2;
-            c.ui.push_back(ImageItem({pw2.x + (pw2.w - w) / 2, pw2.y + (pw2.h - h) / 2, w, h}, bottom, SW, SH, from));
+            c.ui.push_back(KeyedCrop(bottom, from, {pw2.x + (pw2.w - w) / 2, pw2.y + (pw2.h - h) / 2, w, h}));
         }
         if (sel)
         {
             const int w = kRelBigFrom.w * 3, h = kRelBigFrom.h * 3;
-            c.ui.push_back(ImageItem({kRelPortrait.x + (kRelPortrait.w - w) / 2, kRelPortrait.y + (kRelPortrait.h - h) / 2, w, h}, bottom, SW, SH, kRelBigFrom));
+            c.ui.push_back(KeyedCrop(bottom, kRelBigFrom, {kRelPortrait.x + (kRelPortrait.w - w) / 2, kRelPortrait.y + (kRelPortrait.h - h) / 2, w, h}));
         }
     }
 }

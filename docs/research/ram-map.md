@@ -120,7 +120,7 @@ Read by `ReadGameState` into `GameState::town` (any screen; each part valid on i
 | Record table | `0x02122A00 + 0x12 * row` (static) | rows of 9 u16: Sim k = row 2 + k (k < 46), item id = row 0x3B + id; +0/+2/+4 sprite tiles / descriptor / palette resources, +8 name string id (Sims 323 + k, items 463 + id), +0xA portrait / second resource, +0xE price (items) |
 | Sim record | `G + 0x21DC + 0x2C * k` | u16 +0x18 Sim id, u32 +0x14 flags (bit 0 met, bit 1 secret info), u8 +0x1A mood (0..6), u8 +0x1B relationship level |
 | Pocket slots | `G + 0x215C` s32 count (0..6), `G + 0x28 + 2i` u16 item ids | name = the row's +8 (must equal 463 + id, else the inventory is invalid), description 822 + id, icon = the row's descriptor |
-| Counted items | `G + 0x24 + i` u8 (4) | names 1154 + i, descriptions 845 + i |
+| Counted items | `G + 0x24 + i` u8 (4) | names 1154 + i, descriptions 845 + i; their icons the record table's rows of items 23 + i (Nuclear Rod, License Plate, Gourd, Alien Ship Part: the names 486-489 match), sprite triples matching the touch screen's buttons |
 | Key items | bits 1..3 of the u32 at `G` | Vacuum, Super Drencher, Metal Detector: names 1968 + k, descriptions 1972 + k |
 | Options | `G + 0x2F70` music, `G + 0x2F74` SFX | u32 20.12, 0..0x1000 |
 | Popup | `P + 0x8` state (1 opening, 2 shown, 3 closing), `P + 0x10` kind (0 one X, 2 cross + tick, 3 none) | text `P + 0x34` (0x400 bytes), title `P + 0x434` (0x100), both NUL-terminated game text bytes (`GameTextToUtf8` in `romdata.h` decodes them); `P + 0xD88` pressed button, `P + 0xD8C` stylus down |

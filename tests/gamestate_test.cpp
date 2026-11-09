@@ -451,6 +451,15 @@ static void inventory()
     CHECK(v.slots[1].id == 106 && v.slots[1].nameId == 569 && v.slots[1].descId == 928 && v.slots[1].iconRes == 1991);
     CHECK(v.counted[0].count == 27 && v.counted[1].count == 0 && v.counted[2].count == 2 && v.counted[3].count == 0);
     CHECK(v.counted[0].nameId == 1154 && v.counted[3].descId == 848);
+    // The counted items' icons: their items' record rows (23-26) when a row names its item, else none.
+    CHECK(v.counted[0].iconRes == -1 && v.counted[3].iconRes == -1);
+    put_item_row(r, 23, 4000); put_item_row(r, 26, 4100);
+    v = ReadGameState(r.View()).town.inventory;
+    CHECK(v.valid && v.counted[0].iconRes == 4000 && v.counted[0].tilesRes == 3999 && v.counted[0].palRes == 4001 && v.counted[0].count == 27);
+    CHECK(v.counted[3].iconRes == 4100 && v.counted[1].iconRes == -1 && v.counted[2].iconRes == -1);
+    r.W16(kRec + 0x12 * (26 + 0x3B) + 8, 999); // a row that names another item: no icon, the part still valid
+    v = ReadGameState(r.View()).town.inventory;
+    CHECK(v.valid && v.counted[3].iconRes == -1 && v.counted[0].iconRes == 4000);
     CHECK(v.keys[0].count == 1 && v.keys[1].count == 1 && v.keys[2].count == 1 && v.keys[2].nameId == 1970 && v.keys[2].descId == 1974);
     r.W32(kG, 0x04);
     v = ReadGameState(r.View()).town.inventory;

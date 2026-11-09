@@ -217,8 +217,7 @@ void BuildGoals(Composition& c, const MenuView& v, int focus, const GameState& g
     if (bottom && !g.entries.empty())
     {
         const int w = kGoalsPortraitFrom.w * 3, h = kGoalsPortraitFrom.h * 3;
-        c.ui.push_back(ImageItem({kGoalsPortrait.x + (kGoalsPortrait.w - w) / 2, kGoalsPortrait.y + (kGoalsPortrait.h - h) / 2, w, h}, bottom, SW, SH,
-                                 kGoalsPortraitFrom));
+        c.ui.push_back(KeyedCrop(bottom, kGoalsPortraitFrom, {kGoalsPortrait.x + (kGoalsPortrait.w - w) / 2, kGoalsPortrait.y + (kGoalsPortrait.h - h) / 2, w, h}));
     }
 }
 

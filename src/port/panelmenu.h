@@ -32,7 +32,7 @@ constexpr Rect kPmTabBar {kPmInnerX, 44, kPmInnerW, 84};    // LB, the five tabs
 constexpr Rect kPmTitle {kPmInnerX, 140, kPmInnerW, 52};    // the tab's title in a well
 constexpr Rect kPmContent {kPmInnerX, 206, kPmInnerW, 372}; // the tab's own area (to 578)
 constexpr Rect kPmHints {kPmInnerX, 590, kPmInnerW, 40};    // the button hints, right-aligned
-constexpr int kPmTabCell = 88, kPmTabIcon = 72;             // a tab's cell; its icon 3x (24 px)
+constexpr int kPmTabCell = 88, kPmTabIcon = 48;             // a tab's cell; its icon at ui::kTierS (24 px, 2x at 100 %)
 constexpr int kPmTabsX = kPmPanel.x + kPmPanel.w / 2 - 5 * kPmTabCell / 2; // the first tab cell: LB, the tabs, RB centred
 constexpr Rect kPmPhone {kPmInnerX + kPmInnerW - 90, 44, 90, 84}; // the phone button's cell
 constexpr Rect kPmPhoneWell {kPmPhone.x + 8, kPmPhone.y + 4, kPmPhone.w - 16, kPmPhone.h - 8}; // its well: the item, the mouse's piece
@@ -45,9 +45,10 @@ constexpr int kStrClose = 1866;        // "Close" (B: the menu closes)
 constexpr int kStrPhone = 716;         // "Cellphone" (the phone button's A)
 // The game's tab icons: selected (green) and not (blue), frames 0..4 in tab order.
 constexpr int kTabIconGreen = 2247, kTabIconBlue = 2250;
-// The phone button on the touch screen (a live crop: the ROM's sprite for it is not known), the
-// inside of its well (its fill the game's #5961A2; the phone's right edge overhangs the well).
-constexpr Rect kPmPhoneFrom {218, 10, 30, 34};
+// The phone button: the game's sprite (descriptor 1952, 32 x 32: frame 0 at rest, 1-7 ringing,
+// 8-16 lit), whose frame the touch screen shows at (218, 10) (PhoneButtonFrame).
+constexpr int kSprPhoneButton = 1952;
+constexpr int kPmPhoneSprX = 218, kPmPhoneSprY = 10;
 
 // Whether the open menu on screen s is redrawn in HD, and its view (valid false otherwise):
 // the panel's tab whose data reads (RAM valid, its part of GameState valid) with the game's
@@ -106,9 +107,20 @@ struct Measurer
 };
 // A touchable, invisible piece mapping the HD rectangle `to` onto the touch screen's `from`.
 void AddMousePiece(Composition& c, Rect from, Rect to);
+// A live crop of the touch screen `bottom` (256 x 192) drawn at `to` with the game's own frame
+// around the picture keyed out: from the crop's edges inwards, every pixel in the game's panel
+// colours (its wells #51518A / #5961A2, bevels #414979 / #6171B2, outline #383869, fill #828ACB)
+// turns transparent, so a portrait sits on the HD well alone, without the DS cell's square or
+// bevelled corners. The copy is kept per `from` until the next call for the same rectangle (the
+// raster of the frame that built it reads it); null bottom: an item that draws nothing.
+ui::UiItem KeyedCrop(const u32* bottom, Rect from, Rect to);
 // A row's focus ring (UI items, on `layer`): ui::FocusRing around `r` (the game's green, a line inside
 // it, white or dark by `behind`, the ringed item's fill), drawn before the row.
 void AddFocusRing(Composition& c, Rect r, float radius, int layer = 1, u32 behind = ui::kFillRow);
+// The frame of the phone button's sprite the touch screen `bottom` (256 x 192) shows: the frame
+// whose opaque pixels match the screen's at the button's place (a ringing frame within 8 pixels
+// of it, as the game shakes it), the closest one; 0 (at rest) when none comes near.
+int PhoneButtonFrame(IconCache& icons, const u32* bottom);
 // A hint chip right-aligned at `right` in the hints band; returns the next right edge.
 int AddHint(Composition& c, int right, ui::Button b, const std::string& label);
 }

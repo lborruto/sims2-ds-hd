@@ -406,11 +406,11 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
     AddMousePiece(c, {kPhoneClose.x - 8, kPhoneClose.y - 8, 16, 16}, kPhX);
 
     // Images: the signal bars, the buttons, the X; the game's own LCD when its page did not read.
-    AddSpriteIcon(c, icons, kSprPhSignal, 0, 2, {kPhHeader.x, kPhHeader.y, 64, kPhHeader.h});
+    AddTieredIcon(c, icons, kSprPhSignal, 0, kTierS, {kPhHeader.x, kPhHeader.y, 64, kPhHeader.h});
     AddSprite(c, icons, kSprPhUp, kPhUp);
     AddSprite(c, icons, kSprPhOk, kPhOk);
     AddSprite(c, icons, kSprPhDown, kPhDown);
-    AddSpriteIcon(c, icons, kSprPhX, 0, 2, kPhX);
+    AddTieredIcon(c, icons, kSprPhX, 0, kTierS, kPhX);
     if (pg.crop && bottom)
     {
         const int w = kPhLcdFrom.w * 2, h = kPhLcdFrom.h * 2;

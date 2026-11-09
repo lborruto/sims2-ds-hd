@@ -35,7 +35,7 @@ struct EUTable
         u32 maxSims, maxItems;                              // bounds on k / item id
         u32 simFlags, simMood, simLevel;                    // Sim record (from G + simRecords + k * simRecordSize)
         u32 invCount, invIds, invCounted, keyBits;          // from G: s32 count, u16[6], u8[4], u32 bit array
-        u32 maxSlots, countedN, keyN;
+        u32 maxSlots, countedN, keyN, countedItem0;        // countedItem0: the counted items' item ids (their record rows: icons)
         u32 itemName, itemDesc, countedName, countedDesc, keyName, keyDesc;   // string ids: base + index
         u32 optMusic, optSfx;                               // from G, 20.12
         u32 popKind, popParam, popText, popTitle, popPressed, popPressing;   // from P
@@ -211,7 +211,7 @@ constexpr EUTable kEU = {
         46, 0x200,
         0x14, 0x1A, 0x1B,
         0x215C, 0x28, 0x24, 0,
-        6, 4, 3,
+        6, 4, 3, 23,
         463, 822, 1154, 845, 1968, 1972,
         0x2F70, 0x2F74,
         0x10, 0x14, 0x34, 0x434, 0xD88, 0xD8C,
@@ -486,6 +486,16 @@ InventoryState ReadInventory(const Reader& m)
         u32 c;
         if (!m.R8(G + t.invCounted + i, c)) return InventoryState{};
         v.counted[i] = {(int)i, (int)(t.countedName + i), (int)(t.countedDesc + i), -1, (int)c};
+        // Its icon: the record table's row of the same item (Nuclear Rod, License Plate, Gourd,
+        // Alien Ship Part: item ids 23-26), when that row names it; else none (the count alone).
+        const u32 item = t.countedItem0 + i;
+        const RecordRow row = ReadRow(m, t.itemRow0 + item);
+        if (row.valid && row.nameId == (int)(t.itemName + item) && row.descRes > 0)
+        {
+            v.counted[i].iconRes = row.descRes;
+            v.counted[i].tilesRes = row.tilesRes;
+            v.counted[i].palRes = row.palRes;
+        }
     }
     for (u32 k = 0; k < t.keyN; k++)
         v.keys[k] = {(int)k, (int)(t.keyName + k), (int)(t.keyDesc + k), -1, (int)((keys >> (k + 1)) & 1)};

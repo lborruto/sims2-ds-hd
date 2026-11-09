@@ -171,13 +171,12 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
 
     // Images: the items, the bow (the game's sprite), the portrait (live).
     for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++)
-        AddSpriteIcon(c, icons, inv.slots[i], 3, SlotRect(i), v.items[i].enabled ? 0 : 0x60000000);
-    AddSpriteIcon(c, icons, kSprBow, 0, 2, kGiftBowIcon, canGive ? 0 : 0x60000000);
+        AddTieredIcon(c, icons, inv.slots[i], kTierL, SlotRect(i), v.items[i].enabled ? 0 : 0x60000000);
+    AddTieredIcon(c, icons, kSprBow, 0, kTierS, kGiftBowIcon, canGive ? 0 : 0x60000000);
     if (bottom)
     {
         const int w = kGiftPortraitFrom.w * 3, h = kGiftPortraitFrom.h * 3;
-        c.ui.push_back(ImageItem({kGiftPortrait.x + (kGiftPortrait.w - w) / 2, kGiftPortrait.y + (kGiftPortrait.h - h) / 2, w, h}, bottom, SW,
-                                 SH, kGiftPortraitFrom));
+        c.ui.push_back(KeyedCrop(bottom, kGiftPortraitFrom, {kGiftPortrait.x + (kGiftPortrait.w - w) / 2, kGiftPortrait.y + (kGiftPortrait.h - h) / 2, w, h}));
     }
 
     SortUi(c.ui, first);

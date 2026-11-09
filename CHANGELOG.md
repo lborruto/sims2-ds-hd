@@ -98,6 +98,12 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The launch panel keeps out of the screen's outer edge, where some TVs cut the picture.
 - The D-pad chips that mean Up / Down or Left / Right show two arrowheads (˄ ˅, ‹ ›) instead of a
   bar that read as a plus or a minus.
+- The town's menus, Give Gift, notes and the phone: the game's small pictures at two sizes only
+  (buttons and arrows smaller, items larger), each pixel a whole block of screen pixels at any
+  window size; the tabs and the rows' arrows now match. The counted items in Pockets and the
+  phone button are the game's own pictures (no more dark squares or blue band around them).
+- Portraits (Interact, Give Gift, Goals, Relationships, conversations) without the DS's square and
+  bevelled corners around them.
 - The vacuum on a controller: A takes a find for you. The hand goes to the find in the green ring
   (the one nearest the hand; the right stick moves the hand), presses where no dust lies over it,
   carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is

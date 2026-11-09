@@ -198,10 +198,11 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
         {
             const bool focused = i == focus && v.items[i].enabled;
             const SpriteRef ref = SpriteRef::Of(focused ? kTabIconGreen : kTabIconBlue);
-            if (const SpriteFrame* f = icons->Scaled(ref, 0, kArrowIcon / 24))
+            if (icons->Frame(ref, 0))
             {
+                // The panel's tab bar's tier (one for the ▶ wherever it is).
                 const Rect r = v.items[i].rect;
-                UiItem a = icons->Image(ref, 0, *f, {r.x + r.w - f->w - 10, r.y + (r.h - f->h) / 2, f->w, f->h});
+                UiItem a = icons->Tiered(ref, 0, kTierS, {r.x + r.w - kArrowIcon - 10, r.y, kArrowIcon, r.h});
                 if (!v.items[i].enabled) a.fill = 0x50000000; // greyed: faint
                 c.ui.push_back(a);
             }
@@ -209,8 +210,7 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
     if (bottom)
     {
         const int w = kInteractPortraitFrom.w * 3, h = kInteractPortraitFrom.h * 3;
-        c.ui.push_back(ImageItem({kInteractPortrait.x + (kInteractPortrait.w - w) / 2, kInteractPortrait.y + (kInteractPortrait.h - h) / 2, w, h},
-                                 bottom, SW, SH, kInteractPortraitFrom));
+        c.ui.push_back(KeyedCrop(bottom, kInteractPortraitFrom, {kInteractPortrait.x + (kInteractPortrait.w - w) / 2, kInteractPortrait.y + (kInteractPortrait.h - h) / 2, w, h}));
     }
 }
 }
