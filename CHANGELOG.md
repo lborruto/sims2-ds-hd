@@ -192,6 +192,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   what it found after the card closes, and "None" for no signal; the painting's question stays in
   one place; Walk and Point hints name every stick that does it; the autopsy's quit says the
   game's Quit; Moogoo's Start (quit) is in the manual; the social answers sit on rows.
+- The pause menu: a Menu key moved to Enter, Space or the DS's A key resumes the game again
+  instead of choosing the row.
 
 ## [0.1.1] - 2026-11-04
 
