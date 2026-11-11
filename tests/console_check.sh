@@ -536,15 +536,24 @@ def front_cas(page, focus, raw_top=True):
             1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129))}[page]
         ox, oy = bx + (bw - fw * s) // 2, by + (bh - fh * s) // 2
     same = total = 0
+    # (The DS cell's frame and the panel around a figure are keyed out (ux task 6: the picture on the
+    # HD cell): the game's panel colours, its outline and the choice's green are not compared.)
+    keyed = {hexrgb(h) for h in ("383869", "414979", "51518A", "5961A2", "6171B2", "7171B2", "828ACB")}
+    compared = 0
     for dy in range(0, fh, 4):
         for dx in range(0, fw, 4):
             total += 1
             if near:
                 same += C(ox + s * dx + s // 2, oy + s * dy + s // 2) == bottom(fx + dx, fy + dy)
                 continue
-            expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), bottom(fx + dx, fy + dy))
+            want = bottom(fx + dx, fy + dy)
+            if want in keyed or want[1] > want[0] + 60 and want[1] > want[2] + 60:
+                continue
+            compared += 1
+            expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), want)
             if len(errors) > 4:
                 return
+    if not near and fw and compared < 8: errors.append(f"the crop: {compared} of {total} points the picture's own")
     if near and same < total * 0.6: errors.append(f"the cell's sprite: {same} of {total} pixels the touch screen's")
     x, y, w, h = focus
     r, g, b = C(x + w // 2, y - 3)
@@ -2074,7 +2083,9 @@ wait
 pad_cas pad-cas-cross s4 cas-cross 200 &
 pad_cas pad-cas-type s3 cas-type 260 &
 pad_cas pad-cas-turn s3 cas-turn 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-turn" &
-pad_cas pad-cas-still s3 cas-cross 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-still" &
+pad_cas pad-cas-still s3 cas-lb 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-still" &
+pad_cas pad-cas-back s3 cas-back 340 --print-screen &
+pad_cas pad-cas-start s4 cas-start 360 &
 wait
 cas_name() {
     in_order pad-cas-name 'name=Si len=2 keyboard=0' 'name=SiA len=3 keyboard=0' 'name=SiA len=3 keyboard=1' 'name=SiAb len=4' 'name=SiAb len=4 keyboard=2' \
@@ -2100,6 +2111,15 @@ cas_cross() {
     local f; f=$(first_frame pad-cas-cross 'answer=2')
     [ -n "$f" ] && [ "$f" -ge 60 ] || { echo "  pad-cas-cross: one B discarded the Sim (frame $f)"; return 1; }
 }
+# B (ux task 6): the previous page from Hair; from the Name page Keep this Sim? with the focus on
+# the cross (the view's last item, 5), answered only by the next B: the title.
+cas_back() {
+    in_order pad-cas-back 'cas page=1 ' 'cas page=0 ' 'cas page=4 ' 'focus 5' 'answer=2' 'front Title' || return 1
+    local f; f=$(first_frame pad-cas-back 'answer=2')
+    [ -n "$f" ] && [ "$f" -ge 170 ] || { echo "  pad-cas-back: the Sim discarded before the third B (frame $f)"; return 1; }
+}
+# Start on Keep this Sim?: the tick, as A on it (ux task 6).
+cas_start() { in_order pad-cas-start 'aspiration=0 answer=1' 'game Panel/Interact'; }
 cas_turn() {
     "$python" -I -c '
 import sys
@@ -2113,6 +2133,8 @@ check_pad pad-cas-type cas_type
 check_pad pad-cas-looks cas_looks
 check_pad pad-cas-keep cas_keep
 check_pad pad-cas-cross cas_cross
+check_pad pad-cas-back cas_back
+check_pad pad-cas-start cas_start
 check_pad pad-cas-turn cas_turn
 # The HD screens hold through the game's swaps (src/consolehold.*, --print-console: each frame's
 # composition, milestone 1's marked -m1, and the counts at the end): Create-a-Sim's pages from s3 by

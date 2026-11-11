@@ -193,6 +193,11 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The vacuum's side panel shows the money of this session, as the bowl does (it said §0 until
   the vacuum was put away).
 - German music mixer: X says "Abspielen" (it said START, beside the help's own Start chip).
+- Create-a-Sim: B goes back a page (from the name page, to Keep this Sim?'s cross), Start on Keep
+  this Sim? keeps the Sim, and every page says what A, B and Start do; X says what it changes on
+  the keyboard. The hair colours, styles, faces and skin figures sit on the HD cells without the
+  DS's frames and green rings; the scroll arrows are the menus' own; no highlight on an empty
+  cell while a page comes in.
 
 ## [0.1.1] - 2026-11-04
 

@@ -2647,6 +2647,39 @@ static void back_focus_first()
     int x, y;
     CHECK(r.Touched(x, y) && x == 160 && y == 170);
 
+    // B leading to another page (MenuView::backLands: Create-a-Sim's Name page → Keep this Sim?):
+    // the focus lands on that item once the page shows it, not on the page's own first one.
+    {
+        MenuView name;
+        name.valid = name.own = true;
+        name.page = 0x40;
+        ViewItem key;
+        key.rect = {720, 350, 50, 50};
+        key.action = {TapStep(88, 85)};
+        key.id = 0x12000200;
+        name.items.push_back(key);
+        name.back = {TapStep(18, 171)};
+        name.backLands = 0x12000002;
+        MenuView keep = v;
+        keep.page = 0x44;
+        MenuView flight;
+        flight.valid = flight.own = true;
+        flight.page = 0x7F;
+        Rig n;
+        n.view = &name;
+        n.Frame(cas);
+        n.Press(cas, &PadState::b);
+        CHECK(n.Touched(x, y) && x == 18 && y == 171);
+        n.Drain();
+        n.view = &flight;
+        n.Frame(cas);
+        n.view = &keep;
+        n.Frame(cas);
+        CHECK(n.nav.Focus() == 2);
+        n.Press(cas, &PadState::b);   // (on the cross already: B answers)
+        CHECK(n.Touched(x, y) && x == 160 && y == 170);
+    }
+
     // A big picture (MenuView::picture: Settings' concept art): shown big once an A ran; the first
     // B closes it (no tap), the next one is the screen's B; LB / RB close it too.
     const ScreenState fe {Screen::FrontEnd, Tab::None};

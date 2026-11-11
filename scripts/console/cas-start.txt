@@ -1,0 +1,2 @@
+# From s4 (Keep this Sim?), CONSOLE: Start → the game's tick (the Sim kept): the town.
+10 2 pad start

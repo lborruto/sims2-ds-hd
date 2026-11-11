@@ -14,6 +14,11 @@
 // and its tick sprite; the page's green) between LB and RB, which tap the game's tabs (18,
 // 23 + 37 i) in a ring; Start taps the next page's tab (pages 0-3: on the Name page that is what
 // commits the name, as the game commits it when the page closes); the title well; the page:
+// B: the previous page on Hair, Face and Clothes; on the Name page Keep this Sim? with the focus on
+// its cross (MenuView::backLands: B again answers No). Start on Keep this Sim? taps the tick.
+// The swatches', styles' and faces' crops sit on the HD cells with the DS cell's frame keyed out
+// (KeyedCrop); the skin figures without the panel around them nor the chosen one's green ring; no
+// focus is drawn on a page whose pictures are not there yet (CasState::drawn).
 // - Name (0): the title well is the name field, the game's live buffer (N+0x70) in seven slots
 //   (the game's limit: never more); the gender buttons ♀ / ♂ (the game's sprites 2x, the one
 //   not chosen grey) and the four skin figures as live crops 2x (A taps them: 66,25 / 102,25; 144 + 29 i, 23); the keyboard's three pages as a row
@@ -26,7 +31,7 @@
 // - Hair (1): the eight colour swatches (live crops 2x; 59 + 25 i, 42) and the 2 x 2 style grid
 //   (live crops 3x of the game's cells, 117 + 60 c, 90 + 63 r) over its column scroll; Right from
 //   the right column / Left from the left one tap the game's arrows (228,120 / 65,120) while the
-//   game shows them (CasState::canLeft / canRight, its sprites); the arrows the game's sprite 2x (the left one mirrored).
+//   game shows them (CasState::canLeft / canRight); the arrows the kit's scroll arrows (lit while the game shows its own).
 // - Face (2): the 3 x 3 grid (live crops 3x, 90 + 57 c, 58 + 51 r).
 // - Clothes (3): the six categories (their sprites 2x, 50, y_i) and the 3 x 2 cells of the game's
 //   page (each item's own sprite 3x, from the page's list; 111 + 48 c, 72 + 64 r), its arrows as buttons beside them (77,105 /
@@ -75,7 +80,7 @@ constexpr int kCasBackX = 165, kCasBackY = 168;
 constexpr Rect kCasBackFrom {153, 158, 26, 21};
 constexpr int kCasKbX = 58, kCasKbY[3] = {115, 145, 174};
 constexpr int kCasSwatchX0 = 59, kCasSwatchDx = 25, kCasSwatchY = 42;
-constexpr Rect kCasSwatchFrom {49, 33, 20, 19};                // + dx i
+constexpr Rect kCasSwatchFrom {51, 33, 18, 19};                // + dx i (the colour inside its outline and the chosen one's green ring)
 constexpr int kCasHairX0 = 117, kCasHairDx = 60, kCasHairY0 = 90, kCasHairDy = 63;
 constexpr Rect kCasHairFrom {94, 63, 46, 53};                  // + (dx c, dy r)
 constexpr int kCasHairLeftX = 65, kCasHairRightX = 228, kCasHairArrowY = 120;
@@ -124,7 +129,7 @@ constexpr Rect kCasHints {kCasX, 652, kCasW, 40};
 constexpr int kCasSlotW = 44, kCasSlotStep = 52, kCasSlotsX = kCasX + (kCasW - 7 * kCasSlotStep + 8) / 2;
 constexpr Rect CasGenderRect(int g) { return {750 + 94 * g, 188, 84, 84}; }
 constexpr Rect CasSkinRect(int i) { return {956 + 66 * i, 184, 56, 92}; }
-constexpr Rect CasKbPageRect(int p) { return {744 + 130 * p, 290, 120, 48}; }
+constexpr Rect CasKbPageRect(int p) { return {730 + 118 * p, 290, 110, 48}; }   // (X's chip and word after them)
 constexpr int kCasKeyW = 50, kCasKeyStep = 56, kCasKeysX = kCasX + 15, kCasKeysY = 352;
 constexpr Rect CasKeyRect(int i) { return {kCasKeysX + kCasKeyStep * (i % 9), kCasKeysY + kCasKeyStep * (i / 9), kCasKeyW, kCasKeyW}; }
 constexpr Rect kCasBackRect {kCasKeysX + 3 * kCasKeyStep, kCasKeysY + 3 * kCasKeyStep, 3 * kCasKeyStep - 6, kCasKeyW};

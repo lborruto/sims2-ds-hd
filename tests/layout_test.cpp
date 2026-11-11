@@ -3113,11 +3113,15 @@ int main()
                 // The pages' ends (no ring: LB on the Name page never lands on Keep this Sim?).
                 CHECK(page == 0 ? lb.empty() : lb.size() == 1 && lb[0].x == kCasTabX && lb[0].y == kCasTabY0 + kCasTabDy * (page - 1));
                 CHECK(page == 4 ? rb.empty() : rb.size() == 1 && rb[0].x == kCasTabX && rb[0].y == kCasTabY0 + kCasTabDy * (page + 1));
-                CHECK(start.empty() == (page == 4));
                 if (page < 4) CHECK(start == rb);
-                // Keep this Sim?: one B lands on the cross; only B there (or A) discards.
+                // Keep this Sim?: one B lands on the cross; only B there (or A) discards; Start the tick.
                 if (page == 4 && !v.back.empty()) CHECK(MenuFocusable(v, v.backFocus) && v.items[v.backFocus].id == kCasCrossId);
+                if (page == 4) CHECK(v.back.empty() ? start.empty() : start.size() == 1 && start[0].x == kCasTickX && start[0].y == kCasAnswerY);
                 if (page != 4) CHECK(v.backFocus == -1);
+                // B: the previous page on Hair, Face and Clothes (LB's tap); on the Name page Keep this
+                // Sim?'s tab, the focus landing on its cross there.
+                if (page >= 1 && page <= 3) CHECK(v.back == lb && v.backLands == 0);
+                if (page == 0) CHECK(v.back.size() == 1 && v.back[0].x == kCasTabX && v.back[0].y == kCasTabY0 + kCasTabDy * 4 && v.backLands == kCasCrossId);
             }
             for (int topW : {256, 341})
                 for (int focus : {-1, MenuFirst(v), (int)v.items.size() - 1})
