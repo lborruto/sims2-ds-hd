@@ -26,8 +26,7 @@ constexpr const char* kWords[][5] = {
     {"To the tray", "Vers le plateau", "Zur Schale", "Al vassoio", "A la bandeja"},
     {"To the flask", "Vers le bocal", "Zum Glas", "Al barattolo", "Al frasco"},
     {"Hold and pull: tear it open", "Maintenir et tirer : déchirer", "Halten und ziehen: aufreißen", "Tieni e tira: strappa", "Mantén y tira: rasgar"},
-    // Quit, asked once
-    {"Quit", "Quitter", "Beenden", "Esci", "Salir"},
+    // Quit asked again (the first: ShellQuit)
     {"Again: quit, the earnings lost", "Encore : quitter, gains perdus", "Nochmal: beenden, Geld verloren", "Ancora: esci, guadagni persi", "Otra vez: salir sin ganancias"},
     // The autopsy's values
     {"Specimen @1 of 2", "Spécimen @1 sur 2", "Exemplar @1 von 2", "Esemplare @1 di 2", "Espécimen @1 de 2"},
@@ -98,7 +97,6 @@ constexpr const char* kWords[][5] = {
     {"Play on it", "Jouer dessus", "Darauf spielen", "Gioca qui", "Jugar aquí"},
     {"Take it back", "Reprendre", "Zurücknehmen", "Riprendi", "Recuperar"},
     {"Players", "Joueurs", "Spieler", "Giocatori", "Jugadores"},
-    {"OK", "OK", "OK", "OK", "Aceptar"},
     {"Round @1 of 3", "Manche @1 sur 3", "Runde @1 von 3", "Round @1 di 3", "Ronda @1 de 3"},
     {"Cards left", "Cartes restantes", "Karten übrig", "Carte rimaste", "Cartas restantes"},
     // The Super Drencher
@@ -116,7 +114,6 @@ constexpr const char* kWords[][5] = {
     {"Hold: aim", "Maintenir : viser", "Halten: zielen", "Tieni: mira", "Mantén: apuntar"},
     {"Let go: throw", "Relâcher : lancer", "Loslassen: werfen", "Rilascia: lancia", "Suelta: lanzar"},
     {"Subdue", "Maîtriser", "Überwältigen", "Immobilizza", "Reducir"},
-    {"Ready", "Prêt", "Bereit", "Pronto", "Listo"},
     {"Aim", "Visée", "Ziel", "Mira", "Puntería"},
     {"Hit!", "Touché !", "Treffer!", "Colpito!", "¡Tocado!"},
     // The Scratch lottery: A, X, B asked once, the prize, the boxes
@@ -131,10 +128,7 @@ constexpr const char* kWords[][5] = {
     {"Octave", "Octave", "Oktave", "Ottava", "Octava"},
     {"Sustain", "Tenue", "Halten", "Sostegno", "Sostener"},
     {"Stop", "Arrêter", "Stopp", "Ferma", "Parar"},
-    {"Hold: VOX (mic)", "Maintenir : VOX (micro)", "Halten: VOX (Mikro)", "Tieni: VOX (micro)", "Mantén: VOX (micro)"},
     {"Let go: stop", "Relâcher : arrêter", "Loslassen: stopp", "Rilascia: ferma", "Suelta: parar"},
-    {"Choose", "Choisir", "Wählen", "Scegli", "Elegir"},
-    {"Back", "Retour", "Zurück", "Indietro", "Atrás"},
     // The mixer's values
     {"Song", "Morceau", "Song", "Brano", "Canción"},
     {"Instrument", "Instrument", "Instrument", "Strumento", "Instrumento"},
@@ -186,7 +180,7 @@ constexpr const char* kWords[][5] = {
     {"Controls", "Commandes", "Steuerung", "Comandi", "Controles"},
     {"Save states", "Sauvegardes rapides", "Spielstände", "Salvataggi rapidi", "Estados guardados"},
     {"Quit", "Quitter", "Beenden", "Esci", "Salir"},
-    {"Back", "Retour", "Zurück", "Indietro", "Volver"},
+    {"Back", "Retour", "Zurück", "Indietro", "Atrás"},
     {"Change", "Changer", "Ändern", "Cambia", "Cambiar"},
     {"Open", "Ouvrir", "Öffnen", "Apri", "Abrir"},
     {"Yes", "Oui", "Ja", "Sì", "Sí"},
@@ -194,7 +188,6 @@ constexpr const char* kWords[][5] = {
     {"OK", "OK", "OK", "OK", "Aceptar"},
     {"On", "Oui", "An", "Sì", "Sí"},
     {"Off", "Non", "Aus", "No", "No"},
-    {"Pause menu", "Menu pause", "Pausenmenü", "Menu di pausa", "Menú de pausa"},
     // The settings' rows
     {"Layout", "Disposition", "Anordnung", "Disposizione", "Disposición"},
     {"Fullscreen", "Plein écran", "Vollbild", "Schermo intero", "Pantalla completa"},
@@ -231,7 +224,6 @@ constexpr const char* kWords[][5] = {
     {"Turn the camera", "Tourner la caméra", "Kamera drehen", "Ruota la visuale", "Girar la cámara"},
     {"Fast forward", "Avance rapide", "Schnelllauf", "Avanti veloce", "Avance rápido"},
     {"Keys and buttons", "Touches et boutons", "Tasten und Knöpfe", "Tasti e pulsanti", "Teclas y botones"},
-    {"Blow (the vacuum)", "Souffler (l'aspirateur)", "Pusten (der Sauger)", "Soffia (l'aspirapolvere)", "Soplar (la aspiradora)"},
     // The bindings' actions (the DS's buttons by their letters)
     {"D-pad right", "Croix : droite", "Steuerkreuz rechts", "Croce: destra", "Cruceta: derecha"},
     {"D-pad left", "Croix : gauche", "Steuerkreuz links", "Croce: sinistra", "Cruceta: izquierda"},
@@ -245,9 +237,9 @@ constexpr const char* kWords[][5] = {
     // Changing a binding
     {"Press a key or a button: @1", "Appuyez sur une touche ou un bouton : @1", "Taste oder Knopf drücken: @1", "Premi un tasto o un pulsante: @1",
      "Pulsa una tecla o un botón: @1"},
-    {"Esc or Start + Back: keep it. Backspace: no key.", "Échap ou Start + Back : garder. Retour arrière : aucune touche.",
-     "Esc oder Start + Back: behalten. Rücktaste: keine Taste.", "Esc o Start + Back: mantieni. Backspace: nessun tasto.",
-     "Esc o Start + Back: mantener. Retroceso: sin tecla."},
+    {"Esc or @1: keep it. Backspace: no key.", "Échap ou @1 : garder. Retour arrière : aucune touche.",
+     "Esc oder @1: behalten. Rücktaste: keine Taste.", "Esc o @1: mantieni. Backspace: nessun tasto.",
+     "Esc o @1: mantener. Retroceso: sin tecla."},
     {"Clear", "Effacer", "Löschen", "Cancella", "Borrar"},
     {"All in turn", "Toutes à la suite", "Alle nacheinander", "Tutti in fila", "Todas seguidas"},
     {"Reset to defaults", "Valeurs par défaut", "Standard wiederherstellen", "Ripristina predefiniti", "Restablecer"},
@@ -255,7 +247,6 @@ constexpr const char* kWords[][5] = {
     {"Controller", "Manette", "Controller", "Controller", "Mando"},
     // The save states
     {"Empty", "Vide", "Leer", "Vuoto", "Vacío"},
-    {"Save here", "Sauver ici", "Hier speichern", "Salva qui", "Guardar aquí"},
     {"Load", "Charger", "Laden", "Carica", "Cargar"},
     {"Load slot @1? What you played since then is lost (Undo brings it back).",
      "Charger l'emplacement @1 ? Ce que vous avez joué depuis est perdu (Annuler le rend).",
@@ -279,7 +270,6 @@ constexpr const char* kWords[][5] = {
     {"State saved", "État sauvé", "Stand gespeichert", "Stato salvato", "Estado guardado"},
     {"State loaded", "État chargé", "Stand geladen", "Stato caricato", "Estado cargado"},
     {"No state to load", "Aucun état à charger", "Kein Stand zum Laden", "Nessuno stato da caricare", "Ningún estado que cargar"},
-    {"Screenshot saved", "Capture d'écran enregistrée", "Bildschirmfoto gespeichert", "Screenshot salvato", "Captura guardada"},
     {"Save backed up", "Sauvegarde copiée", "Spielstand gesichert", "Salvataggio copiato", "Partida copiada"},
     {"New screen recorded for the port", "Nouvel écran enregistré pour le portage", "Neuer Bildschirm für die Portierung aufgenommen",
      "Nuova schermata registrata per il port", "Nueva pantalla grabada para la versión"},
@@ -291,7 +281,6 @@ constexpr const char* kWords[][5] = {
      "Non è la cartuccia europea (@1): le schermate HD ne hanno bisogno. Il gioco usa le sue.",
      "No es el cartucho europeo (@1): las pantallas HD lo necesitan. El juego usa las suyas."},
     // The launch panel
-    {"Continue", "Continuer", "Weiter", "Continua", "Continuar"},
     {"Where you left off, @1", "Là où vous en étiez, @1", "Wo du aufgehört hast, @1", "Dove eri rimasto, @1", "Donde lo dejaste, @1"},
     {"Choose a file", "Choisir un fichier", "Datei wählen", "Scegli un file", "Elegir un archivo"},
     {"Recent", "Récents", "Zuletzt", "Recenti", "Recientes"},
@@ -474,11 +463,11 @@ constexpr const char* kWords[][5] = {
      "Kurzes Vibrieren, wenn ein Controller sich verbindet (mit Motor). Das Spiel selbst vibriert nicht.",
      "Una breve vibrazione quando un controller si collega (con motore). Il gioco non vibra.",
      "Una breve vibración al conectar un mando (con motor). El juego no vibra."},
-    {"What the DS hears when the game listens (the vacuum, the mixer). Blow key: M.",
-     "Ce que la DS entend quand le jeu écoute (l'aspirateur, la table de mixage). Touche souffle : M.",
-     "Was die DS hört, wenn das Spiel zuhört (der Sauger, das Mischpult). Pustetaste: M.",
-     "Cosa sente il DS quando il gioco ascolta (l'aspirapolvere, il mixer). Tasto soffio: M.",
-     "Lo que oye la DS cuando el juego escucha (la aspiradora, el mezclador). Tecla de soplido: M."},
+    {"What the DS hears when the game listens (the vacuum, the mixer). Blow key: @1.",
+     "Ce que la DS entend quand le jeu écoute (l'aspirateur, la table de mixage). Touche souffle : @1.",
+     "Was die DS hört, wenn das Spiel zuhört (der Sauger, das Mischpult). Pustetaste: @1.",
+     "Cosa sente il DS quando il gioco ascolta (l'aspirapolvere, il mixer). Tasto soffio: @1.",
+     "Lo que oye la DS cuando el juego escucha (la aspiradora, el mezclador). Tecla de soplido: @1."},
     {"Change any key or button, including one button alone for the pause menu.",
      "Changer toute touche ou tout bouton, dont un seul bouton pour le menu pause.",
      "Jede Taste und jeden Knopf ändern, auch einen einzelnen Knopf für das Pausenmenü.",
@@ -497,6 +486,28 @@ constexpr const char* kWords[][5] = {
     // The world's prompt
     {"Hold for more", "Maintenir : plus", "Halten: mehr", "Tieni premuto: altro", "Mantén: más"},
     {"Other target", "Autre cible", "Anderes Ziel", "Altro obiettivo", "Otro objetivo"},
+    // The audit's round (shell): the questions, the pause key kept, the controls card, the keycaps' names.
+    {"Put every key and button back to its default?", "Remettre toutes les touches et tous les boutons par défaut ?",
+     "Alle Tasten und Knöpfe auf den Standard zurücksetzen?", "Riportare tutti i tasti e i pulsanti ai valori predefiniti?",
+     "¿Devolver todas las teclas y botones a sus valores por defecto?"},
+    {"Go back to just before the last load? What you played since is lost.",
+     "Revenir juste avant le dernier chargement ? Ce que vous avez joué depuis est perdu.",
+     "Zurück zu kurz vor dem letzten Laden? Was du seitdem gespielt hast, geht verloren.",
+     "Tornare a poco prima dell'ultimo caricamento? Ciò che hai giocato da allora va perso.",
+     "¿Volver a justo antes de la última carga? Lo jugado desde entonces se pierde."},
+    {"The pause menu keeps a key: give it another one instead.", "Le menu pause garde une touche : donnez-lui-en plutôt une autre.",
+     "Das Pausenmenü behält eine Taste: gib ihm lieber eine andere.", "Il menu di pausa tiene un tasto: assegnagliene un altro.",
+     "El menú de pausa conserva una tecla: dale otra en su lugar."},
+    {"Camera, cursor", "Caméra, curseur", "Kamera, Cursor", "Visuale, cursore", "Cámara, cursor"},
+    {"Tabs, pages", "Onglets, pages", "Reiter, Seiten", "Schede, pagine", "Pestañas, páginas"},
+    {"Camera, tabs", "Caméra, onglets", "Kamera, Reiter", "Visuale, schede", "Cámara, pestañas"},
+    {"Stylus, buttons", "Stylet, boutons", "Stift, Schaltflächen", "Pennino, pulsanti", "Puntero, botones"},
+    {"MOUSE", "SOURIS", "MAUS", "MOUSE", "RATÓN"},
+    {"ENTER", "ENTRÉE", "ENTER", "INVIO", "INTRO"},
+    {"RIGHT SHIFT", "MAJ DROITE", "SHIFT RECHTS", "MAIUSC DESTRO", "MAYÚS DCHA"},
+    {"LEFT SHIFT", "MAJ GAUCHE", "SHIFT LINKS", "MAIUSC SIN.", "MAYÚS IZDA"},
+    {"SPACE", "ESPACE", "LEERTASTE", "SPAZIO", "ESPACIO"},
+    {"BACKSPACE", "RET. ARRIÈRE", "RÜCKTASTE", "BACKSPACE", "RETROCESO"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }
