@@ -17,7 +17,7 @@ enum class OwnWordId : int
     AutopsyLaser, AutopsyHand, AutopsyTweezers,
     AutopsyCut, AutopsyLift, AutopsyPick,
     AutopsyToTray, AutopsyToFlask, AutopsyTear,
-    AutopsyQuit, AutopsyQuitAgain,
+    AutopsyQuitAgain,
     AutopsySpecimen, AutopsyOrgan, AutopsyFreed, AutopsyRemoved, AutopsyDestroyed, AutopsyParasites, AutopsyEating,
     // The Metal Detector.
     DetectorWalk, DetectorDig, DetectorDepth, DetectorPowerOff, DetectorCharge, DetectorSignal, DetectorNone,
@@ -36,16 +36,16 @@ enum class OwnWordId : int
     SocialAnswer, SocialAgain, SocialMatch,
     // MooGoo Monkey: the hints, the round and the deck.
     MooGooPlay, MooGooChooseMonkey, MooGooBet, MooGooPlayCard, MooGooUndoBet, MooGooPlayOn, MooGooTakeBack,
-    MooGooPlayers, MooGooConfirm, MooGooRound, MooGooCardsLeft,
+    MooGooPlayers, MooGooRound, MooGooCardsLeft,
     // The Super Drencher.
     DrencherFire, DrencherPump, DrencherTarget, DrencherRefill, DrencherRun, DrencherPutAway, DrencherWater, DrencherPressure,
     DrencherNone,
     // The Ratticator's crime game (its run and put away: the Drencher's words).
-    CrimeScare, CrimeAim, CrimeThrow, CrimeSubdue, CrimeReady, CrimeAimLabel, CrimeHit,
+    CrimeScare, CrimeAim, CrimeThrow, CrimeSubdue, CrimeAimLabel, CrimeHit,
     // The Scratch lottery.
     ScratchHold, ScratchRub, ScratchQuitAgain, ScratchTopPrize, ScratchOpened,
     // The music mixer and its save page.
-    MixerTouch, MixerPoint, MixerOctave, MixerSustain, MixerStop, MixerVox, MixerVoxStop, MixerChoose, MixerBack,
+    MixerTouch, MixerPoint, MixerOctave, MixerSustain, MixerStop, MixerVoxStop,
     MixerSong, MixerInstrument, MixerReady, MixerPlaying, MixerRecording, MixerHelp,
     SaveType, SaveHere, SaveOverwrite, SaveErase, SaveSlot,
     // The wireless lobby.
@@ -73,17 +73,17 @@ enum class OwnWordId : int
     // The HD shell (shell.*): the pause menu, its pages and questions, the settings' rows and
     // values, the controls card, the bindings, the save states, the toasts, the launch panel.
     ShellPaused, ShellResume, ShellSettings, ShellControls, ShellStates, ShellQuit, ShellBack, ShellChange, ShellOpen,
-    ShellYes, ShellNo, ShellOk, ShellOn, ShellOff, ShellPauseMenu,
+    ShellYes, ShellNo, ShellOk, ShellOn, ShellOff,
     SetLayout, SetFullscreen, SetScaling, SetRes3D, SetWide, SetFps60, SetVolume, SetFastSound, SetStickCursor, SetDeadZone,
     SetTrigger, SetRumble, SetMic, SetLanguage, MicBlowKey, LangAuto, LangNote,
     LayoutConsole, LayoutAuto, LayoutFocus, LayoutSide, LayoutStacked,
-    CtlWalk, CtlTouch, CtlBack, CtlZoom, CtlCamera, CtlFast, CtlKeys, CtlBlow,
+    CtlWalk, CtlTouch, CtlBack, CtlZoom, CtlCamera, CtlFast, CtlKeys,
     ActRight, ActLeft, ActUp, ActDown, ActSwap, ActSaveState, ActLoadState, ActBlow, ActTouch,
     KeysPress, KeysCancel, KeysClear, KeysAll, KeysReset, KeysKeyboard, KeysController,
-    StEmpty, StSave, StLoad, StLoadAsk, StOverwriteAsk, StUndo, StSaved, StLoaded, StUndone, StFailed, StNoFolder,
+    StEmpty, StLoad, StLoadAsk, StOverwriteAsk, StUndo, StSaved, StLoaded, StUndone, StFailed, StNoFolder,
     QuitAsk, QuitNote,
-    ToastStateSaved, ToastStateLoaded, ToastNoState, ToastShot, ToastBackup, ToastCapture, ToastNotSaving, NotEU,
-    LaunchContinue, LaunchWhere, LaunchChoose, LaunchRecent, LaunchDrop, LaunchWrong, LaunchUnreadable, LaunchStart, LaunchTitle,
+    ToastStateSaved, ToastStateLoaded, ToastNoState, ToastBackup, ToastCapture, ToastNotSaving, NotEU,
+    LaunchWhere, LaunchChoose, LaunchRecent, LaunchDrop, LaunchWrong, LaunchUnreadable, LaunchStart, LaunchTitle,
     WirelessNote,
     // The review's round: change game, open the saves' folder, a stale place, a state from another
     // file, a place that did not load.
@@ -108,6 +108,11 @@ enum class OwnWordId : int
     // The world's prompt (port/prompt.*): A held shows the other actions, Up / Down choose one
     // while it is held, Left / Right switch to the next target near the hero.
     PromptMore, PromptOther,
+    // The audit's round (shell): the bindings' reset and Undo asked first, the pause menu's key kept
+    // (clearing its last one is refused), the controls card per device (the pad's right stick, its
+    // shoulders; the keyboard's Q / W, the mouse), the names keycaps print.
+    KeysResetAsk, StUndoAsk, KeysMenuNeeded, CtlCameraCursor, CtlTabs, CtlCameraTabs, CtlStylus,
+    KeyMouse, KeyEnter, KeyRightShift, KeyLeftShift, KeySpace, KeyBackspace,
     // (ux task 6, the front end and the minigames) The mixer's X: play the song (the game's word is
     // its button's, START in German).
     MixerPlay,

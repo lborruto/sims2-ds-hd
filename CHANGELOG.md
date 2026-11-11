@@ -17,42 +17,53 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   the screens by their pixels, with the game's own small pictures.
 - The status bar in HD (the time, money and Sanity) on a strip the window's whole width, with the
   camera and menu hints at its right; what you just won or paid shows beside the money.
-- Conversations in HD: the speaker's name, the words in large type and their portrait; A turns
-  the page.
+- Conversations in HD: the speaker's name, the words in large type and their portrait (without the
+  DS's bevelled corners); A "Continue" turns the page.
 - What A does, in the world: near someone or something, a plate says it ("A Buy", and who or
-  what); hold A for the other actions, Left / Right for the next thing nearby.
+  what); hold A for the other actions, Left / Right "Other target" for the next thing nearby.
 - The camera on the right stick: left / right turns, up / down zooms (the keyboard's Q / W and S /
   A as before).
 - The whole town in HD with a controller: the menu's five tabs (Interact, Pockets, Goals,
   Relationships, Options), Give Gift, the game's save slots, popups, notes and the phone.
 - The shops and the hotel in HD: the shop's catalogue (buy and sell), Build Rooms, the Registry
-  and a guest's check-in, a room's page and its hints, the music panel and the stat panel.
+  and a guest's check-in, a room's page and its hints, the music panel and the stat panel (its
+  pages on white paper, as the game drew them, its tabs named).
 - The front end in HD: the intro, the title, the main menu, the game's Settings (volumes, concept
-  art, credits), Load-a-Sim and Create-a-Sim (your Sim big, the name on the game's keyboard or
-  typed on yours, gender, skin, hair, face, clothes, aspiration).
-- Every minigame on the controller, in an HD frame of its own: the game's name, its numbers, a bar
-  of hints that follows what the game asks, and its messages and questions redrawn. The Alien
-  Autopsy, the Metal Detector, the painting and the scratch tickets have a pointer on the sticks;
-  Moogoo Monkey a green ring; every minigame can be left with a button, and the Drencher's, the
-  Rat-A-Rang's and the mixer's help open with Start.
-- A new pause menu (Start + Back, or Esc), in HD and five languages, with the buttons of the
-  controller you hold: Settings as one list, the Controls card, Keys and buttons (A to change one,
-  X to clear it, Y to set them all in turn), four save states with their picture and date
-  (loading one asks first, and can be undone, even after a restart), Change game, Open the saves
-  folder, and Quit, which asks first and keeps your place.
+  art, credits, its four pages named in a tab bar), Load-a-Sim and Create-a-Sim (your Sim big, the
+  name on the game's keyboard or typed on yours, gender, skin, hair, face, clothes, aspiration),
+  drawn with the game's own pictures.
+- Every minigame on the controller, in an HD frame of its own: the game's name, its numbers on
+  dark wells, a bar of hints that follows what the game asks, and its messages and questions
+  redrawn. The Alien Autopsy, the Metal Detector, the painting and the scratch tickets have a
+  pointer on the sticks; Moogoo Monkey a green ring; every minigame can be left with a button,
+  and the Drencher's, the Rat-A-Rang's and the mixer's help open with Start.
+- The vacuum on a controller: A takes the find in the green ring (the one nearest the hand; the
+  right stick moves the hand) to the funnel at the bowl's bottom and lets go when the funnel is
+  ready, so it is kept and the filter never clogs; the D-pad drives (the keyboard still moves the
+  hand with S and the arrows).
+- Alien Autopsy on a controller: with the hand, A takes a freed organ to the tray by itself; with
+  the tweezers, A takes the nearest parasite (an eating one first) to the flask. The laser still
+  cuts with A held.
+- The HD screens' look: the game's small pictures at two sizes, each pixel a whole block of screen
+  pixels at any window size (with *Game icons* on Pixels); round list arrows; greyed buttons
+  where nothing can be done; the focused row a deep blue with white words inside a green ring
+  with a light line; no text under 18 points at 100 %. Every button hint names what it does
+  (Choose, Scroll, Pages, Adjust, Turn, View), and the D-pad chips show arrowheads for the
+  directions they mean.
 - A launch panel before the game: Continue (where you quit, with its picture), choose a file or
-  drop a `.nds` on the window, your recent games, the language. A file that is not The Sims 2 is
-  said there; another region's cartridge is said once over the game.
-- Settings: Interface size (Auto follows your screen's size and the window's, or 60 to 150 %),
-  Game pictures (Smooth: the game's icons and portraits redrawn with soft edges by xBRZ; or
-  Pixels), Picture filter (Sharp, Smooth or Pixels), Battery saver, Mute, Run in background, fast
-  forward speed (2×, 3×, 4× or maximum) and a press-on / press-off fast forward key, Fast boot,
-  cursor speed, swap the sticks (left-handed), hide the idle mouse pointer, the sticks' dead zone,
-  how far the triggers go down, rumble. The window comes back where it was; its first size fits
-  the screen.
+  drop a `.nds` on the window, your recent games, the language, kept inside a TV's safe area. A
+  file that is not The Sims 2 is said there; another region's cartridge is said once over the game.
+- Settings: Interface size (Auto, the default, follows your screen's size and the window's; or 60
+  to 150 %), Screen scaling (Sharp, the default, Smooth or Pixels), Game icons (Pixels, the DS's
+  own, the default; or Smooth, redrawn by xBRZ), Hide the idle pointer (on), Battery saver (3D at
+  1x and 30 fps while on), Mute, Pause in the background (on), Sound in fast forward, Stick
+  cursor, Cursor speed (50 to 200 %), Swap the sticks (left-handed), Stick dead zone, Trigger
+  press at, Buzz on connect (on), Microphone (off, the blow key or a real microphone), Fast
+  forward speed (2×, 3×, 4× or as fast as it goes), Fast forward key (Hold or Toggle), Fast boot
+  (on: the boot's splashes, which wait for no button, at full speed). The window comes back where
+  it was; its first size fits the screen.
 - The game's language is the DS's own, set from your computer's (or the one you pick): the
   game's text, its keyboards and the HD screens follow it.
-- Fast boot: the boot's splashes, which wait for no button, go by at full speed.
 - Every controller, natively or through Steam: XInput, DirectInput, PlayStation, Switch, 8BitDo
   and the rest SDL knows, plugged in or out at any time; SDL_GameControllerDB built in, and your
   own `gamecontrollerdb.txt` in the settings folder. The Steam Controller and the Steam Deck work
@@ -77,62 +88,17 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Changed
 
-- The pause menu's Settings in five tabs (Display, Graphics, Sound, Controls, Game), changed with
-  LB / RB (Q / W), the rarely needed rows under *Advanced*, a line saying what every row does,
-  `‹ ›` arrows on what Left / Right change, and Y to put a tab back to its defaults (it asks
-  first, on No). Layout is no longer the first row. Battery saver dims the two rows it holds and
-  shows what it holds them at; Language says it applies at the next start. Keys and buttons is
-  in the Controls tab too, and says the pause menu can have one button of its own.
-- Clearer names: *Screen scaling* (was Picture filter), *Game icons* (was Game pictures), *Pause in
-  the background* (was Run in background, the other way round), *Buzz on connect* (was Rumble),
-  fast forward *Hold / Toggle*, and the real microphone reads "Real microphone".
-- The game's icons and portraits in the HD menus are drawn with the DS's own pixels by default.
-  Settings kept from an earlier version move to Pixels once (they all said Smooth, the old
-  default); Smooth stays a choice in *Game icons*, and once chosen again it stays.
-- With *Game icons* on Pixels, the game's icons stay crisp at any window size: they are enlarged
-  from the DS's own pixels, never from a copy already enlarged and then blurred again.
-- Easier to read from the sofa: the focused row is a deep blue with white words (its words were
-  white on light lavender), the focus ring has a light line inside the green (a dark one on light
-  buttons) so it shows without its colour, notes and headings are white, and no text is smaller than 18 points at 100 % (27
-  pixels on a 1080p TV), the buttons' names in their chips (START + BACK, LB, keys) included.
-- The launch panel keeps out of the screen's outer edge, where some TVs cut the picture.
-- The D-pad chips that mean Up / Down or Left / Right show two arrowheads (˄ ˅, ‹ ›) instead of a
-  bar that read as a plus or a minus.
-- The town's menus, Give Gift, notes and the phone: the game's small pictures at two sizes only
-  (buttons and arrows smaller, items and the menu's tabs larger), each pixel a whole block of
-  screen pixels at any window size. The counted items in Pockets and the phone button are the
-  game's own pictures (no more dark squares or blue band around them).
-- Portraits (Interact, Give Gift, Goals, Relationships, conversations, the hotel's Registry and
-  room page) without the DS's bevelled corners around them.
-- Every button hint says what it does: Up / Down "Choose" (Goals, Relationships, the phone), Left /
-  Right "Adjust" on a volume and "Other target" on Interact, A "Continue" in a conversation.
-- The phone's highlighted row has the same focus ring as every other menu; the world's prompt,
-  Relationships' labels and Interact's neighbouring names are easier to read, and buttons that do
-  nothing now (Use, Trash, Give Gift) look like the shops' greyed ones.
-- The shops, the hotel, the front end, Create-a-Sim and the stat panel draw the game's small
-  pictures at one of two sizes, the same for every item of a kind: a shop's items no longer mix
-  big and small ones, and they stay crisp at any window size.
-- The stat panel's pages sit on white paper, as the game drew its pictures for, in dark ink; its
-  tabs name the pages and its X sits beside the title.
-- One look for every list's arrows (the shop, Build Rooms, the music panel): round buttons with a
-  drawn arrow. DS Wireless's icon is drawn sharp, and the shop's greyed words are readable.
-- Every button hint says what it does: the D-pad's (Choose, Scroll, Pages, Adjust), Create-a-Sim's
-  (Turn, Select) and the concept art's (View).
-- The front end's Settings name their four pages in the tab bar, as the stat panel does; the concept
-  art's cells show the art without the DS's frame; DS Wireless is greyed the way the shop greys.
-- The minigames' numbers and button bar sit on dark wells and are never smaller than 18 points:
-  the cards' line, MooGoo's players and the long German words fit without shrinking further.
-- The vacuum on a controller: A takes a find for you. The hand goes to the find in the green ring
-  (the one nearest the hand; the right stick moves the hand), presses where no dust lies over it,
-  carries it to the funnel at the bowl's bottom and lets go when the funnel is ready, so it is
-  kept and the filter never clogs. With no find in the bowl A does nothing. The hint said to drag
-  finds to the box: the game only keeps what is dropped in the funnel. On a controller the D-pad always drives now (the keyboard still moves the hand with S and the arrows).
-- Alien Autopsy on a controller: with the hand, A takes a freed organ to the tray by itself; with
-  the tweezers, A takes the nearest parasite (an eating one first) to the flask. The laser still
-  cuts with A held.
-- Create-a-Sim draws the game's own pictures from your copy of the game: the page tabs as round
-  buttons, ♀ / ♂ (the one not chosen grey), the arrows, the clothes and their categories, and the
-  aspirations twice their size, the ones not chosen properly dimmed.
+- The pause menu (Start + Back, or Esc, which also resumes from any of its pages) is in HD and
+  five languages, with the buttons of the controller you hold. Its Settings have five tabs
+  (Display, Graphics, Sound, Controls, Game) changed with LB / RB (Q / W), the rarely needed rows
+  under *Advanced*, a line saying what each row does, `‹ ›` on what Left / Right (or A) adjust,
+  and Y to put a tab back to its defaults. Controls shows what each button does on your device,
+  and Keys and buttons changes any of them (A to change one, X to clear it, Y to set them all in
+  turn, the last row to reset them; the pause menu keeps a key and can have one button of its
+  own). Four save states with their picture and date: loading one asks first and can be undone
+  (asked too), even after a restart. Change game, Open the saves folder, and Quit, which asks
+  first and keeps your place. Every question opens on No and B says No; a message closes with A
+  or B. Lists stop at their ends.
 - CONSOLE is the default layout; AUTO, FOCUS, SIDE and STACKED stay in the pause menu's Settings
   (keys 0 to 4). Sharper 3D, widescreen and 60 fps are on by default; a settings file from before
   CONSOLE that still holds the old defaults is moved to the new ones once, and a file that names a
@@ -143,15 +109,15 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - LB / RB switch the menus' tabs and pages; in town they no longer turn the camera (the right stick
   does), unless you give L / R buttons of your own.
 - With several controllers, the one used last plays (before, every pad's buttons counted at once).
-- Questions (Quit? Overwrite this save? a minigame's) open on No: two quick presses of A never say
+- The game's questions (a minigame's, Create-a-Sim's) open on No: two quick presses of A never say
   yes. In Create-a-Sim's last page, the first B only moves to the cross.
 - The quick save state (F5 / F7) moved from beside the ROM to the settings folder; F12 saves the
   window as you see it, at full resolution, named by the date and time, in `screenshots/` there.
 - The DS buttons' keys follow their position on any keyboard layout (AZERTY: B on W, Y on Q, L on
   A, R on Z).
 - DS Wireless is greyed on the main menu: it needs a second DS.
-- The game pauses and goes quiet when its window is not in front (Settings > Run in background).
-  The Steam overlay does not pause it.
+- The game pauses and goes quiet when its window is not in front (Settings > Pause in the
+  background). The Steam overlay does not pause it.
 - The volume moves by 5 %.
 - The README is short and for players; the full manual is `docs/manual.md`.
 

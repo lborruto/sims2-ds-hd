@@ -51,6 +51,8 @@ static const char* AskName(shell::Ask a)
     case shell::Ask::Overwrite: return "overwrite";
     case shell::Ask::Message: return "message";
     case shell::Ask::ResetTab: return "reset";
+    case shell::Ask::ResetKeys: return "reset keys";
+    case shell::Ask::Undo: return "undo";
     }
     return "?";
 }
@@ -83,7 +85,7 @@ void ShellHost::Refresh(const App& app, const Input& input)
     for (int a = 0; a < Controls::COUNT; a++)
     {
         const int k = b.Key(a);
-        model.keyGlyph[a] = k > 0 ? Controls::KeyName(k) : "";
+        model.keyGlyph[a] = shell::KeyLabel(k, model.language);
         const int in = b.Pad(a);
         std::string g = in >= 0 ? Controls::InputKey(PrintedInput(in, input.padStyle, labels)) : "";
         if (g == "back" && input.padStyle == Controls::PLAYSTATION)
@@ -92,6 +94,7 @@ void ShellHost::Refresh(const App& app, const Input& input)
     }
     model.padFace = input.padStyle == Controls::PLAYSTATION ? ui::Face::PlayStation : input.padStyle == Controls::NINTENDO ? ui::Face::Nintendo : ui::Face::Xbox;
     model.keyboard = input.lastKeyboard;
+    model.pauseCombo = PauseCombo(input.padStyle, type);
     if (model.capturing >= 0 && !headless)
         model.captureLeft = (int)std::max<long>(0, ((long)captureUntil - (long)SDL_GetTicks() + 999) / 1000);
     model.statesOk = data.Ok();
@@ -362,8 +365,17 @@ void ShellHost::Frame(App& app, Video& video, Input& input, const shell::Input& 
         bool done = false, cancelled = false;
         if (input.newKey != Controls::kDefault)
         {
-            if (input.newKey == Controls::kNone) s.controls.key[a] = Controls::kNone;
-            else s.controls.SetKey(a, input.newKey);
+            // (Backspace on the pause menu's key, or its key given to an action that had none,
+            // would leave the keyboard no way to the pause menu: refused, said.)
+            Controls::Bindings next = s.controls;
+            if (input.newKey == Controls::kNone) next.key[a] = Controls::kNone;
+            else next.SetKey(a, input.newKey);
+            if (next.Key(Controls::MENU) == Controls::kNone)
+            {
+                model.message = OwnWordIn(model.language, W::KeysMenuNeeded);
+                cancelled = true;
+            }
+            else s.controls = next;
             done = true;
         }
         else if (input.newPad >= 0) { s.controls.SetPad(a, input.newPad); done = true; }

@@ -135,18 +135,23 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
         }
         if (menuOpen)
         {
-            // The menu: arrows, Enter and Esc, and the DS's A and B keys as on a console.
-            if (k == SDLK_UP) nav.up = true;
-            else if (k == SDLK_DOWN) nav.down = true;
-            else if (k == SDLK_LEFT) nav.left = true;
-            else if (k == SDLK_RIGHT) nav.right = true;
-            else if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE || a == A) nav.a = true;
-            else if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE || a == B) nav.b = true;
-            else if (k == SDLK_DELETE || a == X) nav.x = true;
-            else if (a == Y) nav.y = true;
-            else if (a == L) { if (!ev.key.repeat) nav.lb = true; } // (Q / W: the settings' tabs, one per press)
-            else if (a == R) { if (!ev.key.repeat) nav.rb = true; }
-            else if (a == MENU && !ev.key.repeat) wantMenu = true;
+            // The menu: arrows, Enter and Esc, and the DS's A and B keys as on a console (MenuKeyOf:
+            // the MENU key, Esc, resumes from every page).
+            switch (MenuKeyOf(k, a))
+            {
+            case MenuKey::Up: nav.up = true; break;
+            case MenuKey::Down: nav.down = true; break;
+            case MenuKey::Left: nav.left = true; break;
+            case MenuKey::Right: nav.right = true; break;
+            case MenuKey::A: nav.a = true; break;
+            case MenuKey::B: nav.b = true; break;
+            case MenuKey::X: nav.x = true; break;
+            case MenuKey::Y: nav.y = true; break;
+            case MenuKey::Lb: if (!ev.key.repeat) nav.lb = true; break; // (Q / W: the settings' tabs, one per press)
+            case MenuKey::Rb: if (!ev.key.repeat) nav.rb = true; break;
+            case MenuKey::Menu: if (!ev.key.repeat) wantMenu = true; break;
+            case MenuKey::None: break;
+            }
             return;
         }
         // Create-a-Sim's Name page: Enter is the navigator's A (the focused key types, a gender or

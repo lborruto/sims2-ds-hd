@@ -488,6 +488,7 @@ int main(int argc, char** argv)
                 input.Poll(app, true);
                 if (input.wantQuit) return false;
                 in = shellInput(input.nav);
+                if (input.wantMenu) in.b = true; // (Esc, the MENU key: B here, onto Quit or closing a message)
                 if (!input.droppedFile.empty()) { tryPath = input.droppedFile; input.droppedFile.clear(); }
                 input.EndFrame();
             }
@@ -1154,9 +1155,16 @@ relaunch:
             }
             if (host.Open())
             {
-                // The pause buttons again (Start + Back, the MENU key): back to the game.
-                if (input.wantMenu && host.model.capturing < 0 && host.model.message.empty()) host.shell.Close();
-                else host.Frame(app, video, input, shellInput(input.nav));
+                // The pause buttons again (Start + Back, the MENU key): back to the game from every
+                // page; over a question or a message they are B (No, close it).
+                const bool boxed = host.shell.ask != shell::Ask::None || !host.model.message.empty();
+                if (input.wantMenu && host.model.capturing < 0 && !boxed) host.shell.Close();
+                else
+                {
+                    shell::Input in = shellInput(input.nav);
+                    if (input.wantMenu && boxed) in.b = true;
+                    host.Frame(app, video, input, in);
+                }
             }
             else if (input.wantMenu || (shellPage >= 0 && frame == shellAt && iter == shellAt))
             {

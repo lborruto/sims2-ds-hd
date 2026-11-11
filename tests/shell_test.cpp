@@ -4,7 +4,9 @@
 // Yes), a message stays until A, the settings' rows change and wrap within their range, the
 // bindings' capture in turn stops on a cancel, the save states' grid and Undo, the mouse lands on
 // the items it shows; every item inside the canvas, the panel's words in five languages (no
-// letter the font lacks), layers ascending; the thumbnails' files and the ROM header's kinds.
+// letter the font lacks), layers ascending, every word whole and inside its box on every page,
+// question, message and the launch panel (no hint over another); the lists stop at their ends;
+// the thumbnails' files and the ROM header's kinds.
 //   ninja -C build shell_test && ./build/shell_test
 #define SDL_MAIN_HANDLED
 #include <SDL.h>
@@ -376,9 +378,24 @@ static void keys_page()
     Result n = sh.CaptureDone(false);
     CHECK(n.act == Act::Capture && n.arg == 4);
     CHECK(sh.CaptureDone(true).act == Act::None && !sh.sequence && sh.focus == 4);
-    // The last row resets.
+    // The last row resets, asked first (No focused: A then is No, B is No).
     sh.focus = Controls::COUNT;
+    CHECK(sh.Update(Press("a"), f.m).act == Act::None && sh.ask == Ask::ResetKeys && sh.askFocus == 0);
+    CheckBuild(sh, f.m, "reset keys question");
+    CHECK(sh.Update(Press("a"), f.m).act == Act::None && sh.ask == Ask::None);
+    sh.Update(Press("a"), f.m);
+    CHECK(sh.Update(Press("b"), f.m).act == Act::None && sh.ask == Ask::None && sh.page == Page::Keys);
+    sh.Update(Press("a"), f.m);
+    sh.Update(Press("right"), f.m);
     CHECK(sh.Update(Press("a"), f.m).act == Act::ResetBindings);
+    // The pause menu's key is never cleared from the keyboard (a pad keeps Start + Back): said.
+    sh.focus = Controls::MENU;
+    f.m.keyboard = true;
+    CHECK(sh.Update(Press("x"), f.m).act == Act::None && !f.m.message.empty());
+    CheckBuild(sh, f.m, "menu key kept");
+    CHECK(sh.Update(Press("b"), f.m).act == Act::None && f.m.message.empty() && sh.page == Page::Keys);
+    f.m.keyboard = false;
+    CHECK(sh.Update(Press("x"), f.m).act == Act::ClearBinding);
     for (int lang = 1; lang <= 5; lang++)
     {
         f.m.language = lang;
@@ -405,6 +422,12 @@ static void states_page()
     sh.focus = 2;
     sh.Update(Press("down"), f.m);
     CHECK(sh.focus == kStateSlots);
+    // Undo asks first (No focused).
+    CHECK(sh.Update(Press("a"), f.m).act == Act::None && sh.ask == Ask::Undo && sh.askFocus == 0);
+    CheckBuild(sh, f.m, "undo question");
+    CHECK(sh.Update(Press("a"), f.m).act == Act::None && sh.ask == Ask::None);
+    sh.Update(Press("a"), f.m);
+    sh.Update(Press("right"), f.m);
     CHECK(sh.Update(Press("a"), f.m).act == Act::Undo);
     sh.Update(Press("up"), f.m);
     CHECK(sh.focus == 2);
@@ -479,12 +502,13 @@ static void launch_panel()
         if (e[i].kind == LaunchItem::Language) sh.focus = i;
     r = sh.Update(Press("right"), f.m);
     CHECK(r.act == Act::Setting && f.s.language == 1);
-    // A message stays until A (B, the D-pad and a click elsewhere do nothing).
+    // A message stays until A or B (the D-pad does nothing).
     f.m.message = "x.nds is not The Sims 2 for the DS.";
-    CHECK(sh.Update(Press("b"), f.m).act == Act::None && !f.m.message.empty());
     CHECK(sh.Update(Press("down"), f.m).act == Act::None && !f.m.message.empty());
     CheckBuild(sh, f.m, "launch message");
     CHECK(sh.Update(Press("a"), f.m).act == Act::None && f.m.message.empty());
+    f.m.message = "x.nds is not The Sims 2 for the DS.";
+    CHECK(sh.Update(Press("b"), f.m).act == Act::None && f.m.message.empty());
     for (int lang = 1; lang <= 5; lang++)
     {
         f.m.language = lang;
@@ -994,6 +1018,153 @@ static void SaveRules(const std::filesystem::path& dir)
     fs::permissions(beside, fs::perms::owner_write, fs::perm_options::add);
 }
 
+// Every word whole and inside its box, on every page, question, message, capture and the launch
+// panel, in five languages, with the pad's look and the keyboard's: no "…", a line no wider than
+// its box, a wrapped text no taller than its box; no two chips over each other (the hint rows: a
+// hint never runs into the next one, nor into the pause chip); the hints inside the panel.
+static void FitScan(const Shell& sh, const Model& m, const std::string& what)
+{
+    const std::vector<ui::UiItem> items = sh.Build(m);
+    std::vector<Rect> chips;
+    for (const ui::UiItem& it : items)
+    {
+        if (it.kind == ui::UiItem::Chip) chips.push_back(it.to);
+        if (it.text.empty() || it.kind == ui::UiItem::Image) continue;
+        const std::string where = what + " (language " + std::to_string(m.language) + (m.keyboard ? ", keyboard" : ", pad") + ")";
+        if (it.text.find("\xE2\x80\xA6") != std::string::npos) { fprintf(stderr, "%s: '%s' cut\n", where.c_str(), it.text.c_str()); failures++; }
+        if (it.kind == ui::UiItem::Chip) continue;
+        if (!it.wrap && ui::TextWidth(it.text, it.size, it.weight) > it.to.w + 0.5f)
+        {
+            fprintf(stderr, "%s: '%s' wider than its box\n", where.c_str(), it.text.c_str());
+            failures++;
+        }
+        if (it.wrap && (float)ui::Wrap(it.text, it.size, (float)it.to.w).size() * it.size * 1.25f > it.to.h + 1)
+        {
+            fprintf(stderr, "%s: '%s' taller than its box\n", where.c_str(), it.text.c_str());
+            failures++;
+        }
+    }
+    for (size_t i = 0; i < chips.size(); i++)
+        for (size_t j = i + 1; j < chips.size(); j++)
+        {
+            const Rect &a = chips[i], &b = chips[j];
+            if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h)
+            {
+                fprintf(stderr, "%s (language %d): two chips over each other at %d,%d and %d,%d\n", what.c_str(), m.language, a.x, a.y, b.x, b.y);
+                failures++;
+            }
+        }
+    for (const Rect& r : sh.HintRects())
+        if (r.x < 0 || r.x + r.w > kW) { fprintf(stderr, "%s: a hint outside the canvas\n", what.c_str()); failures++; }
+}
+
+static void fit_all()
+{
+    for (int lang = 1; lang <= 5; lang++)
+        for (int kb = 0; kb < 2; kb++)
+        {
+            Fixture f;
+            Model& m = f.m;
+            m.language = lang;
+            m.keyboard = kb;
+            m.canOpenFolder = true;
+            m.canUndo = true;
+            for (int a = 0; a < Controls::COUNT; a++) m.keyGlyph[a] = a == Controls::SELECT ? KeyLabel(SDLK_RSHIFT, lang) : a == Controls::FAST ? KeyLabel(SDLK_SPACE, lang) : "X";
+            m.banner = OwnWordIn(lang, OwnWordId::SaveElsewhere);
+            Shell sh;
+            sh.Open(Page::Main);
+            for (int i = 0; i < sh.Count(m); i++) { sh.focus = i; FitScan(sh, m, "main"); }
+            sh.AskQuit();
+            FitScan(sh, m, "quit question");
+            sh.Open(Page::Settings);
+            for (int t = 0; t < kTabs; t++)
+            {
+                sh.tab = t;
+                for (int i = 0; i < (int)TabRows(t).rows.size(); i++) { sh.focus = i; FitScan(sh, m, "settings"); }
+                sh.ask = Ask::ResetTab;
+                FitScan(sh, m, "reset tab question");
+                sh.ask = Ask::None;
+            }
+            f.s.batterySaver = true;
+            sh.tab = (int)Tab::Graphics;
+            for (int i = 0; i < (int)TabRows(sh.tab).rows.size(); i++) { sh.focus = i; FitScan(sh, m, "settings, battery saver"); }
+            f.s.batterySaver = false;
+            sh.Open(Page::Controls);
+            FitScan(sh, m, "controls");
+            sh.Open(Page::Keys);
+            for (int i = 0; i <= Controls::COUNT; i++) { sh.focus = i; sh.scroll = std::max(0, i - 6); FitScan(sh, m, "keys"); }
+            sh.ask = Ask::ResetKeys;
+            FitScan(sh, m, "reset keys question");
+            sh.ask = Ask::None;
+            m.capturing = 5;
+            m.captureLeft = 5;
+            m.pauseCombo = "Options + Create";
+            FitScan(sh, m, "capture");
+            m.capturing = -1;
+            sh.Open(Page::States);
+            for (int i = 0; i <= kStateSlots; i++) { sh.focus = i; FitScan(sh, m, "states, empty"); }
+            for (int i = 0; i < kStateSlots; i++) { m.used[i] = true; m.slots[i].time = 1762430000; }
+            for (int i = 0; i <= kStateSlots; i++) { sh.focus = i; FitScan(sh, m, "states"); }
+            sh.ask = Ask::Load;
+            sh.askSlot = 0;
+            m.otherRom[0] = "The Sims 2 with a rather long file name.nds";
+            FitScan(sh, m, "load question");
+            sh.ask = Ask::Overwrite;
+            FitScan(sh, m, "overwrite question");
+            sh.ask = Ask::Undo;
+            FitScan(sh, m, "undo question");
+            sh.ask = Ask::None;
+            m.statesOk = false;
+            FitScan(sh, m, "states without a folder");
+            m.statesOk = true;
+            m.recents = {"sims2.nds", "The Sims 2 copy with a long name for testing.nds", "third.nds"};
+            m.hasSuspend = true;
+            m.suspend.time = 1762430000;
+            sh.Open(Page::Launch);
+            for (int i = 0; i < sh.Count(m); i++) { sh.focus = i; FitScan(sh, m, "launch"); }
+            for (OwnWordId w : {OwnWordId::LaunchWrong, OwnWordId::NotEU, OwnWordId::LaunchSaveNewer, OwnWordId::LaunchContinueFailed,
+                                OwnWordId::LaunchUnreadable, OwnWordId::KeysMenuNeeded})
+            {
+                std::string t = OwnWordIn(lang, w);
+                if (size_t at = t.find("@1"); at != std::string::npos) t.replace(at, 2, "The Sims 2 (a long file name).nds");
+                m.message = t;
+                FitScan(sh, m, "message");
+            }
+            m.message.clear();
+        }
+    // Every key name a keycap prints fits the bindings' column (170 pixels at 24).
+    for (int lang = 1; lang <= 5; lang++)
+        for (int k : {SDLK_RETURN, SDLK_RSHIFT, SDLK_LSHIFT, SDLK_SPACE, SDLK_BACKSPACE, SDLK_ESCAPE, SDLK_TAB})
+        {
+            const ui::UiItem chip = ui::ChipItemAs(0, 0, ui::Face::Keyboard, KeyLabel(k, lang), "", 24, ui::Weight::ExtraBold);
+            if (chip.to.w > 170) { fprintf(stderr, "key %d: '%s' wider than the bindings' column (language %d)\n", k, KeyLabel(k, lang).c_str(), lang); failures++; }
+        }
+    CHECK(KeyLabel(SDLK_UP, 2) == "up" && KeyLabel(SDLK_RETURN, 2) == "ENTRÉE" && KeyLabel(Controls::kNone, 1).empty());
+}
+
+// The lists stop at their ends (the game's own do); only the tab bars wrap.
+static void list_ends()
+{
+    Fixture f;
+    Shell sh;
+    sh.Open(Page::Main);
+    sh.Update(Press("up"), f.m);
+    CHECK(sh.focus == 0);
+    sh.focus = sh.Count(f.m) - 1;
+    sh.Update(Press("down"), f.m);
+    CHECK(sh.focus == sh.Count(f.m) - 1);
+    sh.Open(Page::Settings);
+    sh.Update(Press("up"), f.m);
+    CHECK(sh.focus == 0);
+    Input lb;
+    lb.lb = true;
+    sh.Update(lb, f.m);
+    CHECK(sh.tab == kTabs - 1); // (the tabs wrap)
+    sh.Open(Page::Keys);
+    sh.Update(Press("up"), f.m);
+    CHECK(sh.focus == 0 && sh.scroll == 0);
+}
+
 int main(int, char**)
 {
     // The pages at the UI's sizes (shell.cpp's Zoom: about the canvas's centre, the mouse's
@@ -1007,7 +1178,9 @@ int main(int, char**)
         states_page();
         launch_panel();
         mouse();
+        fit_all();
     }
+    list_ends();
     ui::SetUiScale(1);
     pad_fallback();
     other_rom();

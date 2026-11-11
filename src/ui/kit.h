@@ -42,7 +42,7 @@ enum class Align { Left, Centre, Right };
 // (the D-pad as a cross).
 // DPadV / DPadH: the cross with its up and down (left and right) arms lit and the others faint:
 // Up / Down (Left / Right) do something there.
-// DPadL / DPadU / DPadR / DPadD: one arm lit (that direction alone). LStick / RStick: the sticks
+// DPadL / DPadU / DPadR / DPadD: one arrowhead on the faint cross (that direction alone). LStick / RStick: the sticks
 // (a round chip with a ring, "L" / "R"). LT: the left trigger (a pill, as LB).
 // Back: the Select-type button (Xbox's Back / View, PlayStation's Share, Nintendo's -: a pill),
 // the TOUCH MENU's on a pad. Pause: the pause menu's buttons, one pill (START + BACK, OPTIONS +
