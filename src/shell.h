@@ -14,7 +14,7 @@
 //   card; a message (a wrong file, another cartridge) stays until A or B.
 //   Lists stop at their ends (only the tab bars wrap). The hints at a page's foot are fitted:
 //   the pause chip goes when they would meet it, then they shrink (shell_test checks every page).
-// Everything here is a function of a Model and the input: no SDL, no emulator. The host
+// Everything here is a function of a Model and the input: no SDL call (its keycodes only), no emulator. The host
 // (main.cpp) fills the model, carries out the Result and draws Build()'s items on a 1280 x 720
 // canvas (the window over the game; --compose's pictures; tests/shell_test.cpp).
 #pragma once
