@@ -19,7 +19,7 @@ namespace
 using namespace ui;
 
 constexpr u32 kPlayingColour = 0xFFFFE9A0;                         // a warm white (the money's)
-constexpr u32 kSubColour = 0xFFD8DAF4;                             // a pale lavender
+constexpr u32 kSubColour = kTextNote;                              // what plays: white, as every information (4.58:1 on a well)
 constexpr u32 kIconWell = 0xFF5961A2;                              // the game's button well
 
 int Rows(const MusicState& m) { return std::min((int)m.list.size(), kMuRows); }
@@ -33,7 +33,7 @@ std::string SongName(const RomData& rom, const SongRow& s)
     return s.nameId >= 0 ? MenuWords(rom, s.nameId) : std::string();
 }
 
-Rect MusicRowRect(int i) { return {kMuList.x + 16, kMuList.y + 12 + i * 86, kMuList.w - 32, 78}; }
+Rect MusicRowRect(int i) { return {kMuList.x + 16, kMuList.y + 12 + i * 86, 512, 78}; }
 
 MenuView MusicView(ScreenState s, const GameState* game, const RomData* rom)
 {
@@ -84,11 +84,11 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
     if ((int)v.items.size() != rows) return;
     const size_t first = c.ui.size();
 
-    // Layer 0: the panel, the title's, the arrows', the list's and the info's wells.
+    // Layer 0: the panel, the title's, the list's and the info's wells.
     UiItem panel = PanelItem(kPmPanel);
     panel.radius = 22;
     c.ui.push_back(panel);
-    for (Rect r : {kMuTitle, kMuArrows, kMuList, kMuInfo})
+    for (Rect r : {kMuTitle, kMuList, kMuInfo})
     {
         UiItem w = WellItem(r);
         w.radius = 16;
@@ -118,14 +118,9 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
              playing ? kPlayingColour : 0);
         AddMousePiece(c, {kMuRowX - 16, kMuRowY0 + i * kMuRowDy - 15, 32, 30}, rr);
     }
-    // The arrows (the kit's, sunk where the game cannot scroll) and the scroll bar between them.
-    for (auto [r, dir, on] : {std::tuple {kMuUp, UiItem::Sign::Up, !v.scrollUp.empty()}, std::tuple {kMuDown, UiItem::Sign::Down, !v.scrollDown.empty()}})
-    {
-        UiItem a = ScrollArrowItem(r, dir, on);
-        a.layer = 1;
-        c.ui.push_back(a);
-    }
-    AddScrollBar(c, {kMuArrows.x + kMuArrows.w / 2 - 5, kMuUp.y + kMuUp.h + 12, 10, kMuDown.y - 12 - (kMuUp.y + kMuUp.h + 12)}, m.scroll, rows, count);
+    // The arrows (sunk where the game cannot scroll) and the scroll bar between them: every list's
+    // column, at its right.
+    AddScrollColumn(c, {kMuUp.x, kMuUp.y, kMuUp.w, kMuDown.y + kMuDown.h - kMuUp.y}, m.scroll, rows, count, !v.scrollUp.empty(), !v.scrollDown.empty());
     AddMousePiece(c, {kMuUpX - 16, kMuUpY - 5, 32, 30}, kMuUp);
     AddMousePiece(c, {kMuDownX - 16, kMuDownY - 25, 32, 30}, kMuDown);
 
@@ -161,10 +156,10 @@ void BuildMusic(Composition& c, const MenuView& v, int focus, const GameState& g
     AddMousePiece(c, {kMuCloseX - 16, kMuCloseY - 15, 32, 30}, kMuClose);
 
     // The hints: B "Close" (the game's X), A "Turn On" on a song not playing, the D-pad's Up / Down
-    // when the list scrolls.
+    // ("Choose", as every list's).
     int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) right = AddHint(c, right, Button::A, v.items[focus].word);
-    if (count > rows) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintScroll));
+    if (rows > 1 || count > rows) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
 
     // Images: the play buttons, the X.
     for (const Icon& i : images) AddTiered(c.ui, icons, SpriteRef::Of(i.desc), i.frame, i.tier, i.box, i.opacity);

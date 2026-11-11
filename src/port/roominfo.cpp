@@ -243,11 +243,13 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
         AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
     }
 
-    // Images: the portrait (the game's own, 3x), the X.
+    // Images: the portrait (the game's own, 3x; under the hint box, the game's box lies over it
+    // on the touch screen: the picture from before it, dimmed with the screen), the X.
     if (bottom)
     {
         const int w = kRiPortraitFrom.w * 3, h = kRiPortraitFrom.h * 3;
-        c.ui.push_back(KeyedCrop(bottom, kRiPortraitFrom, {kRiPortrait.x + (kRiPortrait.w - w) / 2, kRiPortrait.y + (kRiPortrait.h - h) / 2, w, h}));
+        const Rect to {kRiPortrait.x + (kRiPortrait.w - w) / 2, kRiPortrait.y + (kRiPortrait.h - h) / 2, w, h};
+        c.ui.push_back(RoomHintUp(game) ? KeptCrop(kRiPortraitFrom, to) : KeyedCrop(bottom, kRiPortraitFrom, to));
     }
     AddTiered(c.ui, icons, SpriteRef::Of(kSprRiX), 0, kTierS, kRiClose);
     SortUi(c.ui, first);

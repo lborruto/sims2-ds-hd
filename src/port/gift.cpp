@@ -4,6 +4,7 @@
 
 #include "hotspots.h"
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -161,13 +162,15 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
         c.ui.push_back(wt);
         AddMousePiece(c, hs[6].area, kGiftBow);
     }
-    // The hints: A gives (the focused slot's word), B closes (the game's X).
-    const int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
+    // The hints: A gives (the focused slot's word), B closes (the game's X), the D-pad's cross
+    // moves the focus over the slots and the bow ("Choose").
+    int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
     if (canGive)
     {
         const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
-        AddHint(c, right, Button::A, a.text);
+        right = AddHint(c, right, Button::A, a.text);
     }
+    AddHint(c, right, Button::DPad, OwnWord(&rom, OwnWordId::HintChoose));
 
     // Images: the items, the bow (the game's sprite), the portrait (live).
     for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++)

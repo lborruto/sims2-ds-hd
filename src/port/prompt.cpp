@@ -54,7 +54,7 @@ PromptLayout LayOut(const WorldPrompt& p, const RomData* rom)
     l.verb = FitLine(p.verb, kPromptVerbSize, kPromptVerbMin, kPromptVerbW, Weight::ExtraBold);
     l.chip = ChipRect(0, 0, Button::A, "", kPromptVerbSize);
     const int nameW = l.name.text.empty() ? 0 : (int)std::ceil(TextWidth(l.name.text, l.name.size, Weight::Bold));
-    const int verbW = l.verb.text.empty() ? 0 : (int)std::ceil(TextWidth(l.verb.text, l.verb.size, Weight::ExtraBold));
+    const int verbW = std::max(p.verbW, l.verb.text.empty() ? 0 : (int)std::ceil(TextWidth(l.verb.text, l.verb.size, Weight::ExtraBold)));
     l.hints = HintsOf(p, rom);
     int hintsW = 0;
     for (const Hint& h : l.hints)
@@ -107,6 +107,13 @@ WorldPrompt WorldPromptOf(const InteractState& in, const RomData* rom)
     if (HasStrings(rom))
     {
         p.verb = InteractLabel(*rom, in.actions[row].labelId, in.actions[row].amount);
+        // (The widest verb A could run: the plate's width while the choice moves.)
+        for (const InteractAction& a : in.actions)
+        {
+            if (a.greyed) continue;
+            const FittedText f = FitLine(InteractLabel(*rom, a.labelId, a.amount), kPromptVerbSize, kPromptVerbMin, kPromptVerbW, Weight::ExtraBold);
+            if (!f.text.empty()) p.verbW = std::max(p.verbW, (int)std::ceil(TextWidth(f.text, f.size, Weight::ExtraBold)));
+        }
         if (in.target.nameId >= 0) p.name = MenuWords(*rom, in.target.nameId);
     }
     return p;

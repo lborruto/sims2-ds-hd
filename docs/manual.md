@@ -84,16 +84,19 @@ you last typed). The mouse works everywhere too.
   (Up / Down choose, let go to do it); while A is held, Left / Right pick the next person or thing
   nearby.
 - **The status bar** runs along the bottom of the window: the time, your money and your Sanity,
-  with the camera and menu hints at the right. What you just won or paid shows beside the money
-  for a few seconds.
+  with the camera and menu hints at the right. What you just won (green) or paid (red) shows
+  beside the money for a few seconds. The bar stays under conversations too.
 - **The menu** (Back, or E) opens the touch screen's menu big over the town: LB / RB switch
-  tabs, the D-pad moves, A does, B closes.
+  tabs, the D-pad moves, A does, B closes. Every screen's hints say what the D-pad does there
+  ("Choose" whenever it moves the highlight), and a list that scrolls has its up and down arrows
+  at its right. Lists stop at their ends.
 
 ### The menu
 
 - **Interact**: what the person or thing in front of you can do. A does the highlighted action,
   Left / Right pick the next one nearby.
-- **Pockets**: your six slots, the tools and the things you collect, with their descriptions. A
+- **Pockets**: your six slots, the tools and the things you collect, with their descriptions
+  (what you have none of, a tool not found yet or a collection at 0, is drawn faint). A
   uses the highlighted item. X throws it away, but only on the second press: the first press turns
   the bin green and the hint says "Again"; moving away cancels.
 - **Goals** and **Relationships**: Up / Down move through the list; Relationships shows each
@@ -102,8 +105,8 @@ you last typed). The mouse works everywhere too.
   A on *Save* opens the game's three save slots: A saves into the highlighted one (an empty slot at
   once; a used one asks first, and the question opens on No).
 - **The phone** (the top right of the menu): its Up / Down / OK are the D-pad and A, as on the
-  phone itself. B goes back one page (a message to the list, the ringtones to the menu) and, from
-  its first page, hangs up. Back hangs up from anywhere.
+  phone itself. B goes back one page ("Back": a message to the list, the ringtones to the menu)
+  and, from its first page, hangs up ("Close"). Back hangs up from anywhere.
 
 The save slots and the phone, opened from the menu, come back to the menu where you were.
 
@@ -119,13 +122,14 @@ The save slots and the phone, opened from the menu, come back to the menu where 
   sell); A on the simoleon button buys or sells it (it names the item and the price, and is
   greyed when the game would refuse). Up / Down past the list scroll it; B closes.
 - **Build Rooms** (City Hall): A on a room shows the permit and what you would have left, then
-  asks; the question opens on No, so a stray double press never spends. Right then A buys.
+  asks in a box like every question (the room and the sum in it); the question opens on No, so a
+  stray double press never spends. Right then A buys. A permit you cannot pay is red.
 - **The hotel's Registry**: A on a room shows its page (who stays, their mood, when they leave,
   what the room earns a day; A on a line explains it). When a guest checks in, A on a free room
   gives it to them.
 - **A music panel**: A plays the highlighted song (the room keeps it); Up / Down scroll.
 - **The stat panel**: its tabs name the five pages; A opens a page, LB / RB (or Left / Right) go
-  to the previous / next one, B goes back, then closes.
+  to the previous / next one, B goes back ("Back"), then closes ("Close").
 - **Conversations** go on with A. **Popups** (tips, goals, Game Paused) close with A or B. A
   **question** (Quit? Overwrite this save?) always opens on No: Right then A says yes, B is always
   no. When a popup opens over the menu, the menu comes back on the same row after it.
@@ -282,7 +286,7 @@ Everything is kept between runs.
 | Setting | What it does |
 |---|---|
 | Fullscreen | also F11 |
-| Interface size | the size of the HD menus, conversations and hints. Auto (the default) follows your screen's size and the window's, so they are not huge on a big monitor nor tiny on a handheld; or 60 to 150 % by hand. The game's world keeps its size |
+| Interface size | the size of the HD menus, conversations and hints. Auto (the default) follows your screen's size and the window's, so they are not huge on a big monitor nor tiny on a handheld; or 60 to 150 % by hand. 100 % is the menus' largest size at 16:9 (they already fill the screen's height); larger sizes grow the hints, the world's prompts and conversations. The game's world keeps its size |
 | Screen scaling | how the game's pictures are scaled to your window: Sharp (crisp, evenly sized pixels at any size: the default), Smooth or Pixels |
 | Game icons | the game's icons and portraits in the HD menus: Pixels (the DS's own, the default) or Smooth (redrawn with soft edges by the xBRZ scaler) |
 | Hide the idle pointer | the mouse pointer hides after a few seconds still over the game |

@@ -16,7 +16,7 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kSubColour = 0xFFD8DAF4;                             // a pale lavender (Build Rooms' places)
+constexpr u32 kSubColour = kTextNote;                              // who stays, Vacant: white, as every information (4.58:1 on a row)
 constexpr u32 kPinkPlate = 0xE0302F5C;                             // the pink names' plate: dark, the rows' hue
 constexpr u32 kScoreColour = 0xFFFFE9A0;                           // a warm white (the money's)
 constexpr u32 kIconWell = 0xFF5961A2;                              // the game's row button
@@ -85,7 +85,21 @@ void RoomPicture(Composition& c, IconCache* icons, const u32* bottom, const Regi
         c.ui.push_back(KeyedCrop(bottom, from, box, tier));
         return;
     }
-    AddTiered(c.ui, icons, SpriteRef::Of(kSprCiKey), r.built ? 0 : 1, tier, box);
+    if (r.built || !icons) { AddTiered(c.ui, icons, SpriteRef::Of(kSprCiKey), 0, tier, box); return; }
+    // The silhouette (frame 1) has the DS panel's light rim baked in around it (#828ACB, #6171B2:
+    // the screen it was drawn for), a pale outline on the HD well: keyed out, the black shape alone.
+    static std::vector<u32> keyed;
+    static int kw = 0, kh = 0;
+    if (keyed.empty())
+        if (const SpriteFrame* f = icons->Frame(SpriteRef::Of(kSprCiKey), 1); f && f->w > 0 && f->h > 0)
+        {
+            keyed = f->argb;
+            kw = f->w;
+            kh = f->h;
+            for (u32& px : keyed)
+                if ((px >> 24) != 0 && KeyedColour(px)) px = 0;
+        }
+    if (!keyed.empty()) c.ui.push_back(TierImage(box, keyed.data(), kw, kh, {0, 0, kw, kh}, tier));
 }
 }
 
@@ -201,7 +215,7 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
         else
         {
             Text(c, nameAt, RoomName(rom, r.place), kCiNameSize, kCiNameMin, Align::Left, Weight::ExtraBold, colour);
-            Text(c, {x, rr.y + 42, w, 30}, sub, kCiSubSize, kCiSubMin, Align::Left, Weight::Bold, focused ? 0xFFFFFFFF : kSubColour);
+            Text(c, {x, rr.y + 42, w, 30}, sub, kCiSubSize, kCiSubMin, Align::Left, Weight::Bold, kSubColour);
         }
         AddMousePiece(c, {kCiRowX - 15, kCiRowY0 + i * kCiRowDy - 15, 30, 30}, rr);
     }

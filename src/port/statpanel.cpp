@@ -395,11 +395,13 @@ void BuildStatPanel(Composition& c, const MenuView& v, int focus, const GameStat
     AddMousePiece(c, kStCloseFrom, kStClose);
     if (page != 0) AddMousePiece(c, kStCloseFrom, StatTabRect(0, &rom));
 
-    // The hints: B "Close" on Main (the page's name, Main's, on a page: back there), A the focused
-    // button's page; on a page the D-pad's Left / Right (the pages).
-    int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, page == 0 ? MenuWords(rom, kStrClose) : PageName(rom, 0));
+    // The hints: B "Close" on Main ("Back" on a page: back there, a level up; the game's table has
+    // no "Back", the pause menu's word), A the focused button's page; the D-pad: on Main its cross
+    // moves the focus over the four buttons ("Choose"), on a page its Left / Right the pages.
+    int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, page == 0 ? MenuWords(rom, kStrClose) : std::string(OwnWord(&rom, OwnWordId::ShellBack)));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) right = AddHint(c, right, Button::A, v.items[focus].word);
     if (page != 0) AddHint(c, right, Button::DPadH, OwnWord(&rom, OwnWordId::HintPages));
+    else AddHint(c, right, Button::DPad, OwnWord(&rom, OwnWordId::HintChoose));
 
     for (const Icon& i : images) AddIcon(c, icons, i);
     AddIcon(c, icons, Small(SpriteRef::Of(kSprStX), 0, kTierS, kStClose));

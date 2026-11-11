@@ -108,6 +108,9 @@ enum class OwnWordId : int
     // The world's prompt (port/prompt.*): A held shows the other actions, Up / Down choose one
     // while it is held, Left / Right switch to the next target near the hero.
     PromptMore, PromptOther,
+    // (ux task 6, the town's audit) Build Rooms with nothing left; the world's right stick (it turns
+    // the camera and zooms: the status strip's hint).
+    BuildNothingLeft, HintCamera,
     Count
 };
 

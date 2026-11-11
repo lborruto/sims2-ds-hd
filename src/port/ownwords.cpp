@@ -379,11 +379,11 @@ constexpr const char* kWords[][5] = {
     // The interface's size and the game's pictures
     {"Interface size", "Taille de l'interface", "Größe der Oberfläche", "Dimensione interfaccia", "Tamaño de la interfaz"},
     {"Auto", "Auto", "Auto", "Auto", "Auto"},
-    {"Auto follows your screen's size and the window's. The game's world keeps its size.",
-     "Auto suit la taille de l'écran et de la fenêtre. Le monde du jeu garde sa taille.",
-     "Auto folgt der Größe von Bildschirm und Fenster. Die Spielwelt behält ihre Größe.",
-     "Auto segue le dimensioni dello schermo e della finestra. Il mondo del gioco resta com'è.",
-     "Auto sigue el tamaño de la pantalla y de la ventana. El mundo del juego no cambia."},
+    {"Auto follows your screen's size and the window's. 100 % is the menus' largest size at 16:9; larger sizes grow the hints and prompts. The game's world keeps its size.",
+     "Auto suit la taille de l'écran et de la fenêtre. 100 % est la taille maximale des menus en 16:9 ; au-delà, les aides et invites grandissent. Le monde du jeu garde sa taille.",
+     "Auto folgt der Größe von Bildschirm und Fenster. 100 % ist die größte Größe der Menüs in 16:9; darüber wachsen Hinweise und Einblendungen. Die Spielwelt behält ihre Größe.",
+     "Auto segue le dimensioni dello schermo e della finestra. 100 % è la dimensione massima dei menu in 16:9; oltre crescono suggerimenti e indicazioni. Il mondo del gioco resta com'è.",
+     "Auto sigue el tamaño de la pantalla y de la ventana. 100 % es el tamaño máximo de los menús en 16:9; por encima crecen las ayudas y los avisos. El mundo del juego no cambia."},
     {"Game icons", "Icônes du jeu", "Spielsymbole", "Icone del gioco", "Iconos del juego"},
     {"The game's icons and portraits in the HD menus. Pixels: the DS's own. Smooth: redrawn with soft edges.",
      "Les icônes et portraits du jeu dans les menus HD. Pixels : ceux de la DS. Lisse : redessinés aux bords doux.",
@@ -497,6 +497,9 @@ constexpr const char* kWords[][5] = {
     // The world's prompt
     {"Hold for more", "Maintenir : plus", "Halten: mehr", "Tieni premuto: altro", "Mantén: más"},
     {"Other target", "Autre cible", "Anderes Ziel", "Altro obiettivo", "Otro objetivo"},
+    // (ux task 6, the town's audit) Build Rooms with nothing left; the world's camera stick
+    {"Nothing left to build", "Plus rien à construire", "Nichts mehr zu bauen", "Niente altro da costruire", "No queda nada por construir"},
+    {"Camera", "Caméra", "Kamera", "Visuale", "Cámara"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

@@ -90,8 +90,9 @@ Overlay Text(int x, int y, const char* text, int scale)
     return o;
 }
 
-// The money's last change (port/statusbar.h's bar at `bar`): a small kit panel right of it, "+§12"
-// in a light green or "-§1" in a light red, on the bar's layer.
+// The money's last change (port/statusbar.h's bar at `bar`): a small dark pill right of it (the
+// theme's shadow, #383869), "+§12" in a light green (8.24:1 on it) or "-§1" in a light red
+// (5.30:1; on the bar's own fill they were 2.48 and 1.59), on the bar's layer.
 void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom, int right = kConsoleW - 8)
 {
     const std::string text = (payout > 0 ? "+" : "-") + MenuWords(rom, kStrMgMoney, std::abs(payout));
@@ -99,6 +100,8 @@ void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom, int rig
     const int w = (int)std::ceil(ui::TextWidth(text, size, ui::Weight::ExtraBold)) + 36;
     if (bar.x + bar.w + 12 + w > right) return;
     ui::UiItem p = ui::PanelItem({bar.x + bar.w + 12, bar.y, w, bar.h});
+    p.fill = ui::GameTheme().shadow;
+    p.borderArgb = ui::GameTheme().frameDark;
     p.layer = kStatusBarLayer;
     c.ui.push_back(p);
     PanelText(c, {bar.x + bar.w + 12 + 18, bar.y, w - 36, bar.h}, text, size, size, ui::Align::Left, ui::Weight::ExtraBold,
@@ -211,7 +214,7 @@ TownHints TownHintsFor(const RomData* rom, const ui::ChipLook& look)
 {
     TownHints h;
     h.menu = OwnWord(rom, OwnWordId::Menu);
-    h.camera = OwnWord(rom, OwnWordId::CtlCamera);
+    h.camera = OwnWord(rom, OwnWordId::HintCamera); // (the stick turns it and zooms: "Camera", not "Turn the camera")
     // The keyboard turns the camera with its own L / R keys (Input::Actions' turnL / turnR): their
     // keycaps rather than a stick it has not got.
     h.keys = look.face == ui::Face::Keyboard && !look.glyph[(int)ui::Button::LB].empty() && !look.glyph[(int)ui::Button::RB].empty();
@@ -377,8 +380,10 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         {
             screen(s, v, focus);
             if (bar) AddStatusStrip(c, hud, *strings, 0, StripZoom(ui::UiScale()));
-            // Room info's own hint box (a popup of the screen's: port/roominfo.h), over the bar too.
+            // Room info's own hint box (a popup of the screen's: port/roominfo.h) and Build Rooms'
+            // question (port/build.h), over the bar too.
             if (s.screen == Screen::Unknown && RoomHintUp(*game)) BuildRoomHint(c, v, focus, *game, *rom);
+            if (s.screen == Screen::Build) BuildBuildQuestion(c, v, focus, *game, *rom);
         }
         // The UI's size: the screen and its popup together (the strip's own already done); a lone
         // popup (a goal, Game Paused, Quit over the world) as large as the UI's size, as far as the
@@ -492,6 +497,15 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         BuildDialogue(c, *game, *rom, bottom, topW, topH);
         // The UI's size: the box about the canvas's bottom centre (its margin below zoomed too).
         ZoomUi(c, 0, 0, ui::UiScale(), kConsoleW / 2.0f, kConsoleH, kUiLimit);
+        // The strip under the world (the world stops at it: no black band below), its panel alone
+        // (the box lies over it), under the box: first, on layer 0.
+        {
+            static const HudStrings kNoWords;
+            const size_t at = c.ui.size();
+            AddStatusStrip(c, nullptr, kNoWords);
+            for (size_t i = at; i < c.ui.size(); i++) c.ui[i].layer = 0;
+            std::rotate(c.ui.begin(), c.ui.begin() + (long)at, c.ui.end());
+        }
         b = ConsoleBranch::Dialogue;
     }
     else if (s.screen == Screen::Dialogue)

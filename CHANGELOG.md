@@ -7,6 +7,27 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+<!-- ux task 6, town and hotel audit: one block, to be merged into the lists below -->
+### Town and hotel screens (audit)
+
+- What you just won or paid beside the money reads on a dark pill; Build Rooms' permits you cannot
+  pay are red on a dark plate; places, guests and slot details are white: every word reads at
+  4.5:1 or more.
+- The D-pad's hint says "Choose" wherever it moves the highlight (Interact, Pockets, Give Gift,
+  Options, the save slots, the stat panel, Build Rooms, music), and every list that scrolls has its
+  up and down arrows at its right (Goals, Relationships, the phone, music).
+- Build Rooms asks before a purchase in a box like every other question, the room and the sum in
+  it, on No first; with nothing left to build it says so.
+- B says "Back" where it goes up a level (the phone's pages, the stat panel's) and "Close" where it
+  leaves.
+- The camera hint says "Camera" (the stick turns and zooms); the world's prompt keeps its width
+  while you choose an action with A held; conversations keep the status strip under them (no black
+  band).
+- Pockets: a tool not found yet and a collection at 0 look the same, faint. The Registry's locked
+  rooms lose the DS's light rim around their key. Room info's hint box dims the portrait instead
+  of emptying it.
+- The focused volume row in Options is lit like every focused row.
+
 ### Added
 
 - CONSOLE, the new default layout: the game played like a console game. The town fills the
