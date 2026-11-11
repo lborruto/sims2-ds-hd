@@ -10,10 +10,14 @@
 //     the question is up (it still reads Cards; or RAM says so: the mouse asked) A taps its tick,
 //     B its cross. While RAM shows the end-of-turn message, A taps it (the turn goes on).
 //   Vacuum: the left stick (and the D-pad) are the DS's D-pad (the game's own steering); the
-//     hand is the stick cursor (input.h): the right stick moves it, and so does the D-pad while
-//     X or A is held (the keyboard's way, no stick needed); A held keeps the stylus down at the
-//     hand (grab a find, drag it into the box); Y blows into the microphone (7 frames or more
-//     clear a clog); B taps the bowl's X (kVacuumX: the game's only way out, the vacuum put away).
+//     hand is the pointer (px / py, drawn with a ring on the find A takes: `mark`): the right
+//     stick moves it (MovePointer), the keyboard's arrows with its X action held (kHandStep). A takes a find (VacuumTake, from the bowl RAM shows: the find
+//     nearest the hand): the stylus pressed where no dust lies over it, carried to the funnel
+//     (the game keeps a find only there: kVacuumFunnel) and let go once the funnel's keep
+//     animation is idle; no find: the stylus stays up (a bare press only grabs dust: a clog). The
+//     bowl unread (another ROM): A held is the stylus down at the hand. Y blows into the
+//     microphone (7 frames or more clear a clog); B taps the bowl's X (kVacuumX: the game's only
+//     way out, the vacuum put away).
 //   The pointing minigames (milestone 6) have a pointer of their own, a stick cursor that works
 //   headless too (ActivityState::px / py; MovePointer): either stick moves it, faster with a
 //   fuller deflection (a square curve: a light touch is slow), LT held makes it slow (a quarter);
@@ -23,7 +27,11 @@
 //   30 Hz) and the autopsy's laser at kPtrLaser (its cutting pace).
 //   Alien Autopsy: X / Y / RB take the laser / hand / tweezers (their buttons tapped); LB, while
 //     the hand holds an organ or the tweezers a parasite, carries it to the tray / the flask
-//     (the pointer glides there at kPtrDrag, the stylus held, and lets go); B or Start quits
+//     (the pointer glides there at kPtrDrag, the stylus held, and lets go). A with the hand and an
+//     organ freed, or the tweezers and a parasite on the body, takes it (AutopsySeek): the pointer
+//     goes to the freed organ nearest it (kAutopsyOrgan) or the nearest parasite (an eating one
+//     first), presses, follows it until RAM shows it held, then carries it as LB does; nothing to
+//     take (and the laser): A held is the stylus down at the pointer; B or Start quits
 //     (the game's own keys: at once, the earnings forfeited), so the first press asks
 //     (ActivityState::quitArmed, the prompt lit) and a second within kQuitWindow frames quits.
 //   Metal Detector: the left stick and the D-pad walk (the game's own D-pad); A digs, B powers
@@ -106,6 +114,14 @@ struct Hint
     const char* text;
 };
 
+// One thing in the vacuum's bowl as the activities read it (GameState's VacuumItem).
+struct VacuumThing
+{
+    int slot = 0;
+    float x = 0, y = 0, half = 0;   // touch pixels; the half side of the square the game grabs it by
+    bool dust = false, held = false;
+};
+
 // What the game's RAM says about the activity this frame (GameState::minigame), when it reads
 // (cards: false, nothing known: milestone 1's way).
 struct ActivityRam
@@ -116,6 +132,10 @@ struct ActivityRam
     // The pointing minigames (GameState::minigame's parts; each false when its part does not read).
     bool autopsy = false;
     int autopsyTool = 0, autopsySub = 0;   // the tool (0 laser, 1 hand, 2 tweezers); 3 an organ dragged, 6 a parasite held
+    int autopsyPhase = 0;                  // AutopsyState::phase (0-2 the tools; 3 on: the specimen done, the tear)
+    bool autopsyFreed[3] = {};             // an organ freed (the hand can lift it), not removed yet
+    struct Parasite { int slot = 0; float x = 0, y = 0; bool eating = false; };
+    std::vector<Parasite> autopsyParasites;   // the live ones on the touch screen
     bool detector = false;
     int detectorSlider = 0;                // the depth slider, 0..4096
     bool art = false;
@@ -146,11 +166,16 @@ struct ActivityRam
     bool mixer = false;
     int mixerPhase = 0, mixerSongs = 0;
     bool mixerSave = false;
+    bool read = false;            // the game's RAM reads (GameState::valid): a part not valid then is a screen not drawn yet
     bool mixerSaveUsed[3] = {};
     // A question of the game's popup is up over the minigame (kind 2, opening, shown or closing: the
     // painting waits); it takes taps once shown: its tick and cross.
     bool askUp = false, ask = false;
     Point askYes {0, 0}, askNo {0, 0};
+    // The vacuum's bowl (GameState's VacuumState: bowl false, none of it known): its things in
+    // slot order, the funnel's keep animation running.
+    bool vacuumBowl = false, vacuumKeeping = false;
+    std::vector<VacuumThing> vacuumThings;
     // The hotel's furniture editor is up (GameState::placement: the stick cursor's Unknown screen,
     // where B and MENU tap its X, kPlacementX).
     bool placement = false;
@@ -169,10 +194,19 @@ struct ActivityState
     bool confirm = false;
     bool askSeen = false; // Cards: RAM has shown the question (its going then disarms confirm)
     int blowFrames = 0; // Vacuum: frames of blow still to give after a Y press (the game needs 7)
-    // Out, this frame (Vacuum): blow into the microphone; the stylus held at the hand; how far
-    // the hand moves (DS pixels) besides the right stick.
-    bool blow = false, grab = false;
-    float handDx = 0, handDy = 0;
+    // Out, this frame (Vacuum): blow into the microphone.
+    bool blow = false;
+    // Vacuum: A's take (VacuumTake).
+    struct Take
+    {
+        int phase = 0;              // 0 none, 1 reaching (the stylus onto the find), 2 carrying to the funnel, 3 let go there
+                                    // (until the funnel's keep animation shows, kVacuumKeepWait frames at most: the hint stays "Taking")
+        int slot = -1;              // the find taken
+        int frames = 0, pressed = 0, rest = 0;
+        int missed = 0;             // frames in a row the bowl did not read (kVacuumMissMax: given up)
+        float x = 0, y = 0;         // the stylus's last point and press (held through a misread)
+        bool down = false;
+    } take;
     // The pointing minigames' pointer (DS touch pixels; it starts in the middle of a new screen).
     // Out: pointer (it is this screen's, drawn), down (the stylus down at px, py this frame).
     float px = SW / 2, py = SH / 2;
@@ -182,6 +216,10 @@ struct ActivityState
     bool gliding = false;             // the autopsy's LB: carrying to glideTo, the stylus held
     Point glideTo {0, 0};
     int glideRest = 0;                // frames resting on glideTo before letting go
+    bool glideByA = false;            // the glide is A's take's carry (not LB's)
+    // The autopsy's A take (AutopsySeek): 0 none, 1 an organ, 2 a parasite; which (organ 0-2, a
+    // parasite's slot); pressed (frames down on it); frames in all.
+    int seek = 0, seekWhich = -1, seekPressed = 0, seekFrames = 0;
     int quitArmed = 0;                // the autopsy: frames left for the second B / Start
     int quitKeys = 0;                 // the autopsy: frames B is still held for the game
     int sliderFrames = 0;             // the detector: frames the knob has been held
@@ -214,6 +252,7 @@ struct PointerView
     float x = 0, y = 0;
     Rect mark {0, 0, 0, 0};           // MooGoo's focus on the playfield (DS pixels; w 0 none)
     int askFocus = -1;                // a question's focused answer (0 No, 1 Yes; ActivityState::askFocus), -1 none up
+    bool taking = false;              // A's take runs (the vacuum's find, the autopsy's organ or parasite, their carry; not LB's)
 };
 
 // The screens ActivityInput plays.
@@ -228,8 +267,31 @@ std::vector<Hint> ActivityHints(Screen s);
 constexpr Point kCardsQuitYes {93, 92}, kCardsQuitNo {163, 92};
 // The cards' end-of-turn message ("Touch for @1's turn."): any touch goes on; its box's middle.
 constexpr Point kCardsMessage {128, 120};
-// The vacuum's hand speed on the D-pad, DS pixels a frame.
+// The vacuum (overlay 17, research: docs/research/ram-map.md): the game keeps a find only when the
+// stylus lets go of it over the funnel (touch 108 < x < 147, 133 < y < 193, bottom middle) while its
+// keep animation is idle; A's take carries it to kVacuumFunnel at kVacuumCarry a frame (the game
+// moves a held find with the stylus every tick, no cap), rests kVacuumRest frames there once the
+// animation is idle, and gives up after kVacuumReachMax frames without the find held (kVacuumTakeMax
+// in all).
+constexpr Point kVacuumFunnel {127, 150};
+constexpr float kVacuumCarry = 4.0f;
+constexpr int kVacuumRest = 2, kVacuumReachMax = 60, kVacuumTakeMax = 300, kVacuumKeepWait = 4;
+// A take holds its last point (and press) through this many frames of a bowl that does not read (a
+// misread: letting go would drop the find), then gives up.
+constexpr int kVacuumMissMax = 4;
+// The keyboard's hand: its X action held, the arrows move it this far a frame (they do not drive then).
 constexpr float kHandStep = 2.0f;
+// The find A takes from the hand at (hx, hy): the nearest one in the bowl (its index in things), -1 none.
+int VacuumTarget(const std::vector<VacuumThing>& things, float hx, float hy);
+// A point of thing i's square (one pixel inside it) that no square of the dust in a lower slot
+// covers (the game grabs the first slot holding the stylus: dust there would clog), the nearest its
+// middle; false: none.
+bool VacuumSafePoint(const std::vector<VacuumThing>& things, int i, float& x, float& y);
+// One frame of A's take (start: A pressed this frame): from the bowl (ram's vacuumThings and
+// vacuumKeeping) and the hand (px, py), where the stylus is (x, y) and whether it is down; t moves
+// on (phase 0 again: done, the stylus up). Pure: the checks drive it on made-up bowls.
+struct VacuumStylus { float x = 0, y = 0; bool down = false; };
+VacuumStylus VacuumTake(const ActivityRam& ram, float px, float py, bool start, ActivityState::Take& t);
 
 // The pointer (the pointing minigames): DS pixels a frame.
 constexpr float kPtrDead = 0.2f;      // a stick's dead zone
@@ -245,14 +307,23 @@ void MovePointer(const PadState& pad, ActivityState& st, float cap, bool dpad);
 bool IsPointing(Screen s);
 // The timing minigames (MooGoo, the Drencher, the crime game).
 bool IsTiming(Screen s);
-// A minigame with a scheme of its own (pointing or timing, the lottery, the mixer and its save
-// page, the wireless lobby): no stick cursor there.
+// A minigame with a scheme of its own (pointing or timing, the vacuum, the lottery, the mixer and
+// its save page, the wireless lobby): no stick cursor there.
 bool OwnScheme(Screen s);
 
 // Alien Autopsy's buttons (the game's own rectangles: the tools x 0-31, the tray and flask at the
 // right): laser, hand, tweezers; where an organ is dropped (the tray) and a parasite (the flask).
 constexpr Point kAutopsyTool[3] = {{16, 96}, {16, 32}, {16, 160}};
 constexpr Point kAutopsyTray {236, 36}, kAutopsyFlask {236, 156};
+// Where the hand lifts organ slot i (the organs lie there whatever their kind: mg-autopsy-bank).
+constexpr Point kAutopsyOrgan[3] = {{77, 93}, {128, 95}, {183, 95}};
+// A's take: the pointer moves at kPtrMax a frame to its target, presses kSeekSettle frames after it
+// is there, follows it (a parasite crawls) and gives up kSeekMax frames after the press without RAM
+// showing it held.
+constexpr int kSeekSettle = 1, kSeekMax = 60;
+// What the autopsy's A takes from (px, py) now: 1 an organ (which: its slot), 2 a parasite (which:
+// its slot), 0 nothing (A held is the stylus); the tool and the RAM say.
+int AutopsyTarget(const ActivityRam& ram, float px, float py, int& which);
 constexpr int kQuitWindow = 180;      // frames the second B / Start has to quit
 // The Metal Detector's buttons (power 54-101 and dig 156-203, rows 136-167) and its depth slider
 // (the knob along x 195, rows 33-121 for 0..4096).

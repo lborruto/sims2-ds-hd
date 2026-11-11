@@ -50,6 +50,9 @@ static const char* AskName(shell::Ask a)
     case shell::Ask::Load: return "load";
     case shell::Ask::Overwrite: return "overwrite";
     case shell::Ask::Message: return "message";
+    case shell::Ask::ResetTab: return "reset";
+    case shell::Ask::ResetKeys: return "reset keys";
+    case shell::Ask::Undo: return "undo";
     }
     return "?";
 }
@@ -82,7 +85,7 @@ void ShellHost::Refresh(const App& app, const Input& input)
     for (int a = 0; a < Controls::COUNT; a++)
     {
         const int k = b.Key(a);
-        model.keyGlyph[a] = k > 0 ? Controls::KeyName(k) : "";
+        model.keyGlyph[a] = shell::KeyLabel(k, model.language);
         const int in = b.Pad(a);
         std::string g = in >= 0 ? Controls::InputKey(PrintedInput(in, input.padStyle, labels)) : "";
         if (g == "back" && input.padStyle == Controls::PLAYSTATION)
@@ -91,6 +94,7 @@ void ShellHost::Refresh(const App& app, const Input& input)
     }
     model.padFace = input.padStyle == Controls::PLAYSTATION ? ui::Face::PlayStation : input.padStyle == Controls::NINTENDO ? ui::Face::Nintendo : ui::Face::Xbox;
     model.keyboard = input.lastKeyboard;
+    model.pauseCombo = PauseCombo(input.padStyle, type);
     if (model.capturing >= 0 && !headless)
         model.captureLeft = (int)std::max<long>(0, ((long)captureUntil - (long)SDL_GetTicks() + 999) / 1000);
     model.statesOk = data.Ok();
@@ -215,7 +219,7 @@ void ShellHost::SaveSettings(App& app, const Video& video, bool remember) const
     if (!app.settings.Save(settingsPath)) fprintf(stderr, "cannot write %s\n", settingsPath.c_str());
 }
 
-void ShellHost::ApplySetting(App& app, Video& video, int row)
+void ShellHost::ApplySetting(App& app, Video& video, int row, bool save)
 {
     const Settings& s = app.settings;
     switch ((shell::Row)row)
@@ -227,14 +231,14 @@ void ShellHost::ApplySetting(App& app, Video& video, int row)
             video.RememberSize(app.settings); // (the window's, before it fills the screen)
             video.SetFullscreen(s.fullscreen);
         }
-        SaveSettings(app, video, false);
+        if (save) SaveSettings(app, video, false);
         return;
     case shell::Row::Scaling: if (video.win) video.SetScaling(s.scaling); break;
     // (The language: the DS's firmware and the strings are chosen when the game starts; the row's
     // note says so. The battery saver, the volume, mute and the rest are read where they are used.)
     default: break; // (read where they are used, every frame)
     }
-    SaveSettings(app, video);
+    if (save) SaveSettings(app, video);
 }
 
 void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
@@ -335,6 +339,14 @@ void ShellHost::Do(App& app, Video& video, Input& input, const shell::Result& r)
         log("setting", r.arg, true);
         ApplySetting(app, video, r.arg);
         break;
+    case Act::ResetTab:
+        // The tab's rows went back to their defaults: each applied (and saved) as if changed.
+        log("reset tab", r.arg, true);
+        // (One write after them all, without the window's size: a fullscreen change may have just
+        // gone back to windowed.)
+        for (shell::Row row : shell::TabRows(r.arg).rows) ApplySetting(app, video, (int)row, false);
+        SaveSettings(app, video, false);
+        break;
     default: break; // (the launch panel's: main.cpp's)
     }
 }
@@ -343,7 +355,7 @@ void ShellHost::Frame(App& app, Video& video, Input& input, const shell::Input& 
 {
     const shell::Page page0 = shell.page;
     const shell::Ask ask0 = shell.ask;
-    const int focus0 = shell.focus, askFocus0 = shell.askFocus;
+    const int focus0 = shell.focus, askFocus0 = shell.askFocus, tab0 = shell.tab;
     if (model.capturing >= 0)
     {
         // A binding being captured: the first key, or the button let go first; Esc or Start +
@@ -353,8 +365,17 @@ void ShellHost::Frame(App& app, Video& video, Input& input, const shell::Input& 
         bool done = false, cancelled = false;
         if (input.newKey != Controls::kDefault)
         {
-            if (input.newKey == Controls::kNone) s.controls.key[a] = Controls::kNone;
-            else s.controls.SetKey(a, input.newKey);
+            // (Backspace on the pause menu's key, or its key given to an action that had none,
+            // would leave the keyboard no way to the pause menu: refused, said.)
+            Controls::Bindings next = s.controls;
+            if (input.newKey == Controls::kNone) next.key[a] = Controls::kNone;
+            else next.SetKey(a, input.newKey);
+            if (next.Key(Controls::MENU) == Controls::kNone)
+            {
+                model.message = OwnWordIn(model.language, W::KeysMenuNeeded);
+                cancelled = true;
+            }
+            else s.controls = next;
             done = true;
         }
         else if (input.newPad >= 0) { s.controls.SetPad(a, input.newPad); done = true; }
@@ -375,8 +396,9 @@ void ShellHost::Frame(App& app, Video& video, Input& input, const shell::Input& 
     if (messageOnly && model.message.empty()) { shell.Close(); messageOnly = false; }
     Do(app, video, input, r);
     Refresh(app, input);
-    if (print && shell.open && (shell.page != page0 || shell.ask != ask0 || shell.focus != focus0 || shell.askFocus != askFocus0))
-        fprintf(stderr, "frame %ld: shell page=%s focus=%d ask=%s%s\n", frame, PageName(shell.page), shell.focus, AskName(shell.ask),
+    if (print && shell.open && (shell.page != page0 || shell.ask != ask0 || shell.focus != focus0 || shell.askFocus != askFocus0 || shell.tab != tab0))
+        fprintf(stderr, "frame %ld: shell page=%s%s focus=%d ask=%s%s\n", frame, PageName(shell.page),
+                shell.page == shell::Page::Settings ? (" tab=" + std::to_string(shell.tab)).c_str() : "", shell.focus, AskName(shell.ask),
                 shell.ask == shell::Ask::None ? "" : shell.askFocus ? " (yes)" : " (no)");
     if (print && !shell.open) fprintf(stderr, "frame %ld: shell closed\n", frame);
 }

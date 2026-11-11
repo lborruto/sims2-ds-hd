@@ -135,16 +135,23 @@ void Input::HandleEvent(const SDL_Event& ev, App& app, const Video& video, bool 
         }
         if (menuOpen)
         {
-            // The menu: arrows, Enter and Esc, and the DS's A and B keys as on a console.
-            if (k == SDLK_UP) nav.up = true;
-            else if (k == SDLK_DOWN) nav.down = true;
-            else if (k == SDLK_LEFT) nav.left = true;
-            else if (k == SDLK_RIGHT) nav.right = true;
-            else if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE || a == A) nav.a = true;
-            else if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE || a == B) nav.b = true;
-            else if (k == SDLK_DELETE || a == X) nav.x = true;
-            else if (a == Y) nav.y = true;
-            else if (a == MENU && !ev.key.repeat) wantMenu = true;
+            // The menu: arrows, Enter and Esc, and the DS's A and B keys as on a console (MenuKeyOf:
+            // the MENU key, Esc, resumes from every page).
+            switch (MenuKeyOf(k, a))
+            {
+            case MenuKey::Up: nav.up = true; break;
+            case MenuKey::Down: nav.down = true; break;
+            case MenuKey::Left: nav.left = true; break;
+            case MenuKey::Right: nav.right = true; break;
+            case MenuKey::A: nav.a = true; break;
+            case MenuKey::B: nav.b = true; break;
+            case MenuKey::X: nav.x = true; break;
+            case MenuKey::Y: nav.y = true; break;
+            case MenuKey::Lb: if (!ev.key.repeat) nav.lb = true; break; // (Q / W: the settings' tabs, one per press)
+            case MenuKey::Rb: if (!ev.key.repeat) nav.rb = true; break;
+            case MenuKey::Menu: if (!ev.key.repeat) wantMenu = true; break;
+            case MenuKey::None: break;
+            }
             return;
         }
         // Create-a-Sim's Name page: Enter is the navigator's A (the focused key types, a gender or
@@ -327,6 +334,8 @@ void Input::Poll(const App& app, bool menuOpen)
         nav.b |= pn.b;
         nav.x |= pn.x;
         nav.y |= pn.y;
+        nav.lb |= pn.lb;
+        nav.rb |= pn.rb;
         return;
     }
     if (PadPressed(s, SAVESTATE)) wantSave = true;
@@ -367,6 +376,9 @@ PadState Input::Actions(const Settings& s) const
         p.rt = pad.btn[IN_RT] ? 1.0f : 0.0f;
     }
     p.cursor = s.stickCursor && pads.Any();
+    p.keyX = held[X];
+    p.keyDx = (held[RIGHT] ? 1 : 0) - (held[LEFT] ? 1 : 0);
+    p.keyDy = (held[DOWN] ? 1 : 0) - (held[UP] ? 1 : 0);
     p.speed = s.cursorSpeed / 100.0f;
     return p;
 }
@@ -410,7 +422,7 @@ void Input::Steer(App& app, const PadState& p, u32& keys)
                                    ? app.consoleWorldOnly + 1
                                    : 0;
         app.consolePointer = {navigator.PointerShown(), navigator.PointerDown(), navigator.QuitArmed(), navigator.PointerX(), navigator.PointerY(),
-                              navigator.Mark(), navigator.AskFocus()};
+                              navigator.Mark(), navigator.AskFocus(), navigator.Taking()};
         // The money's last change, shown on the panel's world for kPayoutFrames frames (an
         // animation's payout: the slot machine's coin then its win; a ticket's prize).
         // (Only on the panel and the activities: the front end, Create-a-Sim and a load show another save's money.)
@@ -546,19 +558,16 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
     if (tapFrames > 0) tapFrames--;
 
     // The stick cursor: faster with a fuller deflection, for both precision and reach.
-    // In CONSOLE only where no table of targets is (navigator.h), with A as its press there too;
-    // in the vacuum it is the hand, there without a controller too (the D-pad moves it while X or
-    // A is held: activities.h).
+    // In CONSOLE only where no table of targets is (navigator.h), with A as its press there too
+    // (the minigames' pointers, the vacuum's hand among them, are the activities': activities.h).
     const bool console = app.shown == Layout::Console;
-    const bool hand = console && navigator.Hand();
     cursorPress = held[TOUCH] || PadOn(s, TOUCH) || (console && navigator.CursorPress());
     if (console && !navigator.CursorScreen()) cursorShownUntil = 0; // (not left over from a screen before)
-    if ((s.stickCursor && pads.Any() && (!console || navigator.CursorScreen())) || hand)
+    if (s.stickCursor && pads.Any() && (!console || navigator.CursorScreen()))
     {
         // (The stick reads 0 inside its dead zone: Pads::Read.)
-        const float mag = pads.Any() ? std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry) : 0.0f;
-        const bool stepped = hand && (navigator.HandDx() != 0 || navigator.HandDy() != 0);
-        if (mag > 0 || stepped || cursorPress)
+        const float mag = std::sqrt(pad.rx * pad.rx + pad.ry * pad.ry);
+        if (mag > 0 || cursorPress)
         {
             if (mag > 0)
             {
@@ -566,14 +575,8 @@ void Input::Frame(App& app, const Video& video, long frame, u32& keys, bool& tou
                 cursorX = std::clamp(cursorX + pad.rx * step, 0.0f, (float)(SW - 1));
                 cursorY = std::clamp(cursorY + pad.ry * step, 0.0f, (float)(SH - 1));
             }
-            if (stepped)
-            {
-                cursorX = std::clamp(cursorX + navigator.HandDx(), 0.0f, (float)(SW - 1));
-                cursorY = std::clamp(cursorY + navigator.HandDy(), 0.0f, (float)(SH - 1));
-            }
             cursorShownUntil = frame + 180;
         }
-        if (hand) cursorShownUntil = frame + 180; // the vacuum's hand never hides
         if (cursorPress && !touching) { touching = true; tx = (int)cursorX; ty = (int)cursorY; }
     }
     // A pointing minigame without its HD frame (no strings): the pointer drawn as the stick cursor's cross.

@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "port/popup.h"
@@ -16,7 +17,6 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kLineFill = 0xFF6A72B8, kLineFocusFill = 0xFF9AA2E3;   // (Interact's rows)
 constexpr u32 kValueColour = 0xFFFFE9A0;                              // a warm white (the money's)
 constexpr u32 kPortraitWell = 0xFF5961A2;
 
@@ -209,7 +209,7 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
             if (focused)
             {
                 UiItem pl = PanelItem(r);
-                pl.fill = kLineFocusFill;
+                pl.fill = kFillFocus;
                 pl.border = 0;
                 pl.radius = r.h / 2.0f;
                 pl.layer = 1;
@@ -221,7 +221,7 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
         {
             if (focused) AddFocusRing(c, r, 18);
             UiItem row = PanelItem(r);
-            row.fill = focused ? kLineFocusFill : kLineFill;
+            row.fill = focused ? kFillFocus : kFillRow;
             row.borderArgb = th.frame;
             row.border = 2;
             row.radius = 18;
@@ -240,16 +240,18 @@ void BuildRoomInfo(Composition& c, const MenuView& v0, int focus, const GameStat
     {
         int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
         if (MenuFocusable(v, focus)) right = AddHint(c, right, Button::A, v.items[focus].word);
-        AddHint(c, right, Button::DPadV, "");
+        AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
     }
 
-    // Images: the portrait (the game's own, 3x), the X.
+    // Images: the portrait (the game's own, 3x; under the hint box, the game's box lies over it
+    // on the touch screen: the picture from before it, dimmed with the screen), the X.
     if (bottom)
     {
         const int w = kRiPortraitFrom.w * 3, h = kRiPortraitFrom.h * 3;
-        c.ui.push_back(ImageItem({kRiPortrait.x + (kRiPortrait.w - w) / 2, kRiPortrait.y + (kRiPortrait.h - h) / 2, w, h}, bottom, SW, SH, kRiPortraitFrom));
+        const Rect to {kRiPortrait.x + (kRiPortrait.w - w) / 2, kRiPortrait.y + (kRiPortrait.h - h) / 2, w, h};
+        c.ui.push_back(RoomHintUp(game) ? KeptCrop(kRiPortraitFrom, to) : KeyedCrop(bottom, kRiPortraitFrom, to));
     }
-    AddSpriteIcon(c, icons, kSprRiX, 0, 2, kRiClose);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprRiX), 0, kTierS, kRiClose);
     SortUi(c.ui, first);
 }
 

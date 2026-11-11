@@ -1,4 +1,5 @@
 #include "port/dialogue.h"
+#include "port/panelmenu.h"
 
 #include <algorithm>
 #include <cctype>
@@ -7,6 +8,7 @@
 
 #include "console.h"
 #include "port/menuview.h"
+#include "port/ownwords.h"
 #include "romdata.h"
 #include "ui/kit.h"
 
@@ -53,6 +55,7 @@ void Push(std::string& out, std::vector<bool>& dropped, const std::string& add, 
 ui::UiItem PortraitFrame(Rect r)
 {
     ui::UiItem w = ui::WellItem(r);
+    w.fill = ui::GameTheme().frameDark; // (the game's well colour: the portrait's background meets it past its keyed band)
     w.radius = 10;
     return w;
 }
@@ -85,7 +88,9 @@ std::string DialogueText(const std::string& raw, const HudState& hud, const std:
     return Tidy(out, dropped);
 }
 
-DialogueLayout LayoutDialogue(const std::string& text, bool portrait)
+std::string DialogueChipWord(const RomData* rom) { return OwnWord(rom, OwnWordId::Continue); }
+
+DialogueLayout LayoutDialogue(const std::string& text, bool portrait, const RomData* rom)
 {
     DialogueLayout L;
     L.portrait = portrait;
@@ -94,7 +99,7 @@ DialogueLayout LayoutDialogue(const std::string& text, bool portrait)
     L.textW = wellW - 2 * kDlgTextPad;
     // The A chip sits in the text well's bottom right corner: the last row's text must end
     // before it when it is on the bottom row.
-    const int chipW = ui::ChipRect(0, 0, ui::Button::A, "", kDlgChipSize).w + 10;
+    const int chipW = ui::ChipRect(0, 0, ui::Button::A, DialogueChipWord(rom), kDlgChipSize).w + 10;
     auto tryAt = [&](float size, int rows) {
         std::vector<std::string> lines = ui::Wrap(text, size, (float)L.textW);
         if ((int)lines.size() > rows) return false;
@@ -162,7 +167,7 @@ void BuildDialogue(Composition& c, const GameState& game, const RomData& rom, co
     // jump while the touch screen fades in; the picture is drawn when the game shows one.
     const bool picture = d.valid && PortraitShown(bottom);
     const bool portrait = picture || !d.valid || d.speaker != kSpeakerNone;
-    const DialogueLayout L = LayoutDialogue(text, portrait);
+    const DialogueLayout L = LayoutDialogue(text, portrait, &rom);
     const Rect& P = L.panel;
 
     // A click anywhere on the panel taps the game's arrow (the piece is not drawn: alpha 0; the
@@ -187,9 +192,10 @@ void BuildDialogue(Composition& c, const GameState& game, const RomData& rom, co
     const size_t textAt = c.ui.size();
     UiItem t = TextItem(textBox, text, L.size, Align::Left, Weight::Bold);
     c.ui.push_back(t);
-    // The A chip in the well's bottom right corner.
-    const Rect chip = ChipRect(0, 0, Button::A, "", kDlgChipSize);
-    c.ui.push_back(ChipItem(well.x + well.w - chip.w - 12, well.y + well.h - chip.h - 10, Button::A, "", kDlgChipSize));
+    // The A chip in the well's bottom right corner, with its word.
+    const std::string go = DialogueChipWord(&rom);
+    const Rect chip = ChipRect(0, 0, Button::A, go, kDlgChipSize);
+    c.ui.push_back(ChipItem(well.x + well.w - chip.w - 12, well.y + well.h - chip.h - 10, Button::A, go, kDlgChipSize));
     const size_t textEnd = c.ui.size();
     // The name plate: a tab over the panel's top edge, above the well's left.
     if (!name.empty())
@@ -214,7 +220,7 @@ void BuildDialogue(Composition& c, const GameState& game, const RomData& rom, co
         const Rect frame {P.x + P.w - kDlgPad - portraitW, wellY, portraitW, wellH};
         c.ui.push_back(PortraitFrame(frame));
         const int iw = kDlgPortraitFrom.w * kDlgPortraitScale, ih = kDlgPortraitFrom.h * kDlgPortraitScale;
-        if (picture) c.ui.push_back(ImageItem({frame.x + (frame.w - iw) / 2, frame.y + (frame.h - ih) / 2, iw, ih}, bottom, SW, SH, kDlgPortraitFrom));
+        if (picture) c.ui.push_back(KeyedCrop(bottom, kDlgPortraitFrom, {frame.x + (frame.w - iw) / 2, frame.y + (frame.h - ih) / 2, iw, ih}));
     }
     for (size_t i = textAt; i < textEnd; i++) c.ui[i].layer = 1;
     SortUi(c.ui, uiFirst);

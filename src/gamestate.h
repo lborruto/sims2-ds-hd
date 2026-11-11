@@ -73,9 +73,9 @@ struct ItemRec
 {
     int id = -1;
     int nameId = -1, descId = -1;
-    int iconRes = -1;                 // slot items: the sprite descriptor resource (RecordRow::descRes); -1 for the others
+    int iconRes = -1;                 // slot and counted items: the sprite descriptor resource (RecordRow::descRes); -1 for the key items
     int count = 0;
-    int tilesRes = -1, palRes = -1;   // slot items: the record's own tiles and palette (the Large Plant's palette is not the descriptor's neighbour)
+    int tilesRes = -1, palRes = -1;   // slot and counted items: the record's own tiles and palette (the Large Plant's palette is not the descriptor's neighbour)
     bool operator==(const ItemRec&) const = default;
 };
 
@@ -521,6 +521,7 @@ struct DetectorState
     int findType = -1;                // the sensed find's type (0 lead rock ... 8 sarcophagus) when inRange or the card is up (the find dug), else -1
     int findCount = 0;                // the finds the place loaded
     int earnings = 0;                 // "Metal Detector Earnings" (G)
+    int lastFind = -1;                // not RAM's: main.cpp keeps the last find a card showed while the detector stays up, else -1
     bool operator==(const DetectorState&) const = default;
 };
 
@@ -698,15 +699,38 @@ struct CardsState
     bool operator==(const CardsState&) const = default;
 };
 
+// One thing swirling in the vacuum's bowl (a slot of the object's nine): where it is (touch pixels,
+// its sprite's), the half side of the square the game grabs it by (20 x its scale), its kind
+// (dust 0x186-0x188 clogs the filter; above, a find: 0x196 the gold ring), held by the stylus.
+struct VacuumItem
+{
+    int slot = 0;
+    float x = 0, y = 0, half = 0;
+    int type = 0;
+    bool held = false;
+    bool Dust() const { return type <= kVacuumDustMax; }
+    static constexpr int kVacuumDustMax = 0x188;
+    bool operator==(const VacuumItem&) const = default;
+};
+
 // The vacuum (overlay 17; GScreen::Vacuum): the filter's clog (touching dust; a blow clears it) and
-// the stat panel's "Vacuum Earnings" (G).
+// the stat panel's "Vacuum Earnings" (G). The bowl reads on its own (bowl false: none of it known):
+// the things in it (active slots, in slot order: the game grabs the first whose square holds the
+// stylus), the slot held (-1 none), the funnel's keep animation running (a find dropped in it now
+// is not kept: the game waits for it to end).
 struct VacuumState
 {
     bool valid = false;
     bool clogged = false;
-    int earnings = 0;
+    int earnings = 0;                 // the lifetime "Vacuum Earnings" (G+0x7C: banked when put away)
+    int session = 0;                  // the money this session (S+0x150: the bowl's counter, §)
+    bool bowl = false;
+    std::vector<VacuumItem> items;
+    int heldSlot = -1;
+    bool keeping = false;
     bool operator==(const VacuumState&) const = default;
 };
+constexpr int kVacuumSlots = 9;
 
 struct MinigameState
 {
@@ -777,11 +801,27 @@ struct LoadScreen
     bool operator==(const LoadScreen&) const = default;
 };
 constexpr int kCasName = 7;           // the game's name limit
+// A sprite of a Create-a-Sim page's list (CActorSprite): what the game draws there, from the ROM.
+struct CasSprite
+{
+    bool read = false;                // the list's entry read as a sprite (else nothing below is known)
+    bool shown = false;               // +0x4 bit 0
+    int frame = 0;                    // +0x1A: the frame shown (a category's, an arrow's: 1 lit)
+    int tiles = -1, desc = -1, pal = -1;   // *(+0x20): the resources (pal -1: the game's palette at run time)
+    bool operator==(const CasSprite&) const = default;
+};
+constexpr int kCasSprites = 16;       // the most a page lists (Clothes: 15)
 struct CasState
 {
     bool valid = false;
     int page = -1;                    // S+0x74: 0 Name, 1 Hair, 2 Face, 3 Clothes, 4 Keep this Sim?; in game 5 Tan, 6 Hair, 7 Clothes
     bool switching = false;           // the page object is not yet the page's (a page change in flight, 2-4 frames): no page fields
+    // A sprite of the page's list is shown (+0x4 bit 0) with its graphics not uploaded yet (bit 7):
+    // the page's pictures on the touch screen are still the last page's (or empty).
+    bool loading = false;
+    // (Not RAM's: the frame loop's) the page's own pictures are on the touch screen: neither
+    // switching nor loading this frame and the one before (the picture lags the RAM by a frame).
+    bool drawn = false;
     int gender = -1;                  // 0 female, 1 male
     std::string simName;              // G+0x53, the committed name, at most 7 characters, as UTF-8
     int skin = -1;                    // skin figure 0..3 (hero), -1 not read
@@ -809,6 +849,9 @@ struct CasState
     bool keepKnown = false;
     int aspiration = -1;              // 0 Fortune, 1 Romance, 2 Popularity, 3 Party
     int answer = -1;                  // 0 choosing, 1 tick pressed, 2 cross pressed
+    // The page's sprites, in the list's order (not switching; those that do not read: desc -1).
+    int spriteCount = 0;
+    CasSprite sprites[kCasSprites];
     bool operator==(const CasState&) const = default;
 };
 struct BootState
@@ -901,6 +944,9 @@ std::vector<int> SpeechStringIds(RamView ram);
 // One line of the minigame the screen shows (the part's fields as k=v), empty when the screen is
 // none or its part does not read: what --print-minigame logs when it changes.
 std::string MinigameLine(const GameState&);
+// The vacuum's bowl (its own line: it moves every other frame): "bowl held=H keeping=K items=
+// slot:kind@x,y/half[H],...", empty when the vacuum is not up or its bowl does not read (--print-vacuum).
+std::string VacuumBowlLine(const GameState&);
 const char* GScreenName(GScreen);
 std::string GameStateName(const GameState&);   // "Panel/Goals", "Popup", "Unknown(ov=8,vt=0x0214B1C4)"
 // CONSOLE's screen from the game's: Panel with its tab, the rest by name; not valid, a Panel

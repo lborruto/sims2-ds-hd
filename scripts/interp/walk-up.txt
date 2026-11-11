@@ -1,0 +1,2 @@
+# From s7: the left stick held up from frame 5, a straight walk (tests/interp_check.sh).
+5 200 pad ly-

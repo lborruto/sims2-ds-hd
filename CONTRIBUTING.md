@@ -81,6 +81,7 @@ that has played far ("the complete save") and Pillow. Each takes them from the e
     bash tests/screens_check.sh       # the bottom screen recognised by its pixels
     bash tests/hotspots_check.sh      # each touch target tapped in the game does what it says
     bash tests/romdata_check.sh       # the game's strings, resources and sprites (RESEARCH= optional)
+    bash tests/interp_check.sh        # 60 fps: the walking Sim never torn in an in-between frame
 
 `MAX_SIMS` caps how many emulators a script runs at once (4 by default; set it lower on a slow or
 hot machine). The save states the scripts use are your own (never in git): the list, and how each
@@ -161,7 +162,7 @@ The headless mode runs the game without a window, about four times faster than r
 | `--print-screen` | print the recognised bottom screen (`screens.h`) when it changes: `frame N: screen Panel/Pockets` |
 | `--print-game` | print what the game says is up, read from its RAM (European ROM only), at frame 0 and whenever it changes: `frame N: game X` |
 | `--record-dir DIR` | where unmapped screens are recorded (a window run records by default; headless only with this) |
-| `--strings-count`, `--dump-string ID`, `--language N` | the game's own strings read from the ROM (`romdata.h`), printed; they stop the run; `--language` also picks the HD interface's words |
+| `--strings-count`, `--dump-string ID`, `--dump-strings`, `--language N` | the game's own strings read from the ROM (`romdata.h`), printed; they stop the run; `--language` also picks the HD interface's words |
 | `--print-town` | print the town's state read from RAM when it changes (pockets, options, the popup, the save slots, and the HD menu's lists: Interact's actions, Goals, Relationships, the phone, Give Gift, a note) |
 | `--print-front` | print the front end read from RAM when it changes (`frame N: front Title\|MainMenu\|Settings\|Load\|Wireless\|CreateASim\|KeepSim\|Boot\|Video`, `title phase=..`, `boot mode=..`, the Settings page and volumes, the Load rows, the Create-a-Sim page, name and picks); the front end's pad scripts in `scripts/console/front-*.txt`, `boot-keys.txt`, `settings-*.txt`, `load-slot.txt` and `cas-*.txt` drive it from `tests/console_check.sh` |
 | `--print-hotel` | print the hotel block read from RAM (built, unlocked and building rooms, the score, the five guest slots, the money, the stat totals, the songs, the place) and the hotel's and shops' screens when they change: `checkin` (the Registry, the guest's check-in), `roominfo`, `music`, `build`, `placement`, `catalogue`, `stat` |
@@ -181,6 +182,7 @@ The headless mode runs the game without a window, about four times faster than r
 | `--game-language N` | the game's own language (the DS firmware's), 1 English to 5 Spanish; headless keeps English otherwise |
 | `--fast-boot` | the boot's splashes at full speed, as the window does |
 | `--print-console` | CONSOLE's composition (which branch, a held picture) when it changes, and the counts at the end: how many frames showed milestone 1's picture |
+| `--print-words` | The words CONSOLE's picture shows (its texts and chips' labels, in order, ` \| ` between) when they change: what a screen says, for the checks |
 | `--shell PAGE [--shell-at N]`, `--launch`, `--data-dir DIR`, `--print-shell` | the pause menu opened on a page, the launch panel first, where the save states and recent games go (none headless without it), and what they do |
 | `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
 

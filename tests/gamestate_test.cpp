@@ -451,6 +451,15 @@ static void inventory()
     CHECK(v.slots[1].id == 106 && v.slots[1].nameId == 569 && v.slots[1].descId == 928 && v.slots[1].iconRes == 1991);
     CHECK(v.counted[0].count == 27 && v.counted[1].count == 0 && v.counted[2].count == 2 && v.counted[3].count == 0);
     CHECK(v.counted[0].nameId == 1154 && v.counted[3].descId == 848);
+    // The counted items' icons: their items' record rows (23-26) when a row names its item, else none.
+    CHECK(v.counted[0].iconRes == -1 && v.counted[3].iconRes == -1);
+    put_item_row(r, 23, 4000); put_item_row(r, 26, 4100);
+    v = ReadGameState(r.View()).town.inventory;
+    CHECK(v.valid && v.counted[0].iconRes == 4000 && v.counted[0].tilesRes == 3999 && v.counted[0].palRes == 4001 && v.counted[0].count == 27);
+    CHECK(v.counted[3].iconRes == 4100 && v.counted[1].iconRes == -1 && v.counted[2].iconRes == -1);
+    r.W16(kRec + 0x12 * (26 + 0x3B) + 8, 999); // a row that names another item: no icon, the part still valid
+    v = ReadGameState(r.View()).town.inventory;
+    CHECK(v.valid && v.counted[3].iconRes == -1 && v.counted[0].iconRes == 4000);
     CHECK(v.keys[0].count == 1 && v.keys[1].count == 1 && v.keys[2].count == 1 && v.keys[2].nameId == 1970 && v.keys[2].descId == 1974);
     r.W32(kG, 0x04);
     v = ReadGameState(r.View()).town.inventory;
@@ -1316,9 +1325,57 @@ static void cards_and_vacuum()
     CHECK(v.screen == GScreen::Vacuum && v.minigame.vacuum.valid && !v.minigame.vacuum.clogged && v.minigame.vacuum.earnings == 120);
     r.W8(kS + 0x158, 1);
     v = ReadGameState(r.View());
-    CHECK(v.minigame.vacuum.clogged && MinigameLine(v) == "vacuum clogged=1 earnings=120");
+    CHECK(v.minigame.vacuum.clogged && MinigameLine(v) == "vacuum clogged=1 earnings=120 session=0");
+    // The money this session (the bowl's counter, S+0x150): what the side panel shows.
+    r.W32(kS + 0x150, 75);
+    v = ReadGameState(r.View());
+    CHECK(v.minigame.vacuum.valid && v.minigame.vacuum.session == 75 && v.minigame.vacuum.earnings == 120);
+    { Ram q = r; q.W32(kS + 0x150, (u32)-1); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
+    { Ram q = r; q.W32(kS + 0x150, 100000000); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
     { Ram q = r; q.W8(kS + 0x158, 2); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
     { Ram q = r; q.W32(kMg + 0x7C, (u32)-5); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
+    // The bowl: nine slots of 0x1C at S+0x28 (+0 the sprite, its x / y 20.12 at +0x50 / +0x54; +0x14 the scale; +0x18 active,
+    // +0x19 held, +0x1A the kind), S+0x26 the slot held (0xA none), S+0x162 / S+0x170 the keep animation.
+    {
+        Ram q = r;
+        q.W16(kS + 0x26, 0xA);
+        auto item = [&](int i, u32 sprite, float x, float y, float scale, u32 type, bool held) {
+            const u32 e = kS + 0x28 + 0x1C * (u32)i;
+            q.W32(e, sprite); q.W32(e + 0x14, (u32)(int)(scale * 4096)); q.W8(e + 0x18, 1); q.W8(e + 0x19, held); q.W16(e + 0x1A, type);
+            q.W32(sprite + 0x50, (u32)(int)(x * 4096)); q.W32(sprite + 0x54, (u32)(int)(y * 4096));
+        };
+        item(1, kS + 0x400, 120.5f, 80, 0.5f, 0x186, false);
+        item(4, kS + 0x480, -10, 150, 0.75f, 0x196, false);
+        GameState w = ReadGameState(q.View());
+        const VacuumState& b = w.minigame.vacuum;
+        CHECK(b.valid && b.bowl && b.heldSlot == -1 && !b.keeping && b.items.size() == 2);
+        CHECK(b.items[0].slot == 1 && b.items[0].x == 120.5f && b.items[0].y == 80 && b.items[0].half == 10 && b.items[0].Dust() && !b.items[0].held);
+        CHECK(b.items[1].slot == 4 && b.items[1].x == -10 && b.items[1].half == 15 && !b.items[1].Dust());
+        CHECK(VacuumBowlLine(w) == "bowl held=-1 keeping=0 items=1:186@120,80/10,4:196@-10,150/15");
+        CHECK(MinigameLine(w) == "vacuum clogged=1 earnings=120 session=75");   // (the bowl its own line: --print-vacuum)
+        // Held, the keep animation running.
+        q.W16(kS + 0x26, 4); q.W8(kS + 0x28 + 0x1C * 4 + 0x19, 1); q.W8(kS + 0x170, 3);
+        w = ReadGameState(q.View());
+        CHECK(w.minigame.vacuum.bowl && w.minigame.vacuum.heldSlot == 4 && w.minigame.vacuum.items[1].held && w.minigame.vacuum.keeping);
+        q.W8(kS + 0x170, 0); q.W8(kS + 0x162, 1);
+        CHECK(ReadGameState(q.View()).minigame.vacuum.keeping);
+        // Garbage makes the bowl unread, never the clog and the earnings: a held slot past 8, a held flag past 1, a kind
+        // out of range, a sprite outside RAM, a place far off the screen, a scale past 4.
+        for (auto [off, val, w2] : {std::tuple<u32, u32, int>{0x26, 9, 2}, {0x26, 0xB, 2}, {0x28 + 0x1C + 0x19, 2, 1}, {0x28 + 0x1C + 0x1A, 0x50, 2},
+                                    {0x28 + 0x1C + 0x1A, 0x400, 2}, {0x28 + 0x1C, 0x01000000, 4}, {0x28 + 0x1C + 0x14, 5 * 4096, 4},
+                                    {0x400 + 0x50, (u32)(400 * 4096), 4}, {0x480 + 0x54, (u32)(-100 * 4096), 4}})
+        {
+            Ram g2 = q;
+            if (w2 == 1) g2.W8(kS + off, val); else if (w2 == 2) g2.W16(kS + off, val); else g2.W32(kS + off, val);
+            const VacuumState bad = ReadGameState(g2.View()).minigame.vacuum;
+            CHECK(!bad.bowl && bad.items.empty() && bad.valid && bad.clogged);
+        }
+        // An inactive slot is skipped whatever it holds.
+        { Ram g2 = q; g2.W8(kS + 0x28 + 0x1C + 0x18, 0); g2.W32(kS + 0x28 + 0x1C, 0x01000000); g2.W8(kS + 0x28 + 0x1C + 0x19, 7); CHECK(ReadGameState(g2.View()).minigame.vacuum.items.size() == 1); }
+        // The bowl reads without the clog's part (and the other way round).
+        { Ram g2 = q; g2.W8(kS + 0x158, 2); const VacuumState v2 = ReadGameState(g2.View()).minigame.vacuum; CHECK(!v2.valid && v2.bowl); }
+        CHECK(VacuumBowlLine(ReadGameState(mg_ram(0x0212F98C, -1).View())).empty());
+    }
     // Each part only on its own screen.
     CHECK(!ReadGameState(mg_ram(0x0214C658, 17).View()).minigame.cards.valid && !ReadGameState(mg_ram(0x0212F98C, -1).View()).minigame.vacuum.valid);
 }
@@ -1542,6 +1599,29 @@ static void front_cas()
         r.W32(spr + 0x80 * 8 + 0x50, 136u << 12); r.W32(spr + 0x80 * 8 + 0x54, 105u << 12);   // the ring on cell 4
         g = ReadGameState(r.View());
         CHECK(g.front.cas.arrowsKnown && g.front.cas.canLeft && !g.front.cas.canRight && g.front.cas.clothesCell == 4);
+        CHECK(!g.front.cas.loading);
+        // a shown sprite whose graphics are not uploaded yet (+0x4 bit 7): the page's pictures not drawn; a hidden one: nothing
+        r.W32(spr + 0x80 * 3 + 4, 0x48009081); CHECK(ReadGameState(r.View()).front.cas.loading && ReadGameState(r.View()).front.cas.clothesKnown);
+        r.W32(spr + 0x80 * 3 + 4, 0x48009080); CHECK(!ReadGameState(r.View()).front.cas.loading);
+        r.W32(spr + 0x80 * 3 + 4, 0x48009001); CHECK(!ReadGameState(r.View()).front.cas.loading);
+        CHECK(!ReadGameState(r.View()).front.cas.drawn);   // (the frame loop's, never RAM's)
+        {   // each sprite's resources (*(+0x20): tiles, descriptor, palette; 0xFFFF the game's at run time) and frame (+0x1A)
+            const u32 tri = 0x021A4F00;
+            r.W32(spr + 0x20, tri); r.W16(tri, 1110); r.W16(tri + 2, 1111); r.W16(tri + 4, 0xFFFF); r.W8(spr + 0x1A, 1);
+            CasState c = ReadGameState(r.View()).front.cas;
+            CHECK(c.spriteCount == 9 && c.sprites[0].shown && c.sprites[0].frame == 1 && c.sprites[0].tiles == 1110 && c.sprites[0].desc == 1111 && c.sprites[0].pal == -1);
+            CHECK(c.sprites[1].desc == -1 && c.sprites[7].read && c.sprites[7].shown == false);   // (no resources; hidden)
+            {   // an entry that is not a sprite: not read (never taken for a hidden one: an empty cell)
+                Ram q = r;
+                q.W32(spr + 0x80 * 7, 0x12345678);
+                const CasState d = ReadGameState(q.View()).front.cas;
+                CHECK(!d.sprites[7].read && !d.sprites[7].shown && d.sprites[8].read && d.spriteCount == 9);
+            }
+            r.W16(tri + 4, 1076); CHECK(ReadGameState(r.View()).front.cas.sprites[0].pal == 1076);
+            r.W16(tri + 2, 0x5000); CHECK(ReadGameState(r.View()).front.cas.sprites[0].desc == -1 && ReadGameState(r.View()).front.cas.valid);   // not an archive id
+            r.W32(spr + 0x20, 0x09000000); CHECK(ReadGameState(r.View()).front.cas.sprites[0].desc == -1);   // outside RAM
+            r.W32(spr + 0x20, 0);
+        }
         r.W32(spr + 0x80 * 8 + 0x50, 137u << 12); CHECK(ReadGameState(r.View()).front.cas.clothesCell == -1);   // between cells
         r.W32(spr + 0x80 * 8 + 4, 0); r.W32(spr + 0x80 * 8 + 0x50, 136u << 12); CHECK(ReadGameState(r.View()).front.cas.clothesCell == -1);   // hidden
         r.W32(spr + 0x80 * 6, 0x12345678); CHECK(!ReadGameState(r.View()).front.cas.arrowsKnown);   // not a sprite

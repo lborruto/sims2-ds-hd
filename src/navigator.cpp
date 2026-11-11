@@ -446,6 +446,13 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         else if (!popupNow && !popupUp_ && !view_->items.empty() && !HasModule(*view_, focusId_ >> 24)) focus_ = -1;
         else focus_ = MenuKeep(*view_, focusId_, focus_);
     }
+    // B led to another page (MenuView::backLands): the focus lands on that item once it is there.
+    if (landId_ && useView)
+    {
+        for (int i = 0; i < (int)view_->items.size(); i++)
+            if (view_->items[i].id == landId_ && view_->items[i].enabled) { focus_ = i; landId_ = 0; break; }
+        if (landId_ && ++landFrames_ > 4 * kHoldFrames) landId_ = 0;
+    }
     if (!useView && viewFocus_) focus_ = -1; // (an index of the view means nothing to HotspotsFor)
     // A popup coming: its own first focus (MenuView::initial: a question's No), never the index
     // the screen beneath had, nor an answer a popup before it left the focus on.
@@ -490,7 +497,6 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     const std::vector<Hotspot>& h = HotspotsFor(s);
     cursorScreen_ = h.empty() && !useView && !OwnScheme(s.screen); // (the HD Save slots, the minigames with a scheme of their own: no cursor)
     cursorPress_ = blow_ = voice_ = false;
-    handDx_ = handDy_ = 0;
     // A tap only when nothing else touches: a press while a tap or a drag runs is dropped.
     const bool canTap = !touch.Owns() && closing_ == 0;
     // Back from the Save slots or the phone: the tab it came from, tapped once the panel is settled.
@@ -649,7 +655,14 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
             if (ownMenu) { if (Run(v.menu, touch) && v.menuCloses) closing_ = kClosingFrames; }
             else if (backKey && v.picture && pictureOpen_) pictureOpen_ = false;
             else if (backKey && MenuFocusable(v, v.backFocus) && focus_ != v.backFocus) focus_ = v.backFocus;
-            else if (backKey && !v.back.empty()) { if (Run(v.back, touch) && v.backCloses) closing_ = kClosingFrames; }
+            else if (backKey && !v.back.empty())
+            {
+                if (Run(v.back, touch))
+                {
+                    if (v.backCloses) closing_ = kClosingFrames;
+                    if (v.backLands) { landId_ = v.backLands; landFrames_ = 0; }
+                }
+            }
             else if ((back || menu) && !v.own) menuOpen_ = false;
             // DS buttons the view passes on (Game Paused's Start).
             if (v.passKeys) dsKeys |= DsKeys(pad, true) & v.passKeys;
@@ -713,12 +726,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         activity_.ram = activityRam_;
         ActivityInput(s.screen, pad, touch, dsKeys, activity_);
         focus_ = activity_.focus;
-        // The vacuum's hand is the stick cursor: A held presses it.
-        cursorPress_ = activity_.grab;
         blow_ = activity_.blow;
         voice_ = activity_.voice;
-        handDx_ = activity_.handDx;
-        handDy_ = activity_.handDy;
         break;
     }
 
@@ -757,7 +766,6 @@ void Navigator::Leave(TouchScript& touch)
 {
     touch.Cancel();
     menuOpen_ = cursorPress_ = cursorScreen_ = blow_ = voice_ = false;
-    handDx_ = handDy_ = 0;
     activity_ = ActivityState();
     focus_ = -1;
     closing_ = 0;

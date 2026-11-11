@@ -50,6 +50,13 @@ int DefaultKey(int a); // an SDL keycode (SDLK_*); the DS buttons A/B/X/Y/L/R by
 int DefaultPad(int a); // a PadInput, or kNone
 // A key's name in the menu's font (capitals, digits and : - + . / < > ! ( ) only).
 std::string KeyName(int keycode);
+// What a key does in the pause menu and the launch panel (`action`: the key's, ActionOfKey):
+// the arrows move, Enter / Space / the DS's A key accept; the MENU key (Esc by default) resumes
+// before anything but the arrows takes it (even bound to Enter, Space or the DS's A key), so Esc
+// resumes from every page; Esc (when it is not MENU),
+// Backspace and the DS's B key go back; Delete / X clears, Y, the DS's L / R keys the tabs.
+enum class MenuKey { None, Up, Down, Left, Right, A, B, X, Y, Lb, Rb, Menu };
+MenuKey MenuKeyOf(int keycode, int action);
 
 struct Bindings
 {

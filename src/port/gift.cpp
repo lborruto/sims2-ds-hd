@@ -4,6 +4,7 @@
 
 #include "hotspots.h"
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -145,7 +146,7 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
     if (focus == kSlots) AddFocusRing(c, kGiftBow, 24);
     {
         UiItem b = PanelItem(kGiftBow);
-        b.fill = th.fill; // (the game's panel colour: the live button's corners meet it)
+        b.fill = canGive ? th.fill : 0xFF444A85; // (inactive: the shops' sunk plate, ui::kTextInactive words on it, 5.8:1)
         b.borderArgb = th.frameDark;
         b.border = 3;
         b.radius = 24;
@@ -156,28 +157,29 @@ void BuildGiftMenu(Composition& c, const MenuView& v, int focus, const GameState
         UiItem wt = TextItem({kGiftBow.x + 104, kGiftBow.y, kGiftBow.w - 120, kGiftBow.h}, w.text, w.size, Align::Left, Weight::ExtraBold);
         wt.wrap = false;
         wt.middle = true;
-        if (!canGive) { wt.colour = 0x80FFFFFF; wt.shadowArgb = 0x40383869; }
+        if (!canGive) wt.colour = kTextInactive;
         wt.layer = 1;
         c.ui.push_back(wt);
         AddMousePiece(c, hs[6].area, kGiftBow);
     }
-    // The hints: A gives (the focused slot's word), B closes (the game's X).
-    const int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
+    // The hints: A gives (the focused slot's word), B closes (the game's X), the D-pad's cross
+    // moves the focus over the slots and the bow ("Choose").
+    int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
     if (canGive)
     {
         const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
-        AddHint(c, right, Button::A, a.text);
+        right = AddHint(c, right, Button::A, a.text);
     }
+    AddHint(c, right, Button::DPad, OwnWord(&rom, OwnWordId::HintChoose));
 
     // Images: the items, the bow (the game's sprite), the portrait (live).
     for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++)
-        AddSpriteIcon(c, icons, inv.slots[i], 3, SlotRect(i), v.items[i].enabled ? 0 : 0x60000000);
-    AddSpriteIcon(c, icons, kSprBow, 0, 2, kGiftBowIcon, canGive ? 0 : 0x60000000);
+        AddTieredIcon(c, icons, inv.slots[i], kTierL, SlotRect(i), v.items[i].enabled ? 0 : 0x60000000);
+    AddTieredIcon(c, icons, kSprBow, 0, kTierS, kGiftBowIcon, canGive ? 0 : 0x60000000);
     if (bottom)
     {
         const int w = kGiftPortraitFrom.w * 3, h = kGiftPortraitFrom.h * 3;
-        c.ui.push_back(ImageItem({kGiftPortrait.x + (kGiftPortrait.w - w) / 2, kGiftPortrait.y + (kGiftPortrait.h - h) / 2, w, h}, bottom, SW,
-                                 SH, kGiftPortraitFrom));
+        c.ui.push_back(KeyedCrop(bottom, kGiftPortraitFrom, {kGiftPortrait.x + (kGiftPortrait.w - w) / 2, kGiftPortrait.y + (kGiftPortrait.h - h) / 2, w, h}));
     }
 
     SortUi(c.ui, first);

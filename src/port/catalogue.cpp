@@ -1,6 +1,7 @@
 #include "port/catalogue.h"
 
 #include <algorithm>
+#include <tuple>
 
 #include "port/icons.h"
 #include "port/ownwords.h"
@@ -16,7 +17,9 @@ using namespace ui;
 
 constexpr int kCells = 6, kOwnedPlaces = 6;
 constexpr u32 kLitRim = 0xFFB2B2E3;                 // the game's light lavender (a selection it holds)
-constexpr u32 kDim = 0x80FFFFFF, kDimShadow = 0x40383869;
+// Inactive (the mode not shown, Pay when the game would not pay): a sunk plate, its words a pale
+// lavender on it (5.8:1), never a faded white.
+constexpr u32 kInactivePlate = 0xFF444A85, kInactiveText = 0xFFD4D7F2;
 constexpr u32 kPriceColour = 0xFFFFE9A0;            // a warm white: the money's line
 
 Rect ShopCellRect(const CatalogueGeometry& g, int c)
@@ -36,26 +39,28 @@ DsPoint OwnedPoint(int i) { return {kCaOwnedX0 + (i % 2) * kCaOwnedDx, kCaCellY0
 Rect HitAround(DsPoint p) { return {p.x - 16, p.y - 16, 32, 32}; }
 Rect ButtonHit(int x, int y) { return {x - 15, y - 15, 30, 30}; }
 
-// The width the A hint's word is fitted to: what B's "Close" leaves of the hints' band.
+// The width the A hint's word is fitted to: what B's "Close" and the D-pad's "Scroll" leave of the
+// hints' band.
 int HintAWidth(const RomData& rom)
 {
     const Rect b = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold);
+    const Rect d = ChipRect(0, 0, Button::DPad, OwnWord(&rom, OwnWordId::ShopBrowse), kPmHintSize, 0, Weight::ExtraBold);
     const int right = kPmHints.x + kPmHints.w - 8 - b.w - 28;
-    return right - kPmHints.x - 60;
+    return right - kPmHints.x - d.w - 28 - 20;
 }
 
 // An item's icon in its cell, from the record's own triple (tiles, descriptor, palette: a few
-// items' palettes are not the descriptor's neighbour), the largest whole factor (3x at most) that
-// leaves the cell's rim clear (the store's pictures are 24 to 32 pixels: a bed 2x, a chair 3x).
+// items' palettes are not the descriptor's neighbour), at the content's tier (ui::kTierL: the
+// store's pictures are 24 to 32 pixels); one past kCaItemMax at tier S (2x: 64), as the cell
+// (kCaCell, its rim inside) holds 28 x 3 clear of its rim, not 32 x 3.
+constexpr int kCaItemMax = 28;
 void AddItemIcon(Composition& c, IconCache* icons, const ShopItem& it, Rect cell)
 {
-    if (!icons || it.iconRes < 0) return;
+    if (it.iconRes < 0 || !icons) return;
     const SpriteRef ref = it.tilesRes >= 0 && it.palRes >= 0 ? SpriteRef {it.tilesRes, it.iconRes, it.palRes} : SpriteRef::Of(it.iconRes);
     const SpriteFrame* f = icons->Frame(ref, 0);
-    if (!f || f->w <= 0 || f->h <= 0) return;
-    const int scale = std::clamp((cell.w - 16) / std::max(f->w, f->h), 1, 3);
-    if (const SpriteFrame* a = icons->Scaled(ref, 0, scale))
-        c.ui.push_back(icons->Image(ref, 0, *a, {cell.x + (cell.w - a->w) / 2, cell.y + (cell.h - a->h) / 2, a->w, a->h}));
+    const bool big = f && std::max(f->w, f->h) > kCaItemMax;
+    AddTiered(c.ui, icons, ref, 0, big ? kTierS : kTierL, cell);
 }
 
 // "§1,200" (the game's "$@1", its '$' the simoleon drawn §); a negative price is not shown.
@@ -95,6 +100,16 @@ std::string PayName(const RomData* rom, const CatalogueState& ca)
     const ShopItem* s = Selected(ca);
     return s ? MenuWords(*rom, s->nameId) : std::string();
 }
+// Why Pay is greyed, in the port's words: the money short, the places full, an item the store does
+// not take back (or a sale where the game buys nothing); empty without a selection.
+std::string PayWhyNot(const RomData* rom, const CatalogueState& ca)
+{
+    const ShopItem* s = Selected(ca);
+    if (!rom || !s) return {};
+    if (ca.sell) return OwnWord(rom, OwnWordId::ShopNoSale);
+    if ((int)ca.owned.size() >= kOwnedPlaces) return OwnWord(rom, OwnWordId::ShopNoPlace);
+    return ca.money < s->buyPrice ? OwnWord(rom, OwnWordId::ShopNoMoney) : std::string();
+}
 }
 
 CatalogueGeometry CatalogueLayout(bool vendor)
@@ -107,9 +122,9 @@ CatalogueGeometry CatalogueLayout(bool vendor)
     g.ownedX = kCaTitle.x + kCaTitle.w - ownedW;
     g.shopHead = {g.shopX, kCaTop, shopW, kCaHeadH};
     g.ownedHead = vendor ? Rect {} : Rect {g.ownedX, kCaTop, ownedW, kCaHeadH};
-    const int infoX = g.shopX + shopW + 16, infoR = vendor ? kCaTitle.x + kCaTitle.w : g.ownedX - 16;
+    const int infoX = g.shopX + shopW + 12, infoR = vendor ? kCaTitle.x + kCaTitle.w : g.ownedX - 12;
     g.info = {infoX, kCaTop, infoR - infoX, kCaBottom - kCaTop};
-    g.name = {g.info.x + 20, g.info.y + 12, g.info.w - 40, 44};
+    g.name = {g.info.x + 14, g.info.y + 12, g.info.w - 28, 44};
     g.price = {g.info.x + 20, g.info.y + 56, g.info.w - 40, 36};
     g.pay = {g.info.x + 16, g.info.y + g.info.h - 112, g.info.w - 32, 96};
     g.payIcon = {g.pay.x + 12, g.pay.y + 16, 64, 64};
@@ -117,8 +132,8 @@ CatalogueGeometry CatalogueLayout(bool vendor)
     g.desc = {g.info.x + 20, g.info.y + 100, g.info.w - 40, g.pay.y - 12 - (g.info.y + 100)};
     // The game's arrows, under the store's grid.
     const int ay = kCaGridY + 2 * (kCaCell + kCaGap) + 6, cx = g.shopX + shopW / 2;
-    g.up = vendor ? Rect {} : Rect {cx - 76, ay, 68, 64};
-    g.down = vendor ? Rect {} : Rect {cx + 8, ay, 68, 64};
+    g.up = vendor ? Rect {} : Rect {cx - 68, ay, 60, 60};
+    g.down = vendor ? Rect {} : Rect {cx + 8, ay, 60, 60};
     return g;
 }
 
@@ -288,7 +303,7 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
     }
     auto head = [&](Rect r, int id, bool lit) {
         UiItem h = PanelItem(r);
-        h.fill = lit ? th.frame : th.fill;
+        h.fill = lit ? th.frame : kInactivePlate;
         h.borderArgb = lit ? kLitRim : th.frameDark;
         h.border = lit ? 3 : 2;
         h.radius = r.h / 2.0f;
@@ -299,7 +314,7 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
         UiItem t = TextItem(r, f.text, f.size, Align::Centre, Weight::ExtraBold);
         t.wrap = false;
         t.middle = true;
-        if (!lit) { t.colour = kDim; t.shadowArgb = kDimShadow; }
+        if (!lit) t.colour = kInactiveText;
         t.layer = 1;
         c.ui.push_back(t);
     };
@@ -353,7 +368,7 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
     if (focus == pay) AddFocusRing(c, g.pay, 24);
     {
         UiItem b = PanelItem(g.pay);
-        b.fill = th.frame;
+        b.fill = canPay ? th.frame : kInactivePlate;
         b.borderArgb = th.frameDark;
         b.border = 3;
         b.radius = 24;
@@ -361,13 +376,14 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
         b.layer = 1;
         c.ui.push_back(b);
         const FittedText w = FitLine(PayWord(&rom, ca), kCaPaySize, kCaPayMin, g.payText.w, Weight::ExtraBold);
-        const std::string name = PayName(&rom, ca);
+        // (greyed: why, in place of the name: the info above names the item)
+        const std::string name = canPay ? PayName(&rom, ca) : PayWhyNot(&rom, ca);
         // With a selection: the mode and price, then the selection's name under them.
         const Rect top = name.empty() ? g.payText : Rect {g.payText.x, g.payText.y + 10, g.payText.w, 46};
         UiItem wt = TextItem(top, w.text, w.size, Align::Left, Weight::ExtraBold);
         wt.wrap = false;
         wt.middle = true;
-        if (!canPay) { wt.colour = kDim; wt.shadowArgb = kDimShadow; }
+        if (!canPay) wt.colour = kInactiveText;
         wt.layer = 1;
         c.ui.push_back(wt);
         if (!name.empty())
@@ -376,28 +392,21 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
             UiItem nt = TextItem({g.payText.x, g.payText.y + 54, g.payText.w, 32}, n.text, n.size, Align::Left, Weight::Bold);
             nt.wrap = false;
             nt.middle = true;
-            nt.colour = canPay ? kPriceColour : kDim;
-            if (!canPay) nt.shadowArgb = kDimShadow;
+            nt.colour = canPay ? kPriceColour : kInactiveText;
             nt.layer = 1;
             c.ui.push_back(nt);
         }
         AddMousePiece(c, ButtonHit(ca.vendor ? kCaVendorPayX : kCaPayX, kCaPayY), g.pay);
     }
-    // The game's arrows (the store), lit while the game has them enabled; the D-pad scrolls.
-    auto arrow = [&](Rect r, bool on) {
-        UiItem b = PanelItem(r);
-        b.fill = th.fill;
-        b.borderArgb = th.frameDark;
-        b.border = 2;
-        b.radius = 20;
-        b.raised = on;
-        b.layer = 1;
-        c.ui.push_back(b);
-    };
+    // The store's arrows (the kit's, every list's look), lit while the game has them enabled; the D-pad scrolls.
     if (!ca.vendor)
     {
-        arrow(g.up, ca.upEnabled);
-        arrow(g.down, ca.downEnabled);
+        for (auto [r, dir, on] : {std::tuple {g.up, UiItem::Sign::Up, ca.upEnabled}, std::tuple {g.down, UiItem::Sign::Down, ca.downEnabled}})
+        {
+            UiItem a = ScrollArrowItem(r, dir, on);
+            a.layer = 1;
+            c.ui.push_back(a);
+        }
         AddMousePiece(c, ButtonHit(kCaUpX, kCaArrowY), g.up);
         AddMousePiece(c, ButtonHit(kCaDownX, kCaArrowY), g.down);
     }
@@ -411,20 +420,16 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
         const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, HintAWidth(rom), Weight::ExtraBold);
         right = AddHint(c, right, Button::A, a.text);
     }
-    if (!ca.vendor && (ca.upEnabled || ca.downEnabled)) AddHint(c, right, Button::DPadV, "");
+    // The D-pad: it moves the focus in the grid (and scrolls the store's list past its edge).
+    AddHint(c, right, Button::DPad, OwnWord(&rom, OwnWordId::ShopBrowse));
 
-    // Images: the items (the record table's sprites 3x), the pay button, the arrows, the X.
+    // Images: the items (the record table's sprites at tier L), the pay button, the X.
     for (int i = 0; i < kCells; i++)
         if (v.items[i].enabled) AddItemIcon(c, icons, ca.items[ca.scroll + i], ShopCellRect(g, i));
     if (!ca.vendor)
         for (int i = 0; i < kOwnedPlaces && i < (int)ca.owned.size(); i++) AddItemIcon(c, icons, ca.owned[i], OwnedRect(g, i));
-    AddSpriteIcon(c, icons, kSprCaPay, 0, 2, g.payIcon, canPay ? 0 : 0x60000000);
-    if (!ca.vendor)
-    {
-        AddSpriteIcon(c, icons, kSprCaUp, 0, 2, g.up, ca.upEnabled ? 0 : 0x60000000);
-        AddSpriteIcon(c, icons, kSprCaDown, 0, 2, g.down, ca.downEnabled ? 0 : 0x60000000);
-    }
-    AddSpriteIcon(c, icons, kSprCaX, 0, 2, kCaClose);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprCaPay), 0, kTierS, g.payIcon, canPay ? 0 : 0x60000000);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprCaX), 0, kTierS, kCaClose);
 
     SortUi(c.ui, first);
 }
@@ -447,6 +452,9 @@ void MeasureCatalogue(const RomData& rom, BlockMeasure& m)
     };
     const CatalogueGeometry store = CatalogueLayout(false), vendor = CatalogueLayout(true);
     line(9000 + (int)OwnWordId::Select, OwnWord(&rom, OwnWordId::Select), kPmHintSize, kPmHintSize, HintAWidth(rom)); // (a cell's A)
+    // Pay greyed: why, in its name's line (both layouts).
+    for (OwnWordId w : {OwnWordId::ShopNoMoney, OwnWordId::ShopNoPlace, OwnWordId::ShopNoSale})
+        for (const CatalogueGeometry* g : {&store, &vendor}) line(9000 + (int)w, OwnWord(&rom, w), kCaPayNameSize, kCaPayNameMin, g->payText.w);
     // Every item: any object may be on the list or owned. A name may end in an ellipsis (the
     // Italian table's sentence at 463, as Pockets): counted apart.
     for (int id = 0; id <= kItemIdLast; id++)

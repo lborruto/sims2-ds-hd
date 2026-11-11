@@ -150,4 +150,8 @@ void AddTownHints(Composition& c, const TownHints& h);
 // centred when narrower than the canvas; keepSides: never cut at its sides (fitted to the
 // canvas's width, top-aligned, when wider), else cropped to 16:9.
 Piece ConsoleWorld(int topW, int rows, bool keepSides);
+// The kit's focus ring (ui::FocusRing's look: the game's green kFocusOuterW outside `r`, a white
+// line kFocusInnerW wide inside it) as two outline overlays, so the DS picture under `r` shows
+// through: the focus over DS pieces (the cards, the social screen, MixerSave's keyboard, MooGoo).
+void AddKitRingOverlay(Composition& c, Rect r);
 }

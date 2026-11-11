@@ -107,8 +107,10 @@ static void Usage()
         "                                and when the pixels' screen disagrees with it for over 90 settled frames\n"
         "  --print-hotel                 print the hotel block (rooms, score, guests, songs) and the hotel's and shops' screens (registry, room info, music, build rooms, placement, catalogue, stat panel), read from RAM, when they change\n"
         "  --print-minigame              print the minigame the bottom screen shows (Alien Autopsy, Metal Detector, MooGoo Monkey, scratch lottery, Super Drencher, Crime, Music Mixer and its save menu, Art Gallery), read from RAM, when it changes\n"
+        "  --print-vacuum                print the vacuum's bowl (its things, the one held, the funnel's keep animation), read from RAM, when it changes\n"
         "  --print-front                 print the front end (title, Settings, Load-a-Sim, Create-a-Sim, boot screens, video), read from RAM, when it changes\n"
         "  --print-console               print CONSOLE's composition (which branch; milestone 1's marked m1, a held picture) when it changes, and the counts at the end\n"
+        "  --print-words                 print the words CONSOLE's picture shows (its texts, chips' labels) when they change\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
         "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
@@ -121,6 +123,7 @@ static void Usage()
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --strings-count               print how many strings the game's text table has, and stop\n"
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
+        "  --dump-strings                print every string of the game's text, one a line (ID, a tab, the text as --dump-string's), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
         "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms, the Registry, room info, the main menu, Settings, Load-a-Sim, Create-a-Sim) can show fitted to its box, in --language's\n"
@@ -178,7 +181,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printFront = false, printConsole = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printVacuum = false, printFront = false, printConsole = false, printWords = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
     int uiScaleArg = 0;     // --ui-scale N (60-150): the HD interface's size for this run; 0 the settings' (headless 100)
@@ -189,7 +192,7 @@ int main(int argc, char** argv)
     int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
     int gameLanguage = -1;              // the DS firmware's language (--game-language)
     bool fastBootFlag = false;
-    bool stringsCount = false, noRomData = false;
+    bool stringsCount = false, dumpStrings = false, noRomData = false;
     int dumpResource = -1, dumpSprite = -1, dumpFrame = -1; // the archive's data (--dump-resource, --dump-sprite)
     std::string dumpFile;
     std::string measure; // --measure-string ID|all
@@ -239,8 +242,10 @@ int main(int argc, char** argv)
         else if (a == "--print-town") printTown = true;
         else if (a == "--print-hotel") printHotel = true;
         else if (a == "--print-minigame") printMinigame = true;
+        else if (a == "--print-vacuum") printVacuum = true;
         else if (a == "--print-front") printFront = true;
         else if (a == "--print-console") printConsole = true;
+        else if (a == "--print-words") printWords = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -264,6 +269,7 @@ int main(int argc, char** argv)
         }
         else if (a == "--fast-boot") fastBootFlag = true;
         else if (a == "--strings-count") stringsCount = true;
+        else if (a == "--dump-strings") dumpStrings = true;
         else if (a == "--no-romdata") noRomData = true;
         // The archive's data to a file (tests/romdata_check.sh): whole numbers, else the usage.
         else if (a == "--dump-resource" || a == "--dump-sprite")
@@ -319,7 +325,7 @@ int main(int argc, char** argv)
         if (shellPage < 0) { Usage(); return 1; }
     }
     // A run that prints or measures and stops opens no window.
-    const bool tool = stringsCount || dumpString >= 0 || dumpResource >= 0 || dumpSprite >= 0 || measureMenu || !measure.empty();
+    const bool tool = stringsCount || dumpStrings || dumpString >= 0 || dumpResource >= 0 || dumpSprite >= 0 || measureMenu || !measure.empty();
     const bool window = !headless && !tool;
 
     App app;
@@ -426,6 +432,8 @@ int main(int argc, char** argv)
         in.b = edge(p.b, q.b);
         in.x = edge(p.x, q.x);
         in.y = edge(p.y, q.y);
+        in.lb = edge(p.lb, q.lb);
+        in.rb = edge(p.rb, q.rb);
         return in;
     };
     // The window's mouse in output pixels -> the shell's 1280 x 720 canvas.
@@ -482,6 +490,7 @@ int main(int argc, char** argv)
                 input.Poll(app, true);
                 if (input.wantQuit) return false;
                 in = shellInput(input.nav);
+                if (input.wantMenu) in.b = true; // (Esc, the MENU key: B here, onto Quit or closing a message)
                 if (!input.droppedFile.empty()) { tryPath = input.droppedFile; input.droppedFile.clear(); }
                 input.EndFrame();
             }
@@ -696,8 +705,8 @@ relaunch:
     nds.SetupDirectBoot("game.nds");
     nds.Start();
 
-    // The game's text from the ROM (--strings-count, --dump-string ID): print it and stop.
-    if (stringsCount || dumpString >= 0)
+    // The game's text from the ROM (--strings-count, --dump-string ID, --dump-strings): print it and stop.
+    if (stringsCount || dumpStrings || dumpString >= 0)
     {
         RomData data;
         if (!data.Open(rom)) { fprintf(stderr, "no rom.bin archive in this ROM\n"); return 1; }
@@ -705,13 +714,15 @@ relaunch:
         if (!data.LoadStrings(lang)) { fprintf(stderr, "no strings for language %d\n", lang); return 1; }
         fprintf(stderr, "strings: language %d from file %d, %d strings\n", lang, data.StringsFile(), data.StringCount());
         if (dumpString >= data.StringCount()) { fprintf(stderr, "no string %d\n", dumpString); return 1; }
-        if (stringsCount) printf("%d\n", data.StringCount());
-        else
-        {
-            std::string s = data.String(dumpString);
+        auto line = [&](int id) {
+            std::string s = data.String(id);
             for (size_t p = 0; (p = s.find('\n', p)) != std::string::npos; p += 2) s.replace(p, 1, "\\n");
-            printf("%s\n", s.c_str());
-        }
+            return s;
+        };
+        if (stringsCount) printf("%d\n", data.StringCount());
+        else if (dumpStrings)
+            for (int id = 0; id < data.StringCount(); id++) printf("%d\t%s\n", id, line(id).c_str());
+        else printf("%s\n", line(dumpString).c_str());
         return 0;
     }
     // A resource of the game's archive, its compression undone, or a sprite's frame as a PNG
@@ -897,7 +908,7 @@ relaunch:
             }
             for (bool portrait : {true, false})
             {
-                const DialogueLayout L = LayoutDialogue(text, portrait);
+                const DialogueLayout L = LayoutDialogue(text, portrait, app.rom.get());
                 const bool inside = L.fits && L.panel.y >= 0 && L.panel.y + L.panel.h <= kConsoleH;
                 if (!inside) bad++;
                 if (ids.size() == 1)
@@ -991,6 +1002,7 @@ relaunch:
     double nextFrameAt = 0; // in seconds of the performance counter; 0: not started
     bool wasPaused = false; // the pause menu was open: buttons held on leaving it are not presses
     bool lastMenu = app.consoleMenu;
+    std::string lastWords;   // (--print-words)
     int lastFocus = app.consoleFocus;
     int disagree = 0; // frames the game's settled screen and the pixels' answer have disagreed
     int lastTouchX = -1, lastTouchY = -1; // the stylus's last point down (room info's hint: which line)
@@ -1147,9 +1159,16 @@ relaunch:
             }
             if (host.Open())
             {
-                // The pause buttons again (Start + Back, the MENU key): back to the game.
-                if (input.wantMenu && host.model.capturing < 0 && host.model.message.empty()) host.shell.Close();
-                else host.Frame(app, video, input, shellInput(input.nav));
+                // The pause buttons again (Start + Back, the MENU key): back to the game from every
+                // page; over a question or a message they are B (No, close it).
+                const bool boxed = host.shell.ask != shell::Ask::None || !host.model.message.empty();
+                if (input.wantMenu && host.model.capturing < 0 && !boxed) host.shell.Close();
+                else
+                {
+                    shell::Input in = shellInput(input.nav);
+                    if (input.wantMenu && boxed) in.b = true;
+                    host.Frame(app, video, input, in);
+                }
             }
             else if (input.wantMenu || (shellPage >= 0 && frame == shellAt && iter == shellAt))
             {
@@ -1279,6 +1298,11 @@ relaunch:
                 if (ld.valid)
                     ld.loading = (before.front.load.valid && before.front.load.loading) || (p.valid && p.kind == 3 && p.state >= 1 && p.state <= 3);
             }
+            {   // Create-a-Sim: the page's own pictures on the touch screen (no switching nor loading since the frame before)
+                CasState& cs = app.game.front.cas;
+                const CasState& b = before.front.cas;
+                if (cs.valid) cs.drawn = !cs.switching && !cs.loading && b.valid && b.page == cs.page && !b.switching && !b.loading;
+            }
             {   // room info's hint: which line the stylus opened it on (not in RAM), kept while it is up
                 RoomInfoState& ri = app.game.roomInfo;
                 // (a touch before the room info rose opened it, or something else: never a line's)
@@ -1298,9 +1322,16 @@ relaunch:
                 if (upBefore && !upNow && app.game.screen == before.screen) mg.popupGone = p0;
                 // (decided once, when the text rises: kept while it is up, even when it was not
                 // known then (-1), never taken from a later touch)
+                // (no touch since the screen rose, a state loaded with the text up: the text's tail in
+                // the game's scratch buffer, MinigameHelpInRam)
                 auto fill = [&](bool up, bool wasUp, int was, int& id) {
-                    if (up) id = wasUp ? was : lastTouchX >= 0 ? MinigameHelpAt(app.ConsoleScreen().screen, lastTouchX, lastTouchY) : -1;
+                    if (up)
+                        id = wasUp && was >= 0 ? was : lastTouchX >= 0 ? MinigameHelpAt(app.ConsoleScreen().screen, lastTouchX, lastTouchY)
+                           : app.rom && app.portSupported ? MinigameHelpInRam(app.ConsoleScreen().screen, nds.MainRAM, nds.MainRAMMask, *app.rom) : -1;
                 };
+                // the detector's last find (the "Found:" card gone, the side panel still names it)
+                if (DetectorState& d = mg.detector; d.valid)
+                    d.lastFind = d.card && d.findType >= 0 ? d.findType : before.minigame.detector.valid ? before.minigame.detector.lastFind : -1;
                 fill(mg.drencher.valid && mg.drencher.helpText, before.minigame.drencher.valid && before.minigame.drencher.helpText, before.minigame.drencher.helpId, mg.drencher.helpId);
                 fill(mg.crime.valid && mg.crime.helpText, before.minigame.crime.valid && before.minigame.crime.helpText, before.minigame.crime.helpId, mg.crime.helpId);
                 fill(mg.mixer.valid && mg.mixer.phase == 9, before.minigame.mixer.valid && before.minigame.mixer.phase == 9, before.minigame.mixer.helpId, mg.mixer.helpId);
@@ -1334,7 +1365,7 @@ relaunch:
                         // reading; the line counts are for the box with the portrait's column).
                         if (app.rom && d.stringId < app.rom->StringCount())
                         {
-                            const DialogueLayout L = LayoutDialogue(DialogueText(app.rom->String(d.stringId), app.game.hud, app.rom->String(kDlgAmId), app.rom->String(kDlgPmId)), true);
+                            const DialogueLayout L = LayoutDialogue(DialogueText(app.rom->String(d.stringId), app.game.hud, app.rom->String(kDlgAmId), app.rom->String(kDlgPmId)), true, app.rom.get());
                             fprintf(stderr, "frame %ld: hd dialogue id=%d lines=%zu size=%g\n", frame, d.stringId, L.lines.size(), L.size);
                         }
                     }
@@ -1456,6 +1487,11 @@ relaunch:
                     if (t.note.valid) fprintf(stderr, "frame %ld: note text=%d playername=%d\n", frame, t.note.textId, t.note.playerName ? 1 : 0);
                     else fprintf(stderr, "frame %ld: note none\n", frame);
                 }
+            }
+            if (app.portSupported && printVacuum)
+            {   // the vacuum's bowl (gamestate.h): one line when it changes
+                const std::string now = VacuumBowlLine(app.game), was = VacuumBowlLine(before);
+                if (now != was || frame == 0) fprintf(stderr, "frame %ld: vacuum %s\n", frame, now.empty() ? "none" : now.c_str());
             }
             if (app.portSupported && printMinigame)
             {   // the minigames (gamestate.h): one line when the screen's part changes
@@ -1620,6 +1656,8 @@ relaunch:
                             if (c.clothesKnown) fprintf(stderr, " category=%d clothespage=%d item=%d", c.category, c.clothesPage, c.item);
                             if (c.keepKnown) fprintf(stderr, " aspiration=%d answer=%d", c.aspiration, c.answer);
                             if (c.switching) fprintf(stderr, " switching");
+                            if (c.loading) fprintf(stderr, " loading");
+                            if (c.valid && !c.drawn) fprintf(stderr, " undrawn");
                             fprintf(stderr, "\n");
                             if (c.arrowsKnown) fprintf(stderr, "frame %ld: cas-sprites left=%d right=%d cell=%d pos=%d\n", frame, c.canLeft ? 1 : 0, c.canRight ? 1 : 0, c.clothesCell, c.hairPos);
                         }
@@ -1689,6 +1727,16 @@ relaunch:
                 (frame == 0 || fresh != app.consoleHold.Branch() || shown != app.consoleHold.ShownBranch() || held != app.consoleHold.Holding()))
                 fprintf(stderr, "frame %ld: console %s%s\n", frame, ConsoleBranchName(app.consoleHold.Branch()),
                         app.consoleHold.Holding() ? (std::string(" held ") + ConsoleBranchName(app.consoleHold.ShownBranch())).c_str() : "");
+            // The words shown (the checks read what a screen says): its texts and chips' labels, in order.
+            if (printWords && app.shown == Layout::Console)
+            {
+                std::string words;
+                for (const ui::UiItem& it : app.consoleHold.ShownNow().ui)
+                    if ((it.kind == ui::UiItem::Text || it.kind == ui::UiItem::Chip) && !it.text.empty()) words += (words.empty() ? "" : " | ") + it.text;
+                for (char& ch : words) if (ch == '\n') ch = ' ';
+                if (words != lastWords) fprintf(stderr, "frame %ld: words %s\n", frame, words.c_str());
+                lastWords = words;
+            }
         }
         writeShots(false);
         frame++;

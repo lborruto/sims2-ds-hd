@@ -84,16 +84,19 @@ you last typed). The mouse works everywhere too.
   (Up / Down choose, let go to do it); while A is held, Left / Right pick the next person or thing
   nearby.
 - **The status bar** runs along the bottom of the window: the time, your money and your Sanity,
-  with the camera and menu hints at the right. What you just won or paid shows beside the money
-  for a few seconds.
+  with the camera and menu hints at the right. What you just won (green) or paid (red) shows
+  beside the money for a few seconds. The bar stays under conversations too.
 - **The menu** (Back, or E) opens the touch screen's menu big over the town: LB / RB switch
-  tabs, the D-pad moves, A does, B closes.
+  tabs, the D-pad moves, A does, B closes. Every screen's hints say what the D-pad does there
+  ("Choose" whenever it moves the highlight), and a list that scrolls has its up and down arrows
+  at its right. Lists stop at their ends.
 
 ### The menu
 
 - **Interact**: what the person or thing in front of you can do. A does the highlighted action,
   Left / Right pick the next one nearby.
-- **Pockets**: your six slots, the tools and the things you collect, with their descriptions. A
+- **Pockets**: your six slots, the tools and the things you collect, with their descriptions
+  (what you have none of, a tool not found yet or a collection at 0, is drawn faint). A
   uses the highlighted item. X throws it away, but only on the second press: the first press turns
   the bin green and the hint says "Again"; moving away cancels.
 - **Goals** and **Relationships**: Up / Down move through the list; Relationships shows each
@@ -102,14 +105,14 @@ you last typed). The mouse works everywhere too.
   A on *Save* opens the game's three save slots: A saves into the highlighted one (an empty slot at
   once; a used one asks first, and the question opens on No).
 - **The phone** (the top right of the menu): its Up / Down / OK are the D-pad and A, as on the
-  phone itself. B goes back one page (a message to the list, the ringtones to the menu) and, from
-  its first page, hangs up. Back hangs up from anywhere.
+  phone itself. B goes back one page ("Back": a message to the list, the ringtones to the menu)
+  and, from its first page, hangs up ("Close"). Back hangs up from anywhere.
 
 The save slots and the phone, opened from the menu, come back to the menu where you were.
 
 <p align="center">
   <img src="screenshots/pockets.webp" alt="The Pockets tab: the six slots, the tools and counted items, the highlighted item's name and description, Use and Trash" width="440">
-  <img src="screenshots/phone.webp" alt="The phone: the game's green screen with Messages, Phonebook, Options and Exit, its Up, OK and Down buttons below" width="440">
+  <img src="screenshots/phone.webp" alt="The phone: the game's green screen with Messages, Phonebook, Options and Exit, its Up, OK and Down buttons below, the hints Choose, A and B Close" width="440">
 </p>
 
 ### Shops, the hotel and the rest
@@ -119,13 +122,14 @@ The save slots and the phone, opened from the menu, come back to the menu where 
   sell); A on the simoleon button buys or sells it (it names the item and the price, and is
   greyed when the game would refuse). Up / Down past the list scroll it; B closes.
 - **Build Rooms** (City Hall): A on a room shows the permit and what you would have left, then
-  asks; the question opens on No, so a stray double press never spends. Right then A buys.
+  asks in a box like every question (the room and the sum in it); the question opens on No, so a
+  stray double press never spends. Right then A buys. A permit you cannot pay is red.
 - **The hotel's Registry**: A on a room shows its page (who stays, their mood, when they leave,
   what the room earns a day; A on a line explains it). When a guest checks in, A on a free room
   gives it to them.
 - **A music panel**: A plays the highlighted song (the room keeps it); Up / Down scroll.
-- **The stat panel**: A opens a page, LB / RB (or Left / Right) go to the previous / next one,
-  B goes back, then closes.
+- **The stat panel**: its tabs name the five pages; A opens a page, LB / RB (or Left / Right) go
+  to the previous / next one, B goes back ("Back"), then closes ("Close").
 - **Conversations** go on with A. **Popups** (tips, goals, Game Paused) close with A or B. A
   **question** (Quit? Overwrite this save?) always opens on No: Right then A says yes, B is always
   no. When a popup opens over the menu, the menu comes back on the same row after it.
@@ -156,8 +160,8 @@ after the story, and any screen not redrawn yet.
 ### Create-a-Sim
 
 Your Sim is big on the left, the game's pages on the right. LB / RB change page, Start goes to
-the next one. The right stick (or the mouse's right drag) turns your Sim, and so do X / Y after
-the first page.
+the next one and B back to the one before. The right stick (or the mouse's right drag) turns your
+Sim, and so do X / Y after the first page.
 
 - **The name** (the first page): the D-pad and A type it on the game's keyboard, seven letters at
   most; Y erases a letter and X changes the letters (ABC, abc, 123!). With the highlight on the
@@ -165,8 +169,9 @@ the first page.
   gender and skin buttons are above it.
 - **Hair, face and clothes** are picked with the D-pad and A; Left / Right past the edge show
   more, as the game's arrows do.
-- **Keep this Sim?**: pick an aspiration, then A on the tick starts the game. B first moves to the
-  cross and only a second B presses it, so one stray B never throws your Sim away.
+- **Keep this Sim?**: pick an aspiration, then A on the tick (or Start) starts the game. B first
+  moves to the cross and only a second B presses it, so one stray B never throws your Sim away.
+  B on the name page takes you there, onto the cross: the way back to the title.
 
 ## The minigames
 
@@ -178,7 +183,7 @@ have a pointer on the sticks (LT slows it).
 
 <p align="center">
   <img src="screenshots/autopsy.webp" alt="The Alien Autopsy big with its pointer, the organs' health at the right, the buttons' hints in a bar below" width="440">
-  <img src="screenshots/vacuum.webp" alt="The hotel's vacuum: its bowl big, the lobby small at the right with the earnings, the hints below" width="440">
+  <img src="screenshots/vacuum.webp" alt="The hotel's vacuum: its bowl big, a gold ring in the green focus ring, the lobby small at the right with the earnings, the hints below: A Take a find to the funnel" width="440">
 </p>
 
 | Minigame | Controller | Keyboard | Does |
@@ -191,13 +196,15 @@ have a pointer on the sticks (LT slows it).
 | | Y | A | discard the chosen card |
 | | B | Z | quit (it asks: No first) |
 | Vacuum | left stick (or D-pad) | Arrows | drive |
-| | right stick (or X + D-pad) | S + arrows | move the hand over the bowl |
-| | A (hold) | X (hold) | grab a find and drag it to the box |
+| | right stick | S + arrows (or drag with the mouse) | move the hand over the bowl (a green ring shows the find nearest it) |
+| | A | X | take the ringed find to the funnel at the bowl's bottom (kept; dust left alone) |
 | | Y | A | blow: clears a clogged filter |
 | | B | Z | put the vacuum away |
 | Alien Autopsy, painting | either stick (LT: slow), D-pad | Arrows | move the pointer (the D-pad a pixel at a time, faster held) |
 | | A (hold) | X (hold) | the stylus down: cut, lift an organ, pick a parasite, paint |
 | Alien Autopsy | X / Y / RB | S / A / W | laser / hand / tweezers |
+| | A (the hand, an organ cut free) | X | take the freed organ to the tray by itself |
+| | A (the tweezers) | X | take the nearest parasite (an eating one first) to the flask by itself |
 | | LB | Q | carry the organ to the tray (the parasite to the flask) |
 | | B twice | Z twice | quit (the game pays nothing then) |
 | Metal Detector | left stick or D-pad | Arrows | walk |
@@ -210,6 +217,7 @@ have a pointer on the sticks (LT slows it).
 | Moogoo Monkey | D-pad or left stick | Left / Right | choose the monkey to bet on, the card to play, the monkey a special card goes on (a green ring shows it) |
 | | A | X | bet, play the card; otherwise go on |
 | | B | Z | take the bet or the card back; else quit (it asks) |
+| | Start | Enter | quit (it asks: No first), also while a bet or a card is chosen |
 | Super Drencher | left stick or D-pad | Arrows | walk |
 | | A (hold) / X (hold) | X / S (hold) | fire / pump |
 | | Y / RB / LB | A / W / Q | target / refill / run |
@@ -236,26 +244,33 @@ what you won beside the status bar.
 ## The pause menu
 
 **Start + Back** together (press Back first: Start first may open a minigame's help on its way)
-or **Esc** pauses the game and opens the pause menu, in the game's look and your language:
+or **Esc** pauses the game and opens the pause menu, in the game's look and your language. The
+same buttons go back to the game from any of its pages (over a question they say No). Lists stop
+at their first and last rows; the hints at the bottom say what each button does there.
 
 - **Resume** (or B).
-- **Settings**: every option in one list, below.
-- **Controls**: what each button does, and *Keys and buttons* to change them: A on an action,
+- **Settings**: every option, in five tabs, below.
+- **Controls**: what each button does, and *Keys and buttons* to change them (the pause menu
+  too: one button alone can open it): A on an action,
   then the key or button you want (Esc, or Start + Back together, keeps what it had; Backspace
-  leaves it no key); X clears it, Y sets them all one after another; the last row resets them all.
+  leaves it no key); X clears it, Y sets them all one after another; the last row resets them all
+  (it asks first). The pause menu always keeps a key: clearing it is refused, with a message. The
+  Controls page shows the buttons of what you used last: on the keyboard the arrows, Q / W and
+  the mouse; on a pad the sticks and LB / RB.
 - **Save states**: four slots, each with a picture and the date. A on a used slot loads it (it
-  asks first), A on an empty one or X saves. *Undo the last load* takes you back to just before
-  a load, even after a restart. A state made with another ROM file says so before loading.
+  asks first), A on an empty one or X saves (X on a used one asks first). *Undo the last load*
+  takes you back to just before a load, even after a restart (it asks first). A state made with another ROM file says so before loading.
 - **Change game**: keeps your place (as Quit does), then back to the launch panel.
 - **Open the saves folder**: the folder with your save states, screenshots and settings.
 - **Quit** asks first (the question opens on No) and keeps your place: *Continue* on the launch
   panel picks up right there. If the game saved after that (on another computer, say), Continue
   starts from the game's own save instead and says so.
 
-Closing the window asks the same question.
+Closing the window asks the same question. Every question opens on No, and B is No; a message
+closes with A or B.
 
 <p align="center">
-  <img src="screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit" width="440">
+  <img src="screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit; the hints say how to resume and select" width="440">
   <img src="screenshots/save-states.webp" alt="The save states page: slot 1 with its picture and date, three empty slots, Undo the last load" width="440">
 </p>
 
@@ -263,39 +278,67 @@ F5 and F7 save and load one more quick state, without the menu.
 
 ## Settings
 
-In the pause menu's Settings, Left / Right (or A) change the highlighted row. They are kept
-between runs.
+The pause menu's Settings has five tabs: **LB / RB** (Q / W on the keyboard) go from one to the
+next, Up / Down move in the tab, Left / Right (or A) adjust the highlighted row, whose `‹ ›`
+arrows say it can change. The line under the list says what the highlighted row does. Each tab
+puts the rarely needed rows last, under *Advanced*. **Y** puts the tab's rows back to their
+defaults (it asks first, on No); window size and place and your keys and buttons are not touched.
+Everything is kept between runs.
 
 <p align="center">
-  <img src="screenshots/settings.webp" alt="The pause menu's settings: Layout, Fullscreen, Picture filter, Interface size, Game pictures, 3D resolution, Widescreen world, 60 fps" width="700">
+  <img src="screenshots/settings.webp" alt="The pause menu's settings on the Display tab: Fullscreen, Interface size, Screen scaling, Game icons, Hide the idle pointer, and Layout under Advanced" width="700">
 </p>
+
+**Display**
 
 | Setting | What it does |
 |---|---|
-| Layout | Console (the default) or one of the older layouts ([below](#layouts-and-looks)) |
 | Fullscreen | also F11 |
-| Picture filter | how the game's pictures are scaled to your window: Sharp (crisp, evenly sized pixels at any size: the default), Smooth or Pixels |
-| Interface size | the size of the HD menus, conversations and hints. Auto (the default) follows your screen's size and the window's, so they are not huge on a big monitor nor tiny on a handheld; or 60 to 150 % by hand. The game's world keeps its size |
-| Game pictures | the game's icons and portraits in the menus: Smooth (redrawn with soft edges by the xBRZ scaler: the default) or Pixels (the DS's own) |
-| 3D resolution | the 3D world 1 to 4 times sharper (default 2) |
-| Widescreen world | more of the town left and right, 16:9 instead of 4:3 (default on) |
-| 60 fps | in-between frames for the 3D, which the game draws at 30 a second (default on) |
-| Battery saver | the 3D at 1x and 30 fps whatever the two above say: lighter on a laptop's battery and fans |
-| Volume, Mute | by 5 % |
-| Sound in fast forward | muted, or at normal pitch skipping ahead |
-| Run in background | off (the default): the game pauses and goes quiet while its window is not in front |
-| Fast forward speed | 2×, 3×, 4× or as fast as it goes |
-| Fast forward key | held, or pressed once on and once off |
-| Fast boot | the boot's splashes at full speed (default on) |
+| Interface size | the size of the HD menus, conversations and hints. Auto (the default) follows your screen's size and the window's, so they are not huge on a big monitor nor tiny on a handheld; or 60 to 150 % by hand. 100 % is the menus' largest size at 16:9 (they already fill the screen's height); larger sizes grow the hints, the world's prompts and conversations. The game's world keeps its size |
+| Screen scaling | how the game's pictures are scaled to your window: Sharp (crisp, evenly sized pixels at any size: the default), Smooth or Pixels |
+| Game icons | the game's icons and portraits in the HD menus: Pixels (the DS's own, the default) or Smooth (redrawn with soft edges by the xBRZ scaler) |
 | Hide the idle pointer | the mouse pointer hides after a few seconds still over the game |
+| *Advanced:* Layout | Console (the default) or one of the older layouts ([below](#layouts-and-looks)) |
+
+**Graphics**
+
+| Setting | What it does |
+|---|---|
+| Battery saver | the 3D at 1x and 30 fps whatever the two rows below say: lighter on a laptop's battery and fans. While it is on, those two rows are dimmed and show what it holds them at |
+| 3D resolution | the 3D world 1 to 4 times sharper (default 2) |
+| 60 fps | in-between frames for the 3D, which the game draws at 30 a second (default on) |
+| *Advanced:* Widescreen world | more of the town left and right, 16:9 instead of 4:3 (default on) |
+
+**Sound**
+
+| Setting | What it does |
+|---|---|
+| Volume | all the game's sound, by 5 %. Music and effects have their own volumes in the game's own options |
+| Mute | silence without losing the volume |
+| Pause in the background | on (the default): the game pauses and goes quiet while its window is not in front |
+| *Advanced:* Sound in fast forward | muted, or at normal pitch skipping ahead |
+
+**Controls**
+
+| Setting | What it does |
+|---|---|
+| Keys and buttons | opens the page that changes them (the same as the pause menu's Controls). The pause menu can have one button of its own there instead of Start + Back |
 | Stick cursor | the right stick as a cursor on the touch screen where one is needed |
 | Cursor speed | 50 to 200 %: the cursor's and the minigames' pointer |
-| Stick dead zone | raise it if your Sim walks on its own |
 | Swap the sticks | left-handed: the camera and the cursor go to the left stick, walking to the right |
-| Trigger press at | how far a trigger goes down to count |
-| Rumble | a short buzz when a controller connects |
+| *Advanced:* Stick dead zone | raise it if your Sim walks on its own |
+| *Advanced:* Trigger press at | how far a trigger goes down to count |
+| *Advanced:* Buzz on connect | a short buzz when a controller connects (the game itself has no rumble) |
+
+**Game**
+
+| Setting | What it does |
+|---|---|
+| Language | the game's language and the HD screens' ([above](#starting)); applies at the next start, as the row says |
 | Microphone | what the DS hears when the game listens (the vacuum, the music mixer): off, the blow key (M) or your real microphone; in Console the vacuum's Y blows whatever this says |
-| Language | the game's language and the HD screens' ([above](#starting)); applies at the next start |
+| Fast forward speed | 2×, 3×, 4× or as fast as it goes |
+| Fast forward key | Hold, or Toggle (pressed once on and once off) |
+| *Advanced:* Fast boot | the boot's splashes at full speed (default on) |
 
 ## Controllers
 
@@ -339,8 +382,9 @@ same places as QWERTY. Every key and button can be changed in the pause menu.
 | Q / W | LB / RB | switch tabs and pages in the menus |
 | Enter / Right Shift | Start / left stick click | the DS's Start / Select |
 | E | Back | open the menu |
-| Esc | Start + Back | the pause menu |
+| Esc | Start + Back | the pause menu (and back to the game from any of its pages) |
 | Space (hold) | RT (hold) | fast forward |
+| (the mouse's click) | LT (hold) | press with the stick cursor on the touch screen |
 | M (hold) | | blow into the microphone (Y does it in Console) |
 | F5 / F7 | | quick save state / load it |
 | F11 / F12 | | fullscreen / screenshot of the window |
@@ -380,8 +424,8 @@ on the command line):
 | **Side by side** | both screens side by side |
 | **Stacked** | as on the DS, one above the other |
 
-**Looks.** Sharper 3D, the widescreen world and 60 fps are on by default (Settings, or Battery
-saver for all three at once). Widescreen is a stretch for a game made for 4:3: the game is told to
+**Looks.** Sharper 3D, the widescreen world and 60 fps are on by default (Settings; Battery
+saver holds the 3D at 1x and 30 fps, and leaves the widescreen as it is). Widescreen is a stretch for a game made for 4:3: the game is told to
 draw a wider view, and it does in town, in conversations and in Create-a-Sim, but in places not
 checked yet something the game never meant to be seen can show at the edges. Switch it off if a
 place looks odd. All three together still run well over full speed on a recent computer.

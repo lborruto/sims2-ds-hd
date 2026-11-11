@@ -5,6 +5,7 @@
 #include <cstdlib>
 
 #include "hotspots.h"
+#include "port/ownwords.h"
 #include "port/goals.h"
 #include "port/icons.h"
 #include "port/panelmenu.h"
@@ -97,9 +98,12 @@ void AddSprite(Composition& c, IconCache* icons, int desc, Rect box)
 
 bool ListPage(int page) { return page == 0 || page == 2 || page == 4 || page == 5 || page == 7; }
 
-Rect RowRect(int i, int shown, bool list)
+// A list longer than the LCD (scrolls): its rows leave the scroll column room at the right.
+constexpr int kPhColumn = 36;
+Rect ColumnRect(int shown) { return {kPhList.x + kPhList.w - kPhColumn, kPhList.y + 4, kPhColumn, shown * kPhRowH - 8}; }
+Rect RowRect(int i, int shown, bool list, bool scrolls = false)
 {
-    if (list) return {kPhList.x, kPhList.y + i * kPhRowH, kPhList.w, kPhRowH};
+    if (list) return {kPhList.x, kPhList.y + i * kPhRowH, kPhList.w - (scrolls ? kPhColumn + 8 : 0), kPhRowH};
     return {kPhList.x, kPhList.y + kPhList.h - (shown - i) * kPhRowH, kPhList.w, kPhRowH};
 }
 }
@@ -235,7 +239,7 @@ MenuView PhoneViewOf(ScreenState s, const GameState& game, const RomData* rom)
         for (int i = first; i < first + shown; i++)
         {
             ViewItem it;
-            it.rect = RowRect(i - first, shown, list);
+            it.rect = RowRect(i - first, shown, list, list && (int)pg.rows.size() > shown);
             it.id = kPhRowId + (u32)pg.rows[i].row;
             it.group = 1;
             it.action = Presses(ph.row, pg.rows[i].row);
@@ -351,14 +355,11 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
             const bool on = i == focus;
             if (on)
             {
-                // The game's highlight: a dark bar, its letters light; the focus's green halo.
-                UiItem halo = PanelItem({rr.x - 4, rr.y, rr.w + 8, rr.h});
-                halo.plain = true;
-                halo.fill = 0xFF309A41;
-                halo.radius = 14;
-                halo.layer = 1;
-                c.ui.push_back(halo);
-                UiItem bar = PanelItem({rr.x, rr.y + 4, rr.w, rr.h - 8});
+                // The game's highlight: a dark bar, its letters light, in the kit's focus ring (the
+                // green, then the line inside it: white on the dark bar).
+                const Rect br {rr.x, rr.y + 4, rr.w, rr.h - 8};
+                AddFocusRing(c, br, 10, 1, kBar);
+                UiItem bar = PanelItem(br);
                 bar.plain = true;
                 bar.fill = kBar;
                 bar.radius = 10;
@@ -377,14 +378,19 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
             }
             text({rr.x + 48, rr.y, rr.w - 96, rr.h}, r.text, 30, 20, Align::Centre, ink);
         }
-        if (list) AddScrollBar(c, {kPhList.x + kPhList.w + 2, kPhList.y + 4, 8, shown * kPhRowH - 8}, first, shown, (int)pg.rows.size());
+        // A list longer than the LCD: every list's scroll column at its right (the arrows sunk at
+        // the list's ends; the phone's own buttons below move the highlight too).
+        if (list && (int)pg.rows.size() > shown)
+            AddScrollColumn(c, ColumnRect(shown), first, shown, (int)pg.rows.size(), first > 0, first + shown < (int)pg.rows.size());
     }
 
     // The hints, under the buttons.
     {
         const Rect hb {kPhPanel.x + 24, kPhPanel.y + kPhPanel.h - 46, kPhPanel.w - 48, 36};
-        std::vector<std::pair<Button, std::string>> hs = {{Button::DPadV, ""}, {Button::A, MenuFocusable(v, focus) ? FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, 270, Weight::ExtraBold).text : ""},
-                                                          {Button::B, MenuWords(rom, v.backCloses ? kStrClose : kStrPhExit)}};
+        std::vector<std::pair<Button, std::string>> hs = {{Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose)}, {Button::A, MenuFocusable(v, focus) ? FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, 270, Weight::ExtraBold).text : ""},
+                                                          // (B: "Close" leaves the phone, "Back" goes up a level: the game's
+                                                          // table has no "Back", the pause menu's word)
+                                                          {Button::B, v.backCloses ? MenuWords(rom, kStrClose) : std::string(OwnWord(&rom, OwnWordId::ShellBack))}};
         int total = 0;
         std::vector<Rect> rs;
         for (auto& [b, w] : hs) { rs.push_back(ChipRect(0, 0, b, w, kPmHintSize, 0, Weight::ExtraBold)); total += rs.back().w; }
@@ -406,11 +412,11 @@ void BuildPhone(Composition& c, const MenuView& v, int focus, const GameState& g
     AddMousePiece(c, {kPhoneClose.x - 8, kPhoneClose.y - 8, 16, 16}, kPhX);
 
     // Images: the signal bars, the buttons, the X; the game's own LCD when its page did not read.
-    AddSpriteIcon(c, icons, kSprPhSignal, 0, 2, {kPhHeader.x, kPhHeader.y, 64, kPhHeader.h});
+    AddTieredIcon(c, icons, kSprPhSignal, 0, kTierS, {kPhHeader.x, kPhHeader.y, 64, kPhHeader.h});
     AddSprite(c, icons, kSprPhUp, kPhUp);
     AddSprite(c, icons, kSprPhOk, kPhOk);
     AddSprite(c, icons, kSprPhDown, kPhDown);
-    AddSpriteIcon(c, icons, kSprPhX, 0, 2, kPhX);
+    AddTieredIcon(c, icons, kSprPhX, 0, kTierS, kPhX);
     if (pg.crop && bottom)
     {
         const int w = kPhLcdFrom.w * 2, h = kPhLcdFrom.h * 2;
@@ -434,7 +440,7 @@ void MeasurePhone(const RomData& rom, BlockMeasure& m)
         if (b.lines > m.tallestLines) { m.tallestLines = b.lines; m.tallestId = id; }
         if (!b.fits) { m.cut++; m.cutIds.push_back(id); }
     };
-    const int rowW = kPhList.w - 96;
+    const int rowW = kPhList.w - 96 - (kPhColumn + 8); // (a list that scrolls: the column beside its rows)
     // Every row word: the menu, the lists' fixed words, a full price, every Sim's name.
     for (int id = 0x812; id <= 0x81E; id++)
     {

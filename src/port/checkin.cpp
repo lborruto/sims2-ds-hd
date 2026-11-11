@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "port/icons.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -15,8 +16,7 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kRowFill = 0xFF6A72B8, kRowFocusFill = 0xFF9AA2E3;   // (Interact's rows)
-constexpr u32 kSubColour = 0xFFD8DAF4;                             // a pale lavender (Build Rooms' places)
+constexpr u32 kSubColour = kTextNote;                              // who stays, Vacant: white, as every information (4.58:1 on a row)
 constexpr u32 kPinkPlate = 0xE0302F5C;                             // the pink names' plate: dark, the rows' hue
 constexpr u32 kScoreColour = 0xFFFFE9A0;                           // a warm white (the money's)
 constexpr u32 kIconWell = 0xFF5961A2;                              // the game's row button
@@ -72,19 +72,34 @@ void PinkPlate(Composition& c, Rect r, const std::string& s, float size, float m
     c.ui.push_back(p);
 }
 
-// A room's picture in `box`: the occupant's portrait (the game's own row button, live) at `scale`,
-// else the game's key (frame 0) or its silhouette (frame 1, not built).
-void RoomPicture(Composition& c, IconCache* icons, const u32* bottom, const RegistryRow& r, int row, int scale, Rect box)
+// A room's picture in `box` at `tier` (the rows' ui::kTierS, the info's ui::kTierL): the
+// occupant's portrait (the game's own row button, live: KeyedCrop), else the game's key (frame 0)
+// or its silhouette (frame 1, not built).
+void RoomPicture(Composition& c, IconCache* icons, const u32* bottom, const RegistryRow& r, int row, int tier, Rect box)
 {
     if (r.occupant >= 0)
     {
         if (!bottom) return;
         const Rect from {kCiPortraitFrom.x, kCiPortraitFrom.y + kCiRowDy * row, kCiPortraitFrom.w, kCiPortraitFrom.h};
-        const int w = from.w * scale, h = from.h * scale;
-        c.ui.push_back(ImageItem({box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h}, bottom, SW, SH, from));
+        // (28 x 30: small, at the key's tier; its DS bevel keyed out, the well its background's colour)
+        c.ui.push_back(KeyedCrop(bottom, from, box, tier));
         return;
     }
-    AddSpriteIcon(c, icons, kSprCiKey, r.built ? 0 : 1, scale, box);
+    if (r.built || !icons) { AddTiered(c.ui, icons, SpriteRef::Of(kSprCiKey), 0, tier, box); return; }
+    // The silhouette (frame 1) has the DS panel's light rim baked in around it (#828ACB, #6171B2:
+    // the screen it was drawn for), a pale outline on the HD well: keyed out, the black shape alone.
+    static std::vector<u32> keyed;
+    static int kw = 0, kh = 0;
+    if (keyed.empty())
+        if (const SpriteFrame* f = icons->Frame(SpriteRef::Of(kSprCiKey), 1); f && f->w > 0 && f->h > 0)
+        {
+            keyed = f->argb;
+            kw = f->w;
+            kh = f->h;
+            for (u32& px : keyed)
+                if ((px >> 24) != 0 && KeyedColour(px)) px = 0;
+        }
+    if (!keyed.empty()) c.ui.push_back(TierImage(box, keyed.data(), kw, kh, {0, 0, kw, kh}, tier));
 }
 }
 
@@ -176,7 +191,7 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
         const bool focused = focus == i;
         if (focused) AddFocusRing(c, rr, 22);
         UiItem row = PanelItem(rr);
-        row.fill = focused ? kRowFocusFill : kRowFill;
+        row.fill = focused ? kFillFocus : kFillRow;
         row.borderArgb = th.frame;
         row.border = 3;
         row.radius = 22;
@@ -200,7 +215,7 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
         else
         {
             Text(c, nameAt, RoomName(rom, r.place), kCiNameSize, kCiNameMin, Align::Left, Weight::ExtraBold, colour);
-            Text(c, {x, rr.y + 42, w, 30}, sub, kCiSubSize, kCiSubMin, Align::Left, Weight::Bold, focused ? 0xFFFFFFFF : kSubColour);
+            Text(c, {x, rr.y + 42, w, 30}, sub, kCiSubSize, kCiSubMin, Align::Left, Weight::Bold, kSubColour);
         }
         AddMousePiece(c, {kCiRowX - 15, kCiRowY0 + i * kCiRowDy - 15, 30, 30}, rr);
     }
@@ -252,15 +267,15 @@ void BuildCheckIn(Composition& c, const MenuView& v, int focus, const GameState&
     // The hints: B "Close" (the game's X), A with the focused room's word (none when the game refuses it).
     int right = AddHint(c, kPmHints.x + kPmHints.w - 8, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) right = AddHint(c, right, Button::A, v.items[focus].word);
-    AddHint(c, right, Button::DPadV, "");
+    AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose));
 
     // Images: the rooms' pictures (2x in a row, 3x for the focused room), the X.
     for (auto [box, i] : pictures)
     {
         const int row = i >= 0 ? i : -1 - i;
-        RoomPicture(c, icons, bottom, ci.rows[row], row, i >= 0 ? 2 : 3, box);
+        RoomPicture(c, icons, bottom, ci.rows[row], row, i >= 0 ? kTierS : kTierL, box);
     }
-    AddSpriteIcon(c, icons, kSprCiX, 0, 2, kCiClose);
+    AddTiered(c.ui, icons, SpriteRef::Of(kSprCiX), 0, kTierS, kCiClose);
     SortUi(c.ui, first);
 }
 

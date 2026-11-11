@@ -21,8 +21,10 @@ using namespace ui;
 constexpr int kPad = 22, kGap = 28, kChipGap = 12;
 constexpr int kNameY = 8, kNameH = 30, kVerbY = 40, kVerbH = 42;
 constexpr int kHintMaxW = 340;               // a hint chip with its words, at most
-constexpr u32 kNameColour = 0xFFE6E6FA;      // the target's name: a light lavender, under the verb's white
-constexpr u32 kHintColour = 0xFFDCDCF5;
+// The target's name and the hints in white: on the panel's fill (#828ACB, white 3.26:1) only text
+// at 18.67 px bold or larger reads (kPromptNameMin, kPromptHintSize).
+constexpr u32 kNameColour = 0xFFFFFFFF;
+constexpr u32 kHintColour = 0xFFFFFFFF;
 
 bool HasStrings(const RomData* rom) { return rom && rom->StringCount() > 0; }
 
@@ -30,7 +32,7 @@ struct Hint { Button button; std::string label; };
 std::vector<Hint> HintsOf(const WorldPrompt& p, const RomData* rom)
 {
     std::vector<Hint> h;
-    if (p.more) h.push_back(p.held ? Hint {Button::DPadV, OwnWord(rom, OwnWordId::PromptChoose)} : Hint {Button::A, OwnWord(rom, OwnWordId::PromptMore)});
+    if (p.more) h.push_back(p.held ? Hint {Button::DPadV, OwnWord(rom, OwnWordId::HintChoose)} : Hint {Button::A, OwnWord(rom, OwnWordId::PromptMore)});
     // (Left / Right switch targets with A held; without it the D-pad walks the hero.)
     if (p.others && p.held) h.push_back({Button::DPadH, OwnWord(rom, OwnWordId::PromptOther)});
     return h;
@@ -52,7 +54,7 @@ PromptLayout LayOut(const WorldPrompt& p, const RomData* rom)
     l.verb = FitLine(p.verb, kPromptVerbSize, kPromptVerbMin, kPromptVerbW, Weight::ExtraBold);
     l.chip = ChipRect(0, 0, Button::A, "", kPromptVerbSize);
     const int nameW = l.name.text.empty() ? 0 : (int)std::ceil(TextWidth(l.name.text, l.name.size, Weight::Bold));
-    const int verbW = l.verb.text.empty() ? 0 : (int)std::ceil(TextWidth(l.verb.text, l.verb.size, Weight::ExtraBold));
+    const int verbW = std::max(p.verbW, l.verb.text.empty() ? 0 : (int)std::ceil(TextWidth(l.verb.text, l.verb.size, Weight::ExtraBold)));
     l.hints = HintsOf(p, rom);
     int hintsW = 0;
     for (const Hint& h : l.hints)
@@ -105,6 +107,13 @@ WorldPrompt WorldPromptOf(const InteractState& in, const RomData* rom)
     if (HasStrings(rom))
     {
         p.verb = InteractLabel(*rom, in.actions[row].labelId, in.actions[row].amount);
+        // (The widest verb A could run: the plate's width while the choice moves.)
+        for (const InteractAction& a : in.actions)
+        {
+            if (a.greyed) continue;
+            const FittedText f = FitLine(InteractLabel(*rom, a.labelId, a.amount), kPromptVerbSize, kPromptVerbMin, kPromptVerbW, Weight::ExtraBold);
+            if (!f.text.empty()) p.verbW = std::max(p.verbW, (int)std::ceil(TextWidth(f.text, f.size, Weight::ExtraBold)));
+        }
         if (in.target.nameId >= 0) p.name = MenuWords(*rom, in.target.nameId);
     }
     return p;
@@ -201,7 +210,7 @@ void MeasurePrompt(const RomData& rom, BlockMeasure& m)
         if (f.size < kPromptNameSize) m.shrunk++;
         if (!f.fits) m.namesCut++;
     }
-    for (OwnWordId w : {OwnWordId::PromptMore, OwnWordId::PromptChoose, OwnWordId::PromptOther})
+    for (OwnWordId w : {OwnWordId::PromptMore, OwnWordId::HintChoose, OwnWordId::PromptOther})
         me.Note(9000 + (int)w, false, ChipRect(0, 0, Button::A, OwnWord(&rom, w), kPromptHintSize).w <= kHintMaxW);
 }
 }

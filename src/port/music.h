@@ -45,11 +45,10 @@ constexpr int kMuSongNames[] = {101, 103, 104, 105, 106, 107, 108, 109, 110, 111
 // HD geometry (canvas), the frame as the panel's (kPmPanel), no tab bar.
 constexpr Rect kMuTitle {200, 44, 880, 64};
 constexpr Rect kMuClose {1016, 48, 56, 56};
-constexpr Rect kMuArrows {200, 124, 72, 454};
-constexpr Rect kMuList {288, 124, 512, 454};
+constexpr Rect kMuList {200, 124, 600, 454};     // the rows, and the scroll column at their right (Build Rooms' places)
 constexpr Rect kMuInfo {816, 124, 264, 454};
-constexpr Rect kMuUp {kMuArrows.x + 4, kMuArrows.y + 8, 64, 56};
-constexpr Rect kMuDown {kMuArrows.x + 4, kMuArrows.y + kMuArrows.h - 64, 64, 56};
+constexpr Rect kMuUp {740, 140, 48, 48};
+constexpr Rect kMuDown {740, 514, 48, 48};
 Rect MusicRowRect(int i);
 constexpr float kMuNameSize = 30, kMuNameMin = 20;
 

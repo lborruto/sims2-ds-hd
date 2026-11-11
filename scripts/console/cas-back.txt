@@ -1,0 +1,7 @@
+# From s3 (Create-a-Sim's Name page), CONSOLE: RB → Hair, B → back to the Name page (B is the
+# previous page there); B on the Name page → Keep this Sim? with the focus on its cross (nothing
+# discarded); B again → the game's cross: the title at phase 0.
+10 2 pad rb
+60 2 pad b
+110 2 pad b
+170 2 pad b

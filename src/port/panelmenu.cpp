@@ -1,8 +1,12 @@
 #include "port/panelmenu.h"
 
 #include <algorithm>
+#include <unordered_map>
 #include <cctype>
 #include <cmath>
+#include <map>
+#include <tuple>
+#include <vector>
 
 #include "hotspots.h"
 #include "port/goals.h"
@@ -22,8 +26,6 @@ namespace
 using namespace ui;
 
 constexpr u32 kPhoneId = 1;
-// The focus ring's green (the game's own selection green, as its tab ring and arrows).
-constexpr u32 kFocusGreen = 0xFF309A41;
 // The selected tab's raised plate and the hints' text.
 constexpr u32 kTabPlateFill = 0xFF9AA2E3;
 
@@ -112,6 +114,8 @@ std::string MenuTitle(const RomData& rom, int tab, const std::string& name)
 
 FittedText FitLine(const std::string& text, float size, float minSize, int width, Weight w)
 {
+    minSize = std::max(minSize, kMinText); // (never below the smallest text: ui::kMinText)
+    size = std::max(size, minSize);
     FittedText f {text, size, true};
     for (float s = size; s >= minSize - 1e-3f; s -= 1)
         if (TextWidth(text, s, w) <= width) { f.size = s; return f; }
@@ -138,15 +142,135 @@ void AddMousePiece(Composition& c, Rect from, Rect to)
     c.pieces.push_back(p);
 }
 
-void AddFocusRing(Composition& c, Rect r, float radius)
+namespace
 {
-    constexpr int t = 5;
-    UiItem g = PanelItem({r.x - t, r.y - t, r.w + 2 * t, r.h + 2 * t});
-    g.plain = true;
-    g.fill = kFocusGreen;
-    g.radius = radius + t;
-    g.layer = 1;
-    c.ui.push_back(g);
+// KeyedCrop's copies, per DS rectangle: kept until the next crop of the same one (KeptCrop).
+std::map<std::tuple<int, int, int, int>, std::vector<u32>>& CropCopies()
+{
+    static std::map<std::tuple<int, int, int, int>, std::vector<u32>> copies;
+    return copies;
+}
+}
+
+UiItem KeptCrop(Rect from, Rect to, int tier)
+{
+    const auto it = CropCopies().find({from.x, from.y, from.w, from.h});
+    if (it == CropCopies().end() || it->second.size() != (size_t)from.w * from.h) return ImageItem({to.x, to.y, 0, 0}, nullptr, 0, 0, {});
+    const std::vector<u32>& px = it->second;
+    if (tier > 0) return TierImage(to, px.data(), from.w, from.h, {0, 0, from.w, from.h}, tier);
+    return ImageItem(to, px.data(), from.w, from.h, {0, 0, from.w, from.h});
+}
+
+UiItem KeyedCrop(const u32* bottom, Rect from, Rect to, int tier)
+{
+    // (No picture, or a rectangle off the screen: an image item without a source, which draws
+    // nothing and takes no room: ImageItem's own empty item.)
+    if (!bottom || from.w <= 0 || from.h <= 0 || from.x < 0 || from.y < 0 || from.x + from.w > SW || from.y + from.h > SH)
+        return ImageItem({to.x, to.y, 0, 0}, nullptr, 0, 0, {});
+    std::vector<u32>& px = CropCopies()[{from.x, from.y, from.w, from.h}];
+    px.resize((size_t)from.w * from.h);
+    for (int j = 0; j < from.h; j++)
+        for (int i = 0; i < from.w; i++) px[(size_t)j * from.w + i] = bottom[(size_t)(from.y + j) * SW + from.x + i] | 0xFF000000;
+    std::vector<int> todo;
+    auto push = [&](int i, int j) {
+        if (std::min({i, j, from.w - 1 - i, from.h - 1 - j}) >= kKeyBand) return; // (only the frame's band)
+        u32& c = px[(size_t)j * from.w + i];
+        if ((c >> 24) != 0 && KeyedColour(c)) { c = 0; todo.push_back(j * from.w + i); }
+    };
+    for (int i = 0; i < from.w; i++) { push(i, 0); push(i, from.h - 1); }
+    for (int j = 0; j < from.h; j++) { push(0, j); push(from.w - 1, j); }
+    while (!todo.empty())
+    {
+        const int k = todo.back(), i = k % from.w, j = k / from.w;
+        todo.pop_back();
+        if (i > 0) push(i - 1, j);
+        if (i + 1 < from.w) push(i + 1, j);
+        if (j > 0) push(i, j - 1);
+        if (j + 1 < from.h) push(i, j + 1);
+    }
+    if (tier > 0) return TierImage(to, px.data(), from.w, from.h, {0, 0, from.w, from.h}, tier);
+    return ImageItem(to, px.data(), from.w, from.h, {0, 0, from.w, from.h});
+}
+
+bool KeyedColour(u32 c)
+{
+    c &= 0xFFFFFF;
+    return c == 0x383869 || c == 0x414979 || c == 0x51518A || c == 0x5961A2 || c == 0x6171B2 || c == 0x828ACB;
+}
+
+int PhoneButtonFrame(IconCache& icons, const u32* bottom)
+{
+    const SpriteRef ref = SpriteRef::Of(kSprPhoneButton);
+    const int frames = icons.Frames(ref);
+    if (!bottom || frames <= 0) return 0;
+    // Mismatched opaque pixels of frame f placed at (x, y), counting up to `limit`.
+    auto misses = [&](const SpriteFrame& f, int x, int y, int limit) {
+        int n = 0;
+        for (int j = 0; j < f.h; j++)
+            for (int i = 0; i < f.w; i++)
+            {
+                const u32 q = f.argb[(size_t)j * f.w + i];
+                if ((q >> 24) == 0) continue;
+                const int X = x + i, Y = y + j;
+                if (X < 0 || Y < 0 || X >= SW || Y >= SH || ((bottom[(size_t)Y * SW + X] ^ q) & 0xFFFFFF) != 0)
+                    if (++n >= limit) return n;
+            }
+        return n;
+    };
+    const SpriteFrame* f0 = icons.Frame(ref, 0);
+    if (!f0 || f0->w <= 0) return 0;
+    int opaque0 = 0;
+    for (u32 q : f0->argb) opaque0 += (q >> 24) != 0;
+    const int rest = misses(*f0, kPmPhoneSprX, kPmPhoneSprY, opaque0 / 2 + 1);
+    if (rest == 0) return 0;              // (at rest: the usual case, one pass)
+    if (rest > opaque0 / 2) return 0;     // (not even half of it there: no button on screen, no search)
+    // The search (every frame at every shift) runs once per distinct picture of the button: its
+    // result is kept by a hash of the crop it reads (the frames' box, 8 pixels around), so a button
+    // held lit or blinking between two pictures costs one hash a frame.
+    int maxW = 0, maxH = 0;
+    for (int k = 0; k < frames; k++)
+        if (const SpriteFrame* f = icons.Frame(ref, k)) { maxW = std::max(maxW, f->w); maxH = std::max(maxH, f->h); }
+    const int cx0 = std::max(0, kPmPhoneSprX - 8), cy0 = std::max(0, kPmPhoneSprY - 8);
+    const int cx1 = std::min(SW, kPmPhoneSprX + 8 + maxW), cy1 = std::min(SH, kPmPhoneSprY + 8 + maxH);
+    u64 hash = 14695981039346656037ull;
+    for (int y = cy0; y < cy1; y++)
+        for (int x = cx0; x < cx1; x++)
+        {
+            const u32 q = bottom[(size_t)y * SW + x] & 0xFFFFFF;
+            for (int b = 0; b < 3; b++) { hash ^= (q >> (8 * b)) & 0xFF; hash *= 1099511628211ull; }
+        }
+    static const IconCache* cachedFor = nullptr;
+    static std::unordered_map<u64, int> found;
+    if (cachedFor != &icons || found.size() > 256) { found.clear(); cachedFor = &icons; }
+    if (const auto it = found.find(hash); it != found.end()) return it->second;
+    int best = 0;
+    double bestShare = 1;
+    for (int k = 0; k < frames; k++)
+    {
+        const SpriteFrame* f = icons.Frame(ref, k);
+        if (!f || f->w <= 0) continue;
+        int opaque = 0;
+        for (u32 q : f->argb) opaque += (q >> 24) != 0;
+        if (opaque == 0) continue;
+        for (int dy = -8; dy <= 8; dy++)
+            for (int dx = -8; dx <= 8; dx++)
+            {
+                const int limit = (int)(bestShare * opaque) + 1;
+                const int n = misses(*f, kPmPhoneSprX + dx, kPmPhoneSprY + dy, limit);
+                if ((double)n / opaque < bestShare) { bestShare = (double)n / opaque; best = k; }
+            }
+    }
+    const int frame = bestShare <= 0.1 ? best : 0;
+    found.emplace(hash, frame);
+    return frame;
+}
+
+void AddFocusRing(Composition& c, Rect r, float radius, int layer, u32 behind)
+{
+    FocusRingItems g = FocusRing(r, radius, behind);
+    g.outer.layer = g.inner.layer = layer;
+    c.ui.push_back(g.outer);
+    c.ui.push_back(g.inner);
 }
 
 int AddHint(Composition& c, int right, Button b, const std::string& label)
@@ -156,6 +280,29 @@ int AddHint(Composition& c, int right, Button b, const std::string& label)
     it.layer = 1;
     c.ui.push_back(it);
     return right - r.w - 28;
+}
+
+std::vector<DPadHint> PanelDPadHints(const MenuView& v, int focus, const RomData& rom)
+{
+    std::vector<DPadHint> h;
+    // The tab's items the focus can go to (the phone left out: it is one more stop above them).
+    int items = 0, x0 = -1;
+    bool column = true;
+    for (const ViewItem& it : v.items)
+        if (it.enabled && it.id != kPhoneId)
+        {
+            items++;
+            if (x0 < 0) x0 = it.rect.x;
+            else if (it.rect.x != x0) column = false;
+        }
+    const bool slider = MenuFocusable(v, focus) && (!v.items[focus].left.empty() || !v.items[focus].right.empty());
+    const bool gameSel = MenuFocusable(v, v.selected) && focus == v.selected && (!v.scrollUp.empty() || !v.scrollDown.empty());
+    const bool targets = !v.buttons[(int)MenuButton::Left].empty() || !v.buttons[(int)MenuButton::Right].empty();
+    // (Left / Right do something else on a slider or with targets: the cross's vertical arms alone.)
+    if (items >= 2 || gameSel) h.push_back({column || slider || targets ? Button::DPadV : Button::DPad, OwnWord(&rom, OwnWordId::HintChoose)});
+    if (slider) h.push_back({Button::DPadH, OwnWord(&rom, OwnWordId::HintAdjust)});            // (as every slider's hint)
+    else if (targets) h.push_back({Button::DPadH, OwnWord(&rom, OwnWordId::PromptOther)});     // (as the world's prompt says it)
+    return h;
 }
 
 MenuView PanelMenuView(ScreenState s, const GameState* game, const RomData* rom)
@@ -273,12 +420,32 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     else if (s.tab == Tab::Relationships) BuildRelations(c, v, focus, game, rom, bottom);
     else if (s.tab == Tab::Options) BuildOptions(c, v, focus, game, rom);
 
-    // The hints: A (the focused item's own word when it has one), B closes.
+    // The hints: A (the focused item's own word when it has one), B closes, X, and the D-pad's
+    // (each with its word: PanelDPadHints) at the left of them; A's and X's words fit the room
+    // the D-pad's leave.
+    std::vector<DPadHint> dpad = PanelDPadHints(v, focus, rom);
+    auto dpadWidth = [&] {
+        int w = 0;
+        for (const DPadHint& d : dpad) w += ChipRect(0, 0, d.button, d.word, kPmHintSize, 0, Weight::ExtraBold).w + 28;
+        return w;
+    };
+    int dpadW = dpadWidth();
+    // (Two D-pad hints and an A word they would cut, a long verb beside Interact's "Other target":
+    // "Choose" goes, the hint of what Left / Right do stays; MeasureInteract measures that room.)
+    if (dpad.size() == 2 && MenuFocusable(v, focus) && !v.items[focus].action.empty())
+    {
+        const int roomA = kPmHints.x + kPmHints.w - 8 - ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold).w - 28;
+        if (!FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, roomA - kPmHints.x - 60 - dpadW, Weight::ExtraBold).fits)
+        {
+            dpad.erase(dpad.begin());
+            dpadW = dpadWidth();
+        }
+    }
     int right = kPmHints.x + kPmHints.w - 8;
     right = AddHint(c, right, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) // (nothing to perform: no A)
     {
-        const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+        const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60 - dpadW, Weight::ExtraBold);
         right = AddHint(c, right, Button::A, a.text);
     }
     if (MenuFocusable(v, focus) && !v.items[focus].buttonX.empty())
@@ -286,29 +453,25 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
         // An asking X armed (Pockets' bin): the hint says what the second X does.
         const bool armed = v.items[focus].xAsks && v.armed != 0 && v.armed == v.items[focus].id;
         const std::string word = armed ? OwnWord(&rom, OwnWordId::TrashAgain) : v.items[focus].xWord;
-        const FittedText x = FitLine(word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
+        const FittedText x = FitLine(word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60 - dpadW, Weight::ExtraBold);
         right = AddHint(c, right, Button::X, x.text);
     }
-    // The D-pad's Up / Down (its vertical arms lit: the game has no word for its arrows) while they
-    // move a selection the game owns (Goals, Relationships: the game's own arrows).
-    if (MenuFocusable(v, v.selected) && focus == v.selected && (!v.scrollUp.empty() || !v.scrollDown.empty())) AddHint(c, right, Button::DPadV, "");
+    for (const DPadHint& d : dpad) right = AddHint(c, right, d.button, d.word);
 
     // The icons (images: drawn above the still layers): the five tabs, the selected one green.
     if (icons)
         for (int i = 0; i < 5; i++)
         {
             const SpriteRef ref = SpriteRef::Of(i == tab ? kTabIconGreen : kTabIconBlue);
-            if (const SpriteFrame* f = icons->Scaled(ref, i, kPmTabIcon / 24))
-            {
-                const Rect to {kPmTabsX + i * kPmTabCell + (kPmTabCell - f->w) / 2, cellY + (kPmTabCell - f->h) / 2, f->w, f->h};
-                c.ui.push_back(icons->Image(ref, i, *f, to));
-            }
+            if (icons->Frame(ref, i)) c.ui.push_back(icons->Tiered(ref, i, kTierL, {kPmTabsX + i * kPmTabCell, cellY, kPmTabCell, kPmTabCell}));
         }
-    // The phone: the game's own button, live from the touch screen, 2x.
-    if (bottom)
+    // The phone: the game's own button sprite, in the frame the touch screen shows (ringing too),
+    // at the tabs' tier.
+    if (icons)
     {
-        const int w = kPmPhoneFrom.w * 2, h = kPmPhoneFrom.h * 2;
-        c.ui.push_back(ImageItem({kPmPhone.x + (kPmPhone.w - w) / 2, kPmPhone.y + (kPmPhone.h - h) / 2, w, h}, bottom, SW, SH, kPmPhoneFrom));
+        const int frame = PhoneButtonFrame(*icons, bottom);
+        if (icons->Frame(SpriteRef::Of(kSprPhoneButton), frame))
+            c.ui.push_back(icons->Tiered(SpriteRef::Of(kSprPhoneButton), frame, kTierS, kPmPhoneWell));
     }
 
     // The mouse: the tab icons and the phone onto the game's own.

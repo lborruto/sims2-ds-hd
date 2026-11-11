@@ -145,6 +145,23 @@ std::string KeyName(int keycode)
     return s.empty() ? "KEY " + std::to_string(keycode) : s;
 }
 
+MenuKey MenuKeyOf(int k, int a)
+{
+    if (k == SDLK_UP) return MenuKey::Up;
+    if (k == SDLK_DOWN) return MenuKey::Down;
+    if (k == SDLK_LEFT) return MenuKey::Left;
+    if (k == SDLK_RIGHT) return MenuKey::Right;
+    // (MENU before A: a MENU bound to Enter, Space or the DS's A key still resumes.)
+    if (a == MENU) return MenuKey::Menu;
+    if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE || a == A) return MenuKey::A;
+    if (k == SDLK_ESCAPE || k == SDLK_BACKSPACE || a == B) return MenuKey::B;
+    if (k == SDLK_DELETE || a == X) return MenuKey::X;
+    if (a == Y) return MenuKey::Y;
+    if (a == L) return MenuKey::Lb;
+    if (a == R) return MenuKey::Rb;
+    return MenuKey::None;
+}
+
 bool Bindings::Apply(const std::string& k, const std::string& v)
 {
     const bool isKey = !k.compare(0, 4, "key_"), isPad = !k.compare(0, 4, "pad_");

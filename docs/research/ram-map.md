@@ -120,7 +120,7 @@ Read by `ReadGameState` into `GameState::town` (any screen; each part valid on i
 | Record table | `0x02122A00 + 0x12 * row` (static) | rows of 9 u16: Sim k = row 2 + k (k < 46), item id = row 0x3B + id; +0/+2/+4 sprite tiles / descriptor / palette resources, +8 name string id (Sims 323 + k, items 463 + id), +0xA portrait / second resource, +0xE price (items) |
 | Sim record | `G + 0x21DC + 0x2C * k` | u16 +0x18 Sim id, u32 +0x14 flags (bit 0 met, bit 1 secret info), u8 +0x1A mood (0..6), u8 +0x1B relationship level |
 | Pocket slots | `G + 0x215C` s32 count (0..6), `G + 0x28 + 2i` u16 item ids | name = the row's +8 (must equal 463 + id, else the inventory is invalid), description 822 + id, icon = the row's descriptor |
-| Counted items | `G + 0x24 + i` u8 (4) | names 1154 + i, descriptions 845 + i |
+| Counted items | `G + 0x24 + i` u8 (4) | names 1154 + i, descriptions 845 + i; their icons the record table's rows of items 23 + i (Nuclear Rod, License Plate, Gourd, Alien Ship Part: the names 486-489 match), sprite triples matching the touch screen's buttons |
 | Key items | bits 1..3 of the u32 at `G` | Vacuum, Super Drencher, Metal Detector: names 1968 + k, descriptions 1972 + k |
 | Options | `G + 0x2F70` music, `G + 0x2F74` SFX | u32 20.12, 0..0x1000 |
 | Popup | `P + 0x8` state (1 opening, 2 shown, 3 closing), `P + 0x10` kind (0 one X, 2 cross + tick, 3 none) | text `P + 0x34` (0x400 bytes), title `P + 0x434` (0x100), both NUL-terminated game text bytes (`GameTextToUtf8` in `romdata.h` decodes them); `P + 0xD88` pressed button, `P + 0xD8C` stylus down |
@@ -229,7 +229,7 @@ part reads, so a caller falls back to the pixel front end). `--print-front` logs
   (0..11: a female Sim's categories have 12 / 12 / 2 / 2 / 1 / 2 pages, a male's 12 / 8 / 2 / 2 / 1 / 1, measured by tapping the right
   arrow until it stops), `+0x18` item (medium: the cell to item map is not decoded). Confirm: `u8 N+0x10` aspiration 0 Fortune, 1
   Romance, 2 Popularity, 3 Party, `u8 N+0x11` 0 choosing / 1 tick pressed / 2 cross pressed. A page's sprites: `*(N+0x8)` a
-  null-ended list of CActorSprite pointers (vtable 0x0212FED8, `+0x4` bit 0 shown, `+0x50` / `+0x54` x / y in 20.12): Hair [0] the
+  null-ended list of CActorSprite pointers (vtable 0x0212FED8, `+0x4` bit 0 shown, bit 7 its graphics not uploaded yet (shown with bit 7, 0x48009081, for one to three frames after a page change and again while the Clothes page's next cells load, then 0x48009001; a hidden one keeps bit 7, 0x48009080), `u8 +0x1A` the frame shown (a category's, an arrow's: 1 lit), `*(+0x20)` the u16 tiles, descriptor, palette it is drawn from (0xFFFF palette: set at run time; the Clothes categories take 1076, the arrows 1140's 1141, the faces' (1181, 1184 + 3 k) their skin's in OBJ palette RAM, slot `+0x14 >> 12`; the hair cells 1231-1233 are composed in OBJ VRAM at run time), `+0x50` / `+0x54` x / y in 20.12): Hair [0] the
   colour ring, [1] the style ring (hidden when scrolled away), [2] / [3] the left / right arrows (shown only while the game can
   scroll), [4..7] the cells; Clothes [0..5] the categories, [6] / [7] the arrows (the same), [8] the ring at (88 + 48 c, 41 + 64 r),
   [9..14] the cells; Name [0] the skin ring, [1..3] the keyboard page's highlight, [4] / [5] the ♀ / ♂ icons; Confirm [0..3] the
@@ -273,7 +273,14 @@ The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the 
   discard, 3 the plank, 4 the cannon, 5 two cards drawn, 6 the turn ending, 7 the deal, 8 a card drawn), `S+0x2F1` u8 whose turn (0 the player, 1 the opponent); `S+0x308` the player's name (ASCII, as the board shows it). Found on the owner's `act-cards` (draw, discard, the message,
   quit, help: states saved by `--state-save`, the board's numbers compared on the same frames), checked on the research's `G-cas-next-row1` / `G-X-pirate`.
 - **Vacuum** (`VacuumState`, overlay 17, vtable 0x0214C658): `S+0x158` u8 the filter clogged (1 from touching dust to 17 frames after a 7-frame blow: `act-vacuum-clog`, the
-  blow script), the stat panel's "Vacuum Earnings" `G+0x7C`.
+  blow script), the stat panel's "Vacuum Earnings" `G+0x7C` (the lifetime total: banked when the vacuum is put away), `S+0x150` s32 the money this session (the
+  bowl's counter at its top left; `S+0x154` the same a frame later; §75 once the gold ring is kept, `mg-vacuum-pick`). The bowl (`VacuumState::bowl`, read apart; updated every other frame): nine slots of 0x1C at `S+0x28 + 0x1C i`,
+  `+0` the sprite's pointer (its place `sprite+0x50` / `+0x54`, 20.12 touch pixels), `+4` angle, `+8` radius, `+0xC` / `+0x10` speeds, `+0x14` scale (20.12), `+0x18` u8 active,
+  `+0x19` u8 held, `+0x1A` u16 kind (0x186-0x188 dust, above a find: 0x196 the gold ring); `S+0x24` u8 the stylus down since a fresh press, `S+0x26` u16 the slot held (0xA
+  none), `S+0x140` / `S+0x142` the stylus's last point; `S+0x162` and `S+0x170` u8 the funnel's keep animation (both 0: idle). The grab (code 0x0214A3C4): while the stylus is
+  down, the first slot 0..8 whose square (half side 20 x scale) holds it is grabbed (sweeping grabs too; dust = the clog); a held find follows the stylus every tick, nothing
+  else is grabbable meanwhile. The keep (0x0214AFB4): a find let go over the funnel (touch 108 < x < 147, 133 < y < 193, bottom middle) while the keep animation is idle is kept;
+  the box at the bottom right only shows the last find kept. The game lays a text out through a scratch buffer around `0x0213DF00` (0x200): a help text's tail (its last letters and NUL) stays there while it is up (the Drencher's, the crime game's, the mixer's: `MinigameHelpInRam`); the full text is never in RAM. Found on `act-vacuum` driven over the lobby's rug (the research's prototype, `mg-vacuum-pick`).
 - **Social** (CSocialScreen): no part. `*0x0213E70C + 0xC..0x12` held 0, 1, 2 for Impress's High Five / Dance / Laugh, but re-ordered after an answer: neither the social verb
   nor the answers' words were found in RAM (the frame shows the game's own labels, live crops).
 The screen request that brings one up (`P + 0xDF0 + 0x20 * slot`: module, r3, ...) is research-only; the port never writes RAM.

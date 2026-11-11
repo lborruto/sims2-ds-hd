@@ -53,7 +53,10 @@ struct DialogueLayout
     bool portrait = true;
     bool fits = true;
 };
-DialogueLayout LayoutDialogue(const std::string& text, bool portrait);
+// rom: the language of the A chip's word ("Continue", the port's own; null: English).
+DialogueLayout LayoutDialogue(const std::string& text, bool portrait, const RomData* rom = nullptr);
+// The A chip's word in the text well's corner (the port's own "Continue").
+std::string DialogueChipWord(const RomData* rom);
 
 // Whether the touch screen shows a portrait in its frame (the game draws none for some pages:
 // the rectangle is then the frame's flat colours, or black while the box fades in).

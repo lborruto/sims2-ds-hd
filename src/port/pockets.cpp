@@ -20,7 +20,9 @@ constexpr int kSlots = 6, kKeys = 3, kCounted = 4;
 // The game's light lavender (a selection the game holds: its ring) and a cell's colours.
 constexpr u32 kSelRim = 0xFFB2B2E3, kRedRim = 0xFFE03030; // (red: a key item the game's ring marks not owned)
 constexpr u32 kEmptyFill = 0xFF7078BC, kCellFill = 0xFF5961A2;
-constexpr u32 kDim = 0x80FFFFFF, kDimShadow = 0x40383869;
+// A button that does nothing now (the hand, the bin; Give Gift's bow): the shops' inactive look, a
+// sunk plate with ui::kTextInactive words on it (5.8:1), never a faded white.
+constexpr u32 kInactivePlate = 0xFF444A85;
 
 Rect SlotRect(int i) { return {kPkGridX + (i % 3) * (kPkCell + kPkGap), kPkGridY + (i / 3) * (kPkCell + kPkGap), kPkCell, kPkCell}; }
 Rect KeyRect(int k)
@@ -33,12 +35,12 @@ Rect CountRect(int i)
     const int w = (kPkCounted.w - 3 * kPkGap) / 4;
     return {kPkCounted.x + i * (w + kPkGap), kPkCounted.y, w, kPkCounted.h};
 }
-// A counted item's icon, 2x, near the top of its cell.
+// A counted item's icon (its record's sprite, 32 x 32 at ui::kTierS: the row's cells are narrower
+// than the slots'), above the count.
 Rect CountIconRect(int i)
 {
     const Rect r = CountRect(i);
-    const int w = kPkCountIconFrom.w * 2, h = kPkCountIconFrom.h * 2;
-    return {r.x + (r.w - w) / 2, r.y + 16, w, h};
+    return {r.x, r.y + 8, r.w, 72};
 }
 struct DsPoint { int x, y; };
 DsPoint SlotPoint(int i) { return {kPkSlotX0 + (i % 3) * kPkSlotDx, kPkSlotY0 + (i / 3) * kPkSlotDy}; }
@@ -82,6 +84,18 @@ void AddSpriteIcon(Composition& c, IconCache* icons, const ItemRec& item, int sc
     AddSpriteIcon(c, icons, item.tilesRes >= 0 && item.palRes >= 0 ? SpriteRef {item.tilesRes, item.iconRes, item.palRes} : SpriteRef::Of(item.iconRes), 0, scale, box, opacity);
 }
 
+void AddTieredIcon(Composition& c, IconCache* icons, int desc, int frame, int tier, Rect box, u32 opacity)
+{
+    if (desc >= 0) AddTiered(c.ui, icons, SpriteRef::Of(desc), frame, tier, box, opacity);
+}
+
+void AddTieredIcon(Composition& c, IconCache* icons, const ItemRec& item, int tier, Rect box, u32 opacity)
+{
+    if (item.iconRes < 0) return;
+    AddTiered(c.ui, icons, item.tilesRes >= 0 && item.palRes >= 0 ? SpriteRef {item.tilesRes, item.iconRes, item.palRes} : SpriteRef::Of(item.iconRes), 0, tier,
+              box, opacity);
+}
+
 bool PocketsItemText(const InventoryState& inv, int item, int& nameId, int& descId)
 {
     const ItemRec* r = nullptr;
@@ -96,6 +110,8 @@ bool PocketsItemText(const InventoryState& inv, int item, int& nameId, int& desc
 
 FittedBlock FitBlock(const std::string& text, float size, float minSize, Rect box)
 {
+    minSize = std::max(minSize, ui::kMinText); // (never below the smallest text: ui::kMinText)
+    size = std::max(size, minSize);
     FittedBlock b {text, size, 0, true};
     for (float s = size; s >= minSize - 1e-3f; s -= 1)
     {
@@ -220,14 +236,7 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
         UiItem n = TextItem({r.x, r.y + r.h - 44, r.w, 36}, std::to_string(inv.counted[i].count), 28, Align::Centre, Weight::ExtraBold);
         n.wrap = false;
         n.middle = true;
-        if (inv.counted[i].count == 0) { n.colour = kDim; n.shadowArgb = kDimShadow; }
-        // The live icon's own dark well (the game's button colour around it).
-        UiItem well = PanelItem(CountIconRect(i));
-        well.plain = true;
-        well.fill = kPkCountWell;
-        well.radius = 8;
-        well.layer = 1;
-        c.ui.push_back(well);
+        if (inv.counted[i].count == 0) n.colour = kTextInactive; // (none: inactive, never a faded white)
         n.layer = 1;
         c.ui.push_back(n);
         AddMousePiece(c, hs[11 + i].area, r);
@@ -260,7 +269,7 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
     const bool armed = canBin && v.armed != 0 && v.armed == v.items[focus].id;
     auto button = [&](Rect r, const std::string& label, bool on, bool green) {
         UiItem b = PanelItem(r);
-        b.fill = green ? 0xFF8ACB9A : th.frame;
+        b.fill = green ? 0xFF8ACB9A : on ? th.frame : kInactivePlate;
         b.borderArgb = green ? 0xFF309A41 : th.frameDark;
         b.border = 3;
         b.radius = r.h / 2.0f;
@@ -271,7 +280,7 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
         UiItem t = TextItem({r.x + 82, r.y, r.w - 92, r.h}, f.text, f.size, Align::Left, Weight::ExtraBold);
         t.wrap = false;
         t.middle = true;
-        if (!on) { t.colour = kDim; t.shadowArgb = kDimShadow; }
+        if (!on) t.colour = kTextInactive; // (5.8:1 on the sunk plate)
         t.layer = 1;
         c.ui.push_back(t);
     };
@@ -280,18 +289,16 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
     AddMousePiece(c, hs[6].area, kPkHandBtn);
     AddMousePiece(c, hs[10].area, kPkBinBtn);
 
-    // Images: the items, the tools, the counted items (live), the hand and the bin.
-    for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++) AddSpriteIcon(c, icons, inv.slots[i], 3, SlotRect(i));
-    for (int k = 0; k < kKeys; k++) AddSpriteIcon(c, icons, kSprTool[k], inv.keys[k].count > 0 ? 1 : 0, 3, KeyRect(k));
-    if (bottom)
-        for (int i = 0; i < kCounted; i++)
-        {
-            const Rect from {kPkCountIconFrom.x + i * kPkCountDx, kPkCountIconFrom.y, kPkCountIconFrom.w, kPkCountIconFrom.h};
-            c.ui.push_back(ImageItem(CountIconRect(i), bottom, SW, SH, from));
-        }
+    // Images: the items, the tools, the counted items (live), the hand and the bin. What the Sim
+    // has none of has one look: its picture faint (a tool not owned: its own picture, not the
+    // game's black silhouette; a counted item at 0, its count inactive), as every inactive picture.
+    constexpr u32 kNone = 0x60000000;
+    for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++) AddTieredIcon(c, icons, inv.slots[i], kTierL, SlotRect(i));
+    for (int k = 0; k < kKeys; k++) AddTieredIcon(c, icons, kSprTool[k], 1, kTierL, KeyRect(k), inv.keys[k].count > 0 ? 0 : kNone);
+    for (int i = 0; i < kCounted; i++) AddTieredIcon(c, icons, inv.counted[i], kTierS, CountIconRect(i), inv.counted[i].count > 0 ? 0 : kNone);
     const Rect handIcon {kPkHandBtn.x + 10, kPkHandBtn.y, 64, kPkHandBtn.h}, binIcon {kPkBinBtn.x + 10, kPkBinBtn.y, 64, kPkBinBtn.h};
-    AddSpriteIcon(c, icons, kSprHand, 0, 2, handIcon, canUse ? 0 : 0x60000000);
-    AddSpriteIcon(c, icons, armed ? kSprBinGreen : kSprBin, 0, 2, binIcon, canBin ? 0 : 0x60000000);
+    AddTieredIcon(c, icons, kSprHand, 0, kTierS, handIcon, canUse ? 0 : 0x60000000);
+    AddTieredIcon(c, icons, armed ? kSprBinGreen : kSprBin, 0, kTierS, binIcon, canBin ? 0 : 0x60000000);
 }
 
 BlockMeasure MeasurePockets(const RomData& rom)
@@ -353,10 +360,12 @@ BlockMeasure MeasurePockets(const RomData& rom)
     for (int id : {kStrUse, kStrTrash, kStrGive}) line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, 240);
     {
         // The armed bin's X hint ("Again: throw it away", the port's word, 9000 + its id) in the
-        // room BuildPanelMenu leaves it: the hints' band less B "Close" and A "Use".
+        // room BuildPanelMenu leaves it: the hints' band less B "Close", A "Use" and the D-pad's
+        // "Choose" (the grid's cross).
         const int bw = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold).w;
         const int aw = ChipRect(0, 0, Button::A, MenuWords(rom, kStrUse), kPmHintSize, 0, Weight::ExtraBold).w;
-        const int room = kPmHints.w - 8 - bw - 28 - aw - 28 - 60;
+        const int dw = ChipRect(0, 0, Button::DPad, OwnWord(&rom, OwnWordId::HintChoose), kPmHintSize, 0, Weight::ExtraBold).w;
+        const int room = kPmHints.w - 8 - bw - 28 - aw - 28 - 60 - dw - 28;
         line(9000 + (int)OwnWordId::TrashAgain, OwnWord(&rom, OwnWordId::TrashAgain), kPmHintSize, kPmHintSize, room);
     }
     for (int id = kSimNameUnknown; id <= kSimNameLast; id++)

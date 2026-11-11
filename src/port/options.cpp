@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "hotspots.h"
+#include "port/ownwords.h"
 #include "port/panelmenu.h"
 #include "port/pockets.h"
 #include "romdata.h"
@@ -14,10 +15,9 @@ namespace
 {
 using namespace ui;
 
-constexpr u32 kBtnFill = 0xFF6A72B8, kBtnFocusFill = 0xFF9AA2E3;
 constexpr u32 kTrackFill = 0xFF51518A, kTrackOn = 0xFFB2B2E3, kNotch = 0xFF383869;
 constexpr u32 kCurrent = 0xFF6BD36B;      // the game's green for its current slot's number
-constexpr u32 kLabel = 0xFFD6DAF6;
+constexpr u32 kLabel = kTextNote;    // a value, a slot's place: white, as every information (4.58:1 on a row; the pale lavender was 3.32)
 constexpr float kKnob = 46;
 
 Rect SlotRect(int i) { return {kPmContent.x, kSlotY0 + i * (kSlotH + kSlotGap), kPmContent.w, kSlotH}; }
@@ -36,7 +36,7 @@ void AddButton(Composition& c, Rect r, const std::string& word, bool focused)
     const Theme& th = GameTheme();
     if (focused) AddFocusRing(c, r, r.h / 2.0f);
     UiItem b = PanelItem(r);
-    b.fill = focused ? kBtnFocusFill : kBtnFill;
+    b.fill = focused ? kFillFocus : kFillRow;
     b.borderArgb = th.frame;
     b.border = 3;
     b.radius = r.h / 2.0f;
@@ -56,6 +56,7 @@ void AddSlider(Composition& c, Rect well, const std::string& label, int notch, b
     const Theme& th = GameTheme();
     if (focused) AddFocusRing(c, well, 16);
     UiItem w = WellItem(well);
+    w.fill = focused ? kFillFocus : kFillRow; // (focused: the rows' focused fill, as every focused item)
     w.radius = 16;
     w.layer = 1;
     c.ui.push_back(w);
@@ -73,13 +74,7 @@ void AddSlider(Composition& c, Rect well, const std::string& label, int notch, b
     vt.colour = kLabel;
     vt.layer = 1;
     c.ui.push_back(vt);
-    if (focused)
-    {   // The D-pad's chip: Left / Right move the knob.
-        const Rect dp = ChipRect(0, 0, Button::DPadH, "", 24);
-        UiItem chip = ChipItem(well.x + well.w - 28 - pw - 16 - dp.w, well.y + 10 + (44 - dp.h) / 2, Button::DPadH, "", 24);
-        chip.layer = 1;
-        c.ui.push_back(chip);
-    }
+    // (Left / Right move the knob: the hints' D-pad chip says so, "Adjust", as every slider's.)
     const int ty = TrackY(well);
     UiItem track = PanelItem({kOptTrackX - 6, ty - 7, kOptTrackW + 12, 14});
     track.plain = true;
@@ -103,7 +98,7 @@ void AddSlider(Composition& c, Rect well, const std::string& label, int notch, b
         c.ui.push_back(d);
     }
     UiItem knob = PanelItem({KnobX(notch) - (int)kKnob / 2, ty - (int)kKnob / 2, (int)kKnob, (int)kKnob});
-    knob.fill = focused ? kBtnFocusFill : th.fill;
+    knob.fill = th.fill; // (on the focused well's dark fill too: the knob stays light)
     knob.borderArgb = th.frame;
     knob.border = 4;
     knob.radius = kKnob / 2;
@@ -252,7 +247,7 @@ void BuildSaveSlots(Composition& c, const MenuView& v, int focus, const GameStat
         const bool focused = i == focus;
         if (focused) AddFocusRing(c, r, 22);
         UiItem row = PanelItem(r);
-        row.fill = focused ? kBtnFocusFill : kBtnFill;
+        row.fill = focused ? kFillFocus : kFillRow;
         row.borderArgb = th.frame;
         row.border = 3;
         row.radius = 22;
@@ -278,7 +273,7 @@ void BuildSaveSlots(Composition& c, const MenuView& v, int focus, const GameStat
             UiItem e = TextItem({tx, r.y, tw, r.h}, nd.text, nd.size, Align::Left, Weight::ExtraBold);
             e.wrap = false;
             e.middle = true;
-            e.colour = focused ? 0xFFFFFFFF : kLabel;
+            e.colour = kLabel;
             e.layer = 1;
             c.ui.push_back(e);
         }
@@ -304,7 +299,7 @@ void BuildSaveSlots(Composition& c, const MenuView& v, int focus, const GameStat
                 UiItem pt = TextItem({tx, r.y + 74, tw, 44}, pl.text, pl.size, Align::Left, Weight::Bold);
                 pt.wrap = false;
                 pt.middle = true;
-                pt.colour = focused ? 0xFFFFFFFF : kLabel; // (white on the focused row's light fill)
+                pt.colour = kLabel;
                 pt.layer = 1;
                 c.ui.push_back(pt);
             }
@@ -319,8 +314,9 @@ void BuildSaveSlots(Composition& c, const MenuView& v, int focus, const GameStat
         if (MenuFocusable(v, focus))
         {
             const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60, Weight::ExtraBold);
-            AddHint(c, right, Button::A, a.text);
+            right = AddHint(c, right, Button::A, a.text);
         }
+        AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose)); // (Up / Down: the slots)
     }
 
     SortUi(c.ui, first);

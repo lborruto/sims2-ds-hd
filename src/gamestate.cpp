@@ -35,7 +35,7 @@ struct EUTable
         u32 maxSims, maxItems;                              // bounds on k / item id
         u32 simFlags, simMood, simLevel;                    // Sim record (from G + simRecords + k * simRecordSize)
         u32 invCount, invIds, invCounted, keyBits;          // from G: s32 count, u16[6], u8[4], u32 bit array
-        u32 maxSlots, countedN, keyN;
+        u32 maxSlots, countedN, keyN, countedItem0;        // countedItem0: the counted items' item ids (their record rows: icons)
         u32 itemName, itemDesc, countedName, countedDesc, keyName, keyDesc;   // string ids: base + index
         u32 optMusic, optSfx;                               // from G, 20.12
         u32 popKind, popParam, popText, popTitle, popPressed, popPressing;   // from P
@@ -154,8 +154,12 @@ struct EUTable
         u32 cdTotal, cdDeck, cdHand, cdOpponent, cdSlotStride, cdCardFrom, cdCardTo, cdBox, cdMessage, cdQuitAsk, cdName, cdNameMax, cdSize;
         u32 cdScore, cdOppScore, cdTreasure, cdScoreMax;   // s32 each
         u32 cdPhase, cdTurn;   // u8: the turn's step (the top screen's line), whose turn (0 the player, 1 the opponent)
-        // The vacuum (u8 clog; the earnings are the stat panel's hotel.stVacuum, from G)
-        u32 vcClog, vcSize;
+        // The vacuum (u8 clog; s32 the money this session, the bowl's counter; the lifetime earnings are the
+        // stat panel's hotel.stVacuum, from G, banked when the vacuum is put away)
+        u32 vcClog, vcSize, vcSession;
+        // Its bowl: nine slots {+0 sprite pointer (its x / y at vcSpriteX / Y, 20.12), +0x14 scale (20.12), +0x18 u8 active,
+        // +0x19 u8 held, +0x1A u16 kind}; u16 the slot held (vcNone none); u8 the keep animation's two flags
+        u32 vcItems, vcItemStride, vcSpriteX, vcSpriteY, vcSpriteSize, vcScale, vcActive, vcHeld, vcType, vcHeldSlot, vcNone, vcKeepA, vcKeepB;
     } mg;
     // Milestone 5: the front end (research m5-front-end §0-§5). T = *(P+topObj) the top slot's object, S the bottom's.
     struct
@@ -174,6 +178,7 @@ struct EUTable
         u32 bgMode, bgCount, bgDuration, bgMaxMode, vdMovie, vdMaxMovie;   // boot, video
         u32 pgSprites, vtSprite, sprFlags, sprX, sprY, maxSprites;   // a page's CActorSprite list (null-ended), a sprite's vtable, visible bit 0, position 20.12
         u32 hairPos, hairArrowL, hairArrowR, thArrowL, thArrowR, thRing, thCellX0, thCellY0, thCellDx, thCellDy;   // sprite indices; the Clothes ring at (x0 + dx c, y0 + dy r)
+        u32 sprLoading, sprFrame, sprRes, maxRes;            // a sprite's flags: graphics not uploaded yet (with bit 0: shown, not drawn); its frame (u8), its resources' u16 triplet's pointer; the archive's ids below
     } front;
 };
 constexpr int kAnyOverlay = -2;
@@ -207,7 +212,7 @@ constexpr EUTable kEU = {
         46, 0x200,
         0x14, 0x1A, 0x1B,
         0x215C, 0x28, 0x24, 0,
-        6, 4, 3,
+        6, 4, 3, 23,
         463, 822, 1154, 845, 1968, 1972,
         0x2F70, 0x2F74,
         0x10, 0x14, 0x34, 0x434, 0xD88, 0xD8C,
@@ -299,7 +304,8 @@ constexpr EUTable kEU = {
         0x4C, 0x4E, 0xC0, 0x188, 0x14, 0x200, 0x300, 0x306, 0x2F7, 0x307, 0x308, 8, 1000,
         0x2CC, 0x2D0, 0x2E4, 9999,
         0x2F0, 0x2F1,
-        0x158, 0x194,
+        0x158, 0x194, 0x150,
+        0x28, 0x1C, 0x50, 0x54, 0x58, 0x14, 0x18, 0x19, 0x1A, 0x26, 0xA, 0x162, 0x170,
     },
     {
         0xDA8,
@@ -316,6 +322,7 @@ constexpr EUTable kEU = {
         0x28, 0x24, 0x26, 6, 0x2C, 3,
         0x8, 0x0212FED8, 0x4, 0x50, 0x54, 24,
         0x3A, 2, 3, 6, 7, 8, 88, 41, 48, 64,
+        0x80, 0x1A, 0x20, 0x4000,
     },
 };
 const char* const kTabs[] = { "Interact", "Pockets", "Goals", "Relationships", "Options" };
@@ -480,6 +487,16 @@ InventoryState ReadInventory(const Reader& m)
         u32 c;
         if (!m.R8(G + t.invCounted + i, c)) return InventoryState{};
         v.counted[i] = {(int)i, (int)(t.countedName + i), (int)(t.countedDesc + i), -1, (int)c};
+        // Its icon: the record table's row of the same item (Nuclear Rod, License Plate, Gourd,
+        // Alien Ship Part: item ids 23-26), when that row names it; else none (the count alone).
+        const u32 item = t.countedItem0 + i;
+        const RecordRow row = ReadRow(m, t.itemRow0 + item);
+        if (row.valid && row.nameId == (int)(t.itemName + item) && row.descRes > 0)
+        {
+            v.counted[i].iconRes = row.descRes;
+            v.counted[i].tilesRes = row.tilesRes;
+            v.counted[i].palRes = row.palRes;
+        }
     }
     for (u32 k = 0; k < t.keyN; k++)
         v.keys[k] = {(int)k, (int)(t.keyName + k), (int)(t.keyDesc + k), -1, (int)((keys >> (k + 1)) & 1)};
@@ -1602,14 +1619,44 @@ CardsState ReadCards(const Reader& m, u32 S)
     return v;
 }
 
+// The vacuum's bowl into v (bowl false on garbage: the rest of v stays as read).
+void ReadVacuumBowl(const Reader& m, u32 S, VacuumState& v)
+{
+    const auto& q = kEU.mg;
+    u32 held, keepA, keepB;
+    if (!m.In(S, q.vcSize) || !m.R16(S + q.vcHeldSlot, held) || (held >= (u32)kVacuumSlots && held != q.vcNone) || !m.R8(S + q.vcKeepA, keepA) ||
+        !m.R8(S + q.vcKeepB, keepB))
+        return;
+    std::vector<VacuumItem> items;
+    for (int i = 0; i < kVacuumSlots; i++)
+    {
+        const u32 e = S + q.vcItems + q.vcItemStride * (u32)i;
+        u32 active, hold, type, sp, scale, x, y;
+        if (!m.R8(e + q.vcActive, active) || !m.R8(e + q.vcHeld, hold) || !m.R16(e + q.vcType, type) || !m.R32(e, sp)) return;
+        if (active == 0) continue;   // (an empty slot keeps what it held last: unchecked)
+        if (hold > 1 || type < 0x100 || type > 0x2FF || !m.In(sp, q.vcSpriteSize) || !m.R32(e + q.vcScale, scale) || !m.R32(sp + q.vcSpriteX, x) ||
+            !m.R32(sp + q.vcSpriteY, y))
+            return;
+        const float fx = (int)x / 4096.0f, fy = (int)y / 4096.0f, fs = (int)scale / 4096.0f;
+        // (the bowl is the touch screen, its rim a little past it; a scale 0..4)
+        if (fx < -64 || fx > 320 || fy < -64 || fy > 256 || fs < 0 || fs > 4) return;
+        items.push_back({i, fx, fy, 20 * fs, (int)type, hold == 1});
+    }
+    v.items = std::move(items);
+    v.heldSlot = held == q.vcNone ? -1 : (int)held;
+    v.keeping = keepA != 0 || keepB != 0;
+    v.bowl = true;
+}
+
 VacuumState ReadVacuum(const Reader& m, u32 S)
 {
     VacuumState v;
+    ReadVacuumBowl(m, S, v);
     u32 G, clog;
     if (!m.In(S, kEU.mg.vcSize) || !m.R8(S + kEU.mg.vcClog, clog) || clog > 1 || !m.R32(kEU.gameBlock, G)) return v;
-    const int earnings = m.S32(G + kEU.hotel.stVacuum);
-    if (earnings < 0 || earnings > 99999999) return v;
-    v.clogged = clog == 1; v.earnings = earnings;
+    const int earnings = m.S32(G + kEU.hotel.stVacuum), session = m.S32(S + kEU.mg.vcSession);
+    if (earnings < 0 || earnings > 99999999 || session < 0 || session > 99999999) return v;
+    v.clogged = clog == 1; v.earnings = earnings; v.session = session;
     v.valid = true;
     return v;
 }
@@ -1792,6 +1839,31 @@ CasState ReadCas(const Reader& m, u32 S)
         if (sprite(l, c.canLeft, x, y) && sprite(r, c.canRight, x, y)) c.arrowsKnown = true;
         else c.canLeft = c.canRight = false;
     };
+    // A shown sprite whose graphics are not there yet (the game uploads a page's pictures a frame
+    // or more after its object is made, and again for the Clothes page's next cells).
+    // Each sprite's resources and frame too (the HD draws the game's pictures from the ROM).
+    if (!switching)
+    {
+        u32 list, sp, sv, flags;
+        if (m.R32(N + f.pgSprites, list) && list != 0)
+            for (u32 k = 0; k < f.maxSprites && m.R32(list + 4 * k, sp) && sp != 0; k++)
+            {
+                if (!m.R32(sp, sv) || sv != f.vtSprite || !m.R32(sp + f.sprFlags, flags)) continue;
+                if ((flags & (f.sprLoading | 1)) == (f.sprLoading | 1)) c.loading = true;
+                if (k >= (u32)kCasSprites) continue;
+                c.spriteCount = (int)k + 1;
+                CasSprite& s = c.sprites[k];
+                s.read = true;
+                s.shown = flags & 1;
+                u32 fr, t, a, b, p;
+                if (m.R8(sp + f.sprFrame, fr) && fr < 64) s.frame = (int)fr;
+                if (m.R32(sp + f.sprRes, t) && m.In(t, 6) && m.R16(t, a) && m.R16(t + 2, b) && m.R16(t + 4, p) && a < f.maxRes && b < f.maxRes)
+                {
+                    s.tiles = (int)a; s.desc = (int)b;
+                    s.pal = p < f.maxRes ? (int)p : -1;
+                }
+            }
+    }
     switch (switching ? -1 : idx)
     {
     case 0:
@@ -1999,6 +2071,22 @@ GameState ReadGameState(RamView ram)
     return g;
 }
 
+std::string VacuumBowlLine(const GameState& g)
+{
+    const VacuumState& v = g.minigame.vacuum;
+    if (g.screen != GScreen::Vacuum || !v.bowl) return "";
+    std::string r = "bowl held=" + std::to_string(v.heldSlot) + " keeping=" + std::to_string(v.keeping ? 1 : 0) + " items=";
+    char b[64];
+    for (size_t i = 0; i < v.items.size(); i++)
+    {
+        const VacuumItem& t = v.items[i];
+        snprintf(b, sizeof b, "%s%d:%x@%.0f,%.0f/%.0f%s", i ? "," : "", t.slot, t.type, t.x, t.y, t.half, t.held ? "H" : "");
+        r += b;
+    }
+    if (v.items.empty()) r += "-";
+    return r;
+}
+
 std::string MinigameLine(const GameState& g)
 {
     const MinigameState& a = g.minigame;
@@ -2100,7 +2188,7 @@ std::string MinigameLine(const GameState& g)
     {
         const VacuumState& v = a.vacuum;
         if (!v.valid) return "";
-        snprintf(b, sizeof b, "vacuum clogged=%d earnings=%d", v.clogged, v.earnings);
+        snprintf(b, sizeof b, "vacuum clogged=%d earnings=%d session=%d", v.clogged, v.earnings, v.session);
         return b;
     }
     case GScreen::ArtGallery:

@@ -2,7 +2,7 @@
 // game's words, driven by the game's own buttons. The game's LCD look (a green screen, dark
 // letters, the highlighted row a dark bar) with its header (the signal bars, the game's sprite
 // 2419; the date "@2/@1" 0x83C and the clock as the status bar writes it), and below it the
-// game's own Up / OK / Down buttons (sprites 8448 / 5806 / 2755, 2x) and its X (3068).
+// game's own Up / OK / Down buttons (sprites 8448 / 5806 / 2755, fitted) and its X (3068, at ui::kTierS).
 //
 // Pages (GameState::town.phone): 0 the menu ("Messages-@1" with the inbox's count, "FULL" at
 // ten; Phonebook, Options, Exit: the game's table); 2 the messages (the senders, an unread one

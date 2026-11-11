@@ -1,15 +1,20 @@
 // The HD shell: the port's own screens around the game, on the UI kit (ui/kit.h) with the port's
 // own words (port/ownwords.h) in five languages and the chips of the device used last.
-//   The pause menu (Start + Back on a pad, Esc): Resume, Settings (rows with pill values, Left /
-//   Right or A change them), Controls (the controls card, and Keys and buttons: the bindings,
-//   A captures one, X clears it, Y captures them all in turn), Save states (four slots with their
+//   The pause menu (Start + Back on a pad, Esc): Resume, Settings (five tabs, LB / RB: Display,
+//   Graphics, Sound, Controls, Game; rows with ‹ value › pills, Left / Right or A change them, a note
+//   under the list for the focused row, an Advanced group per tab, Y resets the tab after asking,
+//   focus on No), Controls (the controls card, and Keys and buttons: the bindings,
+//   A captures one, X clears it (never the pause menu's key), Y captures them all in turn, the last
+//   row resets them after asking), Save states (four slots with their
 //   picture and date: A loads a used slot after asking, with focus on No, and keeps the state
-//   before the load for Undo; A on an empty slot or X saves) and Quit (asked, focus on No: the
+//   before the load for Undo, itself asked; A on an empty slot or X saves) and Quit (asked, focus on No: the
 //   host then writes a suspend state the launch panel offers as Continue).
 //   The launch panel, before the DS starts: Continue with the last ROM (and where it was left,
 //   when a suspend state is kept), Choose a file, the recent ROMs, Language, Quit, the controls
-//   card; a message (a wrong file, another cartridge) stays until A.
-// Everything here is a function of a Model and the input: no SDL, no emulator. The host
+//   card; a message (a wrong file, another cartridge) stays until A or B.
+//   Lists stop at their ends (only the tab bars wrap). The hints at a page's foot are fitted:
+//   the pause chip goes when they would meet it, then they shrink (shell_test checks every page).
+// Everything here is a function of a Model and the input: no SDL call (its keycodes only), no emulator. The host
 // (main.cpp) fills the model, carries out the Result and draws Build()'s items on a 1280 x 720
 // canvas (the window over the game; --compose's pictures; tests/shell_test.cpp).
 #pragma once
@@ -27,13 +32,14 @@ namespace sims2wide::shell
 constexpr int kW = 1280, kH = 720;
 
 enum class Page { Main, Settings, Controls, Keys, States, Launch };
-// A question over the page (two buttons, No first and focused), or a message (one, OK).
-enum class Ask { None, Quit, Load, Overwrite, Message };
+// A question over the page (two buttons, No first and focused), or a message (one, OK; A or B closes it).
+enum class Ask { None, Quit, Load, Overwrite, Message, ResetTab, ResetKeys, Undo };
 
 // One frame's presses (edges), and the mouse in canvas pixels.
 struct Input
 {
     bool up = false, down = false, left = false, right = false, a = false, b = false, x = false, y = false;
+    bool lb = false, rb = false; // the previous / next tab (the DS's L and R: a pad's LB / RB, Q / W)
     bool hover = false, click = false; // the pointer moved / the left button went down
     float mx = 0, my = 0;
 };
@@ -51,6 +57,7 @@ enum class Act
     ClearBinding,  // arg: the action (the keyboard's key, or the controller's button: the device used last)
     ResetBindings,
     Setting,       // arg: the Row changed (settings already changed in the model's Settings)
+    ResetTab,      // arg: the Tab whose rows went back to their defaults (in the model's Settings): apply each
     Continue,      // launch: the last ROM (with its suspend state, when kept)
     OpenRecent,    // launch: arg the index in Model::recents
     ChooseFile,    // launch: the file picker
@@ -64,17 +71,31 @@ struct Result
     int arg = 0;
 };
 
-// The settings' rows, in order.
-// (Grouped: the picture, the sound, the speed, the mouse and the controller, the game.)
+// The settings' rows (each in one tab: TabRows). Keys opens the bindings (no value).
 enum class Row
 {
     Layout, Fullscreen, Scaling, UiSize, Pictures, Res3D, Wide, Fps60, Battery,
     Volume, Mute, FastSound, Background,
     FastSpeed, FastKey, FastBoot,
     HidePointer, StickCursor, CursorSpeed, DeadZone, LeftHanded, Trigger, Rumble,
-    Mic, Language, Count
+    Mic, Language, Keys, Count
 };
 constexpr int kRows = (int)Row::Count;
+// The settings' tabs, LB / RB (wrapping).
+enum class Tab { Display, Graphics, Sound, Controls, Game, Count };
+constexpr int kTabs = (int)Tab::Count;
+struct TabLayout
+{
+    std::vector<Row> rows; // in order: the everyday ones, then from `advanced` on, under the Advanced heading
+    int advanced;          // rows.size(): none
+};
+const TabLayout& TabRows(int tab);
+std::string TabName(int tab, int language);
+// Battery saver forces the row's look (3D 1x, 30 fps): the row is dimmed, shows the forced value
+// and does not change.
+bool RowHeld(Row r, const Settings& s);
+// The tab's rows back to Settings{}'s values (not the window's size and place, not the bindings).
+void ResetTabRows(int tab, Settings& s);
 
 struct Model
 {
@@ -85,6 +106,7 @@ struct Model
     std::string keyGlyph[Controls::COUNT], padGlyph[Controls::COUNT];
     ui::Face padFace = ui::Face::Xbox;
     bool keyboard = true;             // the keyboard was used last (X clears its key, else the button)
+    std::string pauseCombo = "Start + Back"; // the driving pad's pause buttons as printed on it (Pads' PauseCombo)
     int capturing = -1, captureLeft = 0; // the action being captured, seconds left
     // The save states.
     bool statesOk = false;
@@ -110,6 +132,8 @@ public:
     Page page = Page::Main;
     Ask ask = Ask::None;
     int focus = 0, scroll = 0, askFocus = 0, askSlot = 0;
+    int tab = 0;           // Settings: the tab shown (kept while the program runs)
+    Page keysFrom = Page::Controls; // Keys: where B goes back to (the Controls page, or Settings' Controls tab)
     bool sequence = false; // Keys: every action in turn (Y)
 
     void Open(Page p);
@@ -124,9 +148,11 @@ public:
     bool Focusable(const Model& m, int i) const;
     // Where each item was drawn by the last Build (the mouse; tests).
     const std::vector<Rect>& Rects() const { return rects_; }
+    const std::vector<Rect>& TabRects() const { return tabRects_; } // (Settings: the tab bar)
+    const std::vector<Rect>& HintRects() const { return hintRects_; } // (the hints at the foot, the pause chip last when shown)
 
 private:
-    mutable std::vector<Rect> rects_, askRects_;
+    mutable std::vector<Rect> rects_, askRects_, tabRects_, hintRects_;
     mutable Rect panel_ {};
     void Zoom(std::vector<ui::UiItem>& items) const; // the UI's size (Build's last step)
     int hover_ = -2;
@@ -138,7 +164,7 @@ private:
 void ChangeRow(Row r, int dir, Settings& s);
 std::string RowLabel(Row r, int language);
 std::string RowValue(Row r, const Settings& s, int language);
-// The row's note under the list while it has the focus (W::Count: none).
+// The row's note under the list while it has the focus (an OwnWordId; every row has one).
 int RowNote(Row r);
 // The language the shell's words use: the setting's, else the given automatic one.
 inline int WordsLanguage(const Settings& s, int automatic) { return s.language >= 1 && s.language <= 5 ? s.language : automatic; }
@@ -148,6 +174,10 @@ struct LaunchEntry { LaunchItem kind; int arg; };
 std::vector<LaunchEntry> LaunchEntries(const Model& m);
 // An action's name in the bindings page.
 std::string ActionLabel(int action, int language);
+// A key as its keycap prints it in the shell (the bindings, the controls card): the arrows as the
+// D-pad's arrow ("up" .. "right": ui::ChipItemAs), Enter, the Shifts, Space and Backspace in the
+// language's words, any other key by its name (Controls::KeyName); "" for none.
+std::string KeyLabel(int keycode, int language);
 // The pause menu's main page, in order (the saves' folder only with Model::canOpenFolder).
 enum class MainItem { Resume, Settings, Controls, States, ChangeGame, OpenFolder, Quit };
 std::vector<MainItem> MainEntries(const Model& m);
@@ -158,6 +188,6 @@ std::vector<MainItem> MainEntries(const Model& m);
 // locks the menu (checked in shell_test).
 struct PadIns { int accept = -1, back = -1; };
 PadIns ShellPadIns(const Controls::Bindings& b);
-struct PadNav { bool a = false, b = false, x = false, y = false; };
+struct PadNav { bool a = false, b = false, x = false, y = false, lb = false, rb = false; };
 PadNav ShellPadNav(const Controls::Bindings& b, const bool* now, const bool* before);
 }

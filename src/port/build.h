@@ -22,6 +22,7 @@
 #include "compose.h"
 #include "gamestate.h"
 #include "port/menuview.h"
+#include "port/popup.h"
 #include "screens.h"
 
 namespace sims2wide
@@ -54,14 +55,16 @@ constexpr Rect kBdTitle {200, 44, 880, 64};
 constexpr Rect kBdClose {1016, 48, 56, 56};       // the game's X, in the title band
 constexpr Rect kBdList {200, 124, 600, 454};      // page 0: the list's well
 constexpr Rect kBdUp {740, 140, 48, 48}, kBdDown {740, 514, 48, 48};
-constexpr Rect kBdScroll {760, 200, 8, 302};
 constexpr Rect kBdInfo {816, 124, 264, 454};      // page 0: the focused room's sum
-constexpr Rect kBdAsk {200, 124, 880, 454};       // page 1: the question's well
-constexpr Rect kBdCross {380, 448, 220, 96}, kBdTick {680, 448, 220, 96};
+constexpr Rect kBdEmpty {200, 124, 880, 454};     // page 0 with nothing left to build: one well, the port's line
+// Page 1: the question in the popups' look (port/popup.h's BuildQuestionBox) over the dimmed list:
+// the box, the question's height at the top of its well, its No and Yes.
+constexpr Rect kBdAskBox {300, 150, 680, 400};
+constexpr int kBdAskTextH = 90;
+constexpr Rect kBdCross = QuestionNo(kBdAskBox), kBdTick = QuestionYes(kBdAskBox);
 constexpr float kBdNameSize = 30, kBdNameMin = 20, kBdWhereSize = 24, kBdWhereMin = 18, kBdPriceSize = 28;
-// Row i of the list (page 0) and the chosen room's plate (page 1).
+// Row i of the list.
 Rect BuildRowRect(int i);
-constexpr Rect kBdChosen {300, 236, 680, 120};
 
 // Item ids (stable across rebuilds: a row's id carries its room, so the focus stays on a room when
 // the game's list is rebuilt or scrolled).
@@ -75,7 +78,11 @@ MenuView BuildRoomsView(ScreenState s, const GameState* game, const RomData* rom
 MenuView BuildRoomsViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);
 // The HD screen appended to c (after the dimmed world): the panel, title and money, the page, the
 // hints, the focus on view item `focus`, and the mouse's pieces.
+// Page 1 draws the list beneath without a focus; its question is BuildBuildQuestion's.
 void BuildBuildRooms(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, IconCache* icons);
+// Page 1's question over what c holds (the screen and the status bar: the popups' look, port/popup.h's
+// BuildQuestionBox), the focus on its No (0) or Yes (1); nothing on page 0.
+void BuildBuildQuestion(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom);
 
 // (A check, --measure-menu) every word Build Rooms can show in rom's language, in its box: every
 // room's name and place (rows, the sum, page 1), the title beside the widest money, the question,

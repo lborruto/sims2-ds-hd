@@ -23,6 +23,10 @@ struct SpriteRef
     bool operator<(const SpriteRef& o) const { return std::tie(tiles, desc, pal) < std::tie(o.tiles, o.desc, o.pal); }
 };
 
+// A sprite's frame in a look of its own (IconCache::Look): as it is, mirrored, grey (the colour
+// taken out, lifted), dimmed (two fifths of its light).
+enum class SpriteLook { Plain, Flip, Grey, Dim };
+
 // The largest w or h IconCache::Scaled makes (a bad size is refused, not allocated).
 constexpr int kMaxScaled = 4096;
 
@@ -43,10 +47,20 @@ public:
     // scale x scale block); null as above, or for an empty size or one past kMaxScaled (4096) either way.
     const SpriteFrame* Scaled(SpriteRef s, int frame, int w, int h);
     const SpriteFrame* Scaled(SpriteRef s, int frame, int scale);
-    // The image item that draws frame `frame` of s at `to` from its copy `scaled` (Scaled's, the
-    // size `to` has): Pixel (ui::SmoothPictures false) that copy itself, as always; Smooth the
-    // frame as it is, so the kit enlarges it with the pixel-art scaler at the window's own size.
+    // The image item that draws frame `frame` of s at `to` (`scaled`: Scaled's copy, the size `to`
+    // has, drawn only when the frame does not read): the frame as it is, in both looks, so the kit
+    // enlarges it at the window's own size (Pixel nearest by the whole factor, Smooth the pixel-art
+    // scaler): never a pre-scaled copy blurred again at a fractional window scale.
     ui::UiItem Image(SpriteRef s, int frame, const SpriteFrame& scaled, Rect to);
+    // Frame `frame` of s at tier `tier` (ui::kTierS, ui::kTierL: one per component), centred in
+    // `box` (ui::TierImage of the frame as it is); an item that draws nothing when it does not read.
+    ui::UiItem Tiered(SpriteRef s, int frame, int tier, Rect box);
+    // Frame `frame` of s `scale` times its size (nearest: every pixel a block; 1-8) in `look`, its
+    // colour times light / 255 (a fade: 0-255, the alpha kept); null when it does not read. The
+    // copies at full light are kept for the cache's life, the others for the last two lights asked
+    // (a fade asks a new one every frame): a pointer stays valid until two other lights are asked,
+    // so the previous frame's composition never points at freed pixels while the next is built.
+    const SpriteFrame* Look(SpriteRef s, int frame, SpriteLook look, int scale, int light = 255);
 
     const RomData* Rom() const { return rom; }
 
@@ -54,5 +68,12 @@ private:
     const RomData* rom;
     std::map<std::tuple<SpriteRef, int>, SpriteFrame> frames;            // w == 0: does not read
     std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> scaled;  // (sprite, frame, w, h)
+    std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> looks;   // (sprite, frame, look, scale) at full light
+    std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> faded[2]; // the same at fadedLight[0] (now) and [1] (before)
+    int fadedLight[2] = {-1, -1};
 };
+
+// (4c's screens) Frame `frame` of s at tier `tier` centred in `box` (IconCache::Tiered) appended to
+// `items`, `opacity` its fill (ImageItem's: 0 opaque); nothing without icons.
+void AddTiered(std::vector<ui::UiItem>& items, IconCache* icons, SpriteRef s, int frame, int tier, Rect box, u32 opacity = 0);
 }

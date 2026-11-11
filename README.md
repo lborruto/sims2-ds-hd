@@ -34,16 +34,16 @@
 
 <table>
   <tr>
-    <td><img src="docs/screenshots/menu.webp" alt="The menu's Interact tab in HD over the dimmed casino: Play Keelhaulin', Hotseat, How to Play" width="440"></td>
-    <td><img src="docs/screenshots/dialogue.webp" alt="A conversation in HD: the speaker's name, the words in large type, their portrait" width="440"></td>
+    <td><img src="docs/screenshots/menu.webp" alt="The menu's Interact tab in HD over the dimmed casino: Play Keelhaulin', Hotseat (in the green focus ring), How to Play; the hints say Choose, A Hotseat, B Close" width="440"></td>
+    <td><img src="docs/screenshots/dialogue.webp" alt="A conversation in HD: the speaker's name, the words in large type, their portrait, A Continue" width="440"></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/shop.webp" alt="The General Store's catalogue in HD: items in a grid, the chosen one's price and description, the buy button" width="440"></td>
-    <td><img src="docs/screenshots/create-a-sim.webp" alt="Create-a-Sim: the Sim big on the left, the name, gender, skin and keyboard on the right" width="440"></td>
+    <td><img src="docs/screenshots/shop.webp" alt="The General Store's catalogue in HD: items in a grid, the chosen one in the focus ring, its price and description, the buy button, the sell slots at the right" width="440"></td>
+    <td><img src="docs/screenshots/create-a-sim.webp" alt="Create-a-Sim: the Sim big on the left with R Turn under it, the name, gender, skin and keyboard on the right, the hints at the bottom" width="440"></td>
   </tr>
   <tr>
-    <td><img src="docs/screenshots/cards.webp" alt="Keelhaulin' Cards big in its frame, the score board at the right, the button hints below" width="440"></td>
-    <td><img src="docs/screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit" width="440"></td>
+    <td><img src="docs/screenshots/cards.webp" alt="Keelhaulin' Cards big in its frame, a card in the green focus ring, the score board at the right, X Draw a card and B Quit below" width="440"></td>
+    <td><img src="docs/screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit; the hints say how to resume and select" width="440"></td>
   </tr>
 </table>
 
@@ -98,15 +98,15 @@ from another emulator or a flash cart works if you put it there. If that folder 
 the save goes to the settings folder and the pause menu says where.
 
 **The menus are too big, or too small.**
-Pause, *Settings*, *Interface size*: Auto follows your screen, or pick 60 to 150 %.
+Pause, *Settings > Display > Interface size*: Auto follows your screen, or pick 60 to 150 %.
 
 **It's blurry, or slow.**
-Pause, then *Settings*: *3D resolution* sets how sharp the 3D is, and widescreen and 60 fps can be
-switched off (*Battery saver* does both on a laptop). If it runs too fast, check you aren't holding
+Pause, then *Settings > Graphics*: *3D resolution* sets how sharp the 3D is, and widescreen and 60 fps can be
+switched off (*Battery saver* holds the 3D at 1x and 30 fps on a laptop; widescreen stays as set). If it runs too fast, check you aren't holding
 fast forward.
 
 **It pauses when I click another window.**
-On purpose: *Settings > Run in background* changes it. The Steam overlay does not pause it.
+On purpose: *Settings > Sound > Pause in the background* changes it. The Steam overlay does not pause it.
 
 **Is DS Wireless supported?**
 No. Trading and wireless games need a second DS; the game's screen says so and B leaves it.

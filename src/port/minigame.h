@@ -100,11 +100,12 @@ constexpr int kMgSideBottom = kActivityBottomTo.y + kActivityBottomTo.h + 6;
 constexpr int kMgPad = 14;                                    // the side panel's inner margin
 constexpr int kMgInnerX = kMgSideX + kMgPad, kMgInnerW = kMgSideW - 2 * kMgPad;
 constexpr Rect kMgPrompt {kMgTitleX, kMgSideBottom + 10, kMgSideX + kMgSideW - kMgTitleX, 52};
-constexpr int kMgPromptPad = 20, kMgPromptGap = 34;           // the bar's margin; between two hints
-constexpr float kMgHintSize = 24, kMgHintMin = 17;            // the hints' chips and labels
+constexpr int kMgPromptPad = 20, kMgPromptGap = 34, kMgPromptGapMin = 16;   // the bar's margin; between two hints (closed to fit)
+constexpr float kMgHintSize = 24, kMgHintMin = 18;            // the hints' labels (ui::kMinText at least)
+constexpr float kMgHintChip = 32;                             // their chips, one size in every game (the glyph 14 px or more)
 constexpr float kMgChipBig = 30;                              // the social answers' D-pad chips
 constexpr int kMgAnswerRow = 46;                              // a social answer's row (its label a live crop 2x)
-constexpr float kMgValueSize = 24, kMgValueMin = 16, kMgHeadSize = 18;
+constexpr float kMgValueSize = 24, kMgValueMin = 18, kMgHeadSize = 18;
 // The cards' deck on the touch screen (a thumbnail of the game's own: the values' well) and the
 // social answers' labels (left, middle, right: the game's own words, live crops shown 2x).
 constexpr Rect kMgDeckFrom {110, 6, 36, 53};
@@ -127,6 +128,12 @@ int CardsLineId(const CardsState& k);
 // A minigame's help text the stylus's point (x, y) on its touch screen asks for in help mode (the
 // Drencher's 1661..1666, the crime game's 1667..1669, the mixer's page title 1778 + 2h), -1 none.
 int MinigameHelpAt(Screen s, int x, int y);
+// The same help text when no touch says which (a state loaded with it up): the game copies the text
+// it lays out through a scratch buffer (kMgTextScratch, EU), its tail left there; the candidate of
+// screen s whose last 24 ASCII letters (16 at least) are found there, with the NUL after them, when exactly one is;
+// else -1. ram: the DS's main RAM (mask: its size - 1).
+constexpr u32 kMgTextScratch = 0x0213DF00, kMgTextScratchSize = 0x200;
+int MinigameHelpInRam(Screen s, const u8* ram, u32 mask, const RomData& rom);
 
 // Whether the HD frame draws screen s: an activity (Social, Cards, Vacuum, the pointing and timing games), the game's RAM read
 // (game valid) and its strings there (rom with every id above).

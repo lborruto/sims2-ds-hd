@@ -55,8 +55,10 @@ constexpr int kSeTabX = 21, kSeTabY0 = 54, kSeTabDy = 40, kSeTabs = 4;     // ta
 constexpr Rect kSeTabFrom {6, 40, 30, 28};                                  // tab i's picture: + dy i (its plate when selected)
 constexpr int kSeTrackX0 = 84, kSeTrackW = 128, kSeMusicY = 96, kSeSfxY = 114;
 // The concept art big (MenuView::picture) and its hint's band.
-constexpr Rect kSeArtBig {64, 16, 1152, 640}, kSeArtHints {64, 662, 1152, 48};
+constexpr Rect kSeArtBig {64, 16, 1152, 600}, kSeArtHints {64, 626, 1152, 48};   // (the hint inside the 5 % safe area: its foot at 674)
 constexpr int kSeCells = 12, kSeCellX0 = 56, kSeCellY0 = 72, kSeCellDx = 48, kSeCellDy = 40, kSeCellW = 40, kSeCellH = 32;
+constexpr int kSeCellInset = 4;                                              // a button's frame (left out of its HD cell)
+constexpr int kSprLock = 2152;                                               // a locked concept art's padlock (24 x 32)
 constexpr int kSprX = 7683;                                                 // the game's blue X (as the note's, the catalogue's)
 constexpr int kLdTickX = 231, kLdTickY[3] = {66, 112, 158}, kLdCloseX = 231, kLdCloseY = 22;
 // The game's strings.
@@ -64,22 +66,25 @@ constexpr int kStrSeTitle = 39, kStrSePage0 = 40;                           // +
 constexpr int kStrCredits0 = 2665, kCreditsLines = 436;
 constexpr int kStrLdTitle = 10, kStrLdNoData = 11, kStrLdMoney = 28, kStrLdPlace0 = 67, kStrLdTime = 2432, kStrLdAm = 178, kStrLdPm = 179;
 // The game's colours for the credits' headings (sampled on F-opt-credits-400).
-constexpr u32 kCreditsPink = 0xFFF35961, kCreditsGreen = 0xFF79FB00;
+// On the credits' dark well (#2E3063: white 12.2:1) the pink lightened to 5.4:1 (the game's #F35961
+// 3.7:1), the green the game's (9.1:1).
+constexpr u32 kCreditsPink = 0xFFFF8A90, kCreditsGreen = 0xFF79FB00, kCreditsWell = 0xFF2E3063;
 
 // HD geometry (canvas). Settings: the panel at the right of the top screen (port/front.h's main
 // menu: kFrTopBox, kFrPanel), its title, tab bar, the page's name, its content and hints.
 constexpr Rect kSeX {840, 60, 64, 64};                                     // the game's X (7683 2x), the title beside it
 constexpr Rect kSeTitle {912, 64, 320, 56};
-constexpr Rect kSeTabBar {840, 132, 392, 76};
-constexpr int kSeTabCell = 64, kSeTabsX = 1036 - 2 * kSeTabCell;
-constexpr Rect kSeLabel {840, 222, 392, 44};
+// The tab bar: the pages' names in two rows of two (the stat panel's look: words, the page's on
+// its raised plate), LB at its left, RB at its right.
+constexpr Rect kSeTabBar {828, 132, 416, 136};
+constexpr int kSeTabsX = kSeTabBar.x + 44, kSeTabW = (kSeTabBar.w - 88) / 2, kSeTabH = 58;   // (wide: German's long one-word names keep a gap)
 constexpr Rect kSeSlider {840, 320, 392, 180};
 constexpr int kSeHdTrackX = 880, kSeHdTrackW = 312;                         // the slider's HD track (0 % .. 100 %)
 constexpr int kSeHdCellW = 88, kSeHdCellH = 72, kSeCellGapX = 12, kSeCellGapY = 16, kSeGridX = 842, kSeGridY = 292;
 constexpr Rect kSeCredits {840, 276, 392, 316};
 constexpr int kSeCreditsRow = 34;
 constexpr Rect kSeHints {840, 608, 392, 40};
-constexpr Rect SettingsTabRect(int i) { return {kSeTabsX + i * kSeTabCell, kSeTabBar.y + 6, kSeTabCell, kSeTabBar.h - 12}; }
+constexpr Rect SettingsTabRect(int i) { return {kSeTabsX + (i & 1) * kSeTabW + 2, kSeTabBar.y + 8 + (i >> 1) * (kSeTabH + 4), kSeTabW - 4, kSeTabH}; }
 constexpr Rect SettingsCellRect(int i) { return {kSeGridX + (i & 3) * (kSeHdCellW + kSeCellGapX), kSeGridY + (i >> 2) * (kSeHdCellH + kSeCellGapY), kSeHdCellW, kSeHdCellH}; }
 // Load: the in-game Save slots' panel (port/panelmenu.h's kPmPanel), its rows.
 constexpr Rect kLdTitle {200, 44, 808, 64};

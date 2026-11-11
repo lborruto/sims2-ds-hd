@@ -19,7 +19,7 @@
 #   act-social, act-vacuum, act-cards: the HD minigame frame (src/port/minigame.*): the touch
 #   screen 3x at the left, the world small at the top right, the title plate (none for the social
 #   game), the side panel, the prompt bar's words (cards-ask: B's quit question, A and B alone;
-#   vacuum-clog: the blow's hint lit red; cards-wide, social-wide, vacuum-2x); cards-m1
+#   vacuum-clog: the blow's hint lit red, the ring on the find A takes; cards-wide, social-wide, vacuum-2x); cards-m1
 #   (--no-romdata): milestone 1's hints' box; s2 (the main menu), title, boot: the HD front end (src/port/front.*);
 #   s3-m1 (Create-a-Sim with --no-romdata: no HUD): milestone 1's front end view, the top screen framed at the left at its shape and the touch screen
 #   2.5x framed at the right, the buttons' hint below, never SIDE; s3, s4, cas-hair, cas-face, cas-clothes (and s3 at 2x and
@@ -97,6 +97,42 @@ sims2wide_slot() {
     return $rc
 }
 bin=sims2wide_slot
+
+# The game's text by its string id (this script holds no text of the game's): gtext ID [LANG [PART
+# [WORDS]]] prints string ID of language LANG (1, English, by default), from --dump-strings (one dump
+# per language, made here), its {..} escapes dropped; with PART, only its PART-th piece between
+# newlines and placeholders (@N, the money sign), trimmed; with WORDS, only its first WORDS words.
+# gx: the same, escaped for grep -E (in_order).
+for lang in 1 3; do
+    "$real_bin" "$rom" --dump-strings --language "$lang" > "$tmp/strings-$lang.tsv" 2>/dev/null
+    # (an empty pattern would match anything: no table, no check)
+    [ "$(wc -l < "$tmp/strings-$lang.tsv")" -gt 3000 ] || { echo "no string table in language $lang (--dump-strings)"; exit 2; }
+done
+gtext() {
+    "$python" -I - "$tmp/strings-${2:-1}.tsv" "$1" "${3:-}" "${4:-}" <<'EOF'
+import re, sys
+path, want, part, words = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+text = None
+with open(path, encoding="utf-8", errors="replace") as f:
+    for line in f:
+        sid, _, t = line.rstrip("\n").partition("\t")
+        if sid == want:
+            text = t
+            break
+if text is None:
+    sys.exit("no string " + want)
+text = re.sub(r"\{[^}]*\}", "", text)
+if part:
+    pieces = [p.strip() for p in re.split(r"\\n|@[0-9]*|\$", text)]
+    text = [p for p in pieces if p][int(part)]
+else:
+    text = text.replace("\\n", " ")
+if words:
+    text = " ".join(text.split()[: int(words)])
+print(text)
+EOF
+}
+gx() { gtext "$@" | sed -e 's/[][\.*^$|+?(){}]/\\&/g'; }
 
 # run NAME STATE [options...]: frame 119 as the console's picture (NAME/c/f000119.png) and as
 # the two screens (NAME/r/f000119.png); NAME.ok only if both runs went to their end.
@@ -326,6 +362,15 @@ bottom = lambda x, y: raw.getpixel((x, 192 + y))
 C = lambda x, y: comp.getpixel((x, y))
 hexrgb = lambda h: (int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16))
 FRAME, OUTLINE, PANEL, RING = hexrgb("828ACB"), hexrgb("383869"), hexrgb("5961A2"), hexrgb("309A41")
+# The focus ring (ui::FocusRing): the green outside, a white line inside it: either is the ring.
+def RINGED(x, y):
+    # The focus ring (ui::FocusRing) at (x, y): its green there, or its inner line (white, or the
+    # theme's shadow on a light fill) with the green within 6 pixels beside it (a white letter alone is not a ring).
+    green = lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 40
+    p = C(x, y)
+    if green(p): return True
+    if not (min(p) > 230 or max(abs(a - b) for a, b in zip(p, OUTLINE)) <= 12): return False
+    return any(green(C(min(max(x + dx * d, 0), 1279), min(max(y + dy * d, 0), 719))) for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)) for d in range(1, 7))
 errors = []
 
 def expect(what, got, want):
@@ -333,14 +378,28 @@ def expect(what, got, want):
         errors.append(f"{what}: {got} (want {want})")
 
 # Canvas points the pointing minigames' pointer covers (its ring, 15 around its point): not compared.
-SKIP = [(421, 356)] if case.split("-")[0] in ("autopsy", "art", "scratch") or case in ("mixer", "mixer-wide") else []
-# DS rectangles a ring is drawn around (MooGoo's focus: the first monkey, 56,32 24 x 32): not compared.
-SKIP_DS = [(50, 26, 86, 70)] if case.split("-")[0] == "moogoo" else [(0, 68, 31, 110)] if case == "mixer-save" else []
+SKIP = [(421, 356)] if case.split("-")[0] in ("autopsy", "art", "scratch", "vacuum") or case in ("mixer", "mixer-wide") else []
+# DS rectangles a ring is drawn around (MooGoo's focus: the first monkey, 56,32 24 x 32; the vacuum's
+# ring on the find A takes, the gold ring at 130,70 on vacuum-clog's frame 119): not compared.
+SKIP_DS = ([(50, 26, 86, 70)] if case.split("-")[0] == "moogoo" else [(0, 68, 31, 110)] if case == "mixer-save"
+           else [(114, 54, 146, 86)] if case == "vacuum-clog" else [])
 
-def piece(what, fx, fy, fw, fh, tx, ty, scale, step=5):
-    """A piece of the bottom screen drawn whole-number times bigger: each DS pixel's block."""
+# The game's frame colours a keyed crop (port/panelmenu.h KeyedCrop) may take out around a portrait.
+KEYED = {(0x38, 0x38, 0x69), (0x41, 0x49, 0x79), (0x51, 0x51, 0x8A), (0x59, 0x61, 0xA2), (0x61, 0x71, 0xB2), (0x82, 0x8A, 0xCB)}
+
+KEY_BAND = 3  # (port/panelmenu.h kKeyBand: only the crop's outer 3 pixels may be keyed out)
+
+def in_band(x, y, w, h):
+    return min(x, y, w - 1 - x, h - 1 - y) < KEY_BAND
+
+def piece(what, fx, fy, fw, fh, tx, ty, scale, step=5, keyed=False):
+    """A piece of the bottom screen drawn whole-number times bigger: each DS pixel's block (keyed:
+    the piece is a KeyedCrop's whole rectangle; a DS pixel in the game's frame colours within its
+    outer KEY_BAND pixels may be the HD well's instead; every pixel further in is the DS's own)."""
     for y in range(0, fh, step):
         for x in range(0, fw, step):
+            if keyed and bottom(fx + x, fy + y) in KEYED and in_band(x, y, fw, fh):
+                continue
             if any(abs(tx + x * scale - sx) < 20 and abs(ty + y * scale - sy) < 20 for sx, sy in SKIP):
                 continue
             if any(x0 <= fx + x <= x1 and y0 <= fy + y <= y1 for x0, y0, x1, y1 in SKIP_DS):
@@ -371,7 +430,7 @@ def rail():
     for cx, cy in ((400, 100), (1050, 650), (1000, 300), (900, 658)):
         expect(f"world at {cx},{cy}", C(cx, cy), w(cx, cy))
 
-WELL = hexrgb("6A72B8")
+WELL = hexrgb("6870B6")
 BODY = [hexrgb(h) for h in ("EB0000", "38BA38", "DBA230", "B2B2E3")]
 
 def hud_values():
@@ -432,7 +491,7 @@ def strip(values=None, hints=False):
     if values is not None:
         meter(values, 16, 760, STRIP_Y + 4, 718)
     if hints:
-        expect("the strip's BACK pill", C(1140, 698), (46, 48, 99))
+        expect("the strip's BACK pill", C(1112, 698), (46, 48, 99))
         right = [C(x, y) for y in range(STRIP_Y + 6, 716) for x in range(900, 1260)]
         if right.count((255, 255, 255)) < 40:
             errors.append("no hint words at the strip's right")
@@ -484,33 +543,57 @@ def front_cas(page, focus, raw_top=True):
     expect("top frame", C(12, 300), OUTLINE)
     expect("backdrop", C(5, 5), BACKDROP)
     expect("panel", C(704, 640), FRAME)
+    # The tabs: round kit buttons, the page's green, the others the cells' blue.
     for i in range(5):
-        x0, y0 = 780 + 80 * i + 6, 34 + 4
-        for dy in range(0, 30, 5):
-            for dx in range(0, 34, 5):
-                expect(f"tab {i} DS {1 + dx},{8 + 37 * i + dy}", C(x0 + 2 * dx + 1, y0 + 2 * dy + 1), bottom(1 + dx, 8 + 37 * i + dy))
-        if len(errors) > 4:
-            return
-    # One live crop of the page: DS x, y, w, h, its scale, its HD box (Keep this Sim?: the game's
-    # aspiration pictures, sprite 362, their blue splash in each cell).
+        r, g, b = C(820 + 80 * i, 46)
+        lit = g > r + 40 and g > b
+        if lit != (i == page): errors.append(f"tab {i}: {(r, g, b)} {'not ' if i == page else ''}green")
+    # One picture of the page: DS x, y, w, h, its scale, its HD box (Keep this Sim?: the game's
+    # aspiration pictures, sprite 362, 2x, their blue splash in the chosen one, dimmed in the others;
+    # the Name page: the game's ♀ green (chosen), ♂ grey; Clothes: a cell's sprite from the ROM, the
+    # same pixel art as the touch screen's where it is opaque).
+    green = lambda x0, y0, w, h: sum(1 for yy in range(y0, y0 + h, 2) for xx in range(x0, x0 + w, 2) if C(xx, yy)[1] > C(xx, yy)[0] + 60)
+    near = 0
     if page == 4:
         for j in range(4):
-            blue = sum(1 for yy in range(190, 294, 2) for xx in range(750 + 120 * j, 850 + 120 * j, 2) if C(xx, yy)[2] > 200 and C(xx, yy)[0] < 140)
-            if blue < 100: errors.append(f"aspiration {j}: no picture ({blue})")
+            blue = sum(1 for yy in range(186, 306, 2) for xx in range(722 + 132 * j, 842 + 132 * j, 2) if C(xx, yy)[2] > 200 and C(xx, yy)[0] < 140)
+            if (blue >= 100) != (j == 0): errors.append(f"aspiration {j}: {'no picture' if j == 0 else 'not dimmed'} ({blue})")
         fw = fh = 0
+    elif page == 0:
+        if green(750, 188, 84, 84) < 150: errors.append(f"no green ♀ ({green(750, 188, 84, 84)})")
+        if green(844, 188, 84, 84) > 10: errors.append(f"♂ not grey ({green(844, 188, 84, 84)})")
+        # (and a live crop, gated on the page being drawn: the first skin figure 2x)
+        fx, fy, fw, fh, s, ox, oy = 134, 4, 21, 42, 2, 963, 188
+    elif page == 3:
+        fx, fy, fw, fh, s, ox, oy = 188, 109, 38, 54, 3, 1084, 387
+        near = 1
     else:
         fx, fy, fw, fh, s, (bx, by, bw, bh) = {
-            0: (47, 7, 37, 37, 2, (750, 188, 84, 84)), 1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129)),
-            3: (188, 109, 38, 54, 3, (1084, 384, 120, 174))}[page]
+            1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129))}[page]
         ox, oy = bx + (bw - fw * s) // 2, by + (bh - fh * s) // 2
+    same = total = 0
+    # (The DS cell's frame and the panel around a figure are keyed out (ux task 6: the picture on the
+    # HD cell): the game's panel colours, its outline and the choice's green are not compared.)
+    keyed = {hexrgb(h) for h in ("383869", "414979", "51518A", "5961A2", "6171B2", "7171B2", "828ACB")}
+    compared = 0
     for dy in range(0, fh, 4):
         for dx in range(0, fw, 4):
-            expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), bottom(fx + dx, fy + dy))
+            total += 1
+            if near:
+                same += C(ox + s * dx + s // 2, oy + s * dy + s // 2) == bottom(fx + dx, fy + dy)
+                continue
+            want = bottom(fx + dx, fy + dy)
+            if want in keyed or want[1] > want[0] + 60 and want[1] > want[2] + 60:
+                continue
+            compared += 1
+            expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), want)
             if len(errors) > 4:
                 return
+    if not near and fw and compared < 8: errors.append(f"the crop: {compared} of {total} points the picture's own")
+    if near and same < total * 0.6: errors.append(f"the cell's sprite: {same} of {total} pixels the touch screen's")
     x, y, w, h = focus
     r, g, b = C(x + w // 2, y - 3)
-    if not (g > r + 80 and g > b + 60): errors.append(f"no focus halo above {focus}: {(r, g, b)}")
+    if not (RINGED(x + w // 2, y - 3)): errors.append(f"no focus halo above {focus}: {(r, g, b)}")
     words = sum(1 for yy in range(122, 166) for xx in range(730, 1230) if C(xx, yy) == (255, 255, 255))
     if words < 60: errors.append(f"no title or name ({words})")
     hints = [C(xx, yy) for yy in range(654, 690) for xx in range(1000, 1240)]
@@ -536,23 +619,23 @@ def front_menu(focus, raw_top=True):
         white = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (255, 255, 255))
         arrow = [C(x, y) for y in range(y0 + 18, y0 + 82) for x in range(1164, 1228)]
         if i == 3:
-            # Greyed: a dim label (no white), no arrow.
-            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (0xB8, 0xBC, 0xE0))
+            # Greyed: a dim label (no white: the kit's inactive #D4D7F2), no arrow.
+            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (0xD4, 0xD7, 0xF2))
             if white or dim < 30: errors.append(f"button 3: not greyed ({white} white, {dim} dim pixels)")
             if sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40) > 300: errors.append("button 3: an arrow")  # (an arrow: about 1100; the rim alone: under 100)
             r, g, b = C(835, y0 + 50)
-            if (i == focus) != (g > r + 80 and g > b + 60): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
+            if (i == focus) != (RINGED(835, y0 + 50)): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
             continue
         if white < 30: errors.append(f"button {i}: no label ({white} white pixels)")
         green = sum(1 for r, g, b in arrow if g > r + 60 and g > b + 40)
         blue = sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40)
         if i == focus:
             r, g, b = C(835, y0 + 50)
-            if not (g > r + 80 and g > b + 60): errors.append(f"button {i}: no focus ring ({r}, {g}, {b})")
+            if not (RINGED(835, y0 + 50)): errors.append(f"button {i}: no focus ring ({r}, {g}, {b})")
             if green < 50: errors.append(f"button {i}: the arrow is not green ({green})")
         else:
             r, g, b = C(835, y0 + 50)
-            if g > r + 80 and g > b + 60: errors.append(f"button {i}: ringed")
+            if RINGED(835, y0 + 50): errors.append(f"button {i}: ringed")
             if blue < 50: errors.append(f"button {i}: the arrow is not blue ({blue})")
     hints = [C(x, y) for y in range(616, 656) for x in range(1100, 1232)]
     if sum(1 for p in hints if p != FRAME) < 40: errors.append("no hints")
@@ -569,7 +652,7 @@ def front_title(raw_top=True):
                     return
     expect("backdrop left", C(5, 5), BACKDROP)
     expect("backdrop right", C(1200, 300), BACKDROP)
-    plate = [C(x, y) for y in range(640, 712) for x in range(540, 740)]
+    plate = [C(x, y) for y in range(612, 684) for x in range(400, 880)]
     if sum(1 for r, g, b in plate if g > 180 and r < 160 and b < 140) < 10: errors.append("no A chip")
     if sum(1 for r, g, b in plate if max(r, g, b) < 70) < 200: errors.append("no dark plate")
 
@@ -594,10 +677,11 @@ def front_boot(raw=True):
 
 def front_settings(page, focus):
     """HD Settings (src/port/frontmenus.*): the top screen 3x framed at the left, the panel at the
-    right, the game's four tabs = the touch screen's pixels 2x in the tab bar, the page: Music's
-    slider (its percent's white text, the knob at the right end: 100 %), Concept Art's twelve
-    cells = the touch screen's pixels 2x with the focus ring on `focus`, Credits' lines (white and
-    the game's green) in their well."""
+    right, the four pages' names in the tab bar (two rows of two; the page's in ink on its light
+    plate, the others white), the page: Music's slider (its percent's white text, the knob at the
+    right end: 100 %), Concept Art's twelve cells (an unlocked one = the touch screen's art less its
+    4-pixel frame, 2x; a locked one the ROM's orange padlock) with the focus ring on `focus`,
+    Credits' lines (white and the game's green) in their well."""
     expect("canvas", comp.size, (1280, 720))
     for x in range(0, 256, 11):
         for y in range(0, 192, 11):
@@ -607,28 +691,34 @@ def front_settings(page, focus):
     expect("panel", C(1240, 600), FRAME)
     expect("backdrop", C(5, 5), BACKDROP)
     for i in range(4):
-        cx = 908 + 64 * i
-        for dy in range(0, 26, 5):
-            for dx in range(0, 28, 5):
-                expect(f"tab {i} DS {7 + dx},{41 + 40 * i + dy}", C(cx + 4 + 2 * dx, 138 + 6 + 2 * dy), bottom(7 + dx, 41 + 40 * i + dy))
-        if len(errors) > 4:
-            return
+        tx, ty = 872 + (i % 2) * 164 + 2, 140 + (i // 2) * 62
+        px = [C(x, y) for y in range(ty + 4, ty + 54) for x in range(tx + 4, tx + 156)]
+        plate = sum(1 for p in px if p == hexrgb("9AA2E3"))
+        ink = sum(1 for p in px if p == hexrgb("2E3063"))
+        white = sum(1 for p in px if p == (255, 255, 255))
+        if (plate > 500) != (i == page): errors.append(f"tab {i}: the plate {'missing' if i == page else 'drawn'} ({plate})")
+        if i == page and ink < 30: errors.append(f"tab {i}: no name in ink ({ink})")
+        if i != page and white < 30: errors.append(f"tab {i}: no name in white ({white})")
+    if len(errors) > 4:
+        return
     if page == 0:
         well = [C(x, y) for y in range(338, 402) for x in range(950, 1130)]
         if sum(1 for p in well if p == (255, 255, 255)) < 100: errors.append("no percent text")
         r, g, b = C(1192, 444)
-        if not (r > 120 and b > 180): errors.append(f"knob not at 100 %: {(r, g, b)}")
+        if not ((r > 120 and b > 180) or (r, g, b) == (74, 82, 150)): errors.append(f"knob not at 100 %: {(r, g, b)}")
         r, g, b = C(1036, 318)
-        if not (g > r + 80 and g > b + 60): errors.append(f"slider not focused: {(r, g, b)}")
+        if not (RINGED(1036, 318)): errors.append(f"slider not focused: {(r, g, b)}")
     elif page == 2:
         for i in range(12):
             gx, gy = 842 + (i % 4) * 100 + 4, 292 + (i // 4) * 88 + 4
             fx, fy = 56 + (i % 4) * 48, 72 + (i // 4) * 40
-            for dy in range(0, 32, 7):
-                for dx in range(0, 40, 7):
-                    expect(f"cell {i} DS {fx + dx},{fy + dy}", C(gx + 2 * dx, gy + 2 * dy), bottom(fx + dx, fy + dy))
+            orange = sum(1 for y in range(gy, gy + 64, 2) for x in range(gx, gx + 80, 2) if (lambda p: p[0] > 180 and 70 < p[1] < 180 and p[2] < 90)(C(x, y)))
+            if orange < 50:   # (an unlocked picture: the art, its frame left out, centred 2x)
+                for dy in range(0, 24, 5):
+                    for dx in range(0, 32, 5):
+                        expect(f"cell {i} DS {fx + 4 + dx},{fy + 4 + dy}", C(gx + 8 + 2 * dx, gy + 8 + 2 * dy), bottom(fx + 4 + dx, fy + 4 + dy))
             r, g, b = C(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
-            ringed = g > r + 80 and g > b + 60
+            ringed = RINGED(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
             if ringed != (i == focus): errors.append(f"cell {i}: ring {ringed}")
             if len(errors) > 4:
                 return
@@ -654,7 +744,7 @@ def front_load(focus, used, loading=False):
             if name < 60: errors.append(f"row {i}: no name ({name})")
             if line2 < 60: errors.append(f"row {i}: no place / time ({line2})")
         r, g, b = C(640, y0 - 3)
-        ringed = g > r + 80 and g > b + 60
+        ringed = RINGED(640, y0 - 3)
         if ringed != (i == focus): errors.append(f"row {i}: ring {ringed}")
     if not loading:
         num = [C(x, y) for y in range(124 + 30, 124 + 110) for x in range(240, 300)]
@@ -692,6 +782,13 @@ def activity(rows=192, hd=True, skip=0):
         piece("touch screen 3x", 0, 27, 256, 165, 36, 68 + 81, 3, step=9)
     else:
         piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
+    if case in ("cards", "cards-ask"):
+        # The cards in HD: no top screen (the game's score board in the DS's font; the side panel
+        # says it), the side panel in its place.
+        if any(C(858 + x, 68 + y) == top(x * 256 // 384, y * 192 // 288) for x, y in ((100, 50), (200, 120), (300, 200))) and C(855, 200) == OUTLINE:
+            errors.append("the cards' top screen shown")
+        minigame_frame(0)
+        return
     expect("world frame", C(855, 200), OUTLINE)
     # The small world, 384 wide; without the game's status bar (176 rows: 264 high) where the
     # HD bar sits under it.
@@ -725,10 +822,10 @@ def white_text(name, x0, y0, x1, y1):
 
 def minigame_frame(side_top):
     # side_top: the side panel's top less 68 (the secondary panel's top).
-    # The HD minigame frame (src/port/minigame.*): the prompt bar under the playfield (the kit's
-    # panel fill at its left end, white words), the side panel under the secondary one (its fill
+    # The HD minigame frame (src/port/minigame.*): the prompt bar under the playfield (a dark well,
+    # #3E4683, at its left end, white words), the side panel under the secondary one (its fill
     # just inside its top left), the title plate over the playfield (the cards' and the vacuum's).
-    expect("prompt bar fill", C(40, 686), FRAME)
+    expect("prompt bar fill", C(40, 686), hexrgb("3E4683"))
     bar = white_text("prompt bar", 40, 664, 1240, 708)
     if case in ("cards", "cards-ask", "cards-wide", "vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "detector-wide",
                 "art", "art-ask", "moogoo", "moogoo-2x", "drencher", "drencher-wide", "crime", "scratch", "mixer", "mixer-wide", "mixer-save",
@@ -784,7 +881,7 @@ def hd_menu(rows, focus, wide=False):
     expect("panel outline", C(176, 300), OUTLINE)
     expect("panel band", C(180, 300), hexrgb("6171B2"))
     expect("panel fill", C(190, 300), FRAME)
-    expect("title well", C(640, 166), hexrgb("6A72B8"))
+    expect("title well", C(640, 166), hexrgb("6870B6"))
     # The tab bar: the game's own icons, Interact's (the first of the five cells from x 420, 88
     # wide) the green one, the others blue (no green pixel).
     def greens(cell):
@@ -794,14 +891,16 @@ def hd_menu(rows, focus, wide=False):
     counts = [greens(i) for i in range(5)]
     if counts[0] < 200 or any(counts[1:]):
         errors.append(f"tab icons' green pixels {counts} (want Interact's only)")
-    piece("portrait 3x", 63, 47, 65, 81, 220, 230, 3, step=4)
+    piece("portrait 3x", 63, 47, 65, 81, 220, 230, 3, step=4, keyed=True)
+    if rows == 0 and (255, 255, 255) not in [C(x, y) for y in range(214, 498) for x in range(470, 1070)]:
+        errors.append("no rows: the port's words (NoActions) missing")
     for i in range(4):
         row = [C(x, y) for y in range(214 + 76 * i, 268 + 76 * i) for x in range(488, 900)]
         white = (255, 255, 255) in row
-        if white != (i < rows):
+        if rows > 0 and white != (i < rows):  # (no rows: the port's white words lie across them)
             errors.append(f"row {i}: label {'missing' if i < rows else 'drawn'}")
         r, g, b = C(456, 241 + 76 * i)
-        ring = g > r + 80 and g > b + 60  # the ring's green (its edge softened by the row's shadow)
+        ring = RINGED(456, 241 + 76 * i)  # the ring's green (its edge softened by the row's shadow)
         if ring != (i == focus):
             errors.append(f"row {i}: focus ring {'missing' if i == focus else 'drawn'}")
     if C(256 + 3 * 120 + 1, 72 + 3 * 100 + 1) == bottom(120, 100) and C(256 + 3 * 30 + 1, 72 + 3 * 160 + 1) == bottom(30, 160):
@@ -828,7 +927,7 @@ def hd_phone(y, wide=False):
     if y is not None:
         expect("highlight bar", C(410, y), BAR)
         r, g, b = C(393, y)
-        if not (g > r + 80 and g > b + 60):
+        if not (RINGED(393, y)):
             errors.append(f"no focus halo at {y}")
     if INK not in [C(x, yy) for yy in range(152, 500) for x in range(500, 780)]:
         errors.append("no row letters")
@@ -846,13 +945,13 @@ def hd_popup(kind, title, menu):
         expect("title plate", C(450, 170), hexrgb("6171B2"))
     if kind == 0:
         r, g, b = C(477, 448)
-        if not (g > r + 60 and g > b + 40): errors.append("no focus ring around Close")
+        if not (RINGED(477, 448)): errors.append("no focus ring around Close")
     else:
-        expect("No", C(400, 448), hexrgb("9AA2E3"))
+        expect("No", C(400, 448), hexrgb("4A5296"))
         r, g, b = C(345, 448)
-        if not (g > r + 60 and g > b + 40): errors.append("no focus ring around No")
+        if not (RINGED(345, 448)): errors.append("no focus ring around No")
         r, g, b = C(670, 448)
-        if g > r + 60 and g > b + 40: errors.append("a focus ring around Yes")
+        if RINGED(670, 448): errors.append("a focus ring around Yes")
         expect("Yes", C(880, 448), WELL)
     if menu:
         r, g, b = C(190, 300)
@@ -923,15 +1022,15 @@ elif case in ("gift", "gift-items", "gift-items-2x", "gift-items-wide"):
     # the touch screen's own pixels 3x (DS 167,47 65 x 81), the bow the game's sprite; never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
     expect("panel band", C(180, 300), hexrgb("6171B2"))
-    expect("title well", C(640, 50), hexrgb("6A72B8"))
-    piece("portrait 3x", 167, 47, 65, 81, 862, 195, 3, step=4)
+    expect("title well", C(640, 50), hexrgb("6870B6"))
+    piece("portrait 3x", 167, 47, 65, 81, 862, 195, 3, step=4, keyed=True)
     # The bow: the game's sprite (3631, blue on its round button) in its bar.
     bow = [C(x, y) for y in range(486, 546, 2) for x in range(470, 530, 2)]
     if sum(1 for p in bow if p[2] > p[0] + 60 and p[2] > p[1] + 40) < 20:
         errors.append("no bow in its bar")
     if C(256 + 3 * 120 + 1, 72 + 3 * 100 + 1) == bottom(120, 100) and C(256 + 3 * 30 + 1, 72 + 3 * 160 + 1) == bottom(30, 160):
         errors.append("the touch screen 3x is drawn")
-    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    ring = lambda x, y: RINGED(x, y)
     # The focus ring (green) around the game's selected slot when the pockets hold something.
     if case == "gift":
         if ring(197, 235): errors.append("a focus ring with empty pockets")
@@ -949,46 +1048,51 @@ elif case in ("shop", "shop-2x", "shop-wide", "shop-sell", "shop-poor"):
     # never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
     expect("panel band", C(180, 300), hexrgb("6171B2"))
-    expect("title well", C(640, 50), hexrgb("6A72B8"))
+    expect("title well", C(640, 50), hexrgb("6870B6"))
     warm = sum(1 for y in range(54, 100, 2) for x in range(840, 1010, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
     if warm < 20: errors.append(f"no money in the title ({warm} warm pixels)")
     white = lambda x0, y0, x1, y1: (255, 255, 255) in [C(x, y) for y in range(y0, y1) for x in range(x0, x1)]
     sell = case == "shop-sell"
     if white(210, 128, 526, 160) == sell: errors.append(f"the Buy header {'lit' if sell else 'dim'}")
     if white(888, 128, 1070, 160) != sell: errors.append(f"the Sell header {'dim' if sell else 'lit'}")
-    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
-    at = {"shop-sell": (981, 330), "shop-poor": (537, 514)}.get(case, (197, 224)) # (cell 1; owned place 4; Pay)
+    ring = lambda x, y: RINGED(x, y)
+    at = {"shop-sell": (973, 340), "shop-poor": (551, 514)}.get(case, (197, 224)) # (cell 1; owned place 4; Pay)
     if not ring(*at): errors.append(f"no focus ring at {at}")
     if case != "shop-sell" and case != "shop-poor" and ring(313, 224): errors.append("a focus ring around cell 2")
     cell = {C(x, y) for y in range(186, 266, 4) for x in range(210, 290, 4)}
     if len(cell) < 8: errors.append(f"cell 1 has no icon ({len(cell)} colours)")
-    if white(630, 490, 840, 540) == (case == "shop-poor"): errors.append(f"Pay's word {'white' if case == 'shop-poor' else 'dim'}")
+    if white(645, 490, 825, 540) == (case == "shop-poor"): errors.append(f"Pay's word {'white' if case == 'shop-poor' else 'dim'}")
     not_big()
 elif case in ("build-list", "build-list-2x", "build-list-wide", "build-ask", "build-poor", "build-empty"):
     # Build Rooms in HD (src/port/build.*): the panel, the title's well, the money in its warm
     # white; the list: the focus ring on the row given (row 2; build-poor row 1), a row's knob the
     # game's own sprite, the Spa & Gym's permit red (build-poor: §2,500 against §2,000) and no A
-    # hint for it; the question: the tick focused, its sum (§2,000 - §1,000 = §1,000) in warm white;
-    # the empty list (sit-build: the town's save lists nothing): no row; never the touch screen 3x.
-    expect("panel outline", C(176, 300), OUTLINE)
-    expect("panel band", C(180, 300), hexrgb("6171B2"))
-    expect("title well", C(640, 50), hexrgb("6A72B8"))
+    # hint for it; the question in the popups' look over the dimmed list (kBdAskBox 300,150 680 x
+    # 400: the box's fill, Yes focused at 672,446, its sum (§2,000 - §1,000 = §1,000) in warm
+    # white); the empty list (sit-build: the town's save lists nothing): no row, no arrows, the
+    # port's line; never the touch screen 3x.
     warm = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
-    if warm(840, 54, 1010, 100) < 20: errors.append("no money in the title")
-    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    if case != "build-ask":
+        expect("panel outline", C(176, 300), OUTLINE)
+        expect("panel band", C(180, 300), hexrgb("6171B2"))
+        expect("title well", C(640, 50), hexrgb("6870B6"))
+        if warm(840, 54, 1010, 100) < 20: errors.append("no money in the title")
+    ring = lambda x, y: RINGED(x, y)
     red = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if (lambda p: p[0] > 200 and p[1] < 140 and p[2] < 140)(C(x, y)))
     if case == "build-ask":
-        if not ring(678, 496): errors.append("no focus ring around the tick")
-        if ring(378, 496): errors.append("a focus ring around the cross")
-        if warm(440, 380, 840, 420) < 40: errors.append("no sum under the room")
-        icon = {C(x, y) for y in range(476, 520, 3) for x in range(700, 745, 3)}
-        if len(icon) < 6: errors.append(f"the tick has no sprite ({len(icon)} colours)")
+        expect("question box", C(310, 300), hexrgb("828ACB"))
+        if not any(ring(670 - d, 486) for d in range(4)): errors.append("no focus ring around Yes")
+        if any(ring(346 - d, 486) for d in range(4)): errors.append("a focus ring around No")
+        if warm(440, 344, 840, 394) < 40: errors.append("no sum under the room")
+        if C(240, 600) == hexrgb("828ACB"): errors.append("the panel beneath not dimmed")
     elif case == "build-empty":
         if ring(214, 206) or ring(214, 350): errors.append("a focus ring in the empty list")
         if warm(600, 140, 720, 560) > 0: errors.append("a price in the empty list")
+        if len({C(x, y) for y in range(330, 370, 2) for x in range(450, 830, 2)}) < 4: errors.append("no line in the empty list")
+        if C(764, 164) != C(700, 300): errors.append("an arrow in the empty list")
     else:
         at = (214, 206) if case == "build-poor" else (214, 350)
-        if not ring(*at): errors.append(f"no focus ring at {at}")
+        if not any(ring(at[0] - d, at[1]) for d in range(4)): errors.append(f"no focus ring at {at}")
         knob = {C(x, y) for y in range(185, 225, 3) for x in range(232, 276, 3)}
         if len(knob) < 6: errors.append(f"row 1 has no knob ({len(knob)} colours)")
         if case == "build-poor":
@@ -1004,8 +1108,8 @@ elif case in ("registry", "registry-2x", "registry-wide", "registry-guest"):
     # never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
     expect("panel band", C(180, 300), hexrgb("6171B2"))
-    expect("title well", C(640, 50), hexrgb("6A72B8"))
-    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    expect("title well", C(640, 50), hexrgb("6870B6"))
+    ring = lambda x, y: RINGED(x, y)
     if not ring(212, 175): errors.append("no focus ring around the first room")
     if ring(212, 261): errors.append("a focus ring around the second room")
     warm = sum(1 for y in range(56, 98, 2) for x in range(700, 1000, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
@@ -1019,8 +1123,8 @@ elif case in ("registry", "registry-2x", "registry-wide", "registry-guest"):
         if len(key) < 6: errors.append(f"no key in the first row ({len(key)} colours)")
     else:
         if pink(144) < 10: errors.append("the occupied room's name not pink")
-        piece("row portrait 2x", 8, 24, 28, 30, 228, 145, 2, step=3)
-        piece("big portrait 3x", 8, 24, 28, 30, 906, 151, 3, step=3)
+        piece("row portrait 2x", 8, 24, 28, 30, 228, 145, 2, step=3, keyed=True)
+        piece("big portrait 3x", 8, 24, 28, 30, 906, 151, 3, step=3, keyed=True)
     not_big()
 elif case in ("roominfo", "roominfo-vacant", "roominfo-hint"):
     # Room info in HD (src/port/roominfo.*): the panel; the portrait the game's own (the concierge:
@@ -1028,17 +1132,17 @@ elif case in ("roominfo", "roominfo-vacant", "roominfo-hint"):
     # the hint (M-ci-occ-info, Down, Down, A: the check-out's 2603): the popups' veil and box over
     # it, its Close button (the picture's focus is pinned to none), the portrait under the box
     # gone; never the touch screen 3x.
-    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    ring = lambda x, y: RINGED(x, y)
     if case == "roominfo-hint":
         expect("box band", C(304, 400), hexrgb("6171B2"))
-        expect("the Close button", C(500, 470), hexrgb("6A72B8"))
+        expect("the Close button", C(500, 470), hexrgb("6870B6"))
         if C(330, 300) == bottom(172 + (330 - 223) // 3, 36 + (300 - 145) // 3): errors.append("the portrait drawn under the box")
         text = sum(1 for y in range(232, 380, 2) for x in range(340, 940, 2) if C(x, y) == (255, 255, 255))
         if text < 100: errors.append(f"no hint text ({text} white pixels)")
     else:
         expect("panel outline", C(176, 300), OUTLINE)
-        expect("title well", C(640, 50), hexrgb("6A72B8"))
-        piece("portrait 3x", 172, 36, 70, 86, 223, 145, 3, step=6)
+        expect("title well", C(640, 50), hexrgb("6870B6"))
+        piece("portrait 3x", 172, 36, 70, 86, 223, 145, 3, step=6, keyed=True)
         if not ring(484, 163): errors.append("no focus ring around the guest's line")
         if ring(484, 225): errors.append("a focus ring around the second line")
         warm = sum(1 for y in range(140, 570, 2) for x in range(880, 1060, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
@@ -1051,56 +1155,59 @@ elif case in ("music", "music-2x", "music-wide", "music-scrolled"):
     # three): no green button in the rows (the song playing is off the list's view) and the ring
     # around the first; never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
-    expect("title well", C(640, 50), hexrgb("6A72B8"))
+    expect("title well", C(640, 50), hexrgb("6870B6"))
     green = lambda x0, y0, w, h: sum(1 for y in range(y0, y0 + h, 2) for x in range(x0, x0 + w, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 100)(C(x, y)))
-    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
-    rows = [green(312, 143 + 86 * i, 64, 64) for i in range(5)]
+    ring = lambda x, y: RINGED(x, y)
+    rows = [green(224, 143 + 86 * i, 64, 64) for i in range(5)]  # (the rows at 216: the scroll column at their right)
     playing = 2 if case != "music-scrolled" else None
     for i, n in enumerate(rows):
         if (n >= 20) != (i == playing): errors.append(f"row {i}'s button green pixels {n}")
     focus = 2 if case != "music-scrolled" else 0
-    if not ring(301, 136 + 86 * focus + 39): errors.append(f"no focus ring around row {focus}")
-    if ring(301, 136 + 86 * ((focus + 1) % 5) + 39): errors.append("a focus ring around another row")
+    if not ring(213, 136 + 86 * focus + 39): errors.append(f"no focus ring around row {focus}")
+    if ring(213, 136 + 86 * ((focus + 1) % 5) + 39): errors.append("a focus ring around another row")
     if green(892, 148, 112, 112) < (100 if playing is not None else 0): errors.append("no green button beside the list")
-    blue = {C(x, y) for y in range(150, 200, 3) for x in range(315, 375, 3)}
+    blue = {C(x, y) for y in range(150, 200, 3) for x in range(227, 287, 3)}
     if len(blue) < 4: errors.append(f"no button in the first row ({len(blue)} colours)")
     not_big()
 elif case.startswith("stat-"):
     # The stat panel in HD (src/port/statpanel.*): the panel, the title's well, the tab bar's five
-    # pictures; Main: four buttons, the ring around Aspirations; a page: the ring around its tab,
-    # its content: Aspirations' gauge green (level 2's palette), Hotel Info's and Game Stats'
-    # values in warm white, Skills' star bars (2, 2, 1, 1, 6 filled); never the touch screen 3x.
+    # names; Main: four buttons, the ring around Aspirations; a page: the ring around its tab (the
+    # tabs' widths follow their words: the ring is looked for along the bar, left of the page's
+    # share of it), its content: Aspirations' gauge green (level 2's palette), Hotel Info's and
+    # Game Stats' values in amber ink on paper, Skills' star bars (2, 2, 1, 1, 6 filled); never the
+    # touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
-    expect("title well", C(640, 146), hexrgb("6A72B8"))
-    ring = lambda x, y: (lambda p: p[1] > p[0] + 80 and p[1] > p[2] + 60)(C(x, y))
+    expect("title well", C(640, 146), hexrgb("6870B6"))
+    ring = lambda x, y: RINGED(x, y)
     colours = lambda x0, y0, w, h: len({C(x, y) for y in range(y0, y0 + h, 3) for x in range(x0, x0 + w, 3)})
-    for i in range(5):
-        if colours(420 + 88 * i + 12, 52, 64, 64) < 4: errors.append(f"no picture in tab {i}")
+    if colours(280, 70, 720, 32) < 4: errors.append("no names in the tab bar")
     page = {"stat-asp": 1, "stat-hotel": 2, "stat-skills": 3, "stat-stats": 4}.get(case, 0)
     warm = lambda x0, y0, w, h: sum(1 for y in range(y0, y0 + h, 2) for x in range(x0, x0 + w, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
     if page == 0:
         if not ring(209, 298): errors.append("no focus ring around Aspirations")
-        if ring(641, 298) or ring(209, 486): errors.append("a focus ring around another button")
+        if ring(1070, 298) or ring(209, 486): errors.append("a focus ring around another button")
         for x, y in ((212, 210), (644, 210), (212, 398), (644, 398)):
             if colours(x + 140, y + 10, 144, 108) < 6: errors.append(f"no picture on the button at {x},{y}")
     else:
-        cell = 420 + 88 * page
-        if not ring(cell, 86): errors.append(f"no focus ring around tab {page}")
+        rings = [x for x in range(270, 1010, 2) if ring(x, 86)]
+        if not rings or not (220 + 100 * (page - 1) <= rings[0] <= 280 + 170 * page): errors.append(f"no focus ring around tab {page} {rings[:1]}")
         if ring(209, 298): errors.append("Main's ring on a page")
         if page == 1:
             g = sum(1 for y in range(296, 334, 2) for x in range(380, 800, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 60)(C(x, y)))
             if g < 1000: errors.append(f"the gauge not green ({g})")
         elif page in (2, 4):
-            if warm(880, 214, 180, 360) < 150: errors.append("too few values")
+            ink = sum(1 for y in range(214, 574, 2) for x in range(880, 1060, 2) if (lambda p: 90 < p[0] < 160 and p[2] < 60 and p[0] > p[1] + 20)(C(x, y)))
+            if ink < 100: errors.append(f"too few values ({ink} amber pixels)")
         else:
             lit = [colours(728, 214 + 72 * i + 16, 320, 32) for i in range(5)]
             if min(lit) < 4: errors.append(f"a star bar missing {lit}")
     not_big()
 elif case in ("pockets-menu", "pockets-armed"):
     # Pockets in HD (src/port/pockets.*): the Pockets tab's icon green, the focus ring around slot
-    # 1 (the Arcade-Pie Factory), the counted items' icons the touch screen's pixels 2x (DS 99 +
-    # 29i, 155, 23 x 23), their counts in white, the item's name in the info; never the touch
-    # screen 3x.
+    # 1 (the Arcade-Pie Factory), the counted items' icons the game's record sprites 2x (their
+    # pictures' colours the touch screen's own at DS 99 + 29i, 155, 23 x 23; no dark square of the
+    # button's well #51518A around them), their counts in white, the item's name in the info;
+    # never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
     def greens(cell):
         x0 = 420 + 88 * cell
@@ -1109,10 +1216,18 @@ elif case in ("pockets-menu", "pockets-armed"):
     counts = [greens(i) for i in range(5)]
     if counts[1] < 200 or counts[0] or any(counts[2:]):
         errors.append(f"tab icons' green pixels {counts} (want Pockets' only)")
+    WELL = (81, 81, 138)
+    none = (1, 3)  # (A-pk-cnt3-slot1 counts 27, 0, 2, 0: an item at 0 is drawn faint, the touch screen's colours blended)
     for i in range(4):
-        piece(f"counted {i} 2x", 99 + 29 * i, 155, 23, 23, 200 + 87 * i + 14, 462, 2, step=3)
+        hd = [C(x, y) for y in range(454, 526) for x in range(200 + 87 * i, 275 + 87 * i)]
+        ds = set(bottom(99 + 29 * i + x, 155 + y) for y in range(23) for x in range(23)) - {WELL}
+        shared = len(ds & set(hd))
+        if i in none:
+            if shared > 2 or len(set(hd)) < 20: errors.append(f"counted {i} (none): {shared} of the touch screen's colours, {len(set(hd))} colours (want its picture faint)")
+        elif shared < 5: errors.append(f"counted {i}: {shared} of the touch screen's colours (want the game's picture)")
+        if hd.count(WELL) > 40: errors.append(f"counted {i}: the button's dark well around it ({hd.count(WELL)} pixels)")
     r, g, b = C(197, 258)
-    if not (g > r + 80 and g > b + 60): errors.append("no focus ring around slot 1")
+    if not (RINGED(197, 258)): errors.append("no focus ring around slot 1")
     if (255, 255, 255) not in [C(x, y) for y in range(540, 560) for x in range(215, 260)]:
         errors.append("no count under the first counted item")
     if (255, 255, 255) not in [C(x, y) for y in range(222, 258) for x in range(692, 900)]:
@@ -1140,9 +1255,9 @@ elif case == "s5":
 elif case in ("s5-hd", "s5-hd-wide"):
     # The HD conversation (port/dialogue.h): the panel 1060 wide from x 110 (its frame band
     # #6171B2), the text well, white text in it, the name plate's white text above it, the
-    # portrait: the touch screen's x 174-240, rows 38-121, 2x from (1006, 504) (a page of
+    # portrait: the touch screen's x 174-240, rows 38-121, 2x from (1006, 504), its frame keyed out (a page of
     # four rows: the panel 254 high from y 452), nothing of the game's own box.
-    BAND, TWELL = hexrgb("6171B2"), hexrgb("6A72B8")
+    BAND, TWELL = hexrgb("6171B2"), hexrgb("6870B6")
     expect("panel band", C(112, 600), BAND)
     expect("text well", C(560, 676), TWELL)
     white = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1) for x in range(x0, x1) if min(C(x, y)) > 235)
@@ -1151,7 +1266,8 @@ elif case in ("s5-hd", "s5-hd-wide"):
     if white(140, 430, 400, 476) < 300:
         errors.append("no name on the plate")
     grid = [(x, y) for y in range(0, 84, 3) for x in range(0, 67, 3)]
-    bad = sum(1 for x, y in grid if C(1006 + 2 * x, 504 + 2 * y) != bottom(174 + x, 38 + y))
+    # (its frame's colours keyed out in its outer band: KeyedCrop, the well's colour there)
+    bad = sum(1 for x, y in grid if C(1006 + 2 * x, 504 + 2 * y) != bottom(174 + x, 38 + y) and not (bottom(174 + x, 38 + y) in KEYED and in_band(x, y, 67, 84)))
     if bad:
         errors.append(f"portrait: {bad} pixels not the touch screen's")
     if sum(1 for x, y in grid if max(C(1006 + 2 * x, 504 + 2 * y)) > 40) < len(grid) // 2:
@@ -1234,6 +1350,10 @@ elif case == "social":
 elif case in ("vacuum", "vacuum-2x", "vacuum-clog", "autopsy", "autopsy-2x", "detector", "art", "art-ask",
               "moogoo", "moogoo-2x", "drencher", "crime", "scratch", "mixer", "mixer-save", "trading"):
     activity(176)
+    if case == "vacuum-clog":
+        # The ring on the find A takes (the gold ring, DS 130,70: canvas 36 + 3 x, 68 + 3 y), the game's selection green.
+        if not any(C(x, y) == RING for y in range(68 + 3 * 58, 68 + 3 * 82) for x in range(36 + 3 * 118, 36 + 3 * 142)):
+            errors.append("no ring on the vacuum's find")
 elif case in ("cards", "cards-ask", "cards-m1"):
     # The card game has no HUD: its world whole, no status bar.
     expect("canvas", comp.size, (1280, 720))
@@ -1242,8 +1362,8 @@ elif case in ("cards-wide", "social-wide", "detector-wide", "drencher-wide", "mi
     # The widescreen top screen: the secondary panel shorter, the side panel under it.
     expect("background", C(10, 10), PANEL)
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
-    expect("world frame", C(855, 100), OUTLINE)
-    minigame_frame(round(384 * (192 if case == "cards-wide" else 160 if case == "social-wide" else 176) / 341) + (18 if case == "cards-wide" else 72))
+    if case != "cards-wide": expect("world frame", C(855, 100), OUTLINE)
+    minigame_frame(0 if case == "cards-wide" else round(384 * (160 if case == "social-wide" else 176) / 341) + 72)
 elif case == "s2":
     front_menu(0)
 elif case in ("menu-2x", "menu-wide", "menu-de"):
@@ -1279,7 +1399,7 @@ elif case == "s3-res2":
         expect(f"turn pill {name} covered", C(16 + int(dx * k), 87 + int(150 * k)), hexrgb("5961A2"))
         expect(f"turn pill {name} covered (its end)", C(16 + int((dx + 23) * k), 87 + int(146 * k)), hexrgb("5961A2"))
 elif case == "s4":
-    front_cas(4, (746, 186, 108, 112))
+    front_cas(4, (718, 182, 128, 128))
 elif case == "s4-it":
     front_cas(4, (756, 544, 210, 88))
 elif case == "cas-hair":
@@ -1321,40 +1441,41 @@ elif case in ("slots", "slots-hd"):
         green = lambda y0: sum(1 for y in range(y0 + 30, y0 + 112, 2) for x in range(230, 310, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 60)(C(x, y)))
         if green(rows[2]) < 40 or green(rows[0]) or green(rows[1]): errors.append(f"current slot's green number {[green(r) for r in rows]}")
         r, g, b = C(197, rows[2] + 70)
-        if not (g > r + 80 and g > b + 60): errors.append("no focus ring around slot 3")
+        if not (RINGED(197, rows[2] + 70)): errors.append("no focus ring around slot 3")
         if (255, 255, 255) not in [C(x, y) for y in range(rows[2] + 30, rows[2] + 70) for x in range(348, 460)]:
             errors.append("no name in slot 3")
 elif case == "goals-menu":
     # Goals in HD (src/port/goals.*): the Goals tab's icon green, the giver's portrait the touch
-    # screen's pixels 3x (DS 47,88 30 x 30 at 219,225), the focus ring on the first goal (the
+    # screen's pixels 3x (DS 47,88 30 x 30 at 219,225, its bevel keyed out), the focus ring on the first goal (the
     # game's selection), white text in the list; never the touch screen 3x.
     expect("panel outline", C(176, 300), OUTLINE)
-    piece("giver", 47, 88, 30, 30, 219, 225, 3, step=3)
+    piece("giver", 47, 88, 30, 30, 219, 225, 3, step=3, keyed=True)
     r, g, b = C(355, 240)
-    if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the first goal")
+    if not (RINGED(355, 240)): errors.append("no focus ring around the first goal")
     if sum(1 for y in range(220, 400, 2) for x in range(390, 1000, 2) if min(C(x, y)) > 235) < 300:
         errors.append("no goal text")
     same = sum(1 for y in range(8, 184, 16) for x in range(8, 248, 16) if C(256 + 3 * x + 1, 72 + 3 * y + 1) == bottom(x, y))
     if same > 100: errors.append(f"the touch screen 3x is drawn ({same} of 165 samples)")
 elif case in ("rel-menu", "rel-menu-wide"):
     # Relationships in HD (src/port/relations.*): the big portrait the touch screen's pixels 3x
-    # (DS 84,37 69 x 84 at 474,222), the first row's portrait 2x (DS 43,28 28 x 28 at 214,220),
+    # (DS 84,37 69 x 84 at 496,222), the first row's portrait 2x (DS 43,28 28 x 28 at 214,220),
     # the focus ring on the first row (the game's selection), the mood in white.
     expect("panel outline", C(176, 300), OUTLINE)
-    piece("big portrait", 84, 37, 69, 84, 474, 222, 3, step=4)
-    piece("row 1 portrait", 43, 28, 28, 28, 214, 220, 2, step=3)
+    piece("big portrait", 84, 37, 69, 84, 496, 222, 3, step=4, keyed=True)
+    piece("row 1 portrait", 43, 28, 28, 28, 214, 220, 2, step=3, keyed=True)
     r, g, b = C(197, 248)
-    if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the first Sim")
+    if not (RINGED(197, 248)): errors.append("no focus ring around the first Sim")
     if (255, 255, 255) not in [C(x, y) for y in range(240, 280) for x in range(728, 900)]:
         errors.append("no mood word")
 elif case == "opt-menu":
-    # Options in HD (src/port/options.*): both knobs at 100 % (the track's right end, x 1012), the
-    # music's focused (lighter) with the focus ring around its well.
+    # Options in HD (src/port/options.*): both knobs at 100 % (the track's right end, x 1012) in the
+    # light fill, the music's well focused (kFillFocus, as every focused row) with the focus ring.
     expect("panel outline", C(176, 300), OUTLINE)
-    expect("music knob (focused)", C(1012, 390), hexrgb("9AA2E3"))
+    expect("music knob", C(1012, 390), hexrgb("828ACB"))
+    expect("music well (focused)", C(700, 330), hexrgb("4A5296"))
     expect("SFX knob", C(1012, 536), FRAME)
     r, g, b = C(197, 360)
-    if not (g > r + 80 and g > b + 60): errors.append("no focus ring around the music volume")
+    if not (RINGED(197, 360)): errors.append("no focus ring around the music volume")
 elif case.startswith("prompt-"):
     # The world's prompt: a kit plate (the panel's fill) centred at the world's foot, it and its
     # shadow above the strip (row 661), white words in it; none without a target or on another tab.
@@ -1601,7 +1722,7 @@ build_cancel() {
 }
 build_buy() {
     in_order pad-build-buy 'build .*page=1 chosen=1 money=2000 ' 'hotel .*building=0x2 .*money=1000 earned=0 spent=1000 ' \
-        'build scroll=0 page=0 chosen=-1 money=1000 places=0:2000:70:poor,8:' 'game Panel/Interact' 'popup state=2 kind=0 .*text="Your build permit has been approved' \
+        'build scroll=0 page=0 chosen=-1 money=1000 places=0:2000:70:poor,8:' 'game Panel/Interact' "popup state=2 kind=0 .*text=\"$(gx 2628 1 0 5)" \
         'popup none' || return 1
     ! grep -q 'money=0 ' "$tmp/pad-build-buy.log" || { echo "  pad-build-buy: bought twice"; return 1; }
 }
@@ -1691,10 +1812,10 @@ check_pad pad-slot slot_save
 # Jun's slot → "Overwrite this save?" (kind 2), the HD focus on its Yes; B → its cross, the
 # question gone, nothing saved; A, A → its tick, "Saving", slot 3 written (Jun's money now).
 ask_no() {
-    in_order pad-ask-no 'saves current=2 .*2=Jun/9150/' 'console menu closed, focus 2' 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup none' || return 1
+    in_order pad-ask-no 'saves current=2 .*2=Jun/9150/' 'console menu closed, focus 2' "popup state=1 kind=2 .*$(gx 2423 1 0 1)" 'focus 0' 'popup none' || return 1
     if grep -q -E 'kind=3|2=Jun/14843' "$tmp/pad-ask-no.log"; then echo "  pad-ask-no: saved after B"; return 1; fi
 }
-ask_yes() { in_order pad-ask-yes 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup state=1 kind=3' 'saves current=2 .*2=Jun/14843/'; }
+ask_yes() { in_order pad-ask-yes "popup state=1 kind=2 .*$(gx 2423 1 0 1)" 'focus 0' 'popup state=1 kind=3' 'saves current=2 .*2=Jun/14843/'; }
 check_pad pad-ask-no ask_no
 check_pad pad-ask-yes ask_yes
 # Popups, the phone (src/port/popup.*, phone.*): from B-pause, A (the HD popup's button: the
@@ -1703,10 +1824,10 @@ check_pad pad-ask-yes ask_yes
 # title; from s7, Down, A → the phonebook (page 5), A → the contacts (7), A → the call's answer
 # (9, the Sim), A → the game's Down five times to Exit, then its A (back to 7), B → the panel; from
 # C-cas-msg1, A → ten Downs past the text to "Next Message", then A: the next message (slot 1).
-pause_a() { in_order pad-pause-a 'popup state=2 kind=0 .*Game Paused' 'popup state=3' 'game Panel/Interact'; }
+pause_a() { in_order pad-pause-a "popup state=2 kind=0 .*$(gx 22)" 'popup state=3' 'game Panel/Interact'; }
 pause_start() { in_order pad-pause-start 'popup state=2 kind=0' 'popup state=3' 'game Panel/Interact'; }
 quit_no() {
-    in_order pad-quit-no 'console menu open, focus 1' 'popup state=1 kind=2 .*Quit' 'popup state=3' 'game Panel/Options' 'console menu open, focus 1' || return 1
+    in_order pad-quit-no 'console menu open, focus 1' "popup state=1 kind=2 .*$(gx 65 1 0 1)" 'popup state=3' 'game Panel/Options' 'console menu open, focus 1' || return 1
     if grep -q -E 'game FrontEnd|console menu closed' "$tmp/pad-quit-no.log"; then echo "  pad-quit-no: the menu closed or the game quit"; return 1; fi
 }
 phone_pages() {
@@ -1894,7 +2015,7 @@ from PIL import Image, ImageChops
 
 im = Image.open(sys.argv[1]).convert("RGB")
 # The well's top edge: the first row of the well's colour at x 600, from y 380 down.
-top = next((y for y in range(380, 700) if im.getpixel((600, y)) == (0x6A, 0x72, 0xB8)), None)
+top = next((y for y in range(380, 700) if im.getpixel((600, y)) == (0x68, 0x70, 0xB6)), None)
 if top is None:
     print("  no text well")
     sys.exit(1)
@@ -1982,7 +2103,7 @@ settings_pages() {
     in_order pad-settings-pages 'settings page=2 .*art=0 concept=8' 'settings page=2 .*art=1 concept=8' 'settings page=3' 'settings page=0' 'settings page=3' 'settings page=2' 'front Title' 'title phase=0'
 }
 load_slot() {
-    in_order pad-load-slot 'front Load' 'popup state=[1-3] kind=3 .*title="Loading"' 'front None' 'game Panel/Interact' 'game Dialogue'
+    in_order pad-load-slot 'front Load' "popup state=[1-3] kind=3 .*title=\"$(gx 2425)\"" 'front None' 'game Panel/Interact' 'game Dialogue'
 }
 boot_keys() {
     in_order pad-boot-keys 'boot mode=3' 'boot mode=2' 'boot mode=1' 'boot mode=0' 'front Title' 'title phase=0' || return 1
@@ -2014,7 +2135,9 @@ wait
 pad_cas pad-cas-cross s4 cas-cross 200 &
 pad_cas pad-cas-type s3 cas-type 260 &
 pad_cas pad-cas-turn s3 cas-turn 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-turn" &
-pad_cas pad-cas-still s3 cas-cross 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-still" &
+pad_cas pad-cas-still s3 cas-lb 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-still" &
+pad_cas pad-cas-back s3 cas-back 340 --print-screen &
+pad_cas pad-cas-start s4 cas-start 360 &
 wait
 cas_name() {
     in_order pad-cas-name 'name=Si len=2 keyboard=0' 'name=SiA len=3 keyboard=0' 'name=SiA len=3 keyboard=1' 'name=SiAb len=4' 'name=SiAb len=4 keyboard=2' \
@@ -2040,6 +2163,15 @@ cas_cross() {
     local f; f=$(first_frame pad-cas-cross 'answer=2')
     [ -n "$f" ] && [ "$f" -ge 60 ] || { echo "  pad-cas-cross: one B discarded the Sim (frame $f)"; return 1; }
 }
+# B (ux task 6): the previous page from Hair; from the Name page Keep this Sim? with the focus on
+# the cross (the view's last item, 5), answered only by the next B: the title.
+cas_back() {
+    in_order pad-cas-back 'cas page=1 ' 'cas page=0 ' 'cas page=4 ' 'focus 5' 'answer=2' 'front Title' || return 1
+    local f; f=$(first_frame pad-cas-back 'answer=2')
+    [ -n "$f" ] && [ "$f" -ge 170 ] || { echo "  pad-cas-back: the Sim discarded before the third B (frame $f)"; return 1; }
+}
+# Start on Keep this Sim?: the tick, as A on it (ux task 6).
+cas_start() { in_order pad-cas-start 'aspiration=0 answer=1' 'game Panel/Interact'; }
 cas_turn() {
     "$python" -I -c '
 import sys
@@ -2053,6 +2185,8 @@ check_pad pad-cas-type cas_type
 check_pad pad-cas-looks cas_looks
 check_pad pad-cas-keep cas_keep
 check_pad pad-cas-cross cas_cross
+check_pad pad-cas-back cas_back
+check_pad pad-cas-start cas_start
 check_pad pad-cas-turn cas_turn
 # The HD screens hold through the game's swaps (src/consolehold.*, --print-console: each frame's
 # composition, milestone 1's marked -m1, and the counts at the end): Create-a-Sim's pages from s3 by
@@ -2109,6 +2243,89 @@ check_pad hold-phone hold_phone
 check_pad hold-gift hold_gift
 check_pad hold-registry hold_registry
 check_pad hold-load-slot hold_load_slot
+# Create-a-Sim's pictures through every page change (src/port/cas.cpp, CasState::drawn): from s3,
+# RB, LB and Start (scripts/console/cas-walk.txt), each of the 9 frames from a change on: every
+# cell and tab of the page either empty (one colour: the game's last page never shows in it) or
+# the page's own picture (as 8 frames after the change).
+cas_gate_run() {
+    local frames
+    frames=$(for b in 20 70 120 170 220 270 320 370 420 470 520 570; do for d in 0 1 2 3 4 5 6 7 8; do printf '%s,' $((b + d)); done; done)
+    cp "$complete_save" "$tmp/cas-gate.sav" || return
+    "$bin" "$rom" --headless --frames 580 --state-load "$shots/s3.st" --save "$tmp/cas-gate.sav" --layout console --compose \
+        --print-front "${town[@]}" --input "$repo/scripts/console/cas-walk.txt" --shot-at "${frames%,}" --shot-dir "$tmp/cas-gate" > "$tmp/cas-gate.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/cas-gate.log" && touch "$tmp/cas-gate.ok"
+}
+cas_gate_run
+cas_gate() {
+    "$python" -I -c '
+import sys
+from PIL import Image
+d = sys.argv[1]
+# Each change: its first frame and the page it goes to (cas-walk: RB x4, LB x4, Start x4).
+changes = [(20, 1), (70, 2), (120, 3), (170, 4), (220, 3), (270, 2), (320, 1), (370, 0), (420, 1), (470, 2), (520, 3), (570, 4)]
+tabs = [(780 + 80 * i + 6, 38, 68, 60) for i in range(5)]
+cells = {0: [(750 + 94 * g, 188, 84, 84) for g in range(2)] + [(956 + 66 * i, 184, 56, 92) for i in range(4)],
+         1: [(728 + 64 * i, 186, 56, 56) for i in range(8)] + [(822 + 166 * (c & 1), 258 + 183 * (c >> 1), 150, 171) for c in range(4)],
+         2: [(754 + 155 * (i % 3), 190 + 141 * (i // 3), 141, 129) for i in range(9)],
+         3: [(716, 190 + 70 * i, 64, 64) for i in range(6)] + [(824 + 130 * (c % 3), 200 + 184 * (c // 3), 120, 174) for c in range(6)],
+         4: []}
+# The page at each frame (--print-front): a change lands a frame after its press or on it.
+at, cur = {}, -1
+for line in open(sys.argv[2]):
+    if line.startswith("frame ") and ": cas page=" in line:
+        n = int(line.split()[1].rstrip(":"))
+        at[n] = int(line.split("page=")[1].split()[0])
+pages = []
+for n in range(600):
+    cur = at.get(n, cur)
+    pages.append(cur)
+FILLS = [(0x68, 0x70, 0xB6), (0x4A, 0x52, 0x96)]                       # (a cell, a focused cell)
+bad = []
+for f0, page in changes:
+    final = Image.open(f"{d}/f{f0 + 8:06d}.png").convert("RGB")
+    for f in range(f0, f0 + 8):
+        if pages[f] != page: continue                                     # (the last page still: its own pictures)
+        im = Image.open(f"{d}/f{f:06d}.png").convert("RGB")
+        for (x, y, w, h) in tabs + cells[page]:
+            box = (x + w // 4, y + h // 4, x + w - w // 4, y + h - h // 4)   # (its middle: the well s bevel aside)
+            a = im.crop(box)
+            if len(a.getcolors(1 << 16) or [0, 0]) == 1: continue          # empty
+            # the page s own: as 8 frames later but for the cells fill under a picture s
+            # transparent pixels (the focus lands a frame late) and the game s brief dimming
+            fa, fb, n, off = a.tobytes(), final.crop(box).tobytes(), a.size[0] * a.size[1], 0
+            for k in range(0, 3 * n, 3):
+                pa, pb = fa[k:k + 3], fb[k:k + 3]
+                if max(abs(pa[c] - pb[c]) for c in range(3)) <= 8: continue
+                if any(max(abs(q[c] - f[c]) for c in range(3)) <= 10 for q in (pa, pb) for f in FILLS): continue
+                off += 1
+            if off <= n // 10: continue
+            bad.append(f"frame {f} page {page}: box {x},{y} neither empty nor the page s picture")
+for b in bad[:4]: print("  cas-gate: " + b)
+sys.exit(1 if bad else 0)' "$tmp/cas-gate" "$tmp/cas-gate.log"
+}
+check_pad cas-gate cas_gate
+# The game's pictures fade with Create-a-Sim's veil (src/console.cpp): from s4, the tick
+# (scripts/console/cas-keep.txt) and the game's fade out: once the panel is under a third dark, the
+# chosen aspiration's picture (the ROM's, drawn above every still item) as dark as the panel (within 0.1).
+cas_fade_run() {
+    cp "$complete_save" "$tmp/cas-fade.sav" || return
+    "$bin" "$rom" --headless --frames 136 --state-load "$shots/s4.st" --save "$tmp/cas-fade.sav" --layout console --compose \
+        "${town[@]}" --input "$repo/scripts/console/cas-keep.txt" --shot-at 100,134 --shot-dir "$tmp/cas-fade" > "$tmp/cas-fade.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/cas-fade.log" && touch "$tmp/cas-fade.ok"
+}
+cas_fade_run
+cas_fade() {
+    "$python" -I -c '
+import sys
+from PIL import Image
+a, b = (Image.open(f"{sys.argv[1]}/f{n:06d}.png").convert("RGB") for n in (100, 134))
+mean = lambda im, box: sum(im.crop(box).tobytes()) / (box[2] - box[0]) / (box[3] - box[1])
+panel, asp = (700, 560, 712, 700), (870, 200, 950, 290)
+p, q = mean(b, panel) / mean(a, panel), mean(b, asp) / mean(a, asp)
+if p > 0.75: print(f"  cas-fade: the panel not dark yet ({p:.2f})"); sys.exit(1)
+if q > p + 0.1: print(f"  cas-fade: the aspiration {q:.2f} of its light, the panel {p:.2f}"); sys.exit(1)' "$tmp/cas-fade"
+}
+check_pad cas-fade cas_fade
 # The world's camera on the right stick (navigator.h, WorldKeys; from s7, the phone closed): held
 # left it turns (the DS's L), held up it zooms in (X): the world's picture differs from the same
 # run without it; LB held (the shoulders' default L) changes nothing there any more.
@@ -2156,6 +2373,9 @@ pad_mg mg-autopsy-quit G-X-autopsy autopsy-quit 150 &
 pad_mg mg-autopsy-stay G-X-autopsy autopsy-quit-once 200 &
 pad_mg mg-autopsy-payout G-A-payout-base autopsy-wait 120 &
 wait
+pad_mg mg-autopsy-take-organ G-A-autopsy-nopara autopsy-take-organ 1000 &
+pad_mg mg-autopsy-take-parasite G-A-para autopsy-take-parasite 200 &
+wait
 pad_mg mg-detector-dig G-A-md-walk detector-dig 220 &
 pad_mg mg-detector-quit G-X-metal detector-quit 120 &
 pad_mg mg-art-play G-X-artgal art-play 200 &
@@ -2170,6 +2390,19 @@ autopsy_bank() {
         'minigame autopsy .*sub=3 .*dragged=0' 'minigame autopsy .*sub=4 ' 'minigame autopsy .*earnings=84 .*organs=5:'
 }
 check_pad mg-autopsy-bank autopsy_bank
+# A alone takes (activities.h's AutopsyTarget): the hand's freed organ (the pointer from the middle to
+# 77,93, pressed, dragged, carried to the tray and let go there: §84 banked, the slot removed); the
+# tweezers' nearest eating parasite (followed, held, carried to the flask: into it, sub 7).
+autopsy_take_organ() {
+    in_order mg-autopsy-take-organ 'minigame autopsy .*organs=0:[0-9]+:freed' 'minigame autopsy phase=1 .*tool=1 ' 'pointer down at 77,93' \
+        'minigame autopsy .*sub=3 .*dragged=0' 'pointer up at 236,36' 'minigame autopsy .*sub=4 ' 'minigame autopsy .*earnings=84 .*organs=5:'
+}
+check_pad mg-autopsy-take-organ autopsy_take_organ
+autopsy_take_parasite() {
+    in_order mg-autopsy-take-parasite 'minigame autopsy .*tool=2 ' 'pointer down' 'minigame autopsy .*sub=6 .*held=[0-7] ' 'pointer up at 236,156' \
+        'minigame autopsy .*sub=7 '
+}
+check_pad mg-autopsy-take-parasite autopsy_take_parasite
 autopsy_quit() { in_order mg-autopsy-quit 'game Autopsy' 'game Panel/Interact'; }
 check_pad mg-autopsy-quit autopsy_quit
 autopsy_stay() {
@@ -2209,8 +2442,8 @@ art_play() {
 }
 check_pad mg-art-play art_play
 art_done() {
-    in_order mg-art-done 'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=0,1' 'popup none' \
-        'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=1,1' 'popup none'
+    in_order mg-art-done "popup state=2 kind=2 .*$(gx 2440)" 'popup state=2 kind=2 pressed=0,1' 'popup none' \
+        "popup state=2 kind=2 .*$(gx 2440)" 'popup state=2 kind=2 pressed=1,1' 'popup none'
 }
 check_pad mg-art-done art_done
 # The timing minigames on the controller (the research's held-out states on copies of the complete
@@ -2352,12 +2585,16 @@ then echo "ok   mg-crime-buttons"; else echo "FAIL mg-crime-buttons"; fails=$((f
 # last splash takes Start and A at frames where a 3-frame touch fell between its slow polls.
 pad_t1() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 clock=$5
+    shift 5
     cp "$complete_save" "$tmp/$name.sav" || return
     "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
-        --print-game --print-town --print-minigame --print-front --print-hotel --clock "$clock" --input "$input" > "$tmp/$name.log" 2>&1 &&
+        --print-game --print-town --print-minigame --print-front --print-hotel --clock "$clock" --input "$input" "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
 pad_t1 mg-vacuum-leave act-vacuum vacuum-leave 120 "2026-01-01 14:00" &
+pad_t1 mg-vacuum-pick act-vacuum vacuum-pick 420 "2026-01-01 14:00" --print-vacuum &
+pad_t1 mg-vacuum-none act-vacuum vacuum-none 120 "2026-01-01 14:00" --print-vacuum &
+wait
 pad_t1 mg-art-palette G-X-artgal art-palette 200 "2026-11-05 12:05" &
 pad_t1 mg-drencher-help G-C-wg-pump drencher-help 240 "2026-11-05 12:05" &
 pad_t1 mg-crime-help G-X-crime crime-help 240 "2026-11-05 12:05" &
@@ -2369,9 +2606,97 @@ pad_t1 pad-boot-late-a F-boot-900 boot-late-a 220 "2026-11-05 12:05" &
 wait
 vacuum_leave() { in_order mg-vacuum-leave 'game Vacuum' 'minigame none' 'game Panel/Interact'; }
 check_pad mg-vacuum-leave vacuum_leave
+# The vacuum's A (activities.h): the gold ring (kind 196) held, carried to the funnel, let go there,
+# the keep animation run and the ring gone from the bowl; never a clog.
+vacuum_pick() {
+    in_order mg-vacuum-pick 'vacuum bowl .*:196@' 'pointer down' 'vacuum bowl held=[0-8] .*:196@[0-9-]*,[0-9-]*/[0-9]*H' 'pointer up at 127,150' \
+        'vacuum bowl held=-1 keeping=1' || return 1
+    ! grep -q 'clogged=1' "$tmp/mg-vacuum-pick.log" || { echo "  mg-vacuum-pick: a clog"; return 1; }
+    last_before mg-vacuum-pick 400 'vacuum bowl' | grep -qv ':196@' || { echo "  mg-vacuum-pick: the ring still in the bowl"; return 1; }
+}
+check_pad mg-vacuum-pick vacuum_pick
+# A with no find in the bowl: the stylus stays up (no press, no clog).
+vacuum_none() {
+    in_order mg-vacuum-none 'vacuum bowl held=-1 keeping=0 items=-' || return 1
+    ! grep -q -E 'pointer down|clogged=1' "$tmp/mg-vacuum-none.log" || { echo "  mg-vacuum-none: pressed"; return 1; }
+}
+check_pad mg-vacuum-none vacuum_none
+# The words the HD frames say (--print-words: the composition's texts and chips' labels; ux task 6):
+# MooGoo's players before their names are set (strings 1758-1760, never the table's string 0, its
+# copyright line); the lottery's result popup (string 317) with no title (RAM's is a stale 2425); the
+# vacuum's money this session (§75 once the gold ring is kept, while the lifetime total waits for
+# the put away); the German mixer's X our own MixerPlay (the game's word, 1778, is its button's,
+# beside the help's chip). The game's words by id only (gtext, gx): no game text in this script.
+words_run() {
+    local name=$1 state=$2 clock=$3 frames=$4
+    shift 4
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-words --print-minigame --print-game --clock "$clock" "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+words_run words-moogoo G-B-mg-x "2026-11-05 12:05" 40 &
+words_run words-scratch G-B-sc-win-pop "2026-11-05 12:05" 40 &
+words_run words-vacuum act-vacuum "2026-01-01 14:00" 430 --input "$repo/scripts/console/vacuum-pick.txt" &
+words_run words-mixer-de G-X-music "2026-11-05 12:05" 40 --game-language 3 &
+wait
+words_run words-help-drencher G-C-wg-help-pump "2026-11-05 12:05" 10 &
+words_run words-help-crime G-C-cr-help "2026-11-05 12:05" 10 &
+words_run words-help-mixer G-D-mus-help2 "2026-11-05 12:05" 10 &
+words_run words-detector G-A-md-walk "2026-11-05 12:05" 240 --input "$repo/scripts/console/detector-dig.txt" &
+words_run words-mixersave G-X-musicsave "2026-11-05 12:05" 10 &
+words_run words-popup-pause B-pause "2026-01-01 12:00" 40 &
+words_run words-popup-goal s6 "2026-01-01 12:00" 40 &
+wait
+last_words() { grep ': words ' "$tmp/$1.log" | tail -n 1; }
+words_moogoo() {
+    last_words words-moogoo | grep -q -E "\| $(gx 1758) \| .*\| $(gx 1759) \| .*\| $(gx 1760) \|" || { echo "  words-moogoo: no players 1-3 (strings 1758-1760): $(last_words words-moogoo)"; return 1; }
+    ! grep ' words ' "$tmp/words-moogoo.log" | grep -q -F "$(gtext 0 1 0)" || { echo "  words-moogoo: the copyright line (string 0) as a name"; return 1; }
+}
+check_pad words-moogoo words_moogoo
+words_scratch() {
+    last_words words-scratch | grep -q -F "$(gtext 317 1 0)" || { echo "  words-scratch: no result (string 317): $(last_words words-scratch)"; return 1; }
+    ! grep ' words ' "$tmp/words-scratch.log" | grep -q -F "$(gtext 2425)" || { echo "  words-scratch: a stale title (string 2425)"; return 1; }
+}
+check_pad words-scratch words_scratch
+words_vacuum() {
+    local head
+    head="words $(gx 1968) \| $(gx 2014 1 0 | sed 's/:$//') \|"
+    in_order words-vacuum "$head §0 " 'minigame vacuum .*session=75' "$head §75 "
+}
+check_pad words-vacuum words_vacuum
+words_mixer_de() {
+    last_words words-mixer-de | grep -q '| Abspielen |' || { echo "  words-mixer-de: no Abspielen: $(last_words words-mixer-de)"; return 1; }
+    ! last_words words-mixer-de | grep -q -F "| $(gtext 1778 3) |" || { echo "  words-mixer-de: the button word (string 1778) as X's word"; return 1; }
+}
+check_pad words-mixer-de words_mixer_de
+# A help text up in a loaded state (no touch since: its tail in the game's scratch buffer,
+# MinigameHelpInRam) in the HD box; the detector's last find named after its card closed, no
+# signal said None; the unread save page (G-X-musicsave: RAM reads, its part not yet): no hints.
+words_help() { last_words "$1" | grep -q -E "$2" || { echo "  $1: no \"$2\": $(last_words "$1")"; return 1; }; }
+check_pad words-help-drencher words_help words-help-drencher "$(gx 1663 1 0 3)"
+check_pad words-help-crime words_help words-help-crime "$(gx 1667 1 0 4)"
+check_pad words-help-mixer words_help words-help-mixer "$(gx 1779 1 0 4)"
+words_detector() {
+    local found rock
+    found=$(gx 1160) rock=$(gx 1164)
+    in_order words-detector "words .*$found \| — " "words .*$found \| $rock \|" || return 1
+    last_words words-detector | grep -q -F "$(gtext 1160) | $(gtext 1164) |" || { echo "  words-detector: the find (strings 1160, 1164) forgotten"; return 1; }
+    ! grep -q 'words .*Signal | 0%' "$tmp/words-detector.log" || { echo "  words-detector: Signal 0%"; return 1; }
+}
+check_pad words-detector words_detector
+words_mixersave() { last_words words-mixersave | grep -q -E "^frame [0-9]*: words $(gx 1805) \| [0-9:]* [ap]m \| " || { echo "  words-mixersave: $(last_words words-mixersave)"; return 1; }; }
+check_pad words-mixersave words_mixersave
+# A town message popup (kind 0) titled as the game draws it: Game Paused (string 22, drawn by the
+# game above its text 23) first; the goal unlocked (2448) has none in RAM nor on the DS screen, so
+# its words start with the text. (Over a minigame RAM's title is stale: none drawn, words-scratch.)
+words_popup_pause() { last_words words-popup-pause | grep -q -E "^frame [0-9]*: words $(gx 22) \| $(gx 23 1 0 3)" || { echo "  words-popup-pause: $(last_words words-popup-pause)"; return 1; }; }
+check_pad words-popup-pause words_popup_pause
+words_popup_goal() { last_words words-popup-goal | grep -q -E "^frame [0-9]*: words $(gx 2448 1 0 3)" || { echo "  words-popup-goal: $(last_words words-popup-goal)"; return 1; }; }
+check_pad words-popup-goal words_popup_goal
 art_palette() {
     in_order mg-art-palette 'minigame art .*swatch=3 page=0 ' 'minigame art .*page=1 ' 'minigame art .*page=2 ' 'minigame art .*swatch=4 page=2 ' \
-        'popup state=2 kind=2 .*done painting'
+        "popup state=2 kind=2 .*$(gx 2440)"
 }
 check_pad mg-art-palette art_palette
 drencher_help() {
@@ -2429,11 +2754,11 @@ wait
 pad_t2 t2-cas-arrive s2 cas-arrive 140 "2026-01-01 12:00" --compose --shot-every 1 --shot-dir "$tmp/t2-cas-arrive" &
 wait
 ask_aa() {
-    in_order t2-ask-aa 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup none' || return 1
+    in_order t2-ask-aa "popup state=1 kind=2 .*$(gx 2423 1 0 1)" 'focus 0' 'popup none' || return 1
     if grep -q -E 'kind=3|2=Jun/14843' "$tmp/t2-ask-aa.log"; then echo "  t2-ask-aa: saved by the second A"; return 1; fi
 }
 quit_aa() {
-    in_order t2-quit-aa 'popup state=1 kind=2 .*Quit' 'console menu open, focus 0' 'popup none' 'game Panel/Options' 'console menu open, focus 1' || return 1
+    in_order t2-quit-aa "popup state=1 kind=2 .*$(gx 65 1 0 1)" 'console menu open, focus 0' 'popup none' 'game Panel/Options' 'console menu open, focus 1' || return 1
     if grep -q 'game FrontEnd' "$tmp/t2-quit-aa.log"; then echo "  t2-quit-aa: quit by the second A"; return 1; fi
 }
 cas_lb() {
@@ -2498,7 +2823,7 @@ check_pad t2-gift-bow gift_bow
 check_pad t2-cas-arrive cas_arrive
 stat_held() { grep -q -E 'stat page=0 .* held=[1-4]' "$tmp/pad-stat.log" || { echo "  pad-stat: the page left not held while the game showed Main"; return 1; }; }
 check_pad pad-stat stat_held
-load_done() { in_order pad-load-slot 'popup state=[1-3] kind=3 .*title="Loading"' 'load .* loading' 'front None'; }
+load_done() { in_order pad-load-slot "popup state=[1-3] kind=3 .*title=\"$(gx 2425)\"" 'load .* loading' 'front None'; }
 check_pad pad-load-slot load_done
 # The minigames' messages in HD (the remake's polish, task 3; copies of the complete save, pad only): a
 # question of a minigame (the cards' and MooGoo's quit, the painting's "done?", the mixer's save
@@ -2565,7 +2890,7 @@ t3_cards_turn() {
     t3_pic "$tmp/t3-cards-turn/f000230.png" box && t3_pic "$tmp/t3-cards-turn/f000640.png" ring_free
 }
 t3_art_aa() {
-    in_order t3-art-aa 'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=0,1' 'popup none' 'minigame art .*painted=[1-9]' || return 1
+    in_order t3-art-aa "popup state=2 kind=2 .*$(gx 2440)" 'popup state=2 kind=2 pressed=0,1' 'popup none' 'minigame art .*painted=[1-9]' || return 1
     if grep -q 'pressed=1,1' "$tmp/t3-art-aa.log"; then echo "  t3-art-aa: Yes by A A"; return 1; fi
     t3_pic "$tmp/t3-art-aa/f000040.png" halo
 }
@@ -2606,7 +2931,7 @@ if bad: print(f"  t3-detector-off: milestone 1's rail in {bad[:3]}")
 sys.exit(1 if bad else 0)
 PYEOF
 }
-t3_scratch_win() { in_order t3-scratch-win 'popup state=2 kind=0 .*Congratulations' 'game Panel' && t3_pic "$tmp/t3-scratch-win/f000330.png" box; }
+t3_scratch_win() { in_order t3-scratch-win "popup state=2 kind=0 .*$(gx 317 1 0 1)" 'game Panel' && t3_pic "$tmp/t3-scratch-win/f000330.png" box; }
 check_pad t3-cards-aa t3_cards_aa
 check_pad t3-cards-turn t3_cards_turn
 check_pad t3-art-aa t3_art_aa
@@ -2659,7 +2984,7 @@ check_pad fx-return-veil fx_return_veil
 # The HD shell (src/shell.*, src/shellhost.*, scripts/shell/), the pad alone, its files in a scratch
 # --data-dir: from s7, Start + Back opens the pause menu, slot 1 saved (its state and picture),
 # the phone closed, slot 1 loaded after its question (No first: one A closes it, then A, Right, A),
-# the phone back; Undo: the panel back; Quit asked (No first), then Yes: the suspend state written
+# the phone back; Undo, asked (Right, A): the panel back; Quit asked (No first), then Yes: the suspend state written
 # and the run ends. Then --launch from the same folder: Continue (the first item, A) starts the
 # game where it was left (the panel, from frame 5: the launch's turns count) and the suspend
 # state is gone. Pictures: each page of the pause menu over s7 (--shell) and the launch panel:
@@ -2783,8 +3108,8 @@ for page in ["main", "settings", "controls", "keys", "states", "quit"]:
 try:
     im = Image.open(f"{t}/shell-launch/f000002.png").convert("RGB")
     if not near(im.getpixel((10, 10)), (0x10, 0x12, 0x18), 2): bad.append(f"launch: no backdrop {im.getpixel((10, 10))}")
-    if not near(im.getpixel((60, 690)), (0x82, 0x8A, 0xCB)): bad.append(f"launch: no list panel {im.getpixel((60, 690))}")
-    if not near(im.getpixel((1220, 690)), (0x82, 0x8A, 0xCB)): bad.append(f"launch: no controls card {im.getpixel((1220, 690))}")
+    if not near(im.getpixel((120, 660)), (0x82, 0x8A, 0xCB)): bad.append(f"launch: no list panel {im.getpixel((120, 660))}")
+    if not near(im.getpixel((1160, 660)), (0x82, 0x8A, 0xCB)): bad.append(f"launch: no controls card {im.getpixel((1160, 660))}")
 except OSError:
     bad.append("launch: no picture")
 for b in bad: print("  " + b)
@@ -2792,6 +3117,34 @@ sys.exit(1 if bad else 0)
 PYEOF
 then echo "ok   shell pictures: the pause menu's pages and the launch panel"
 else echo "FAIL shell pictures"; fails=$((fails + 1)); fi
+# The settings' five tabs (scripts/shell/settings-tabs.txt, --shell settings): RB through every tab
+# and round (wrapping), LB wraps back, A on Battery saver (Graphics) dims 3D resolution and 60 fps,
+# Y asks to reset the tab (No first), B keeps it. Pictures of each tab: all different, the panel's
+# fill at its foot; Graphics with the saver on differs from Graphics without it.
+"$bin" "$rom" --headless --frames 122 --state-load "$shots/s7.st" --save "$tmp/shell-tabs.sav" --compose --print-shell \
+    --shell settings --shell-at 60 --input "$repo/scripts/shell/settings-tabs.txt" --shot-at 63,67,73,79,85,91,115 \
+    --shot-dir "$tmp/shell-tabs" "${town[@]}" > "$tmp/shell-tabs.log" 2>&1 && grep -q '^clock: ' "$tmp/shell-tabs.log" && touch "$tmp/shell-tabs.ok"
+shell_tabs() {
+    in_order shell-tabs 'shell open page=settings' 'page=settings tab=1 focus=0' 'shell setting 8 ok' 'tab=2' 'tab=3' 'tab=4' \
+        'page=settings tab=0' 'page=settings tab=4' 'page=settings tab=0' 'ask=reset \(no\)' 'page=settings tab=0 focus=0 ask=none' || return 1
+    ! grep -q 'reset tab' "$tmp/shell-tabs.log" || { echo "  shell-tabs: reset without a Yes"; return 1; }
+    "$python" -I - "$tmp/shell-tabs" <<'PYEOF'
+import sys
+from PIL import Image
+d = sys.argv[1]
+f = {n: Image.open(f"{d}/f{n:06d}.png").convert("RGB") for n in (63, 67, 73, 79, 85, 91, 115)}
+tabs = [f[n].tobytes() for n in (63, 67, 79, 85, 91)]
+bad = []
+if len(set(tabs)) != 5: bad.append("two tabs look the same")
+if f[67].tobytes() == f[73].tobytes(): bad.append("Battery saver changed nothing on Graphics")
+for n in (63, 67, 79, 85, 91):
+    p = f[n].getpixel((220, 650))
+    if max(abs(a - b) for a, b in zip(p, (0x82, 0x8A, 0xCB))) > 8: bad.append(f"frame {n}: no panel fill {p}")
+for b in bad: print("  shell-tabs: " + b)
+sys.exit(1 if bad else 0)
+PYEOF
+}
+check_pad shell-tabs shell_tabs
 # Platform (task 5). The game's language: --game-language 2 sets the DS firmware's, so the boot's
 # last splash (frame 900, a fresh boot) says the game's French words: its touch screen differs from
 # English's and the strings load in French; fast boot (--fast-boot, the window's rule, logged) ends

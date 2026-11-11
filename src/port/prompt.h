@@ -34,7 +34,7 @@ constexpr int kPromptLayer = 7;
 constexpr int kPromptShadow = 7;
 constexpr int kPromptBottom = 640, kPromptH = 88, kPromptMaxW = 1000;
 // The texts: the verb beside the A chip, the name above it, the hints at the right.
-constexpr float kPromptVerbSize = 30, kPromptVerbMin = 22, kPromptNameSize = 22, kPromptNameMin = 18, kPromptHintSize = 20;
+constexpr float kPromptVerbSize = 30, kPromptVerbMin = 22, kPromptNameSize = 22, kPromptNameMin = 19, kPromptHintSize = 20;
 constexpr int kPromptVerbW = 440, kPromptNameW = 520;
 
 // How long the Interact target and its actions have been the same (App::consolePrompt, updated
@@ -60,6 +60,9 @@ struct WorldPrompt
     bool held = false;         // A held (pad mode): Up / Down choose, release runs
     bool more = false;         // other enabled actions (hint: hold A for more / choose)
     bool others = false;       // a previous or next target (hint, while A is held: Left / Right)
+    // The widest verb of the target's enabled actions (canvas pixels, fitted as `verb`): the plate
+    // keeps that width while Up / Down (A held) change the verb, never re-centred under the eye.
+    int verbW = 0;
 };
 // The prompt for this Interact state (shown: a target, an enabled action to run, not pad mode 2).
 WorldPrompt WorldPromptOf(const InteractState& in, const RomData* rom);

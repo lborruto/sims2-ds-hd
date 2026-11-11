@@ -137,14 +137,10 @@ public:
     // Unknown: A asks for the stick cursor's press.
     bool CursorPress() const { return cursorPress_; }
     // The stick cursor is the way to touch here (no table of targets: the front end, None,
-    // Vacuum, Unknown).
+    // Unknown).
     bool CursorScreen() const { return cursorScreen_; }
-    // The vacuum: the stick cursor is its hand, shown and moved even without a controller (the
-    // D-pad moves it while X or A is held: HandDx / HandDy, DS pixels this frame); CursorPress
-    // is A held.
-    bool Hand() const { return screen_.screen == Screen::Vacuum; }
-    float HandDx() const { return handDx_; }
-    float HandDy() const { return handDy_; }
+    // The vacuum's or the autopsy's A take runs (activities.h; its carry included, not LB's).
+    bool Taking() const { return activity_.take.phase != 0 || activity_.seek != 0 || (activity_.gliding && activity_.glideByA); }
     // The vacuum's Y: blow into the microphone this frame.
     bool Blow() const { return blow_; }
     // The mixer's Y (activities.h): its microphone held (VOX): the blow's signal, or the computer's
@@ -185,7 +181,6 @@ private:
     bool fresh_ = true;  // take the next pad as the previous one (no presses)
     ScreenState screen_;
     bool menuOpen_ = false, cursorPress_ = false, cursorScreen_ = false, blow_ = false, voice_ = false;
-    float handDx_ = 0, handDy_ = 0;
     ActivityState activity_;
     ActivityRam activityRam_;
     int focus_ = -1;
@@ -206,7 +201,9 @@ private:
     int viewPage_ = 0;   // the view's page last frame (MenuView::page)
     bool viewQuestion_ = false;   // and whether it was a question
     u32 pageKeptId_ = 0; // the focused item's id when the last non-question page was left
-    int pageKeptIndex_ = -1; // and its index (the item gone when the page is back: the one in its place)
+    int pageKeptIndex_ = -1;
+    u32 landId_ = 0;     // MenuView::backLands after a B: the item the focus lands on once the next page shows it
+    int landFrames_ = 0; // frames since (it is dropped after kHoldFrames' worth of a page change) // and its index (the item gone when the page is back: the one in its place)
     bool pictureOpen_ = false; // MenuView::picture shown big: an A ran; B, LB / RB or another screen close it
     // The Save slots or the phone opened from the menu: the tab and item it was opened from, the
     // frames left to come back to the panel (returnFrames_) and to put the focus back

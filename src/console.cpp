@@ -27,6 +27,7 @@
 #include "port/prompt.h"
 #include "port/ownwords.h"
 #include "romdata.h"
+#include "ui/kit.h"
 
 namespace sims2wide
 {
@@ -90,8 +91,9 @@ Overlay Text(int x, int y, const char* text, int scale)
     return o;
 }
 
-// The money's last change (port/statusbar.h's bar at `bar`): a small kit panel right of it, "+§12"
-// in a light green or "-§1" in a light red, on the bar's layer.
+// The money's last change (port/statusbar.h's bar at `bar`): a small dark pill right of it (the
+// theme's shadow, #383869), "+§12" in a light green (8.24:1 on it) or "-§1" in a light red
+// (5.30:1; on the bar's own fill they were 2.48 and 1.59), on the bar's layer.
 void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom, int right = kConsoleW - 8)
 {
     const std::string text = (payout > 0 ? "+" : "-") + MenuWords(rom, kStrMgMoney, std::abs(payout));
@@ -99,6 +101,8 @@ void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom, int rig
     const int w = (int)std::ceil(ui::TextWidth(text, size, ui::Weight::ExtraBold)) + 36;
     if (bar.x + bar.w + 12 + w > right) return;
     ui::UiItem p = ui::PanelItem({bar.x + bar.w + 12, bar.y, w, bar.h});
+    p.fill = ui::GameTheme().shadow;
+    p.borderArgb = ui::GameTheme().frameDark;
     p.layer = kStatusBarLayer;
     c.ui.push_back(p);
     PanelText(c, {bar.x + bar.w + 12 + 18, bar.y, w - 36, bar.h}, text, size, size, ui::Align::Left, ui::Weight::ExtraBold,
@@ -106,7 +110,7 @@ void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom, int rig
 }
 
 // The focus ring around hotspot `focus`'s area, as the topmost touchable bottom piece showing the
-// area's centre draws it (the area clipped to that piece), 4 pixels outside it.
+// area's centre draws it (the area clipped to that piece), the kit's ring around it.
 void AddRing(Composition& c, ScreenState s, int focus)
 {
     const std::vector<Hotspot>& h = HotspotsFor(s);
@@ -123,13 +127,19 @@ void AddRing(Composition& c, ScreenState s, int focus)
         const int x1 = std::min(a.x + a.w, f.x + f.w), y1 = std::min(a.y + a.h, f.y + f.h);
         const int rx0 = q.to.x + (x0 - f.x) * q.to.w / f.w, ry0 = q.to.y + (y0 - f.y) * q.to.h / f.h;
         const int rx1 = q.to.x + (x1 - f.x) * q.to.w / f.w, ry1 = q.to.y + (y1 - f.y) * q.to.h / f.h;
-        constexpr int t = 4;
-        c.overlays.push_back({{rx0 - t, ry0 - t, rx1 - rx0 + 2 * t, ry1 - ry0 + 2 * t}, 0, 8, t, kRingArgb, -1});
+        AddKitRingOverlay(c, {rx0, ry0, rx1 - rx0, ry1 - ry0});
         return;
     }
 }}
 
 Piece ConsoleWorld(int topW, int rows, bool keepSides) { return World(topW, rows, keepSides); }
+
+void AddKitRingOverlay(Composition& c, Rect r)
+{
+    constexpr int outer = ui::kFocusOuterW, inner = ui::kFocusInnerW;
+    c.overlays.push_back({{r.x - outer, r.y - outer, r.w + 2 * outer, r.h + 2 * outer}, 0, 10 + outer, outer - inner, ui::kFocusOuter, -1});
+    c.overlays.push_back({{r.x - inner, r.y - inner, r.w + 2 * inner, r.h + 2 * inner}, 0, 10 + inner, inner, ui::kFocusInner, -1});
+}
 
 void AddHints(Composition& c, const std::vector<Hint>& hints)
 {
@@ -192,13 +202,18 @@ static void AddCursorHint(Composition& c, int y, const RomData* rom, bool right 
     // The UI's size: about the hints' bottom right (or bottom centre). At the right (the stick
     // cursor's framed touch screen above), the hints below the frame (kCursorHintsLimit), the pause
     // panel its own group about its bottom right, right of the frame (kCursorPauseLimit).
-    if (right) ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW - 24.0f, (float)(y + kH), kCursorHintsLimit);
-    const Rect panel = right ? Rect {std::max(kCursorPauseLimit.x, kConsoleW - 16 - pw), y - kH - kGap, pw, kH}
-                             : Rect {bx + bw + kGap, y, pw, kH};
+    // (A pause chip wider than the room right of the frame, its glyph at the smallest text size,
+    // START + BACK: the pause panel in the hints' row instead, left of them, zoomed with them.)
+    const bool beside = right && kConsoleW - 16 - pw < kCursorPauseLimit.x;
+    if (right && !beside) ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW - 24.0f, (float)(y + kH), kCursorHintsLimit);
+    const Rect panel = beside  ? Rect {bx - kGap - pw, y, pw, kH}
+                       : right ? Rect {std::max(kCursorPauseLimit.x, kConsoleW - 16 - pw), y - kH - kGap, pw, kH}
+                               : Rect {bx + bw + kGap, y, pw, kH};
     const size_t pause = c.ui.size();
     c.ui.push_back(ui::PanelItem(panel));
     c.ui.push_back(ui::ChipItem(panel.x + kPad, panel.y + (kH - chip.h) / 2, ui::Button::Pause, word, kSize));
-    if (right) ZoomUi(c, pause, c.pieces.size(), ui::UiScale(), (float)(panel.x + panel.w), (float)(panel.y + panel.h), kCursorPauseLimit);
+    if (beside) ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW - 24.0f, (float)(y + kH), kCursorHintsLimit);
+    else if (right) ZoomUi(c, pause, c.pieces.size(), ui::UiScale(), (float)(panel.x + panel.w), (float)(panel.y + panel.h), kCursorPauseLimit);
     else ZoomUi(c, first, c.pieces.size(), ui::UiScale(), kConsoleW / 2.0f, (float)(y + kH), kUiLimit);
 }
 
@@ -206,7 +221,7 @@ TownHints TownHintsFor(const RomData* rom, const ui::ChipLook& look)
 {
     TownHints h;
     h.menu = OwnWord(rom, OwnWordId::Menu);
-    h.camera = OwnWord(rom, OwnWordId::CtlCamera);
+    h.camera = OwnWord(rom, OwnWordId::HintCamera); // (the stick turns it and zooms: "Camera", not "Turn the camera")
     // The keyboard turns the camera with its own L / R keys (Input::Actions' turnL / turnR): their
     // keycaps rather than a stick it has not got.
     h.keys = look.face == ui::Face::Keyboard && !look.glyph[(int)ui::Button::LB].empty() && !look.glyph[(int)ui::Button::RB].empty();
@@ -300,13 +315,17 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             b = ConsoleBranch::CasFade;
             if (brightest < kCasFadeBlack) return c;
             b = ConsoleBranch::Cas;
-            BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH);
-            if (brightest < kCasFadeWhite)
+            // The veil lies over every still item; the pictures lie above it, so the ROM's are drawn
+            // as dark as the veil makes the rest (their colour, never their opacity: nothing under
+            // them shows through); the touch screen's own are already as dark as the game's fade.
+            const int dark = brightest < kCasFadeWhite ? 255 * (kCasFadeWhite - brightest) / kCasFadeWhite : 0;
+            BuildCas(c, v, focus, *game, *rom, icons, bottom, topW, topH, 255 - dark);
+            if (dark > 0)
             {
                 ui::UiItem veil = ui::PanelItem(kCanvas);
                 veil.plain = true;
                 veil.radius = 0;
-                veil.fill = (u32)(255 * (kCasFadeWhite - brightest) / kCasFadeWhite) << 24;
+                veil.fill = (u32)dark << 24;
                 veil.layer = kCasFadeLayer;
                 c.ui.push_back(veil);
                 SortUi(c.ui);
@@ -368,8 +387,10 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         {
             screen(s, v, focus);
             if (bar) AddStatusStrip(c, hud, *strings, 0, StripZoom(ui::UiScale()));
-            // Room info's own hint box (a popup of the screen's: port/roominfo.h), over the bar too.
+            // Room info's own hint box (a popup of the screen's: port/roominfo.h) and Build Rooms'
+            // question (port/build.h), over the bar too.
             if (s.screen == Screen::Unknown && RoomHintUp(*game)) BuildRoomHint(c, v, focus, *game, *rom);
+            if (s.screen == Screen::Build) BuildBuildQuestion(c, v, focus, *game, *rom);
         }
         // The UI's size: the screen and its popup together (the strip's own already done); a lone
         // popup (a goal, Game Paused, Quit over the world) as large as the UI's size, as far as the
@@ -483,6 +504,15 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         BuildDialogue(c, *game, *rom, bottom, topW, topH);
         // The UI's size: the box about the canvas's bottom centre (its margin below zoomed too).
         ZoomUi(c, 0, 0, ui::UiScale(), kConsoleW / 2.0f, kConsoleH, kUiLimit);
+        // The strip under the world (the world stops at it: no black band below), its panel alone
+        // (the box lies over it), under the box: first, on layer 0.
+        {
+            static const HudStrings kNoWords;
+            const size_t at = c.ui.size();
+            AddStatusStrip(c, nullptr, kNoWords);
+            for (size_t i = at; i < c.ui.size(); i++) c.ui[i].layer = 0;
+            std::rotate(c.ui.begin(), c.ui.begin() + (long)at, c.ui.end());
+        }
         b = ConsoleBranch::Dialogue;
     }
     else if (s.screen == Screen::Dialogue)
@@ -524,8 +554,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             // MooGoo's focus (activities.h): a ring around what A touches.
             const Rect m = pointer->mark, to = kActivityBottomTo;
             const int x0 = to.x + m.x * to.w / SW, y0 = to.y + m.y * to.h / SH, x1 = to.x + (m.x + m.w) * to.w / SW, y1 = to.y + (m.y + m.h) * to.h / SH;
-            constexpr int t = 4;
-            c.overlays.push_back({{x0 - t, y0 - t, x1 - x0 + 2 * t, y1 - y0 + 2 * t}, 0, 8, t, kRingArgb, -1});
+            AddKitRingOverlay(c, {x0, y0, x1 - x0, y1 - y0});
         }
         if (hudHere) AddStatusBar(c, *hud, *strings, topTo.x - 6, topTo.y + topTo.h + kActivityBarGap, topTo.w + 12);
     }
