@@ -280,7 +280,7 @@ The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the 
   none), `S+0x140` / `S+0x142` the stylus's last point; `S+0x162` and `S+0x170` u8 the funnel's keep animation (both 0: idle). The grab (code 0x0214A3C4): while the stylus is
   down, the first slot 0..8 whose square (half side 20 x scale) holds it is grabbed (sweeping grabs too; dust = the clog); a held find follows the stylus every tick, nothing
   else is grabbable meanwhile. The keep (0x0214AFB4): a find let go over the funnel (touch 108 < x < 147, 133 < y < 193, bottom middle) while the keep animation is idle is kept;
-  the box at the bottom right only shows the last find kept. Found on `act-vacuum` driven over the lobby's rug (the research's prototype, `mg-vacuum-pick`).
+  the box at the bottom right only shows the last find kept. The game lays a text out through a scratch buffer around `0x0213DF00` (0x200): a help text's tail (its last letters and NUL) stays there while it is up (the Drencher's, the crime game's, the mixer's: `MinigameHelpInRam`); the full text is never in RAM. Found on `act-vacuum` driven over the lobby's rug (the research's prototype, `mg-vacuum-pick`).
 - **Social** (CSocialScreen): no part. `*0x0213E70C + 0xC..0x12` held 0, 1, 2 for Impress's High Five / Dance / Laugh, but re-ordered after an answer: neither the social verb
   nor the answers' words were found in RAM (the frame shows the game's own labels, live crops).
 The screen request that brings one up (`P + 0xDF0 + 0x20 * slot`: module, r3, ...) is research-only; the port never writes RAM.

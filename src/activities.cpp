@@ -733,6 +733,9 @@ void Mixer(const PadState& pad, TouchScript& touch, u32& dsKeys, ActivityState& 
 void MixerSave(const PadState& pad, TouchScript& touch, ActivityState& st, bool canTap)
 {
     const std::vector<Hotspot>& h = HotspotsFor({Screen::MixerSave, Tab::None});
+    // The RAM reads but the page's part does not (the page not drawn yet, black): no focus to draw,
+    // nothing to press.
+    if (st.ram.read && !st.ram.mixerSave) { st.focus = -1; st.armedSlot = -1; return; }
     if (st.focus < 0 || st.focus >= (int)h.size()) st.focus = 0;
     const int slot = SaveSlotAt(st.focus);
     if (slot != st.armedSlot) st.armedSlot = -1; // (a move forgets the question)
@@ -915,6 +918,13 @@ static VacuumStylus TakeStep(const ActivityRam& ram, float px, float py, bool st
         return s;
     }
     t.missed = 0;
+    // Let go at the funnel: the stylus up, the take not over until the game's keep shows (the bowl
+    // reads every other frame), a few frames at most.
+    if (t.phase == 3)
+    {
+        if (ram.vacuumKeeping || ++t.rest > kVacuumKeepWait) t = {};
+        return s;
+    }
     if (start && t.phase == 0)
     {
         const int i = VacuumTarget(th, px, py);
@@ -975,7 +985,14 @@ static VacuumStylus TakeStep(const ActivityRam& ram, float px, float py, bool st
     s.x = (float)kVacuumFunnel.x;
     s.y = (float)kVacuumFunnel.y;
     if (ram.vacuumKeeping) t.rest = 0;
-    else if (++t.rest > kVacuumRest) { t = {}; s.down = false; }
+    else if (++t.rest > kVacuumRest)
+    {
+        const int slot = t.slot;
+        t = {};
+        t.phase = 3;
+        t.slot = slot;   // (the ring stays on it)
+        s.down = false;
+    }
     return s;
 }
 

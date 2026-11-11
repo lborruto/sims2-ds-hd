@@ -213,6 +213,7 @@ have a pointer on the sticks (LT slows it).
 | Moogoo Monkey | D-pad or left stick | Left / Right | choose the monkey to bet on, the card to play, the monkey a special card goes on (a green ring shows it) |
 | | A | X | bet, play the card; otherwise go on |
 | | B | Z | take the bet or the card back; else quit (it asks) |
+| | Start | Enter | quit (it asks: No first), also while a bet or a card is chosen |
 | Super Drencher | left stick or D-pad | Arrows | walk |
 | | A (hold) / X (hold) | X / S (hold) | fire / pump |
 | | Y / RB / LB | A / W / Q | target / refill / run |

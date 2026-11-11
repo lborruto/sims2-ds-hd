@@ -1318,9 +1318,16 @@ relaunch:
                 if (upBefore && !upNow && app.game.screen == before.screen) mg.popupGone = p0;
                 // (decided once, when the text rises: kept while it is up, even when it was not
                 // known then (-1), never taken from a later touch)
+                // (no touch since the screen rose, a state loaded with the text up: the text's tail in
+                // the game's scratch buffer, MinigameHelpInRam)
                 auto fill = [&](bool up, bool wasUp, int was, int& id) {
-                    if (up) id = wasUp ? was : lastTouchX >= 0 ? MinigameHelpAt(app.ConsoleScreen().screen, lastTouchX, lastTouchY) : -1;
+                    if (up)
+                        id = wasUp && was >= 0 ? was : lastTouchX >= 0 ? MinigameHelpAt(app.ConsoleScreen().screen, lastTouchX, lastTouchY)
+                           : app.rom && app.portSupported ? MinigameHelpInRam(app.ConsoleScreen().screen, nds.MainRAM, nds.MainRAMMask, *app.rom) : -1;
                 };
+                // the detector's last find (the "Found:" card gone, the side panel still names it)
+                if (DetectorState& d = mg.detector; d.valid)
+                    d.lastFind = d.card && d.findType >= 0 ? d.findType : before.minigame.detector.valid ? before.minigame.detector.lastFind : -1;
                 fill(mg.drencher.valid && mg.drencher.helpText, before.minigame.drencher.valid && before.minigame.drencher.helpText, before.minigame.drencher.helpId, mg.drencher.helpId);
                 fill(mg.crime.valid && mg.crime.helpText, before.minigame.crime.valid && before.minigame.crime.helpText, before.minigame.crime.helpId, mg.crime.helpId);
                 fill(mg.mixer.valid && mg.mixer.phase == 9, before.minigame.mixer.valid && before.minigame.mixer.phase == 9, before.minigame.mixer.helpId, mg.mixer.helpId);

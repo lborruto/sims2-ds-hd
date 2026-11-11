@@ -169,6 +169,14 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   the credits scroll on a dark well, their headings readable; the German Settings tabs have room.
 - The shop: the items no longer touch their cells' rims; the D-pad's hint says Choose; a greyed
   Pay says why (not enough money, no place left, not taken here).
+- The minigames: the hints' buttons one size everywhere and large enough to read (the help's
+  Start, and the painting's Back, moved up beside the title); the focus is the menus' green ring
+  everywhere; a help text open in a loaded save state is redrawn in HD; the cards no longer show
+  the DS's score screen (the side panel says it); the save page shows no hints before it is up;
+  the vacuum's hint stays "Taking it to the funnel" until the find is kept; the Metal Detector says
+  what it found after the card closes, and "None" for no signal; the painting's question stays in
+  one place; Walk and Point hints name every stick that does it; the autopsy's quit says the
+  game's Quit; Moogoo's Start (quit) is in the manual; the social answers sit on rows.
 
 ## [0.1.1] - 2026-11-04
 

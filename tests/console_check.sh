@@ -746,6 +746,13 @@ def activity(rows=192, hd=True, skip=0):
         piece("touch screen 3x", 0, 27, 256, 165, 36, 68 + 81, 3, step=9)
     else:
         piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
+    if case in ("cards", "cards-ask"):
+        # The cards in HD: no top screen (the game's score board in the DS's font; the side panel
+        # says it), the side panel in its place.
+        if any(C(858 + x, 68 + y) == top(x * 256 // 384, y * 192 // 288) for x, y in ((100, 50), (200, 120), (300, 200))) and C(855, 200) == OUTLINE:
+            errors.append("the cards' top screen shown")
+        minigame_frame(0)
+        return
     expect("world frame", C(855, 200), OUTLINE)
     # The small world, 384 wide; without the game's status bar (176 rows: 264 high) where the
     # HD bar sits under it.
@@ -1311,8 +1318,8 @@ elif case in ("cards-wide", "social-wide", "detector-wide", "drencher-wide", "mi
     # The widescreen top screen: the secondary panel shorter, the side panel under it.
     expect("background", C(10, 10), PANEL)
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
-    expect("world frame", C(855, 100), OUTLINE)
-    minigame_frame(round(384 * (192 if case == "cards-wide" else 160 if case == "social-wide" else 176) / 341) + (18 if case == "cards-wide" else 72))
+    if case != "cards-wide": expect("world frame", C(855, 100), OUTLINE)
+    minigame_frame(0 if case == "cards-wide" else round(384 * (160 if case == "social-wide" else 176) / 341) + 72)
 elif case == "s2":
     front_menu(0)
 elif case in ("menu-2x", "menu-wide", "menu-de"):
@@ -2587,6 +2594,12 @@ words_run words-scratch G-B-sc-win-pop "2026-11-05 12:05" 40 &
 words_run words-vacuum act-vacuum "2026-01-01 14:00" 430 --input "$repo/scripts/console/vacuum-pick.txt" &
 words_run words-mixer-de G-X-music "2026-11-05 12:05" 40 --game-language 3 &
 wait
+words_run words-help-drencher G-C-wg-help-pump "2026-11-05 12:05" 10 &
+words_run words-help-crime G-C-cr-help "2026-11-05 12:05" 10 &
+words_run words-help-mixer G-D-mus-help2 "2026-11-05 12:05" 10 &
+words_run words-detector G-A-md-walk "2026-11-05 12:05" 240 --input "$repo/scripts/console/detector-dig.txt" &
+words_run words-mixersave G-X-musicsave "2026-11-05 12:05" 10 &
+wait
 last_words() { grep ': words ' "$tmp/$1.log" | tail -n 1; }
 words_moogoo() {
     last_words words-moogoo | grep -q '| Player 1 | .*| Player 2 | .*| Player 3 |' || { echo "  words-moogoo: no Player 1-3: $(last_words words-moogoo)"; return 1; }
@@ -2607,6 +2620,21 @@ words_mixer_de() {
     ! last_words words-mixer-de | grep -q '| START |' || { echo "  words-mixer-de: START as X's word"; return 1; }
 }
 check_pad words-mixer-de words_mixer_de
+# A help text up in a loaded state (no touch since: its tail in the game's scratch buffer,
+# MinigameHelpInRam) in the HD box; the detector's last find named after its card closed, no
+# signal said None; the unread save page (G-X-musicsave: RAM reads, its part not yet): no hints.
+words_help() { last_words "$1" | grep -q "$2" || { echo "  $1: no \"$2\": $(last_words "$1")"; return 1; }; }
+check_pad words-help-drencher words_help words-help-drencher 'Pump this device'
+check_pad words-help-crime words_help words-help-crime 'scare one'
+check_pad words-help-mixer words_help words-help-mixer 'begins the song'
+words_detector() {
+    in_order words-detector 'words .*Found: \| — ' 'words .*Found: \| Lead Rock \|' || return 1
+    last_words words-detector | grep -q 'Found: | Lead Rock |' || { echo "  words-detector: the find forgotten"; return 1; }
+    ! grep -q 'words .*Signal | 0%' "$tmp/words-detector.log" || { echo "  words-detector: Signal 0%"; return 1; }
+}
+check_pad words-detector words_detector
+words_mixersave() { last_words words-mixersave | grep -q '^frame [0-9]*: words Burn Song to Cartridge | [0-9:]* [ap]m | ' || { echo "  words-mixersave: $(last_words words-mixersave)"; return 1; }; }
+check_pad words-mixersave words_mixersave
 art_palette() {
     in_order mg-art-palette 'minigame art .*swatch=3 page=0 ' 'minigame art .*page=1 ' 'minigame art .*page=2 ' 'minigame art .*swatch=4 page=2 ' \
         'popup state=2 kind=2 .*done painting'

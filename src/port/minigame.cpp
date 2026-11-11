@@ -177,13 +177,15 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         if (phase == 1) return {PointHint(rom), touch, {{C(Button::X), Sep("/"), C(Button::B)}, own(OwnWordId::MixerStop), true}, octave};
         if (phase == 2) return {PointHint(rom), touch, {{C(Button::RB), Sep("/"), C(Button::B)}, own(OwnWordId::MixerStop), true}, octave};
         // (Idle: every button has a use; the pointer and A as one hint, the D-pad's three as one.)
-        return {{{C(Button::LStick), Sep("+"), C(Button::A)}, own(OwnWordId::MixerPoint)}, {{C(Button::X)}, own(OwnWordId::MixerPlay)},
+        return {{{C(Button::LStick), Sep("/"), C(Button::RStick), Sep("+"), C(Button::A)}, own(OwnWordId::MixerPoint)}, {{C(Button::X)}, own(OwnWordId::MixerPlay)},
                 {{C(Button::RB)}, Words(rom, kStrMgMixRecord)}, {{C(Button::Y)}, Words(rom, kStrMgMixVox)}, {{C(Button::LB)}, Words(rom, kStrMgMixGenre)},
                 {{C(Button::Start)}, own(OwnWordId::MixerHelp)}, {{C(Button::B)}, Words(rom, kStrMgMixQuit)}};
         // (the D-pad's octave, sustain and PREP: the game's own keys; the octave's hint shows while it plays)
     }
     case Screen::MixerSave:
     {
+        // (its part unread while the RAM reads: the page not up yet, black: nothing to press)
+        if (game.valid && !game.minigame.mixerSave.valid) return {};
         if (quitArmed) return {{{C(Button::A)}, own(OwnWordId::SaveOverwrite), true}, {{C(Button::DPad)}, own(OwnWordId::HintChoose)}};
         return {{{C(Button::DPad)}, own(OwnWordId::HintChoose)}, {{C(Button::A)}, own(SaveSlotAt(focus) >= 0 ? OwnWordId::SaveHere : OwnWordId::SaveType)},
                 {{C(Button::Y)}, own(OwnWordId::SaveErase)}, {{C(Button::B)}, own(OwnWordId::ShellBack)}};
@@ -212,7 +214,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
             for (int t = 0; t < 3; t++)
                 if (t != tool) h.push_back({{C(key[t])}, w.tools[t], alert[t]});
         }
-        h.push_back({{C(Button::B)}, w.quit});
+        h.push_back({{C(Button::B)}, Words(rom, kStrMgQuit)});   // (the game's Quit, as the cards', MooGoo's, the lottery's)
         return h;
     }
     case Screen::Detector:
@@ -229,7 +231,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         const PopupState& p = game.town.popup;
         if (p.valid && p.state >= 1 && p.state <= 3 && p.kind == 2) return AskHints(rom, askFocus);
         // (the pointer and A as one hint, as the mixer's: the bar holds eight hints in no language)
-        return {{{C(Button::LStick), Sep("+"), C(Button::A)}, w.paint}, {{C(Button::LB), C(Button::RB)}, w.tool},
+        return {{{C(Button::LStick), Sep("/"), C(Button::RStick), Sep("+"), C(Button::A)}, w.paint}, {{C(Button::LB), C(Button::RB)}, w.tool},
                 {{C(Button::X)}, w.colour}, {{C(Button::Back)}, Own(rom, OwnWordId::ArtNextPalette)}, {{C(Button::Y)}, w.undo}, {{C(Button::B)}, w.done}};
     }
     case Screen::MooGoo:
@@ -261,7 +263,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         if (d.valid && d.helpText) return {{{C(Button::A)}, Own(rom, OwnWordId::Close)}};
         if (d.valid && d.help)
             return {{{C(Button::A), C(Button::X), C(Button::Y), C(Button::RB)}, Own(rom, OwnWordId::HelpWhat)}, {{C(Button::B)}, Own(rom, OwnWordId::HelpLeave)}};
-        return {{{C(Button::LStick)}, Own(rom, OwnWordId::DetectorWalk)},
+        return {{{C(Button::LStick), Sep("/"), C(Button::DPad)}, Own(rom, OwnWordId::DetectorWalk)},
                 {{C(Button::A)}, Own(rom, OwnWordId::DrencherFire)},
                 {{C(Button::X)}, Own(rom, OwnWordId::DrencherPump), low},
                 {{C(Button::Y)}, Own(rom, OwnWordId::DrencherTarget)},
@@ -308,7 +310,8 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         // (no find yet); the bowl unread: the stylus held at the hand.
         bool find = false;
         for (const VacuumItem& t : v.items) find = find || !t.Dust();
-        const OwnWordId a = !v.bowl ? OwnWordId::VacuumGrab : taking ? OwnWordId::VacuumTaking : find ? OwnWordId::VacuumTake : OwnWordId::VacuumNoFind;
+        // (the funnel's keep animation still running: the find still on its way, A's word kept)
+        const OwnWordId a = !v.bowl ? OwnWordId::VacuumGrab : taking || v.keeping ? OwnWordId::VacuumTaking : find ? OwnWordId::VacuumTake : OwnWordId::VacuumNoFind;
         return {{{C(Button::LStick)}, Own(rom, OwnWordId::VacuumDrive)}, {{C(Button::RStick)}, Own(rom, OwnWordId::VacuumHand)},
                 {{C(Button::A)}, Own(rom, a)}, {{C(Button::Y)}, Own(rom, clog ? OwnWordId::VacuumBlowNow : OwnWordId::VacuumBlow), clog},
                 {{C(Button::B)}, Own(rom, OwnWordId::DrencherPutAway)}};
@@ -489,10 +492,17 @@ int AutopsyValues(Composition& c, int y, const AutopsyState& a, const RomData& r
 std::string FindName(const RomData& rom, int type)
 {
     if (type < 0 || type >= kMgFindTypes) return "";
-    std::string a = Words(rom, kStrMgFind0 + 2 * type), b = Words(rom, kStrMgFind0 + 2 * type + 1);
-    auto empty = [](const std::string& s) { return s.empty() || s == "\xC2\xB9"; };
-    if (empty(a)) return empty(b) ? "" : b;
-    return empty(b) ? a : a + " " + b;
+    auto trim = [](std::string s) {
+        while (!s.empty() && s.back() == ' ') s.pop_back();
+        while (!s.empty() && s.front() == ' ') s.erase(0, 1);
+        return s;
+    };
+    std::string a = trim(Words(rom, kStrMgFind0 + 2 * type)), b = trim(Words(rom, kStrMgFind0 + 2 * type + 1));
+    // (an empty line of the card: nothing, or the game's one-letter filler "¹", in whatever bytes)
+    auto empty = [](const std::string& s) { return s.size() <= 2 && std::none_of(s.begin(), s.end(), [](char ch) { return std::isalnum((unsigned char)ch); }); };
+    std::string n = empty(a) ? (empty(b) ? "" : b) : empty(b) ? a : a + " " + b;
+    while (!n.empty() && n.back() == ' ') n.pop_back();   // (a line's trailing blanks)
+    return n;
 }
 
 // The detector's values: the charge (the game's gauge), the signal (a find in range: how well
@@ -507,14 +517,16 @@ int DetectorValues(Composition& c, int y, const DetectorState& d, const RomData&
     MeterRow(c, ix, yy, iw, w.charge, charge, Health(charge), Percent(d.charge, kDetectorFull), 0xFFFFFFFF);
     yy += kMgRow;
     const float signal = d.inRange ? 1.0f - std::clamp(d.mismatch, 0, 128) / 128.0f : 0.0f;
-    MeterRow(c, ix, yy, iw, w.signal, d.inRange ? signal : 0, kMeterGreen, d.inRange ? Percent(128 - std::clamp(d.mismatch, 0, 128), 128) : w.none,
-             d.inRange ? kGoodColour : kHeadColour);
+    // (no signal, in range or not, says None: never "0%" beside it)
+    const bool sensed = d.inRange && d.mismatch < 128;
+    MeterRow(c, ix, yy, iw, w.signal, sensed ? signal : 0, kMeterGreen, sensed ? Percent(128 - std::clamp(d.mismatch, 0, 128), 128) : w.none,
+             sensed ? kGoodColour : kHeadColour);
     yy += kMgRow;
     MeterRow(c, ix, yy, iw, w.depth, std::clamp(d.slider, 0, kDetectorSliderMax) / (float)kDetectorSliderMax, 0xFFB2B2E3,
              Percent(d.slider, kDetectorSliderMax), 0xFFFFFFFF);
     yy += kMgRow;
-    // The game's card: "Found:" and the find (while it is up).
-    const std::string found = d.card ? FindName(rom, d.findType) : "";
+    // The game's card: "Found:" and the find (while it is up, and the last one after).
+    const std::string found = d.card ? FindName(rom, d.findType) : FindName(rom, d.lastFind);
     PanelText(c, {ix, yy, kMgLabelW - 8, kMgRow}, Words(rom, kStrMgFound), kMgValueSize - 2, kMgValueMin, Align::Left, Weight::Bold, 0xFFFFFFFF);
     PanelText(c, {ix + kMgLabelW, yy, iw - kMgLabelW, kMgRow}, found.empty() ? "\xE2\x80\x94" : found, kMgValueSize - 2, kMgValueMin, Align::Right,
          Weight::ExtraBold, found.empty() ? kHeadColour : kValueColour);
@@ -812,8 +824,12 @@ void AddMark(Composition& c, Rect m)
     if (m.w <= 0) return;
     const Rect to = kActivityBottomTo;
     const int x0 = to.x + m.x * to.w / SW, y0 = to.y + m.y * to.h / SH, x1 = to.x + (m.x + m.w) * to.w / SW, y1 = to.y + (m.y + m.h) * to.h / SH;
-    constexpr int t = 5;
-    c.overlays.push_back({{x0 - t, y0 - t, x1 - x0 + 2 * t, y1 - y0 + 2 * t}, 0, 10, t, kMarkColour, -1});
+    // The kit's focus ring (ui::FocusRing's look: the green outside, a white line inside it), drawn
+    // as outlines (overlays: the playfield's picture shows through them).
+    const Rect r {x0, y0, x1 - x0, y1 - y0};
+    constexpr int outer = kFocusOuterW, inner = kFocusInnerW;
+    c.overlays.push_back({{r.x - outer, r.y - outer, r.w + 2 * outer, r.h + 2 * outer}, 0, 10 + outer, outer - inner, kMarkColour, -1});
+    c.overlays.push_back({{r.x - inner, r.y - inner, r.w + 2 * inner, r.h + 2 * inner}, 0, 10 + inner, inner, kFocusInner, -1});
 }
 
 // The pointer over the playfield: a ring with a dot at its point, gold while the stylus is down.
@@ -850,6 +866,13 @@ int SocialAnswers(Composition& c, int y, const u32* bottom, const RomData& rom)
     const Button dir[3] = {Button::DPadL, Button::DPadU, Button::DPadR};
     for (int i = 0; i < 3; i++, yy += kMgAnswerRow)
     {
+        // Each answer on a kit row (the game's words are not in RAM: its label stays a live crop).
+        UiItem row = PanelItem({x + 4, yy + 3, w - 8, kMgAnswerRow - 6});
+        row.plain = true;
+        row.fill = kMgBar;
+        row.radius = 10;
+        row.layer = 0;
+        c.ui.push_back(row);
         const Rect r = ChipRect(0, 0, dir[i], "", kMgChipBig);
         UiItem a = ChipItem(x + 10, yy + (kMgAnswerRow - r.h) / 2, dir[i], "", kMgChipBig);
         a.layer = 1;
@@ -860,11 +883,11 @@ int SocialAnswers(Composition& c, int y, const u32* bottom, const RomData& rom)
     return yy + 10 - y;
 }
 
-// One hint's width at `size` (its chips, separators, label).
+// One hint's width with its label at `size` (its chips at kMgHintChip, separators, label).
 int HintWidth(const HdHint& h, float size)
 {
     float w = 0;
-    for (const Token& t : h.tokens) w += (t.chip ? ChipRect(0, 0, t.b, "", size).w : std::ceil(TextWidth(t.sep, size, Weight::ExtraBold))) + 6;
+    for (const Token& t : h.tokens) w += (t.chip ? ChipRect(0, 0, t.b, "", kMgHintChip).w : std::ceil(TextWidth(t.sep, size, Weight::ExtraBold))) + 6;
     if (!h.text.empty()) w += 4 + std::ceil(TextWidth(h.text, size, Weight::ExtraBold));
     return (int)w;
 }
@@ -892,10 +915,53 @@ PromptFit FitPrompts(const std::vector<HdHint>& hints)
     return {size, gap, total(size, gap), total(size, gap) <= avail};
 }
 
-// The prompt bar under the playfield, across the frame: the hints in a row, centred, shrunk to fit,
-// on a dark well (its words at 18 px read there: ui::kMinText).
-void AddPrompts(Composition& c, const std::vector<HdHint>& hints)
+// Start's help ("?") and Back's (the painting's next palette page) are no hints of the bar: they go
+// to the title's row, at the playfield's top right (the least used: the bar keeps room for the
+// game's own, its chips at one size).
+bool HelpHint(const HdHint& h)
 {
+    return h.tokens.size() == 1 && h.tokens[0].chip && (h.tokens[0].b == Button::Start || h.tokens[0].b == Button::Back) && !h.lit;
+}
+std::vector<HdHint> BarHints(const std::vector<HdHint>& hints)
+{
+    std::vector<HdHint> bar;
+    for (const HdHint& h : hints)
+        if (!HelpHint(h)) bar.push_back(h);
+    return bar;
+}
+// The title row's width the help hints take (0: none), their gaps included.
+int HelpWidth(const std::vector<HdHint>& hints)
+{
+    int w = 0;
+    for (const HdHint& h : hints)
+        if (HelpHint(h)) w += ChipRect(0, 0, h.tokens[0].b, h.text, kMgHintSize, 0, Weight::ExtraBold).w + 36 + 10;
+    return w;
+}
+void AddHelpHint(Composition& c, const std::vector<HdHint>& hints)
+{
+    int right = kActivityBottomTo.x + kActivityBottomTo.w + 6;
+    for (auto h = hints.rbegin(); h != hints.rend(); ++h)
+    {
+        if (!HelpHint(*h)) continue;
+        const Button b = h->tokens[0].b;
+        const Rect r = ChipRect(0, 0, b, h->text, kMgHintSize, 0, Weight::ExtraBold);
+        const int w = r.w + 36;
+        UiItem plate = PanelItem({right - w, kMgTitleY, w, kMgTitleH});
+        plate.fill = kMgWell;
+        c.ui.push_back(plate);
+        UiItem it = ChipItem(right - w + 18, kMgTitleY + (kMgTitleH - r.h) / 2, b, h->text, kMgHintSize, 0, Weight::ExtraBold);
+        it.layer = 1;
+        c.ui.push_back(it);
+        right -= w + 10;
+    }
+}
+
+// The prompt bar under the playfield, across the frame: the hints in a row, centred, shrunk to fit,
+// on a dark well (its words at 18 px read there: ui::kMinText); the chips one size (kMgHintChip).
+void AddPrompts(Composition& c, const std::vector<HdHint>& all)
+{
+    AddHelpHint(c, all);
+    const std::vector<HdHint> hints = BarHints(all);
     if (hints.empty()) return;
     UiItem bar = PanelItem(kMgPrompt);
     bar.fill = kMgWell;
@@ -921,8 +987,8 @@ void AddPrompts(Composition& c, const std::vector<HdHint>& hints)
         {
             if (t.chip)
             {
-                const Rect r = ChipRect(0, 0, t.b, "", size);
-                UiItem it = ChipItem(x, y + (h - r.h) / 2, t.b, "", size);
+                const Rect r = ChipRect(0, 0, t.b, "", kMgHintChip);
+                UiItem it = ChipItem(x, y + (h - r.h) / 2, t.b, "", kMgHintChip);
                 it.layer = 1;
                 c.ui.push_back(it);
                 x += r.w + 6;
@@ -995,6 +1061,32 @@ int MinigameHelpAt(Screen s, int x, int y)
     return -1;
 }
 
+int MinigameHelpInRam(Screen s, const u8* ram, u32 mask, const RomData& rom)
+{
+    if (!ram) return -1;
+    std::vector<int> ids;   // (the text's id; the mixer's: its page's title, the body the next one)
+    if (s == Screen::Drencher) for (int id = kStrMgDrHelp0; id < kStrMgCrHelp0; id++) ids.push_back(id);
+    else if (s == Screen::Crime) for (int id = kStrMgCrHelp0; id < kStrMgCrHelp0 + 3; id++) ids.push_back(id);
+    else if (s == Screen::Mixer) for (int id = kStrMgMixHelp0; id + 1 < kStrMgMixHelpEnd; id += 2) ids.push_back(id);
+    else return -1;
+    std::string window(kMgTextScratchSize, '\0');
+    for (u32 i = 0; i < kMgTextScratchSize; i++) window[i] = (char)ram[(kMgTextScratch + i) & mask];
+    int found = -1, matches = 0;
+    for (int id : ids)
+    {
+        const int body = s == Screen::Mixer ? id + 1 : id;
+        if (body >= rom.StringCount()) continue;
+        const std::string t = rom.String(body);
+        size_t a = t.size();
+        while (a > 0 && (unsigned char)t[a - 1] >= 0x20 && (unsigned char)t[a - 1] < 0x7F) a--;
+        if (t.size() - a < 16) continue;
+        a = std::max(a, t.size() - 24);   // (its last 24 letters: the buffer keeps the tail only)
+        // (its end with the NUL after it: the text's own tail, not a longer one's middle)
+        if (window.find(t.substr(a) + std::string(1, '\0')) != std::string::npos) { found = id; matches++; }
+    }
+    return matches == 1 ? found : -1;
+}
+
 namespace
 {
 // A box of the minigame's own, or the game's popup over it, as the HD port draws it: its words,
@@ -1042,14 +1134,13 @@ bool BoxOf(Screen s, const GameState& game, const RomData& rom, MgBox& b)
 {
     const MinigameState& m = game.minigame;
     // The game's own popup (its manager's: the lottery's results and hint, the painting's question).
-    // (Its box slides in and out from below: opening and closing, and the frame after it went, the
-    // cover reaches the playfield's foot.)
+    // (Its box slides in and out from below; the HD box stays where the game's is shown, boxY, through
+    // the opening, the closing and the frame after: one place, under the veil.)
     const bool gone = !GamePopup(game) && m.popupGone.valid;
     const PopupState& p = gone ? m.popupGone : game.town.popup;
     if ((GamePopup(game) || gone) && p.boxW > 0 && p.boxTiles > 0)
     {
         b.cover = {128 - p.boxW / 2, p.boxY, p.boxW, 8 * p.boxTiles + 32};
-        if (gone || p.state != 2) b.cover.h = SH - p.boxY;
         b.text = MenuText(GameTextToUtf8(p.text));
         // (No title: over a minigame the game draws none, a question's nor a message's or hint's
         // (the lottery's); the one in RAM is stale, the last box's elsewhere: "Loading".)
@@ -1194,6 +1285,7 @@ ActivityRam MinigameRam(const GameState* game)
 {
     ActivityRam r;
     if (!game || !game->valid) return r;
+    r.read = true;
     const MinigameState& m = game->minigame;
     if (game->screen == GScreen::Cards && m.cards.valid) { r.cards = true; r.quitAsk = m.cards.quitAsk; r.message = m.cards.message; }
     if (game->screen == GScreen::Autopsy && m.autopsy.valid)
@@ -1277,20 +1369,25 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
     const Rect topTo {kActivityTopX, kActivityTopY, kActivityTopW, h};
     c.overlays.push_back({{0, 0, kConsoleW, kConsoleH}, kPanelArgb, 0, 0, 0, 0});
     c.overlays.push_back({{kActivityBottomTo.x - 6, kActivityBottomTo.y - 6, kActivityBottomTo.w + 12, kActivityBottomTo.h + 12}, kFrameArgb, 14, 6, kOutlineArgb, 0});
-    c.overlays.push_back({{topTo.x - 6, topTo.y - 6, topTo.w + 12, topTo.h + 12}, kFrameArgb, 14, 6, kOutlineArgb, 0});
+    // (The cards: no world on the top screen, the game's score board in the DS's font, which the side
+    // panel says in HD: not shown; the side panel takes its place.)
+    const bool world = s.screen != Screen::Cards;
+    if (world) c.overlays.push_back({{topTo.x - 6, topTo.y - 6, topTo.w + 12, topTo.h + 12}, kFrameArgb, 14, 6, kOutlineArgb, 0});
     c.pieces.push_back({Src::Bottom, {0, 0, SW, SH}, kActivityBottomTo});
-    c.pieces.push_back({Src::Top, {0, skip, topW, rows}, topTo});
+    if (world) c.pieces.push_back({Src::Top, {0, skip, topW, rows}, topTo});
 
-    // The title plate, over the playfield's frame.
+    const std::vector<HdHint> hints = Hints(s.screen, game, rom, pointer && pointer->quitArmed, focus, pointer ? pointer->askFocus : -1, pointer && pointer->taking);
+    // The title plate, over the playfield's frame (beside the help's hints at its right).
     if (const std::string title = Title(s.screen, game, rom); !title.empty())
     {
-        const FittedText t = FitLine(title, kMgTitleSize, kMgTitleMin, kMgTitleMaxW - 48, Weight::ExtraBold);
-        const int w = std::min(kMgTitleMaxW, (int)std::ceil(TextWidth(t.text, t.size, Weight::ExtraBold)) + 48);
+        const int maxW = kMgTitleMaxW - HelpWidth(hints);
+        const FittedText t = FitLine(title, kMgTitleSize, kMgTitleMin, maxW - 48, Weight::ExtraBold);
+        const int w = std::min(maxW, (int)std::ceil(TextWidth(t.text, t.size, Weight::ExtraBold)) + 48);
         c.ui.push_back(PanelItem({kMgTitleX, kMgTitleY, w, kMgTitleH}));
         PanelText(c, {kMgTitleX + 24, kMgTitleY, w - 48, kMgTitleH}, t.text, t.size, t.size, Align::Left, Weight::ExtraBold, 0xFFFFFFFF, 0);
     }
 
-    int y = topTo.y + topTo.h + 6;
+    int y = world ? topTo.y + topTo.h + 6 : kActivityTopY - kMgSideGap;
     if (bar)
     {
         // (Its place kept when a frame's values do not read and the bar is not drawn: no jump.)
@@ -1319,7 +1416,7 @@ void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudS
     if (content > 0) c.ui[panel].to.h = std::min(content + 2 * kMgPad, kMgSideBottom - y);
     else c.ui.erase(c.ui.begin() + (long)panel);
     // The prompt bar: the controller's hints.
-    AddPrompts(c, Hints(s.screen, game, rom, pointer && pointer->quitArmed, focus, pointer ? pointer->askFocus : -1, pointer && pointer->taking));
+    AddPrompts(c, hints);
     // MooGoo's line and turn banner in HD over the game's (its letters 1x: "Touch a Monkey!").
     if (s.screen == Screen::MooGoo && game.minigame.mooGoo.valid && !game.minigame.mooGoo.intro && !game.minigame.mooGoo.quitAsk)
     {
@@ -1425,8 +1522,11 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     bars.push_back(Hints(Screen::MixerSave, states.back().second, rom, true, 30));   // a slot's overwrite asked
     for (const std::vector<HdHint>& hs : bars)
     {
-        const PromptFit pf = FitPrompts(hs);
+        const PromptFit pf = FitPrompts(BarHints(hs));
         me.Note(kOwn, pf.size < kMgHintSize || pf.gap < kMgPromptGap, pf.fits);
+        // (the help's hints on the title row: each title beside them)
+        if (const int hw = HelpWidth(hs); hw > 0)
+            for (int id : {kStrMgDrencher, kStrMgRatARang, kStrMgMixer, kStrMgArtGallery}) me.Line(id, Words(rom, id), kMgTitleSize, kMgTitleMin, kMgTitleMaxW - hw - 48);
     }
     // The side panels' own words (their boxes as the Build functions give them).
     const float vs = kMgValueSize - 2;
