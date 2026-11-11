@@ -6,6 +6,7 @@
 #include <cstring>
 #include <vector>
 
+#include "console.h"
 #include "hotspots.h"
 
 #include "port/menuview.h"
@@ -28,7 +29,6 @@ constexpr u32 kHeadColour = 0xFFD2D6F4;    // the board's column heads: a dim la
 constexpr u32 kValueColour = 0xFFFFE9A0;   // a warm white (the money's, room info's values)
 constexpr u32 kLitFill = 0xFFB8323A;       // a hint the game asks for now (the vacuum's clog): the game's red, deepened
 constexpr u32 kNowFill = 0xFF6E4A9E;       // MooGoo: the row of the player whose turn it is (a violet: the money's words 5.5:1)
-constexpr u32 kMarkColour = 0xFF309A41;    // MooGoo's focus: the game's selection green
 constexpr u32 kMooPlate = 0xFF5A2038;      // MooGoo's line: a plate in its table's maroon
 // The side panel's and the prompt bar's wells: darker than the kit's kFillRow, so their small words
 // read (18 px: white 8.7:1, the dim heads 6:1, the money's warm white 7:1, the red words 4.7:1); a
@@ -824,12 +824,7 @@ void AddMark(Composition& c, Rect m)
     if (m.w <= 0) return;
     const Rect to = kActivityBottomTo;
     const int x0 = to.x + m.x * to.w / SW, y0 = to.y + m.y * to.h / SH, x1 = to.x + (m.x + m.w) * to.w / SW, y1 = to.y + (m.y + m.h) * to.h / SH;
-    // The kit's focus ring (ui::FocusRing's look: the green outside, a white line inside it), drawn
-    // as outlines (overlays: the playfield's picture shows through them).
-    const Rect r {x0, y0, x1 - x0, y1 - y0};
-    constexpr int outer = kFocusOuterW, inner = kFocusInnerW;
-    c.overlays.push_back({{r.x - outer, r.y - outer, r.w + 2 * outer, r.h + 2 * outer}, 0, 10 + outer, outer - inner, kMarkColour, -1});
-    c.overlays.push_back({{r.x - inner, r.y - inner, r.w + 2 * inner, r.h + 2 * inner}, 0, 10 + inner, inner, kFocusInner, -1});
+    AddKitRingOverlay(c, {x0, y0, x1 - x0, y1 - y0}); // (outlines: the playfield shows through)
 }
 
 // The pointer over the playfield: a ring with a dot at its point, gold while the stylus is down.

@@ -63,7 +63,9 @@ bool ClipOutside(UiItem& im, Rect cover)
 }
 
 // The popup's text as shown: the title (kinds 0 and 3; the question's is stale: the game draws
-// none) and the text, decoded, its escapes and placeholders dropped.
+// none) and the text, decoded, its escapes and placeholders dropped. (In town RAM's title is the
+// one the game draws: Game Paused drawn above its text, a goal's empty and none drawn; checked by
+// console_check's words-popup-pause and words-popup-goal. Over a minigame it is stale: BoxOf.)
 void PopupWords(const PopupState& p, std::string& title, std::string& text)
 {
     title = p.kind == 2 ? "" : MenuText(GameTextToUtf8(p.title));

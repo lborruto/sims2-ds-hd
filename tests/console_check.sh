@@ -98,6 +98,42 @@ sims2wide_slot() {
 }
 bin=sims2wide_slot
 
+# The game's text by its string id (this script holds no text of the game's): gtext ID [LANG [PART
+# [WORDS]]] prints string ID of language LANG (1, English, by default), from --dump-strings (one dump
+# per language, made here), its {..} escapes dropped; with PART, only its PART-th piece between
+# newlines and placeholders (@N, the money sign), trimmed; with WORDS, only its first WORDS words.
+# gx: the same, escaped for grep -E (in_order).
+for lang in 1 3; do
+    "$real_bin" "$rom" --dump-strings --language "$lang" > "$tmp/strings-$lang.tsv" 2>/dev/null
+    # (an empty pattern would match anything: no table, no check)
+    [ "$(wc -l < "$tmp/strings-$lang.tsv")" -gt 3000 ] || { echo "no string table in language $lang (--dump-strings)"; exit 2; }
+done
+gtext() {
+    "$python" -I - "$tmp/strings-${2:-1}.tsv" "$1" "${3:-}" "${4:-}" <<'EOF'
+import re, sys
+path, want, part, words = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+text = None
+with open(path, encoding="utf-8", errors="replace") as f:
+    for line in f:
+        sid, _, t = line.rstrip("\n").partition("\t")
+        if sid == want:
+            text = t
+            break
+if text is None:
+    sys.exit("no string " + want)
+text = re.sub(r"\{[^}]*\}", "", text)
+if part:
+    pieces = [p.strip() for p in re.split(r"\\n|@[0-9]*|\$", text)]
+    text = [p for p in pieces if p][int(part)]
+else:
+    text = text.replace("\\n", " ")
+if words:
+    text = " ".join(text.split()[: int(words)])
+print(text)
+EOF
+}
+gx() { gtext "$@" | sed -e 's/[][\.*^$|+?(){}]/\\&/g'; }
+
 # run NAME STATE [options...]: frame 119 as the console's picture (NAME/c/f000119.png) and as
 # the two screens (NAME/r/f000119.png); NAME.ok only if both runs went to their end.
 run() {
@@ -1686,7 +1722,7 @@ build_cancel() {
 }
 build_buy() {
     in_order pad-build-buy 'build .*page=1 chosen=1 money=2000 ' 'hotel .*building=0x2 .*money=1000 earned=0 spent=1000 ' \
-        'build scroll=0 page=0 chosen=-1 money=1000 places=0:2000:70:poor,8:' 'game Panel/Interact' 'popup state=2 kind=0 .*text="Your build permit has been approved' \
+        'build scroll=0 page=0 chosen=-1 money=1000 places=0:2000:70:poor,8:' 'game Panel/Interact' "popup state=2 kind=0 .*text=\"$(gx 2628 1 0 5)" \
         'popup none' || return 1
     ! grep -q 'money=0 ' "$tmp/pad-build-buy.log" || { echo "  pad-build-buy: bought twice"; return 1; }
 }
@@ -1776,10 +1812,10 @@ check_pad pad-slot slot_save
 # Jun's slot → "Overwrite this save?" (kind 2), the HD focus on its Yes; B → its cross, the
 # question gone, nothing saved; A, A → its tick, "Saving", slot 3 written (Jun's money now).
 ask_no() {
-    in_order pad-ask-no 'saves current=2 .*2=Jun/9150/' 'console menu closed, focus 2' 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup none' || return 1
+    in_order pad-ask-no 'saves current=2 .*2=Jun/9150/' 'console menu closed, focus 2' "popup state=1 kind=2 .*$(gx 2423 1 0 1)" 'focus 0' 'popup none' || return 1
     if grep -q -E 'kind=3|2=Jun/14843' "$tmp/pad-ask-no.log"; then echo "  pad-ask-no: saved after B"; return 1; fi
 }
-ask_yes() { in_order pad-ask-yes 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup state=1 kind=3' 'saves current=2 .*2=Jun/14843/'; }
+ask_yes() { in_order pad-ask-yes "popup state=1 kind=2 .*$(gx 2423 1 0 1)" 'focus 0' 'popup state=1 kind=3' 'saves current=2 .*2=Jun/14843/'; }
 check_pad pad-ask-no ask_no
 check_pad pad-ask-yes ask_yes
 # Popups, the phone (src/port/popup.*, phone.*): from B-pause, A (the HD popup's button: the
@@ -1788,10 +1824,10 @@ check_pad pad-ask-yes ask_yes
 # title; from s7, Down, A → the phonebook (page 5), A → the contacts (7), A → the call's answer
 # (9, the Sim), A → the game's Down five times to Exit, then its A (back to 7), B → the panel; from
 # C-cas-msg1, A → ten Downs past the text to "Next Message", then A: the next message (slot 1).
-pause_a() { in_order pad-pause-a 'popup state=2 kind=0 .*Game Paused' 'popup state=3' 'game Panel/Interact'; }
+pause_a() { in_order pad-pause-a "popup state=2 kind=0 .*$(gx 22)" 'popup state=3' 'game Panel/Interact'; }
 pause_start() { in_order pad-pause-start 'popup state=2 kind=0' 'popup state=3' 'game Panel/Interact'; }
 quit_no() {
-    in_order pad-quit-no 'console menu open, focus 1' 'popup state=1 kind=2 .*Quit' 'popup state=3' 'game Panel/Options' 'console menu open, focus 1' || return 1
+    in_order pad-quit-no 'console menu open, focus 1' "popup state=1 kind=2 .*$(gx 65 1 0 1)" 'popup state=3' 'game Panel/Options' 'console menu open, focus 1' || return 1
     if grep -q -E 'game FrontEnd|console menu closed' "$tmp/pad-quit-no.log"; then echo "  pad-quit-no: the menu closed or the game quit"; return 1; fi
 }
 phone_pages() {
@@ -2067,7 +2103,7 @@ settings_pages() {
     in_order pad-settings-pages 'settings page=2 .*art=0 concept=8' 'settings page=2 .*art=1 concept=8' 'settings page=3' 'settings page=0' 'settings page=3' 'settings page=2' 'front Title' 'title phase=0'
 }
 load_slot() {
-    in_order pad-load-slot 'front Load' 'popup state=[1-3] kind=3 .*title="Loading"' 'front None' 'game Panel/Interact' 'game Dialogue'
+    in_order pad-load-slot 'front Load' "popup state=[1-3] kind=3 .*title=\"$(gx 2425)\"" 'front None' 'game Panel/Interact' 'game Dialogue'
 }
 boot_keys() {
     in_order pad-boot-keys 'boot mode=3' 'boot mode=2' 'boot mode=1' 'boot mode=0' 'front Title' 'title phase=0' || return 1
@@ -2406,8 +2442,8 @@ art_play() {
 }
 check_pad mg-art-play art_play
 art_done() {
-    in_order mg-art-done 'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=0,1' 'popup none' \
-        'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=1,1' 'popup none'
+    in_order mg-art-done "popup state=2 kind=2 .*$(gx 2440)" 'popup state=2 kind=2 pressed=0,1' 'popup none' \
+        "popup state=2 kind=2 .*$(gx 2440)" 'popup state=2 kind=2 pressed=1,1' 'popup none'
 }
 check_pad mg-art-done art_done
 # The timing minigames on the controller (the research's held-out states on copies of the complete
@@ -2586,10 +2622,11 @@ vacuum_none() {
 }
 check_pad mg-vacuum-none vacuum_none
 # The words the HD frames say (--print-words: the composition's texts and chips' labels; ux task 6):
-# MooGoo's players before their names are set ("Player 1", never the table's string 0, its copyright
-# line); the lottery's result popup with no title (RAM's is a stale "Loading"); the vacuum's money
-# this session (§75 once the gold ring is kept, while the lifetime total waits for the put away);
-# the German mixer's X "Abspielen" (the game's word is its button's, START, beside the help's chip).
+# MooGoo's players before their names are set (strings 1758-1760, never the table's string 0, its
+# copyright line); the lottery's result popup (string 317) with no title (RAM's is a stale 2425); the
+# vacuum's money this session (§75 once the gold ring is kept, while the lifetime total waits for
+# the put away); the German mixer's X our own MixerPlay (the game's word, 1778, is its button's,
+# beside the help's chip). The game's words by id only (gtext, gx): no game text in this script.
 words_run() {
     local name=$1 state=$2 clock=$3 frames=$4
     shift 4
@@ -2608,45 +2645,58 @@ words_run words-help-crime G-C-cr-help "2026-11-05 12:05" 10 &
 words_run words-help-mixer G-D-mus-help2 "2026-11-05 12:05" 10 &
 words_run words-detector G-A-md-walk "2026-11-05 12:05" 240 --input "$repo/scripts/console/detector-dig.txt" &
 words_run words-mixersave G-X-musicsave "2026-11-05 12:05" 10 &
+words_run words-popup-pause B-pause "2026-01-01 12:00" 40 &
+words_run words-popup-goal s6 "2026-01-01 12:00" 40 &
 wait
 last_words() { grep ': words ' "$tmp/$1.log" | tail -n 1; }
 words_moogoo() {
-    last_words words-moogoo | grep -q '| Player 1 | .*| Player 2 | .*| Player 3 |' || { echo "  words-moogoo: no Player 1-3: $(last_words words-moogoo)"; return 1; }
-    ! grep -q 'words .*Electronic Arts' "$tmp/words-moogoo.log" || { echo "  words-moogoo: the copyright line as a name"; return 1; }
+    last_words words-moogoo | grep -q -E "\| $(gx 1758) \| .*\| $(gx 1759) \| .*\| $(gx 1760) \|" || { echo "  words-moogoo: no players 1-3 (strings 1758-1760): $(last_words words-moogoo)"; return 1; }
+    ! grep ' words ' "$tmp/words-moogoo.log" | grep -q -F "$(gtext 0 1 0)" || { echo "  words-moogoo: the copyright line (string 0) as a name"; return 1; }
 }
 check_pad words-moogoo words_moogoo
 words_scratch() {
-    last_words words-scratch | grep -q 'you won' || { echo "  words-scratch: no result: $(last_words words-scratch)"; return 1; }
-    ! grep -q 'words .*Loading' "$tmp/words-scratch.log" || { echo "  words-scratch: a stale title"; return 1; }
+    last_words words-scratch | grep -q -F "$(gtext 317 1 0)" || { echo "  words-scratch: no result (string 317): $(last_words words-scratch)"; return 1; }
+    ! grep ' words ' "$tmp/words-scratch.log" | grep -q -F "$(gtext 2425)" || { echo "  words-scratch: a stale title (string 2425)"; return 1; }
 }
 check_pad words-scratch words_scratch
 words_vacuum() {
-    in_order words-vacuum 'words Vacuum \| Vacuum Earnings \| §0 ' 'minigame vacuum .*session=75' 'words Vacuum \| Vacuum Earnings \| §75 '
+    local head
+    head="words $(gx 1968) \| $(gx 2014 1 0 | sed 's/:$//') \|"
+    in_order words-vacuum "$head §0 " 'minigame vacuum .*session=75' "$head §75 "
 }
 check_pad words-vacuum words_vacuum
 words_mixer_de() {
     last_words words-mixer-de | grep -q '| Abspielen |' || { echo "  words-mixer-de: no Abspielen: $(last_words words-mixer-de)"; return 1; }
-    ! last_words words-mixer-de | grep -q '| START |' || { echo "  words-mixer-de: START as X's word"; return 1; }
+    ! last_words words-mixer-de | grep -q -F "| $(gtext 1778 3) |" || { echo "  words-mixer-de: the button word (string 1778) as X's word"; return 1; }
 }
 check_pad words-mixer-de words_mixer_de
 # A help text up in a loaded state (no touch since: its tail in the game's scratch buffer,
 # MinigameHelpInRam) in the HD box; the detector's last find named after its card closed, no
 # signal said None; the unread save page (G-X-musicsave: RAM reads, its part not yet): no hints.
-words_help() { last_words "$1" | grep -q "$2" || { echo "  $1: no \"$2\": $(last_words "$1")"; return 1; }; }
-check_pad words-help-drencher words_help words-help-drencher 'Pump this device'
-check_pad words-help-crime words_help words-help-crime 'scare one'
-check_pad words-help-mixer words_help words-help-mixer 'begins the song'
+words_help() { last_words "$1" | grep -q -E "$2" || { echo "  $1: no \"$2\": $(last_words "$1")"; return 1; }; }
+check_pad words-help-drencher words_help words-help-drencher "$(gx 1663 1 0 3)"
+check_pad words-help-crime words_help words-help-crime "$(gx 1667 1 0 4)"
+check_pad words-help-mixer words_help words-help-mixer "$(gx 1779 1 0 4)"
 words_detector() {
-    in_order words-detector 'words .*Found: \| — ' 'words .*Found: \| Lead Rock \|' || return 1
-    last_words words-detector | grep -q 'Found: | Lead Rock |' || { echo "  words-detector: the find forgotten"; return 1; }
+    local found rock
+    found=$(gx 1160) rock=$(gx 1164)
+    in_order words-detector "words .*$found \| — " "words .*$found \| $rock \|" || return 1
+    last_words words-detector | grep -q -F "$(gtext 1160) | $(gtext 1164) |" || { echo "  words-detector: the find (strings 1160, 1164) forgotten"; return 1; }
     ! grep -q 'words .*Signal | 0%' "$tmp/words-detector.log" || { echo "  words-detector: Signal 0%"; return 1; }
 }
 check_pad words-detector words_detector
-words_mixersave() { last_words words-mixersave | grep -q '^frame [0-9]*: words Burn Song to Cartridge | [0-9:]* [ap]m | ' || { echo "  words-mixersave: $(last_words words-mixersave)"; return 1; }; }
+words_mixersave() { last_words words-mixersave | grep -q -E "^frame [0-9]*: words $(gx 1805) \| [0-9:]* [ap]m \| " || { echo "  words-mixersave: $(last_words words-mixersave)"; return 1; }; }
 check_pad words-mixersave words_mixersave
+# A town message popup (kind 0) titled as the game draws it: Game Paused (string 22, drawn by the
+# game above its text 23) first; the goal unlocked (2448) has none in RAM nor on the DS screen, so
+# its words start with the text. (Over a minigame RAM's title is stale: none drawn, words-scratch.)
+words_popup_pause() { last_words words-popup-pause | grep -q -E "^frame [0-9]*: words $(gx 22) \| $(gx 23 1 0 3)" || { echo "  words-popup-pause: $(last_words words-popup-pause)"; return 1; }; }
+check_pad words-popup-pause words_popup_pause
+words_popup_goal() { last_words words-popup-goal | grep -q -E "^frame [0-9]*: words $(gx 2448 1 0 3)" || { echo "  words-popup-goal: $(last_words words-popup-goal)"; return 1; }; }
+check_pad words-popup-goal words_popup_goal
 art_palette() {
     in_order mg-art-palette 'minigame art .*swatch=3 page=0 ' 'minigame art .*page=1 ' 'minigame art .*page=2 ' 'minigame art .*swatch=4 page=2 ' \
-        'popup state=2 kind=2 .*done painting'
+        "popup state=2 kind=2 .*$(gx 2440)"
 }
 check_pad mg-art-palette art_palette
 drencher_help() {
@@ -2704,11 +2754,11 @@ wait
 pad_t2 t2-cas-arrive s2 cas-arrive 140 "2026-01-01 12:00" --compose --shot-every 1 --shot-dir "$tmp/t2-cas-arrive" &
 wait
 ask_aa() {
-    in_order t2-ask-aa 'popup state=1 kind=2 .*Overwrite' 'focus 0' 'popup none' || return 1
+    in_order t2-ask-aa "popup state=1 kind=2 .*$(gx 2423 1 0 1)" 'focus 0' 'popup none' || return 1
     if grep -q -E 'kind=3|2=Jun/14843' "$tmp/t2-ask-aa.log"; then echo "  t2-ask-aa: saved by the second A"; return 1; fi
 }
 quit_aa() {
-    in_order t2-quit-aa 'popup state=1 kind=2 .*Quit' 'console menu open, focus 0' 'popup none' 'game Panel/Options' 'console menu open, focus 1' || return 1
+    in_order t2-quit-aa "popup state=1 kind=2 .*$(gx 65 1 0 1)" 'console menu open, focus 0' 'popup none' 'game Panel/Options' 'console menu open, focus 1' || return 1
     if grep -q 'game FrontEnd' "$tmp/t2-quit-aa.log"; then echo "  t2-quit-aa: quit by the second A"; return 1; fi
 }
 cas_lb() {
@@ -2773,7 +2823,7 @@ check_pad t2-gift-bow gift_bow
 check_pad t2-cas-arrive cas_arrive
 stat_held() { grep -q -E 'stat page=0 .* held=[1-4]' "$tmp/pad-stat.log" || { echo "  pad-stat: the page left not held while the game showed Main"; return 1; }; }
 check_pad pad-stat stat_held
-load_done() { in_order pad-load-slot 'popup state=[1-3] kind=3 .*title="Loading"' 'load .* loading' 'front None'; }
+load_done() { in_order pad-load-slot "popup state=[1-3] kind=3 .*title=\"$(gx 2425)\"" 'load .* loading' 'front None'; }
 check_pad pad-load-slot load_done
 # The minigames' messages in HD (the remake's polish, task 3; copies of the complete save, pad only): a
 # question of a minigame (the cards' and MooGoo's quit, the painting's "done?", the mixer's save
@@ -2840,7 +2890,7 @@ t3_cards_turn() {
     t3_pic "$tmp/t3-cards-turn/f000230.png" box && t3_pic "$tmp/t3-cards-turn/f000640.png" ring_free
 }
 t3_art_aa() {
-    in_order t3-art-aa 'popup state=2 kind=2 .*done painting' 'popup state=2 kind=2 pressed=0,1' 'popup none' 'minigame art .*painted=[1-9]' || return 1
+    in_order t3-art-aa "popup state=2 kind=2 .*$(gx 2440)" 'popup state=2 kind=2 pressed=0,1' 'popup none' 'minigame art .*painted=[1-9]' || return 1
     if grep -q 'pressed=1,1' "$tmp/t3-art-aa.log"; then echo "  t3-art-aa: Yes by A A"; return 1; fi
     t3_pic "$tmp/t3-art-aa/f000040.png" halo
 }
@@ -2881,7 +2931,7 @@ if bad: print(f"  t3-detector-off: milestone 1's rail in {bad[:3]}")
 sys.exit(1 if bad else 0)
 PYEOF
 }
-t3_scratch_win() { in_order t3-scratch-win 'popup state=2 kind=0 .*Congratulations' 'game Panel' && t3_pic "$tmp/t3-scratch-win/f000330.png" box; }
+t3_scratch_win() { in_order t3-scratch-win "popup state=2 kind=0 .*$(gx 317 1 0 1)" 'game Panel' && t3_pic "$tmp/t3-scratch-win/f000330.png" box; }
 check_pad t3-cards-aa t3_cards_aa
 check_pad t3-cards-turn t3_cards_turn
 check_pad t3-art-aa t3_art_aa

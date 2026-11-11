@@ -270,6 +270,15 @@ static void menu_keys()
     b.SetKey(MENU, 'p');
     CHECK(MenuKeyOf('p', b.ActionOfKey('p')) == MenuKey::Menu);
     CHECK(MenuKeyOf(SDLK_ESCAPE, b.ActionOfKey(SDLK_ESCAPE)) == MenuKey::B);
+    // MENU bound to Enter, Space or the DS's A key still resumes (it is tested before A); Enter
+    // without MENU on it still accepts.
+    for (int key : {(int)SDLK_RETURN, (int)SDLK_SPACE, (int)'x'})
+    {
+        Bindings m;
+        m.SetKey(MENU, key);
+        CHECK(MenuKeyOf(key, m.ActionOfKey(key)) == MenuKey::Menu);
+    }
+    CHECK(MenuKeyOf(SDLK_RETURN, Bindings().ActionOfKey(SDLK_RETURN)) == MenuKey::A);
 }
 
 static void camera_turns()

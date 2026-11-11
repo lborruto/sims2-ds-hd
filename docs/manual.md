@@ -112,7 +112,7 @@ The save slots and the phone, opened from the menu, come back to the menu where 
 
 <p align="center">
   <img src="screenshots/pockets.webp" alt="The Pockets tab: the six slots, the tools and counted items, the highlighted item's name and description, Use and Trash" width="440">
-  <img src="screenshots/phone.webp" alt="The phone: the game's green screen with Messages, Phonebook, Options and Exit, its Up, OK and Down buttons below" width="440">
+  <img src="screenshots/phone.webp" alt="The phone: the game's green screen with Messages, Phonebook, Options and Exit, its Up, OK and Down buttons below, the hints Choose, A and B Close" width="440">
 </p>
 
 ### Shops, the hotel and the rest
@@ -183,7 +183,7 @@ have a pointer on the sticks (LT slows it).
 
 <p align="center">
   <img src="screenshots/autopsy.webp" alt="The Alien Autopsy big with its pointer, the organs' health at the right, the buttons' hints in a bar below" width="440">
-  <img src="screenshots/vacuum.webp" alt="The hotel's vacuum: its bowl big, the lobby small at the right with the earnings, the hints below" width="440">
+  <img src="screenshots/vacuum.webp" alt="The hotel's vacuum: its bowl big, a gold ring in the green focus ring, the lobby small at the right with the earnings, the hints below: A Take a find to the funnel" width="440">
 </p>
 
 | Minigame | Controller | Keyboard | Does |
@@ -270,7 +270,7 @@ Closing the window asks the same question. Every question opens on No, and B is 
 closes with A or B.
 
 <p align="center">
-  <img src="screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit" width="440">
+  <img src="screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit; the hints say how to resume and select" width="440">
   <img src="screenshots/save-states.webp" alt="The save states page: slot 1 with its picture and date, three empty slots, Undo the last load" width="440">
 </p>
 

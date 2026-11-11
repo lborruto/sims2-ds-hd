@@ -130,6 +130,9 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - Pockets: a tool not found yet and a collection at 0 look the same, faint. The world's prompt
   keeps its width while you choose an action with A held.
 - The README is short and for players; the full manual is `docs/manual.md`.
+- The cards', the social game's and the song save page's keyboard focus is the menus' ring too
+  (green with a white line inside), as in the other minigames.
+- The pictures in the README and the manual are taken again with today's look.
 
 ### Fixed
 
@@ -190,6 +193,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   what it found after the card closes, and "None" for no signal; the painting's question stays in
   one place; Walk and Point hints name every stick that does it; the autopsy's quit says the
   game's Quit; Moogoo's Start (quit) is in the manual; the social answers sit on rows.
+- The pause menu: a Menu key moved to Enter, Space or the DS's A key resumes the game again
+  instead of choosing the row.
 
 ## [0.1.1] - 2026-11-04
 

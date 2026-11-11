@@ -57,8 +57,9 @@ public:
     ui::UiItem Tiered(SpriteRef s, int frame, int tier, Rect box);
     // Frame `frame` of s `scale` times its size (nearest: every pixel a block; 1-8) in `look`, its
     // colour times light / 255 (a fade: 0-255, the alpha kept); null when it does not read. The
-    // copies at full light are kept for the cache's life, the others only for the light last asked
-    // (a fade asks a new one every frame).
+    // copies at full light are kept for the cache's life, the others for the last two lights asked
+    // (a fade asks a new one every frame): a pointer stays valid until two other lights are asked,
+    // so the previous frame's composition never points at freed pixels while the next is built.
     const SpriteFrame* Look(SpriteRef s, int frame, SpriteLook look, int scale, int light = 255);
 
     const RomData* Rom() const { return rom; }
@@ -68,8 +69,8 @@ private:
     std::map<std::tuple<SpriteRef, int>, SpriteFrame> frames;            // w == 0: does not read
     std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> scaled;  // (sprite, frame, w, h)
     std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> looks;   // (sprite, frame, look, scale) at full light
-    std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> faded;   // the same at fadedLight
-    int fadedLight = -1;
+    std::map<std::tuple<SpriteRef, int, int, int>, SpriteFrame> faded[2]; // the same at fadedLight[0] (now) and [1] (before)
+    int fadedLight[2] = {-1, -1};
 };
 
 // (4c's screens) Frame `frame` of s at tier `tier` centred in `box` (IconCache::Tiered) appended to

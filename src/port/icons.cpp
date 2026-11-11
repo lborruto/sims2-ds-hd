@@ -1,5 +1,7 @@
 #include "port/icons.h"
 
+#include <utility>
+
 #include "ui/kit.h"
 
 namespace sims2wide
@@ -51,8 +53,22 @@ const SpriteFrame* IconCache::Look(SpriteRef s, int frame, SpriteLook look, int 
 {
     if (scale < 1 || scale > 8 || light < 0 || light > 255) return nullptr;
     if (look == SpriteLook::Plain && light == 255) return scale == 1 ? Frame(s, frame) : Scaled(s, frame, scale);
-    if (light != 255 && light != fadedLight) { faded.clear(); fadedLight = light; }
-    auto& cache = light == 255 ? looks : faded;
+    // Two fade slots, the light asked now and the one before it: a new light frees only the slot
+    // two lights back, so the pictures of the composition built with the previous light (still
+    // drawn, or held by a layer's cache, while the next one is built) never dangle. A light asked
+    // again keeps its slot.
+    if (light != 255 && light != fadedLight[0])
+    {
+        if (light == fadedLight[1]) { std::swap(faded[0], faded[1]); std::swap(fadedLight[0], fadedLight[1]); }
+        else
+        {
+            faded[1] = std::move(faded[0]);
+            fadedLight[1] = fadedLight[0];
+            faded[0] = {};
+            fadedLight[0] = light;
+        }
+    }
+    auto& cache = light == 255 ? looks : faded[0];
     const auto key = std::make_tuple(s, frame, (int)look, scale);
     auto it = cache.find(key);
     if (it == cache.end())

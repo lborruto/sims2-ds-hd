@@ -1021,25 +1021,30 @@ int main()
         CHECK(OverTopComposition(town, fit, 600, 300));
         CHECK(!OverTopComposition(town, fit, 1200, 300));
     }
-    // The focus ring: the hotspot's area, through the piece that shows it, 4 pixels outside.
+    // The focus ring: the hotspot's area, through the piece that shows it, the kit's ring (the green
+    // kFocusOuterW outside, the white line kFocusInnerW) as two outlines.
     {
         const ScreenState goals {Screen::Panel, Tab::Goals};
         const Composition m = BuildConsole(goals, true, 0, SW, SH);
         const Rect a = HotspotsFor(goals)[0].area;
-        CHECK(m.overlays.size() == 2);
-        const Overlay& r = m.overlays.back();
-        CHECK(r.argb == 0 && r.border == 4 && r.radius == 8 && r.borderArgb == kRingArgb && r.before == -1);
-        CHECK(r.to.x == 256 + 3 * a.x - 4 && r.to.y == 72 + 3 * a.y - 4 && r.to.w == 3 * a.w + 8 && r.to.h == 3 * a.h + 8);
+        CHECK(m.overlays.size() == 3);
+        const Overlay& o = m.overlays[1];
+        const Overlay& r = m.overlays[2];
+        constexpr int ow = ui::kFocusOuterW, iw = ui::kFocusInnerW;
+        CHECK(o.argb == 0 && o.border == ow - iw && o.radius == 10 + ow && o.borderArgb == ui::kFocusOuter && o.before == -1);
+        CHECK(o.to.x == 256 + 3 * a.x - ow && o.to.y == 72 + 3 * a.y - ow && o.to.w == 3 * a.w + 2 * ow && o.to.h == 3 * a.h + 2 * ow);
+        CHECK(r.argb == 0 && r.border == iw && r.radius == 10 + iw && r.borderArgb == ui::kFocusInner && r.before == -1);
+        CHECK(r.to.x == 256 + 3 * a.x - iw && r.to.y == 72 + 3 * a.y - iw && r.to.w == 3 * a.w + 2 * iw && r.to.h == 3 * a.h + 2 * iw);
         // In town the tab icons are on the rail (2x); a goal line is not shown: no ring.
         int tab = -1;
         const std::vector<Hotspot>& h = HotspotsFor(goals);
         for (int i = 0; i < (int)h.size(); i++) if (std::string(h[i].name) == "pockets") tab = i;
         CHECK(tab >= 0);
         const Composition town = BuildConsole(goals, false, tab, SW, SH);
-        CHECK(town.overlays.size() == 2);
+        CHECK(town.overlays.size() == 3);
         const Rect ta = h[tab].area;
-        CHECK(town.overlays[1].to.x == kRailTabsTo.x + 2 * (ta.x - kRailTabsFrom.x) - 4);
-        CHECK(town.overlays[1].to.y == kRailTabsTo.y + 2 * (ta.y - kRailTabsFrom.y) - 4);
+        CHECK(town.overlays[1].to.x == kRailTabsTo.x + 2 * (ta.x - kRailTabsFrom.x) - ow);
+        CHECK(town.overlays[1].to.y == kRailTabsTo.y + 2 * (ta.y - kRailTabsFrom.y) - ow);
         CHECK(BuildConsole(goals, false, 0, SW, SH).overlays.size() == 1);
         CHECK(BuildConsole(goals, false, 999, SW, SH).overlays.size() == 1);
         // The dialogue's arrow: its area clipped to the arrow piece.
