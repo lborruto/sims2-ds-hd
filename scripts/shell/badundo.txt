@@ -1,5 +1,5 @@
 # From s7, a broken before-load.st left by an earlier run (written by the check): Start + Back,
-# Down x3, A (the save states), Down, Down (Undo: offered, the file is there), A: the load fails,
+# Down x3, A (the save states), Down, Down (Undo: offered, the file is there), A, asked: Right, A: the load fails,
 # the machine of a moment ago is put back (still the phone); B B back to the game.
 10 2 pad start
 10 2 pad menu
@@ -10,5 +10,7 @@
 50 2 pad down
 56 2 pad down
 66 2 pad a
-80 2 pad b
+72 2 pad right
+78 2 pad a
 90 2 pad b
+100 2 pad b
