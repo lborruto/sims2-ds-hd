@@ -7,6 +7,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
 ### Added
 
 - CONSOLE, the new default layout: the game played like a console game. The town fills the
