@@ -123,6 +123,7 @@ static void Usage()
         "  --fast                        start with fast forward held (headless: the clock's hold is tested)\n"
         "  --strings-count               print how many strings the game's text table has, and stop\n"
         "  --dump-string ID              print string ID of the game's text (UTF-8, a newline as \\n), and stop\n"
+        "  --dump-strings                print every string of the game's text, one a line (ID, a tab, the text as --dump-string's), and stop\n"
         "  --dump-resource ID FILE       write resource ID of the game's archive to FILE, its compression undone, and stop\n"
         "  --dump-sprite ID FRAME FILE   write frame FRAME of the sprite whose descriptor is resource ID as a PNG, and stop\n"
         "  --measure-menu                (checks) every word the HD menu (Interact, Pockets, Give Gift, Goals, Relationships, Options, Save slots, popups, phone, notes, the shop's catalogue, Build Rooms, the Registry, room info, the main menu, Settings, Load-a-Sim, Create-a-Sim) can show fitted to its box, in --language's\n"
@@ -191,7 +192,7 @@ int main(int argc, char** argv)
     int language = -1, dumpString = -1; // the game's text (--language, --dump-string ID)
     int gameLanguage = -1;              // the DS firmware's language (--game-language)
     bool fastBootFlag = false;
-    bool stringsCount = false, noRomData = false;
+    bool stringsCount = false, dumpStrings = false, noRomData = false;
     int dumpResource = -1, dumpSprite = -1, dumpFrame = -1; // the archive's data (--dump-resource, --dump-sprite)
     std::string dumpFile;
     std::string measure; // --measure-string ID|all
@@ -268,6 +269,7 @@ int main(int argc, char** argv)
         }
         else if (a == "--fast-boot") fastBootFlag = true;
         else if (a == "--strings-count") stringsCount = true;
+        else if (a == "--dump-strings") dumpStrings = true;
         else if (a == "--no-romdata") noRomData = true;
         // The archive's data to a file (tests/romdata_check.sh): whole numbers, else the usage.
         else if (a == "--dump-resource" || a == "--dump-sprite")
@@ -323,7 +325,7 @@ int main(int argc, char** argv)
         if (shellPage < 0) { Usage(); return 1; }
     }
     // A run that prints or measures and stops opens no window.
-    const bool tool = stringsCount || dumpString >= 0 || dumpResource >= 0 || dumpSprite >= 0 || measureMenu || !measure.empty();
+    const bool tool = stringsCount || dumpStrings || dumpString >= 0 || dumpResource >= 0 || dumpSprite >= 0 || measureMenu || !measure.empty();
     const bool window = !headless && !tool;
 
     App app;
@@ -703,8 +705,8 @@ relaunch:
     nds.SetupDirectBoot("game.nds");
     nds.Start();
 
-    // The game's text from the ROM (--strings-count, --dump-string ID): print it and stop.
-    if (stringsCount || dumpString >= 0)
+    // The game's text from the ROM (--strings-count, --dump-string ID, --dump-strings): print it and stop.
+    if (stringsCount || dumpStrings || dumpString >= 0)
     {
         RomData data;
         if (!data.Open(rom)) { fprintf(stderr, "no rom.bin archive in this ROM\n"); return 1; }
@@ -712,13 +714,15 @@ relaunch:
         if (!data.LoadStrings(lang)) { fprintf(stderr, "no strings for language %d\n", lang); return 1; }
         fprintf(stderr, "strings: language %d from file %d, %d strings\n", lang, data.StringsFile(), data.StringCount());
         if (dumpString >= data.StringCount()) { fprintf(stderr, "no string %d\n", dumpString); return 1; }
-        if (stringsCount) printf("%d\n", data.StringCount());
-        else
-        {
-            std::string s = data.String(dumpString);
+        auto line = [&](int id) {
+            std::string s = data.String(id);
             for (size_t p = 0; (p = s.find('\n', p)) != std::string::npos; p += 2) s.replace(p, 1, "\\n");
-            printf("%s\n", s.c_str());
-        }
+            return s;
+        };
+        if (stringsCount) printf("%d\n", data.StringCount());
+        else if (dumpStrings)
+            for (int id = 0; id < data.StringCount(); id++) printf("%d\t%s\n", id, line(id).c_str());
+        else printf("%s\n", line(dumpString).c_str());
         return 0;
     }
     // A resource of the game's archive, its compression undone, or a sprite's frame as a PNG
