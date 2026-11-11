@@ -60,6 +60,9 @@ struct WorldPrompt
     bool held = false;         // A held (pad mode): Up / Down choose, release runs
     bool more = false;         // other enabled actions (hint: hold A for more / choose)
     bool others = false;       // a previous or next target (hint, while A is held: Left / Right)
+    // The widest verb of the target's enabled actions (canvas pixels, fitted as `verb`): the plate
+    // keeps that width while Up / Down (A held) change the verb, never re-centred under the eye.
+    int verbW = 0;
 };
 // The prompt for this Interact state (shown: a target, an enabled action to run, not pad mode 2).
 WorldPrompt WorldPromptOf(const InteractState& in, const RomData* rom);
