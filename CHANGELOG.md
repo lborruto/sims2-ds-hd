@@ -119,6 +119,16 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The game pauses and goes quiet when its window is not in front (Settings > Pause in the
   background). The Steam overlay does not pause it.
 - The volume moves by 5 %.
+- Town and hotel screens: every word reads at 4.5:1 or more (what you just won or paid on a dark
+  pill beside the money, Build Rooms' permits you cannot pay red on a dark plate, places, guests
+  and slot details in white). The D-pad's hint says "Choose" wherever it moves the highlight, and
+  every list that scrolls has its up and down arrows at its right (Goals, Relationships, the
+  phone, Build Rooms, music). B says "Back" where it goes up a level (the phone's pages, the stat
+  panel's) and "Close" where it leaves. The camera hint says "Camera" (the stick turns and zooms).
+- Build Rooms asks before a purchase in a box like every other question, the room and the sum in
+  it, on No first; with nothing left to build it says so.
+- Pockets: a tool not found yet and a collection at 0 look the same, faint. The world's prompt
+  keeps its width while you choose an action with A held.
 - The README is short and for players; the full manual is `docs/manual.md`.
 
 ### Fixed
@@ -152,6 +162,9 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   in one piece, or, the rare time it cannot be followed, takes that one step at 30 fps.
 - A failed state load puts back the game as it was a moment before; save states and the place
   kept on quitting are written safely (a failed write keeps the old one).
+- Conversations keep the status strip under them (no black band below the world). The
+  Registry's locked rooms lose the DS's light rim around their key; room info's hint box dims the
+  portrait instead of emptying it; the focused volume row in Options is lit like every focused row.
 <!-- The front end, Create-a-Sim, the shop and the minigames (ux audit, task 6). -->
 - MooGoo Monkey: before the players are named, the side panel says "Player 1-3" (not the game's
   copyright line).

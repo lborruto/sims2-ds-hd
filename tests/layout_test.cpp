@@ -702,8 +702,15 @@ static void ui_scale()
                 d.dialogue.valid = true; d.dialogue.page = 1; d.dialogue.pages = 2; d.dialogue.stringId = 7; d.dialogue.speaker = 0x40;
                 const Composition dlg = BuildConsole({Screen::Dialogue, Tab::None}, false, -1, 341, 192, &hud, &strings, &d, &rom, face.data());
                 inCanvas(dlg, "dialogue");
-                int x0 = kConsoleW, x1 = 0;
-                for (const ui::UiItem& it : dlg.ui) { x0 = std::min(x0, ui::Placed(it).x); x1 = std::max(x1, ui::Placed(it).x + ui::Placed(it).w); }
+                int x0 = kConsoleW, x1 = 0, strip = 0;
+                for (const ui::UiItem& it : dlg.ui)
+                {
+                    // (The status strip's panel under the box, the canvas's width: the world stops at it, no black band.)
+                    if (it.to.x == 0 && it.to.w == kConsoleW && it.to.y >= kStripY) { strip++; CHECK(it.layer == 0); continue; }
+                    x0 = std::min(x0, ui::Placed(it).x);
+                    x1 = std::max(x1, ui::Placed(it).x + ui::Placed(it).w);
+                }
+                CHECK(strip > 0);
                 const float want = z < 1 ? 1060 * z : z == 1 ? 1060 : 1060 * (636.0f / 530);
                 CHECK(std::abs((x1 - x0) - want) < 40 && std::abs((x0 + x1) / 2.0f - 640) < 4);
                 for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
@@ -1725,10 +1732,17 @@ int main()
                                 world.touch = false;
                                 comp.pieces.push_back(world);
                                 BuildBuildRooms(comp, v, focus, h, rom, nullptr);
+                                // (Page 1's question in the popups' look, as console.cpp draws it over the status bar.)
+                                BuildBuildQuestion(comp, v, focus, h, rom);
                                 CHECK(!comp.ui.empty());
+                                if (count == 0) // (nothing left: the port's line, no arrows)
+                                    CHECK(std::none_of(comp.ui.begin(), comp.ui.end(), [](const ui::UiItem& u) { return u.sign == ui::UiItem::Sign::Up; }));
+                                if (page == 1) // (the question's box over the dimmed list)
+                                    CHECK(std::any_of(comp.ui.begin(), comp.ui.end(), [](const ui::UiItem& u) { return u.layer == kPopLayer && u.to.x == kBdAskBox.x && u.to.w == kBdAskBox.w; }));
                                 int layer = 0;
                                 for (const ui::UiItem& u : comp.ui)
                                 {
+                                    if (u.layer == kPopLayer && u.kind != ui::UiItem::Image) { CHECK(u.layer >= layer); layer = u.layer; continue; } // (the veil: the canvas)
                                     CHECK(u.to.x >= kPmPanel.x && u.to.y >= kPmPanel.y && u.to.x + u.to.w <= kPmPanel.x + kPmPanel.w &&
                                           u.to.y + u.to.h <= kPmPanel.y + kPmPanel.h);
                                     if (u.kind == ui::UiItem::Image) continue;
@@ -1749,15 +1763,19 @@ int main()
                                     const int py = page == 0 ? kBdRowY0 + (r.y - BuildRowRect(0).y) / (BuildRowRect(1).y - BuildRowRect(0).y) * kBdRowDy : kBdConfirmY;
                                     CHECK(std::abs(tx - px) <= 15 && std::abs(ty - py) <= 15);
                                 }
-                                if (page == 0)
+                                if (page == 0 && count > 0)
                                 {
                                     CHECK(TouchFromComposition(comp, fit, kBdUp.x + kBdUp.w / 2.0f, kBdUp.y + kBdUp.h / 2.0f, tx, ty));
                                     CHECK(std::abs(tx - kBdUpX) <= 15 && std::abs(ty - kBdArrowY) <= 15);
                                     CHECK(TouchFromComposition(comp, fit, kBdDown.x + kBdDown.w / 2.0f, kBdDown.y + kBdDown.h / 2.0f, tx, ty));
                                     CHECK(std::abs(tx - kBdDownX) <= 15 && std::abs(ty - kBdArrowY) <= 15);
                                 }
-                                CHECK(TouchFromComposition(comp, fit, kBdClose.x + kBdClose.w / 2.0f, kBdClose.y + kBdClose.h / 2.0f, tx, ty));
-                                CHECK(std::abs(tx - kBdCloseX) <= 15 && std::abs(ty - kBdCloseY) <= 15);
+                                if (page == 0) // (page 1: the question's box alone takes the mouse, as a popup)
+                                {
+                                    CHECK(TouchFromComposition(comp, fit, kBdClose.x + kBdClose.w / 2.0f, kBdClose.y + kBdClose.h / 2.0f, tx, ty));
+                                    CHECK(std::abs(tx - kBdCloseX) <= 15 && std::abs(ty - kBdCloseY) <= 15);
+                                }
+                                else CHECK(!TouchFromComposition(comp, fit, kBdClose.x + kBdClose.w / 2.0f, kBdClose.y + kBdClose.h / 2.0f, tx, ty));
                                 CHECK(!TouchFromComposition(comp, fit, kBdTitle.x + 10.5f, kBdTitle.y + 10.5f, tx, ty)); // the title: nothing
                                 CHECK(!TouchFromComposition(comp, fit, 20.5f, 360.5f, tx, ty));                          // the dimmed world: nothing
                             }
@@ -3447,6 +3465,39 @@ int main()
             }
             CHECK(chips == 1 + (more ? 1 : 0) + (others && held2 ? 1 : 0));
         }
+    }
+
+    {
+        // The panel's D-pad hints (ux task 6): "Choose" whenever Up / Down move the focus (the
+        // vertical arms for a column, the cross for a grid), a slider's "Adjust", Interact's targets.
+        RomData rom;
+        auto item = [](Rect r, u32 id) { ViewItem it; it.rect = r; it.id = id; return it; };
+        MenuView col;
+        col.items = {item({200, 200, 400, 60}, 10), item({200, 280, 400, 60}, 11), item(kPmPhoneWell, 1)};
+        std::vector<DPadHint> h = PanelDPadHints(col, 0, rom);
+        CHECK(h.size() == 1 && h[0].button == ui::Button::DPadV && h[0].word == OwnWord(&rom, OwnWordId::HintChoose));
+        MenuView grid = col;
+        grid.items[1].rect.x = 640;
+        h = PanelDPadHints(grid, 0, rom);
+        CHECK(h.size() == 1 && h[0].button == ui::Button::DPad);
+        MenuView slider = grid;
+        slider.items[1].left = {TapStep(10, 10)};
+        h = PanelDPadHints(slider, 1, rom);
+        CHECK(h.size() == 2 && h[0].button == ui::Button::DPadV && h[1].button == ui::Button::DPadH && h[1].word == OwnWord(&rom, OwnWordId::HintAdjust));
+        MenuView targets = col;
+        targets.buttons[(int)MenuButton::Left] = {TapStep(10, 10)};
+        h = PanelDPadHints(targets, 0, rom);
+        CHECK(h.size() == 2 && h[0].button == ui::Button::DPadV && h[1].word == OwnWord(&rom, OwnWordId::PromptOther));
+        MenuView one;
+        one.items = {item({200, 200, 400, 60}, 10), item(kPmPhoneWell, 1)};
+        CHECK(PanelDPadHints(one, 0, rom).empty()); // (one item: the D-pad moves nothing but to the phone)
+        // Every scrolling list's column: two kit arrows (sunk where the list cannot go) and the bar.
+        Composition c {kConsoleW, kConsoleH, {}, {}};
+        Rect up, down;
+        AddScrollColumn(c, {740, 140, 48, 422}, 0, 3, 7, false, true, &up, &down);
+        int arrows = 0;
+        for (const ui::UiItem& it : c.ui) arrows += it.sign == ui::UiItem::Sign::Up || it.sign == ui::UiItem::Sign::Down;
+        CHECK(arrows == 2 && c.ui.size() == 4 && up.y == 140 && down.y + down.h == 562 && up.w == 48);
     }
 
     if (failures) { fprintf(stderr, "%d failure(s)\n", failures); return 1; }

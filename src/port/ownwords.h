@@ -113,6 +113,9 @@ enum class OwnWordId : int
     // shoulders; the keyboard's Q / W, the mouse), the names keycaps print.
     KeysResetAsk, StUndoAsk, KeysMenuNeeded, CtlCameraCursor, CtlTabs, CtlCameraTabs, CtlStylus,
     KeyMouse, KeyEnter, KeyRightShift, KeyLeftShift, KeySpace, KeyBackspace,
+    // (ux task 6, the town's audit) Build Rooms with nothing left; the world's right stick (it turns
+    // the camera and zooms: the status strip's hint).
+    BuildNothingLeft, HintCamera,
     // (ux task 6, the front end and the minigames) The mixer's X: play the song (the game's word is
     // its button's, START in German).
     MixerPlay,

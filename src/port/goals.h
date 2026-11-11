@@ -55,6 +55,11 @@ void BuildGoals(Composition& c, const MenuView& v, int focus, const GameState& g
 
 // A thin scroll bar in a list's right margin (UI items, layer 1): `first` and `shown` of `count`.
 void AddScrollBar(Composition& c, Rect track, int first, int shown, int count);
+// Every scrolling list's column at its right (one look: Goals, Relationships, the phone, Build
+// Rooms, music): the kit's up arrow at the top of `col`, its down arrow at the foot (both col.w
+// square; sunk when the list cannot go that way: upOn, downOn) and the scroll bar between them,
+// on layer 1 (`layer`). The arrows' rectangles in up / down (the callers' mouse pieces).
+void AddScrollColumn(Composition& c, Rect col, int first, int shown, int count, bool upOn, bool downOn, Rect* up = nullptr, Rect* down = nullptr, int layer = 1);
 
 // (A check, --measure-menu) every goal's text (1627 + 0..33 and the requests' ids the code knows)
 // alone in the list well at its smallest size, and the footer's words.

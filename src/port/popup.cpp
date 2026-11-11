@@ -1,6 +1,7 @@
 #include "port/popup.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "port/build.h"
 #include "port/checkin.h"
@@ -33,6 +34,33 @@ constexpr u32 kVeil = 0x8C181C38;
 constexpr Rect kCanvas {0, 0, 1280, 720};
 
 bool Overlaps(Rect a, Rect b) { return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h; }
+
+// A picture under a box (`cover`): kept whole when the box misses it; else cut to its largest
+// strip outside the box (left, right, above or below), in whole pixels of its source, so what
+// shows beside the box stays where it was; false when nothing of it is outside (the box hides it:
+// images are drawn above every still item, so it would show through).
+bool ClipOutside(UiItem& im, Rect cover)
+{
+    if (!Overlaps(im.to, cover)) return true;
+    if (!im.src || im.from.w <= 0 || im.from.h <= 0 || im.to.w <= 0 || im.to.h <= 0) return false;
+    const double sx = (double)im.to.w / im.from.w, sy = (double)im.to.h / im.from.h;
+    // The strips' source pixels: left of the box, right of it, above it, below it.
+    const int left = (int)std::floor((cover.x - im.to.x) / sx), right = (int)std::floor((im.to.x + im.to.w - (cover.x + cover.w)) / sx);
+    const int top = (int)std::floor((cover.y - im.to.y) / sy), bottom = (int)std::floor((im.to.y + im.to.h - (cover.y + cover.h)) / sy);
+    const int areas[4] = {std::max(0, left) * im.from.h, std::max(0, right) * im.from.h, std::max(0, top) * im.from.w, std::max(0, bottom) * im.from.w};
+    const int k = (int)(std::max_element(areas, areas + 4) - areas);
+    if (areas[k] <= 0) return false;
+    Rect f = im.from;
+    if (k == 0) f.w = left;
+    else if (k == 1) { f.x += f.w - right; f.w = right; }
+    else if (k == 2) f.h = top;
+    else { f.y += f.h - bottom; f.h = bottom; }
+    const Rect to {im.to.x + (int)std::lround((f.x - im.from.x) * sx), im.to.y + (int)std::lround((f.y - im.from.y) * sy), (int)std::lround(f.w * sx),
+                   (int)std::lround(f.h * sy)};
+    im.from = f;
+    im.to = to;
+    return true;
+}
 
 // The popup's text as shown: the title (kinds 0 and 3; the question's is stale: the game draws
 // none) and the text, decoded, its escapes and placeholders dropped.
@@ -176,7 +204,10 @@ namespace
 // go (they would be drawn over it) and the others are dimmed with the rest; the veil, the box,
 // the title on its plate (none when empty), the text in its well (`buttons`: the well leaves
 // their row free). Everything on kPopLayer.
-void BoxBase(Composition& c, const std::string& title, const std::string& text, bool buttons, Rect boxAt = kPopBox)
+// clip: the pictures the box covers in part keep their part outside it (a screen's own box: its
+// pictures are sound; under the game's popup a live crop of the touch screen shows the game's own
+// box, so a picture the box touches goes).
+void BoxBase(Composition& c, const std::string& title, const std::string& text, bool buttons, Rect boxAt = kPopBox, int textH = 0, bool clip = false)
 {
     // (A title that does not hold on the plate at its smallest gets a plate almost the box's width:
     // a minigame's long help title, Spanish's "RELLENOS DE PERCUSIÓN / VARIACIONES".)
@@ -191,8 +222,10 @@ void BoxBase(Composition& c, const std::string& title, const std::string& text, 
         // The status bar stays clear: above the veil, never dimmed.
         if (u.layer == kStatusBarLayer) { u.layer = kPopLayer + 1; kept.push_back(u); continue; }
         if (u.kind != UiItem::Image) { kept.push_back(u); continue; }
-        if (Overlaps(u.to, {boxAt.x - 8, titleAt.y - 8, boxAt.w + 16, boxAt.y + boxAt.h - titleAt.y + 24})) continue;
+        // (A picture the box covers in part: its part outside the box, dimmed as the rest.)
         UiItem d = u;
+        const Rect cover {boxAt.x - 8, titleAt.y - 8, boxAt.w + 16, boxAt.y + boxAt.h - titleAt.y + 24};
+        if (clip ? !ClipOutside(d, cover) : Overlaps(d.to, cover)) continue;
         d.fill = 0x50000000; // (its opacity)
         kept.push_back(d);
     }
@@ -224,7 +257,8 @@ void BoxBase(Composition& c, const std::string& title, const std::string& text, 
         tt.middle = true;
         add(tt);
     }
-    const Rect tb {well.x + 24, well.y + 10, well.w - 48, well.h - 20};
+    // (textH: the text at the well's top in that height, the rest of it the caller's.)
+    const Rect tb {well.x + 24, well.y + 10, well.w - 48, textH > 0 ? std::min(textH, well.h - 20) : well.h - 20};
     const FittedBlock b = FitBlock(text, 30, 20, tb);
     UiItem tt = TextItem(tb, b.text, b.size, Align::Centre, Weight::ExtraBold);
     tt.middle = true;
@@ -272,6 +306,23 @@ void BoxButton(Composition& c, Rect r, bool pressed, bool focused, const std::ve
     }
     if (from.w > 0) AddMousePiece(c, from, r);
 }
+
+// A question's two buttons (a popup's kind 2, a screen's own question): No and Yes, A answering
+// the focused one (No first), B always No; `pressed` the game's held one (green; -1 none).
+void QuestionButtons(Composition& c, Rect no, Rect yes, int focus, int pressed, const RomData& rom, Rect fromNo, Rect fromYes)
+{
+    const std::string n = MenuWords(rom, kStrPopNo), y = MenuWords(rom, kStrPopYes);
+    if (focus == 1) BoxButton(c, no, pressed == 0, false, {{Button::B, n}}, fromNo);
+    else BoxButton(c, no, pressed == 0, true, {{Button::A, ""}, {Button::B, n}}, fromNo);
+    if (focus == 1) BoxButton(c, yes, pressed == 1, true, {{Button::A, y}}, fromYes);
+    else BoxButton(c, yes, pressed == 1, false, {{Button::A, y, true}}, fromYes);
+}
+}
+
+void BuildQuestionBox(Composition& c, Rect box, const std::string& text, int textH, int focus, const RomData& rom, Rect fromNo, Rect fromYes)
+{
+    BoxBase(c, "", text, true, box, textH, true);
+    QuestionButtons(c, QuestionNo(box), QuestionYes(box), focus, -1, rom, fromNo, fromYes);
 }
 
 void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& game, const RomData& rom)
@@ -291,17 +342,16 @@ void BuildPopup(Composition& c, const MenuView&, int focus, const GameState& gam
     else if (p.kind == 2)
     {
         // A answers the focused button (No first), B is always No.
-        const std::string no = MenuWords(rom, kStrPopNo), yes = MenuWords(rom, kStrPopYes);
-        if (focus == 1) button(kPopNo, 0, false, {{Button::B, no}});
-        else button(kPopNo, 0, true, {{Button::A, ""}, {Button::B, no}});
-        if (focus == 1) button(kPopYes, 1, true, {{Button::A, yes}});
-        else button(kPopYes, 1, false, {{Button::A, yes, true}});
+        int bx, by;
+        const Rect fromNo = PopupButton(p, 0, bx, by) ? Rect {bx - 12, by - 12, 24, 24} : Rect {};
+        const Rect fromYes = PopupButton(p, 1, bx, by) ? Rect {bx - 12, by - 12, 24, 24} : Rect {};
+        QuestionButtons(c, kPopNo, kPopYes, focus, p.pressing ? p.pressed : -1, rom, fromNo, fromYes);
     }
 }
 
 void BuildHintBox(Composition& c, int focus, const std::string& title, const std::string& text, const RomData& rom, Rect from)
 {
-    BoxBase(c, title, text, true);
+    BoxBase(c, title, text, true, kPopBox, 0, true);
     BoxButton(c, kPopClose, false, focus == 0, {{Button::A, ""}, {Button::B, MenuWords(rom, kStrPopClose)}}, from);
 }
 

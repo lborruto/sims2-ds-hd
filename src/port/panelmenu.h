@@ -12,6 +12,7 @@
 // does; the rest of the panel and the dimmed world take no click.
 #pragma once
 #include <string>
+#include <vector>
 
 #include "compose.h"
 #include "gamestate.h"
@@ -115,6 +116,10 @@ void AddMousePiece(Composition& c, Rect from, Rect to);
 constexpr int kKeyBand = 3;
 bool KeyedColour(u32 argb);
 ui::UiItem KeyedCrop(const u32* bottom, Rect from, Rect to, int tier = 0);
+// The last KeyedCrop of `from` as it was (no new copy): a portrait while the game's own box lies
+// over it on the touch screen (room info's hint), kept as it was before the box. Nothing (an item
+// with no source) when that rectangle was never cropped.
+ui::UiItem KeptCrop(Rect from, Rect to, int tier = 0);
 // A row's focus ring (UI items, on `layer`): ui::FocusRing around `r` (the game's green, a line inside
 // it, white or dark by `behind`, the ringed item's fill), drawn before the row.
 void AddFocusRing(Composition& c, Rect r, float radius, int layer = 1, u32 behind = ui::kFillRow);
@@ -123,10 +128,14 @@ void AddFocusRing(Composition& c, Rect r, float radius, int layer = 1, u32 behin
 // of it, as the game shakes it), the closest one; 0 (at rest) when none comes near, and without a
 // search when frame 0 at its place misses more than half its pixels (no button on the screen).
 int PhoneButtonFrame(IconCache& icons, const u32* bottom);
-// The panel's D-pad hint for the focus (the chip and its word; false: none): a slider's Left /
-// Right (DPadH, "Adjust", every slider's: HintAdjust), the game's own selection's Up / Down (DPadV,
-// "Choose": HintChoose), the view's Left / Right (DPadH, "Other target": Interact's targets).
-bool PanelDPadHint(const MenuView& v, int focus, const RomData& rom, ui::Button& b, std::string& word);
+// The panel's D-pad hints for the focus (each a chip and its word, right to left; none, one or
+// two): "Choose" (HintChoose) whenever the D-pad moves the focus (the tab has two items or more
+// besides the phone, or the game's own selection moves on Up / Down: Goals, Relationships): its
+// vertical arms for a list in one column, the whole cross for a grid (Pockets, Options); then a
+// slider's Left / Right (DPadH, "Adjust", every slider's: HintAdjust; the cross then says Up /
+// Down alone) or the view's Left / Right (DPadH, "Other target": Interact's targets).
+struct DPadHint { ui::Button button; std::string word; };
+std::vector<DPadHint> PanelDPadHints(const MenuView& v, int focus, const RomData& rom);
 // A hint chip right-aligned at `right` in the hints band; returns the next right edge.
 int AddHint(Composition& c, int right, ui::Button b, const std::string& label);
 }

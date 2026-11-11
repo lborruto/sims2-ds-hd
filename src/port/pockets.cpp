@@ -289,10 +289,13 @@ void BuildPockets(Composition& c, const MenuView& v, int focus, const GameState&
     AddMousePiece(c, hs[6].area, kPkHandBtn);
     AddMousePiece(c, hs[10].area, kPkBinBtn);
 
-    // Images: the items, the tools, the counted items (live), the hand and the bin.
+    // Images: the items, the tools, the counted items (live), the hand and the bin. What the Sim
+    // has none of has one look: its picture faint (a tool not owned: its own picture, not the
+    // game's black silhouette; a counted item at 0, its count inactive), as every inactive picture.
+    constexpr u32 kNone = 0x60000000;
     for (int i = 0; i < kSlots && i < (int)inv.slots.size(); i++) AddTieredIcon(c, icons, inv.slots[i], kTierL, SlotRect(i));
-    for (int k = 0; k < kKeys; k++) AddTieredIcon(c, icons, kSprTool[k], inv.keys[k].count > 0 ? 1 : 0, kTierL, KeyRect(k));
-    for (int i = 0; i < kCounted; i++) AddTieredIcon(c, icons, inv.counted[i], kTierS, CountIconRect(i));
+    for (int k = 0; k < kKeys; k++) AddTieredIcon(c, icons, kSprTool[k], 1, kTierL, KeyRect(k), inv.keys[k].count > 0 ? 0 : kNone);
+    for (int i = 0; i < kCounted; i++) AddTieredIcon(c, icons, inv.counted[i], kTierS, CountIconRect(i), inv.counted[i].count > 0 ? 0 : kNone);
     const Rect handIcon {kPkHandBtn.x + 10, kPkHandBtn.y, 64, kPkHandBtn.h}, binIcon {kPkBinBtn.x + 10, kPkBinBtn.y, 64, kPkBinBtn.h};
     AddTieredIcon(c, icons, kSprHand, 0, kTierS, handIcon, canUse ? 0 : 0x60000000);
     AddTieredIcon(c, icons, armed ? kSprBinGreen : kSprBin, 0, kTierS, binIcon, canBin ? 0 : 0x60000000);
@@ -357,10 +360,12 @@ BlockMeasure MeasurePockets(const RomData& rom)
     for (int id : {kStrUse, kStrTrash, kStrGive}) line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, 240);
     {
         // The armed bin's X hint ("Again: throw it away", the port's word, 9000 + its id) in the
-        // room BuildPanelMenu leaves it: the hints' band less B "Close" and A "Use".
+        // room BuildPanelMenu leaves it: the hints' band less B "Close", A "Use" and the D-pad's
+        // "Choose" (the grid's cross).
         const int bw = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold).w;
         const int aw = ChipRect(0, 0, Button::A, MenuWords(rom, kStrUse), kPmHintSize, 0, Weight::ExtraBold).w;
-        const int room = kPmHints.w - 8 - bw - 28 - aw - 28 - 60;
+        const int dw = ChipRect(0, 0, Button::DPad, OwnWord(&rom, OwnWordId::HintChoose), kPmHintSize, 0, Weight::ExtraBold).w;
+        const int room = kPmHints.w - 8 - bw - 28 - aw - 28 - 60 - dw - 28;
         line(9000 + (int)OwnWordId::TrashAgain, OwnWord(&rom, OwnWordId::TrashAgain), kPmHintSize, kPmHintSize, room);
     }
     for (int id = kSimNameUnknown; id <= kSimNameLast; id++)

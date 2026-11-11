@@ -1031,24 +1031,29 @@ elif case in ("build-list", "build-list-2x", "build-list-wide", "build-ask", "bu
     # Build Rooms in HD (src/port/build.*): the panel, the title's well, the money in its warm
     # white; the list: the focus ring on the row given (row 2; build-poor row 1), a row's knob the
     # game's own sprite, the Spa & Gym's permit red (build-poor: §2,500 against §2,000) and no A
-    # hint for it; the question: the tick focused, its sum (§2,000 - §1,000 = §1,000) in warm white;
-    # the empty list (sit-build: the town's save lists nothing): no row; never the touch screen 3x.
-    expect("panel outline", C(176, 300), OUTLINE)
-    expect("panel band", C(180, 300), hexrgb("6171B2"))
-    expect("title well", C(640, 50), hexrgb("6870B6"))
+    # hint for it; the question in the popups' look over the dimmed list (kBdAskBox 300,150 680 x
+    # 400: the box's fill, Yes focused at 672,446, its sum (§2,000 - §1,000 = §1,000) in warm
+    # white); the empty list (sit-build: the town's save lists nothing): no row, no arrows, the
+    # port's line; never the touch screen 3x.
     warm = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if (lambda p: p[0] > 230 and p[1] > 200 and p[2] < 190)(C(x, y)))
-    if warm(840, 54, 1010, 100) < 20: errors.append("no money in the title")
+    if case != "build-ask":
+        expect("panel outline", C(176, 300), OUTLINE)
+        expect("panel band", C(180, 300), hexrgb("6171B2"))
+        expect("title well", C(640, 50), hexrgb("6870B6"))
+        if warm(840, 54, 1010, 100) < 20: errors.append("no money in the title")
     ring = lambda x, y: RINGED(x, y)
     red = lambda x0, y0, x1, y1: sum(1 for y in range(y0, y1, 2) for x in range(x0, x1, 2) if (lambda p: p[0] > 200 and p[1] < 140 and p[2] < 140)(C(x, y)))
     if case == "build-ask":
-        if not ring(678, 496): errors.append("no focus ring around the tick")
-        if ring(378, 496): errors.append("a focus ring around the cross")
-        if warm(440, 380, 840, 420) < 40: errors.append("no sum under the room")
-        icon = {C(x, y) for y in range(476, 520, 3) for x in range(700, 745, 3)}
-        if len(icon) < 6: errors.append(f"the tick has no sprite ({len(icon)} colours)")
+        expect("question box", C(310, 300), hexrgb("828ACB"))
+        if not any(ring(670 - d, 486) for d in range(4)): errors.append("no focus ring around Yes")
+        if any(ring(346 - d, 486) for d in range(4)): errors.append("a focus ring around No")
+        if warm(440, 344, 840, 394) < 40: errors.append("no sum under the room")
+        if C(240, 600) == hexrgb("828ACB"): errors.append("the panel beneath not dimmed")
     elif case == "build-empty":
         if ring(214, 206) or ring(214, 350): errors.append("a focus ring in the empty list")
         if warm(600, 140, 720, 560) > 0: errors.append("a price in the empty list")
+        if len({C(x, y) for y in range(330, 370, 2) for x in range(450, 830, 2)}) < 4: errors.append("no line in the empty list")
+        if C(764, 164) != C(700, 300): errors.append("an arrow in the empty list")
     else:
         at = (214, 206) if case == "build-poor" else (214, 350)
         if not any(ring(at[0] - d, at[1]) for d in range(4)): errors.append(f"no focus ring at {at}")
@@ -1117,15 +1122,15 @@ elif case in ("music", "music-2x", "music-wide", "music-scrolled"):
     expect("title well", C(640, 50), hexrgb("6870B6"))
     green = lambda x0, y0, w, h: sum(1 for y in range(y0, y0 + h, 2) for x in range(x0, x0 + w, 2) if (lambda p: p[1] > p[0] + 60 and p[1] > p[2] + 100)(C(x, y)))
     ring = lambda x, y: RINGED(x, y)
-    rows = [green(312, 143 + 86 * i, 64, 64) for i in range(5)]
+    rows = [green(224, 143 + 86 * i, 64, 64) for i in range(5)]  # (the rows at 216: the scroll column at their right)
     playing = 2 if case != "music-scrolled" else None
     for i, n in enumerate(rows):
         if (n >= 20) != (i == playing): errors.append(f"row {i}'s button green pixels {n}")
     focus = 2 if case != "music-scrolled" else 0
-    if not ring(301, 136 + 86 * focus + 39): errors.append(f"no focus ring around row {focus}")
-    if ring(301, 136 + 86 * ((focus + 1) % 5) + 39): errors.append("a focus ring around another row")
+    if not ring(213, 136 + 86 * focus + 39): errors.append(f"no focus ring around row {focus}")
+    if ring(213, 136 + 86 * ((focus + 1) % 5) + 39): errors.append("a focus ring around another row")
     if green(892, 148, 112, 112) < (100 if playing is not None else 0): errors.append("no green button beside the list")
-    blue = {C(x, y) for y in range(150, 200, 3) for x in range(315, 375, 3)}
+    blue = {C(x, y) for y in range(150, 200, 3) for x in range(227, 287, 3)}
     if len(blue) < 4: errors.append(f"no button in the first row ({len(blue)} colours)")
     not_big()
 elif case.startswith("stat-"):
@@ -1176,11 +1181,14 @@ elif case in ("pockets-menu", "pockets-armed"):
     if counts[1] < 200 or counts[0] or any(counts[2:]):
         errors.append(f"tab icons' green pixels {counts} (want Pockets' only)")
     WELL = (81, 81, 138)
+    none = (1, 3)  # (A-pk-cnt3-slot1 counts 27, 0, 2, 0: an item at 0 is drawn faint, the touch screen's colours blended)
     for i in range(4):
         hd = [C(x, y) for y in range(454, 526) for x in range(200 + 87 * i, 275 + 87 * i)]
         ds = set(bottom(99 + 29 * i + x, 155 + y) for y in range(23) for x in range(23)) - {WELL}
         shared = len(ds & set(hd))
-        if shared < 5: errors.append(f"counted {i}: {shared} of the touch screen's colours (want the game's picture)")
+        if i in none:
+            if shared > 2 or len(set(hd)) < 20: errors.append(f"counted {i} (none): {shared} of the touch screen's colours, {len(set(hd))} colours (want its picture faint)")
+        elif shared < 5: errors.append(f"counted {i}: {shared} of the touch screen's colours (want the game's picture)")
         if hd.count(WELL) > 40: errors.append(f"counted {i}: the button's dark well around it ({hd.count(WELL)} pixels)")
     r, g, b = C(197, 258)
     if not (RINGED(197, 258)): errors.append("no focus ring around slot 1")
@@ -1414,20 +1422,21 @@ elif case == "goals-menu":
     if same > 100: errors.append(f"the touch screen 3x is drawn ({same} of 165 samples)")
 elif case in ("rel-menu", "rel-menu-wide"):
     # Relationships in HD (src/port/relations.*): the big portrait the touch screen's pixels 3x
-    # (DS 84,37 69 x 84 at 474,222), the first row's portrait 2x (DS 43,28 28 x 28 at 214,220),
+    # (DS 84,37 69 x 84 at 496,222), the first row's portrait 2x (DS 43,28 28 x 28 at 214,220),
     # the focus ring on the first row (the game's selection), the mood in white.
     expect("panel outline", C(176, 300), OUTLINE)
-    piece("big portrait", 84, 37, 69, 84, 474, 222, 3, step=4, keyed=True)
+    piece("big portrait", 84, 37, 69, 84, 496, 222, 3, step=4, keyed=True)
     piece("row 1 portrait", 43, 28, 28, 28, 214, 220, 2, step=3, keyed=True)
     r, g, b = C(197, 248)
     if not (RINGED(197, 248)): errors.append("no focus ring around the first Sim")
     if (255, 255, 255) not in [C(x, y) for y in range(240, 280) for x in range(728, 900)]:
         errors.append("no mood word")
 elif case == "opt-menu":
-    # Options in HD (src/port/options.*): both knobs at 100 % (the track's right end, x 1012), the
-    # music's focused (lighter) with the focus ring around its well.
+    # Options in HD (src/port/options.*): both knobs at 100 % (the track's right end, x 1012) in the
+    # light fill, the music's well focused (kFillFocus, as every focused row) with the focus ring.
     expect("panel outline", C(176, 300), OUTLINE)
-    expect("music knob (focused)", C(1012, 390), hexrgb("4A5296"))
+    expect("music knob", C(1012, 390), hexrgb("828ACB"))
+    expect("music well (focused)", C(700, 330), hexrgb("4A5296"))
     expect("SFX knob", C(1012, 536), FRAME)
     r, g, b = C(197, 360)
     if not (RINGED(197, 360)): errors.append("no focus ring around the music volume")

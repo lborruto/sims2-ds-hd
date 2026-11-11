@@ -1,6 +1,7 @@
 #include "port/goals.h"
 
 #include <algorithm>
+#include <tuple>
 
 #include "port/ownwords.h"
 #include "port/panelmenu.h"
@@ -22,7 +23,9 @@ constexpr u32 kTrack = 0xFF51518A, kThumb = 0xFFB2B2E3;
 // to kGoalsMin when the selected goal alone does not fit the well).
 struct GoalBox { std::string text; int lines = 1; int h = 0; };
 
-int TextW(Rect list) { return list.w - 2 * kGoalsPad - kGoalsMark - 18 - 12; } // (the scroll bar's margin)
+constexpr int kGoalsColumn = 40;   // the scroll column at the list's right (AddScrollColumn), and its gap
+int TextW(Rect list) { return list.w - 2 * kGoalsPad - kGoalsMark - kGoalsColumn - 10 - 12; }
+Rect ColumnRect(Rect list) { return {list.x + list.w - kGoalsPad - kGoalsColumn, list.y + kGoalsPad, kGoalsColumn, list.h - 2 * kGoalsPad}; }
 
 std::vector<GoalBox> Boxes(const GoalsState& g, const RomData* rom, Rect list, float& size)
 {
@@ -96,7 +99,7 @@ void AddGoalsView(MenuView& v, const GoalsState& g, const RomData* rom)
     {
         const GoalEntry& e = g.entries[i];
         ViewItem it;
-        it.rect = {list.x + kGoalsPad, y, list.w - 2 * kGoalsPad - 18, b[i].h};
+        it.rect = {list.x + kGoalsPad, y, list.w - 2 * kGoalsPad - kGoalsColumn - 10, b[i].h};
         it.group = 1;
         it.id = kGoalsId + (e.mission ? 0 : 0x100) + (u32)std::max(0, e.id);
         // No action: a goal is only read. (Without the game's selection, A selects it by its
@@ -131,6 +134,22 @@ void AddScrollBar(Composition& c, Rect track, int first, int shown, int count)
     th.radius = track.w / 2.0f;
     th.layer = 1;
     c.ui.push_back(th);
+}
+
+void AddScrollColumn(Composition& c, Rect col, int first, int shown, int count, bool upOn, bool downOn, Rect* up, Rect* down, int layer)
+{
+    const Rect u {col.x, col.y, col.w, col.w}, d {col.x, col.y + col.h - col.w, col.w, col.w};
+    for (auto [r, dir, on] : {std::tuple {u, UiItem::Sign::Up, upOn}, std::tuple {d, UiItem::Sign::Down, downOn}})
+    {
+        UiItem a = ScrollArrowItem(r, dir, on);
+        a.layer = layer;
+        c.ui.push_back(a);
+    }
+    const size_t at = c.ui.size();
+    AddScrollBar(c, {col.x + col.w / 2 - 4, u.y + u.h + 12, 8, d.y - 12 - (u.y + u.h + 12)}, first, shown, count);
+    for (size_t i = at; i < c.ui.size(); i++) c.ui[i].layer = layer;
+    if (up) *up = u;
+    if (down) *down = d;
 }
 
 void BuildGoals(Composition& c, const MenuView& v, int focus, const GameState& game, const RomData& rom, const u32* bottom)
@@ -191,7 +210,14 @@ void BuildGoals(Composition& c, const MenuView& v, int focus, const GameState& g
         const int l0 = std::max(g.entries[i].firstLine, g.first), l1 = std::min(g.entries[i].firstLine + g.entries[i].nLines, g.first + kGoalsLinesShown);
         if (l1 > l0) AddMousePiece(c, {kGoalsLineX, kGoalsLineY0 + kGoalsLineH * (l0 - g.first), kGoalsLineW, kGoalsLineH * (l1 - l0)}, r);
     }
-    AddScrollBar(c, {list.x + list.w - kGoalsPad - 10, list.y + kGoalsPad, 10, list.h - 2 * kGoalsPad}, first, last - first, (int)g.entries.size());
+    if (!g.entries.empty())
+    {
+        // The arrows (the game's, which move its selection: sunk at the list's ends) and the bar.
+        Rect up, down;
+        AddScrollColumn(c, ColumnRect(list), first, last - first, (int)g.entries.size(), !v.scrollUp.empty(), !v.scrollDown.empty(), &up, &down);
+        AddMousePiece(c, {kGoalsUpX - 12, kGoalsUpY - 12, 24, 24}, up);
+        AddMousePiece(c, {kGoalsDownX - 12, kGoalsDownY - 12, 24, 24}, down);
+    }
     // No goal: the port's words in the list's well (the game's table has none for it).
     if (g.entries.empty())
         PanelText(c, {list.x + 24, list.y, list.w - 48, list.h}, OwnWord(&rom, OwnWordId::NoGoals), kGoalsSize, 20, Align::Centre, Weight::ExtraBold);

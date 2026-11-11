@@ -131,7 +131,14 @@ void BuildRelations(Composition& c, const MenuView& v, int focus, const GameStat
         c.ui.push_back(t);
         AddMousePiece(c, {40, kRelSimY[i] - 16, 33, 33}, row); // (hotspots.cpp's "Sim i" area)
     }
-    AddScrollBar(c, kRelScroll, r.first, std::min(kRelRowsShown, n), n);
+    if (n > 0)
+    {
+        // The arrows (the game's, which move its selection: sunk at the list's ends) and the bar.
+        Rect up, down;
+        AddScrollColumn(c, kRelScroll, r.first, std::min(kRelRowsShown, n), n, !v.scrollUp.empty(), !v.scrollDown.empty(), &up, &down);
+        AddMousePiece(c, {kRelPrevX - 12, kRelPrevY - 10, 24, 20}, up);
+        AddMousePiece(c, {kRelNextX - 12, kRelNextY - 10, 24, 20}, down);
+    }
     if (sel)
     {
         const FittedText name = FitLine(MenuWords(rom, sel->nameId), 26, 18, kRelName.w - 32, Weight::ExtraBold);

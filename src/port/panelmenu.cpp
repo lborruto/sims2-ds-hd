@@ -141,14 +141,32 @@ void AddMousePiece(Composition& c, Rect from, Rect to)
     c.pieces.push_back(p);
 }
 
+namespace
+{
+// KeyedCrop's copies, per DS rectangle: kept until the next crop of the same one (KeptCrop).
+std::map<std::tuple<int, int, int, int>, std::vector<u32>>& CropCopies()
+{
+    static std::map<std::tuple<int, int, int, int>, std::vector<u32>> copies;
+    return copies;
+}
+}
+
+UiItem KeptCrop(Rect from, Rect to, int tier)
+{
+    const auto it = CropCopies().find({from.x, from.y, from.w, from.h});
+    if (it == CropCopies().end() || it->second.size() != (size_t)from.w * from.h) return ImageItem({to.x, to.y, 0, 0}, nullptr, 0, 0, {});
+    const std::vector<u32>& px = it->second;
+    if (tier > 0) return TierImage(to, px.data(), from.w, from.h, {0, 0, from.w, from.h}, tier);
+    return ImageItem(to, px.data(), from.w, from.h, {0, 0, from.w, from.h});
+}
+
 UiItem KeyedCrop(const u32* bottom, Rect from, Rect to, int tier)
 {
     // (No picture, or a rectangle off the screen: an image item without a source, which draws
     // nothing and takes no room: ImageItem's own empty item.)
     if (!bottom || from.w <= 0 || from.h <= 0 || from.x < 0 || from.y < 0 || from.x + from.w > SW || from.y + from.h > SH)
         return ImageItem({to.x, to.y, 0, 0}, nullptr, 0, 0, {});
-    static std::map<std::tuple<int, int, int, int>, std::vector<u32>> copies;
-    std::vector<u32>& px = copies[{from.x, from.y, from.w, from.h}];
+    std::vector<u32>& px = CropCopies()[{from.x, from.y, from.w, from.h}];
     px.resize((size_t)from.w * from.h);
     for (int j = 0; j < from.h; j++)
         for (int i = 0; i < from.w; i++) px[(size_t)j * from.w + i] = bottom[(size_t)(from.y + j) * SW + from.x + i] | 0xFF000000;
@@ -242,25 +260,27 @@ int AddHint(Composition& c, int right, Button b, const std::string& label)
     return right - r.w - 28;
 }
 
-bool PanelDPadHint(const MenuView& v, int focus, const RomData& rom, Button& b, std::string& word)
+std::vector<DPadHint> PanelDPadHints(const MenuView& v, int focus, const RomData& rom)
 {
-    if (MenuFocusable(v, focus) && (!v.items[focus].left.empty() || !v.items[focus].right.empty()))
-    {
-        b = Button::DPadH; // (a slider: "Adjust", as every slider's hint)
-        word = OwnWord(&rom, OwnWordId::HintAdjust);
-    }
-    else if (MenuFocusable(v, v.selected) && focus == v.selected && (!v.scrollUp.empty() || !v.scrollDown.empty()))
-    {
-        b = Button::DPadV; // (a selection the game owns, moved by its own arrows: Goals, Relationships)
-        word = OwnWord(&rom, OwnWordId::HintChoose);
-    }
-    else if (!v.buttons[(int)MenuButton::Left].empty() || !v.buttons[(int)MenuButton::Right].empty())
-    {
-        b = Button::DPadH; // (Interact: the previous / next target, as the world's prompt says it)
-        word = OwnWord(&rom, OwnWordId::PromptOther);
-    }
-    else return false;
-    return true;
+    std::vector<DPadHint> h;
+    // The tab's items the focus can go to (the phone left out: it is one more stop above them).
+    int items = 0, x0 = -1;
+    bool column = true;
+    for (const ViewItem& it : v.items)
+        if (it.enabled && it.id != kPhoneId)
+        {
+            items++;
+            if (x0 < 0) x0 = it.rect.x;
+            else if (it.rect.x != x0) column = false;
+        }
+    const bool slider = MenuFocusable(v, focus) && (!v.items[focus].left.empty() || !v.items[focus].right.empty());
+    const bool gameSel = MenuFocusable(v, v.selected) && focus == v.selected && (!v.scrollUp.empty() || !v.scrollDown.empty());
+    const bool targets = !v.buttons[(int)MenuButton::Left].empty() || !v.buttons[(int)MenuButton::Right].empty();
+    // (Left / Right do something else on a slider or with targets: the cross's vertical arms alone.)
+    if (items >= 2 || gameSel) h.push_back({column || slider || targets ? Button::DPadV : Button::DPad, OwnWord(&rom, OwnWordId::HintChoose)});
+    if (slider) h.push_back({Button::DPadH, OwnWord(&rom, OwnWordId::HintAdjust)});            // (as every slider's hint)
+    else if (targets) h.push_back({Button::DPadH, OwnWord(&rom, OwnWordId::PromptOther)});     // (as the world's prompt says it)
+    return h;
 }
 
 MenuView PanelMenuView(ScreenState s, const GameState* game, const RomData* rom)
@@ -379,12 +399,26 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
     else if (s.tab == Tab::Options) BuildOptions(c, v, focus, game, rom);
 
     // The hints: A (the focused item's own word when it has one), B closes, X, and the D-pad's
-    // (one, always with its word: PanelDPadHint) at the left of them; A's and X's words fit the
-    // room the D-pad's leaves.
-    Button dpad = Button::DPad;
-    std::string dword;
-    const bool hasDpad = PanelDPadHint(v, focus, rom, dpad, dword);
-    const int dpadW = hasDpad ? ChipRect(0, 0, dpad, dword, kPmHintSize, 0, Weight::ExtraBold).w + 28 : 0;
+    // (each with its word: PanelDPadHints) at the left of them; A's and X's words fit the room
+    // the D-pad's leave.
+    std::vector<DPadHint> dpad = PanelDPadHints(v, focus, rom);
+    auto dpadWidth = [&] {
+        int w = 0;
+        for (const DPadHint& d : dpad) w += ChipRect(0, 0, d.button, d.word, kPmHintSize, 0, Weight::ExtraBold).w + 28;
+        return w;
+    };
+    int dpadW = dpadWidth();
+    // (Two D-pad hints and an A word they would cut, a long verb beside Interact's "Other target":
+    // "Choose" goes, the hint of what Left / Right do stays; MeasureInteract measures that room.)
+    if (dpad.size() == 2 && MenuFocusable(v, focus) && !v.items[focus].action.empty())
+    {
+        const int roomA = kPmHints.x + kPmHints.w - 8 - ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold).w - 28;
+        if (!FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, roomA - kPmHints.x - 60 - dpadW, Weight::ExtraBold).fits)
+        {
+            dpad.erase(dpad.begin());
+            dpadW = dpadWidth();
+        }
+    }
     int right = kPmHints.x + kPmHints.w - 8;
     right = AddHint(c, right, Button::B, MenuWords(rom, kStrClose));
     if (MenuFocusable(v, focus) && !v.items[focus].action.empty()) // (nothing to perform: no A)
@@ -400,7 +434,7 @@ void BuildPanelMenu(Composition& c, ScreenState s, const MenuView& v, int focus,
         const FittedText x = FitLine(word, kPmHintSize, kPmHintSize, right - kPmHints.x - 60 - dpadW, Weight::ExtraBold);
         right = AddHint(c, right, Button::X, x.text);
     }
-    if (hasDpad) AddHint(c, right, dpad, dword);
+    for (const DPadHint& d : dpad) right = AddHint(c, right, d.button, d.word);
 
     // The icons (images: drawn above the still layers): the five tabs, the selected one green.
     if (icons)

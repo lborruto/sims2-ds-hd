@@ -75,6 +75,17 @@ void BuildPopup(Composition& c, const MenuView& v, int focus, const GameState& g
 // rectangle `from` (none when empty). Everything on kPopLayer, as BuildPopup.
 void BuildHintBox(Composition& c, int focus, const std::string& title, const std::string& text, const RomData& rom, Rect from);
 
+// A screen's own question in the popups' look (Build Rooms' "Are you sure you want to buy this
+// room?"): over what c holds, the veil, the box at `box` (no title), `text` at the top of its well
+// in `textH` canvas pixels (the caller draws the rest of the well: what the question is about, on
+// kPopLayer), the No / Yes buttons as a popup's question (QuestionNo / QuestionYes: No the first
+// focus, A answers the focused one, B is always No), their mouse pieces onto the DS rectangles
+// fromNo / fromYes. Everything on kPopLayer, as BuildPopup.
+void BuildQuestionBox(Composition& c, Rect box, const std::string& text, int textH, int focus, const RomData& rom, Rect fromNo, Rect fromYes);
+// Its buttons' places (the popups' No and Yes places in `box`).
+constexpr Rect QuestionNo(Rect box) { return {box.x + 48, box.y + box.h - 104, 260, kPopBtnH}; }
+constexpr Rect QuestionYes(Rect box) { return {box.x + box.w - 308, box.y + box.h - 104, 260, kPopBtnH}; }
+
 // A box of a minigame's own (the cards' and MooGoo's quit questions, the end of a turn, the mixer's
 // save question, a help text; port/minigame.h) or the game's popup over a minigame, in the popups'
 // look: a button's chips (the activity's own buttons: no focus, each answer its button) and the

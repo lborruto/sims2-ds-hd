@@ -31,12 +31,12 @@ constexpr int kStrMood = 181, kStrRelationship = 182;
 
 // HD geometry (canvas), inside the frame's content area (200, 206, 880 x 372).
 constexpr int kRelRowX = 200, kRelRowW = 236, kRelRowH = 84, kRelRowGap = 12;
-constexpr Rect kRelScroll {442, 206, 8, 372};
-constexpr Rect kRelPortrait {462, 206, 232, 284};
-constexpr Rect kRelName {462, 502, 232, 56};
-constexpr Rect kRelMood {710, 206, 370, 76};
-constexpr Rect kRelLevel {710, 292, 370, 76};
-constexpr Rect kRelDescWell {710, 378, 370, 200};
+constexpr Rect kRelScroll {444, 206, 36, 372};          // the list's scroll column (AddScrollColumn: arrows and bar)
+constexpr Rect kRelPortrait {492, 206, 216, 284};        // (the big portrait 3x: 207 x 252)
+constexpr Rect kRelName {492, 502, 216, 56};
+constexpr Rect kRelMood {720, 206, 360, 76};
+constexpr Rect kRelLevel {720, 292, 360, 76};
+constexpr Rect kRelDescWell {720, 378, 360, 200};
 constexpr Rect kRelDesc {kRelDescWell.x + 18, kRelDescWell.y + 12, kRelDescWell.w - 36, kRelDescWell.h - 24};
 constexpr u32 kRelId = kModRelations + 0x500;   // + the Sim's id
 
