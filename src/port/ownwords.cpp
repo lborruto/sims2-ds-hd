@@ -497,6 +497,8 @@ constexpr const char* kWords[][5] = {
     // The world's prompt
     {"Hold for more", "Maintenir : plus", "Halten: mehr", "Tieni premuto: altro", "Mantén: más"},
     {"Other target", "Autre cible", "Anderes Ziel", "Altro obiettivo", "Otro objetivo"},
+    // (ux task 6) The mixer's play
+    {"Play", "Jouer", "Abspielen", "Riproduci", "Reproducir"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

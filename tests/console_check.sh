@@ -2547,6 +2547,44 @@ vacuum_none() {
     ! grep -q -E 'pointer down|clogged=1' "$tmp/mg-vacuum-none.log" || { echo "  mg-vacuum-none: pressed"; return 1; }
 }
 check_pad mg-vacuum-none vacuum_none
+# The words the HD frames say (--print-words: the composition's texts and chips' labels; ux task 6):
+# MooGoo's players before their names are set ("Player 1", never the table's string 0, its copyright
+# line); the lottery's result popup with no title (RAM's is a stale "Loading"); the vacuum's money
+# this session (§75 once the gold ring is kept, while the lifetime total waits for the put away);
+# the German mixer's X "Abspielen" (the game's word is its button's, START, beside the help's chip).
+words_run() {
+    local name=$1 state=$2 clock=$3 frames=$4
+    shift 4
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-words --print-minigame --print-game --clock "$clock" "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+words_run words-moogoo G-B-mg-x "2026-11-05 12:05" 40 &
+words_run words-scratch G-B-sc-win-pop "2026-11-05 12:05" 40 &
+words_run words-vacuum act-vacuum "2026-01-01 14:00" 430 --input "$repo/scripts/console/vacuum-pick.txt" &
+words_run words-mixer-de G-X-music "2026-11-05 12:05" 40 --game-language 3 &
+wait
+last_words() { grep ': words ' "$tmp/$1.log" | tail -n 1; }
+words_moogoo() {
+    last_words words-moogoo | grep -q '| Player 1 | .*| Player 2 | .*| Player 3 |' || { echo "  words-moogoo: no Player 1-3: $(last_words words-moogoo)"; return 1; }
+    ! grep -q 'words .*Electronic Arts' "$tmp/words-moogoo.log" || { echo "  words-moogoo: the copyright line as a name"; return 1; }
+}
+check_pad words-moogoo words_moogoo
+words_scratch() {
+    last_words words-scratch | grep -q 'you won' || { echo "  words-scratch: no result: $(last_words words-scratch)"; return 1; }
+    ! grep -q 'words .*Loading' "$tmp/words-scratch.log" || { echo "  words-scratch: a stale title"; return 1; }
+}
+check_pad words-scratch words_scratch
+words_vacuum() {
+    in_order words-vacuum 'words Vacuum \| Vacuum Earnings \| §0 ' 'minigame vacuum .*session=75' 'words Vacuum \| Vacuum Earnings \| §75 '
+}
+check_pad words-vacuum words_vacuum
+words_mixer_de() {
+    last_words words-mixer-de | grep -q '| Abspielen |' || { echo "  words-mixer-de: no Abspielen: $(last_words words-mixer-de)"; return 1; }
+    ! last_words words-mixer-de | grep -q '| START |' || { echo "  words-mixer-de: START as X's word"; return 1; }
+}
+check_pad words-mixer-de words_mixer_de
 art_palette() {
     in_order mg-art-palette 'minigame art .*swatch=3 page=0 ' 'minigame art .*page=1 ' 'minigame art .*page=2 ' 'minigame art .*swatch=4 page=2 ' \
         'popup state=2 kind=2 .*done painting'

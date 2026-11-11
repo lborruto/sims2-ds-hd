@@ -186,6 +186,13 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   in one piece, or, the rare time it cannot be followed, takes that one step at 30 fps.
 - A failed state load puts back the game as it was a moment before; save states and the place
   kept on quitting are written safely (a failed write keeps the old one).
+<!-- The front end, Create-a-Sim, the shop and the minigames (ux audit, task 6). -->
+- MooGoo Monkey: before the players are named, the side panel says "Player 1-3" (not the game's
+  copyright line).
+- The scratch lottery's messages no longer carry a stale "Loading" title.
+- The vacuum's side panel shows the money of this session, as the bowl does (it said §0 until
+  the vacuum was put away).
+- German music mixer: X says "Abspielen" (it said START, beside the help's own Start chip).
 
 ## [0.1.1] - 2026-11-04
 

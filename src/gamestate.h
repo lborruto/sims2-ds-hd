@@ -721,7 +721,8 @@ struct VacuumState
 {
     bool valid = false;
     bool clogged = false;
-    int earnings = 0;
+    int earnings = 0;                 // the lifetime "Vacuum Earnings" (G+0x7C: banked when put away)
+    int session = 0;                  // the money this session (S+0x150: the bowl's counter, §)
     bool bowl = false;
     std::vector<VacuumItem> items;
     int heldSlot = -1;

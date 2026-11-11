@@ -273,7 +273,8 @@ The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the 
   discard, 3 the plank, 4 the cannon, 5 two cards drawn, 6 the turn ending, 7 the deal, 8 a card drawn), `S+0x2F1` u8 whose turn (0 the player, 1 the opponent); `S+0x308` the player's name (ASCII, as the board shows it). Found on the owner's `act-cards` (draw, discard, the message,
   quit, help: states saved by `--state-save`, the board's numbers compared on the same frames), checked on the research's `G-cas-next-row1` / `G-X-pirate`.
 - **Vacuum** (`VacuumState`, overlay 17, vtable 0x0214C658): `S+0x158` u8 the filter clogged (1 from touching dust to 17 frames after a 7-frame blow: `act-vacuum-clog`, the
-  blow script), the stat panel's "Vacuum Earnings" `G+0x7C`. The bowl (`VacuumState::bowl`, read apart; updated every other frame): nine slots of 0x1C at `S+0x28 + 0x1C i`,
+  blow script), the stat panel's "Vacuum Earnings" `G+0x7C` (the lifetime total: banked when the vacuum is put away), `S+0x150` s32 the money this session (the
+  bowl's counter at its top left; `S+0x154` the same a frame later; §75 once the gold ring is kept, `mg-vacuum-pick`). The bowl (`VacuumState::bowl`, read apart; updated every other frame): nine slots of 0x1C at `S+0x28 + 0x1C i`,
   `+0` the sprite's pointer (its place `sprite+0x50` / `+0x54`, 20.12 touch pixels), `+4` angle, `+8` radius, `+0xC` / `+0x10` speeds, `+0x14` scale (20.12), `+0x18` u8 active,
   `+0x19` u8 held, `+0x1A` u16 kind (0x186-0x188 dust, above a find: 0x196 the gold ring); `S+0x24` u8 the stylus down since a fresh press, `S+0x26` u16 the slot held (0xA
   none), `S+0x140` / `S+0x142` the stylus's last point; `S+0x162` and `S+0x170` u8 the funnel's keep animation (both 0: idle). The grab (code 0x0214A3C4): while the stylus is

@@ -110,6 +110,7 @@ static void Usage()
         "  --print-vacuum                print the vacuum's bowl (its things, the one held, the funnel's keep animation), read from RAM, when it changes\n"
         "  --print-front                 print the front end (title, Settings, Load-a-Sim, Create-a-Sim, boot screens, video), read from RAM, when it changes\n"
         "  --print-console               print CONSOLE's composition (which branch; milestone 1's marked m1, a held picture) when it changes, and the counts at the end\n"
+        "  --print-words                 print the words CONSOLE's picture shows (its texts, chips' labels) when they change\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
         "                                (frame N: hud money=.. time=hh:mm sanity=cur/max tier=.. name=..; frame N: dialogue ..)\n"
@@ -179,7 +180,7 @@ int main(int argc, char** argv)
     std::set<long> shotAt;
     Layout layout = Layout::Console;
     bool layoutGiven = false;
-    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printVacuum = false, printFront = false, printConsole = false, consoleMenu = false, consolePinned = false;
+    bool compose = false, printScreen = false, printGame = false, printHud = false, printTown = false, printHotel = false, printMinigame = false, printVacuum = false, printFront = false, printConsole = false, printWords = false, consoleMenu = false, consolePinned = false;
     int consoleFocus = -1;
     int composeScale = 1;
     int uiScaleArg = 0;     // --ui-scale N (60-150): the HD interface's size for this run; 0 the settings' (headless 100)
@@ -243,6 +244,7 @@ int main(int argc, char** argv)
         else if (a == "--print-vacuum") printVacuum = true;
         else if (a == "--print-front") printFront = true;
         else if (a == "--print-console") printConsole = true;
+        else if (a == "--print-words") printWords = true;
         else if (a == "--record-dir") recordDir = next();
         // For checks only (tests/gamestate_check.sh; not in --help): fakes a new unmapped screen
         // every 200 frames from frame N, to drive the recorder.
@@ -995,6 +997,7 @@ relaunch:
     double nextFrameAt = 0; // in seconds of the performance counter; 0: not started
     bool wasPaused = false; // the pause menu was open: buttons held on leaving it are not presses
     bool lastMenu = app.consoleMenu;
+    std::string lastWords;   // (--print-words)
     int lastFocus = app.consoleFocus;
     int disagree = 0; // frames the game's settled screen and the pixels' answer have disagreed
     int lastTouchX = -1, lastTouchY = -1; // the stylus's last point down (room info's hint: which line)
@@ -1705,6 +1708,16 @@ relaunch:
                 (frame == 0 || fresh != app.consoleHold.Branch() || shown != app.consoleHold.ShownBranch() || held != app.consoleHold.Holding()))
                 fprintf(stderr, "frame %ld: console %s%s\n", frame, ConsoleBranchName(app.consoleHold.Branch()),
                         app.consoleHold.Holding() ? (std::string(" held ") + ConsoleBranchName(app.consoleHold.ShownBranch())).c_str() : "");
+            // The words shown (the checks read what a screen says): its texts and chips' labels, in order.
+            if (printWords && app.shown == Layout::Console)
+            {
+                std::string words;
+                for (const ui::UiItem& it : app.consoleHold.ShownNow().ui)
+                    if ((it.kind == ui::UiItem::Text || it.kind == ui::UiItem::Chip) && !it.text.empty()) words += (words.empty() ? "" : " | ") + it.text;
+                for (char& ch : words) if (ch == '\n') ch = ' ';
+                if (words != lastWords) fprintf(stderr, "frame %ld: words %s\n", frame, words.c_str());
+                lastWords = words;
+            }
         }
         writeShots(false);
         frame++;

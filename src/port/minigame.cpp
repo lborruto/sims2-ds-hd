@@ -177,7 +177,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         if (phase == 1) return {PointHint(rom), touch, {{C(Button::X), Sep("/"), C(Button::B)}, own(OwnWordId::MixerStop), true}, octave};
         if (phase == 2) return {PointHint(rom), touch, {{C(Button::RB), Sep("/"), C(Button::B)}, own(OwnWordId::MixerStop), true}, octave};
         // (Idle: every button has a use; the pointer and A as one hint, the D-pad's three as one.)
-        return {{{C(Button::LStick), Sep("+"), C(Button::A)}, own(OwnWordId::MixerPoint)}, {{C(Button::X)}, Words(rom, kStrMgMixPlay)},
+        return {{{C(Button::LStick), Sep("+"), C(Button::A)}, own(OwnWordId::MixerPoint)}, {{C(Button::X)}, own(OwnWordId::MixerPlay)},
                 {{C(Button::RB)}, Words(rom, kStrMgMixRecord)}, {{C(Button::Y)}, Words(rom, kStrMgMixVox)}, {{C(Button::LB)}, Words(rom, kStrMgMixGenre)},
                 {{C(Button::Start)}, own(OwnWordId::MixerHelp)}, {{C(Button::B)}, Words(rom, kStrMgMixQuit)}};
         // (the D-pad's octave, sustain and PREP: the game's own keys; the octave's hint shows while it plays)
@@ -395,8 +395,9 @@ int CardsValues(Composition& c, int y, const CardsState& k, const RomData& rom, 
 
 int EarningsValues(Composition& c, int y, int index, int amount, const RomData& rom);
 
-// The vacuum's values: the stat panel's "Vacuum Earnings: $@1", label and value.
-int VacuumValues(Composition& c, int y, const VacuumState& v, const RomData& rom) { return EarningsValues(c, y, 2, v.earnings, rom); }
+// The vacuum's values: the stat panel's "Vacuum Earnings: $@1", label and the money this session (the
+// bowl's counter: the lifetime total is banked only when the vacuum is put away).
+int VacuumValues(Composition& c, int y, const VacuumState& v, const RomData& rom) { return EarningsValues(c, y, 2, v.session, rom); }
 
 int EarningsValues(Composition& c, int y, int index, int amount, const RomData& rom)
 {
@@ -576,6 +577,10 @@ int ArtValues(Composition& c, int y, const ArtState& a, const RomData& rom)
 // A string of the game's when the table holds it (an id from RAM: a name), else empty.
 std::string SafeWords(const RomData& rom, int id) { return id >= 0 && id < rom.StringCount() ? Words(rom, id) : std::string(); }
 
+// A MooGoo player's name (a Sim's: its string id from RAM), or empty: 0 before the players are set
+// (the table's string 0 is the game's copyright line, never a name).
+std::string PlayerName(const RomData& rom, int id) { return id > 0 ? SafeWords(rom, id) : std::string(); }
+
 // The Drencher's locked target as the game names it (a Sim 323 + k, an object 463 + k), or empty.
 std::string DrencherTargetName(const RomData& rom, const DrencherState& d)
 {
@@ -623,7 +628,7 @@ int MooGooValues(Composition& c, int y, const MooGooState& g, const RomData& rom
         bar.radius = 8;
         bar.layer = 0;
         c.ui.push_back(bar);
-        const std::string name = SafeWords(rom, pl.nameId);
+        const std::string name = PlayerName(rom, pl.nameId);
         PanelText(c, {ix + 6, yy + 3, iw - 12, 24}, name.empty() ? Words(rom, kStrMgMooPlayer1 + p) : name, kMgValueSize - 2, kMgValueMin, Align::Left,
                   Weight::ExtraBold, 0xFFFFFFFF);
         // The score and its fruit (the game's words: coconuts, watermelons, pineapples).
@@ -1046,8 +1051,9 @@ bool BoxOf(Screen s, const GameState& game, const RomData& rom, MgBox& b)
         b.cover = {128 - p.boxW / 2, p.boxY, p.boxW, 8 * p.boxTiles + 32};
         if (gone || p.state != 2) b.cover.h = SH - p.boxY;
         b.text = MenuText(GameTextToUtf8(p.text));
-        // (a question's title in RAM is stale: not drawn; a message's and a hint's are its own)
-        b.title = p.kind == 2 ? "" : MenuText(GameTextToUtf8(p.title));
+        // (No title: over a minigame the game draws none, a question's nor a message's or hint's
+        // (the lottery's); the one in RAM is stale, the last box's elsewhere: "Loading".)
+        b.title.clear();
         for (size_t at; (at = b.text.find('$')) != std::string::npos;) b.text.replace(at, 1, "\xC2\xA7");   // (the game's simoleon)
         int x, y;
         auto from = [&](int i) { return PopupButton(p, i, x, y) ? Rect {x - 12, y - 12, 24, 24} : Rect {}; };
@@ -1173,7 +1179,7 @@ void AddMooGooLine(Composition& c, const std::string& line)
 void AddMooGooBanner(Composition& c, const MooGooState& g, const RomData& rom)
 {
     const MooGooPlayer& pl = g.players[std::clamp(g.current, 0, kMooGooPlayers - 1)];
-    std::string name = SafeWords(rom, pl.nameId);
+    std::string name = PlayerName(rom, pl.nameId);
     if (name.empty()) name = Words(rom, kStrMgMooPlayer1 + std::clamp(g.current, 0, kMooGooPlayers - 1));
     const Rect r = ToCanvas(kMgMooBannerFrom, 6);
     UiItem box = PanelItem(r);

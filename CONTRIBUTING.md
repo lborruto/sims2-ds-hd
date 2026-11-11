@@ -182,6 +182,7 @@ The headless mode runs the game without a window, about four times faster than r
 | `--game-language N` | the game's own language (the DS firmware's), 1 English to 5 Spanish; headless keeps English otherwise |
 | `--fast-boot` | the boot's splashes at full speed, as the window does |
 | `--print-console` | CONSOLE's composition (which branch, a held picture) when it changes, and the counts at the end: how many frames showed milestone 1's picture |
+| `--print-words` | The words CONSOLE's picture shows (its texts and chips' labels, in order, ` \| ` between) when they change: what a screen says, for the checks |
 | `--shell PAGE [--shell-at N]`, `--launch`, `--data-dir DIR`, `--print-shell` | the pause menu opened on a page, the launch panel first, where the save states and recent games go (none headless without it), and what they do |
 | `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
 

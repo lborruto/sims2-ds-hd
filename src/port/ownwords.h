@@ -108,6 +108,9 @@ enum class OwnWordId : int
     // The world's prompt (port/prompt.*): A held shows the other actions, Up / Down choose one
     // while it is held, Left / Right switch to the next target near the hero.
     PromptMore, PromptOther,
+    // (ux task 6, the front end and the minigames) The mixer's X: play the song (the game's word is
+    // its button's, START in German).
+    MixerPlay,
     Count
 };
 
