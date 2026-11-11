@@ -92,6 +92,7 @@ void ShellHost::Refresh(const App& app, const Input& input)
     }
     model.padFace = input.padStyle == Controls::PLAYSTATION ? ui::Face::PlayStation : input.padStyle == Controls::NINTENDO ? ui::Face::Nintendo : ui::Face::Xbox;
     model.keyboard = input.lastKeyboard;
+    model.pauseCombo = PauseCombo(input.padStyle, type);
     if (model.capturing >= 0 && !headless)
         model.captureLeft = (int)std::max<long>(0, ((long)captureUntil - (long)SDL_GetTicks() + 999) / 1000);
     model.statesOk = data.Ok();

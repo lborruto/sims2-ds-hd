@@ -122,7 +122,7 @@ const std::vector<CardEntry>& Card()
         {{ui::Button::X, ui::Button::Y}, -1, W::CtlZoom},
         {{ui::Button::RStick}, -1, W::CtlCamera}, // (in the world: it turns, and zooms up / down)
         {{ui::Button::Back}, -1, W::Menu},
-        {{ui::Button::Pause}, -1, W::ShellPauseMenu},
+        {{ui::Button::Pause}, -1, W::Pause},
         {{ui::Button::RStick}, -1, W::Cursor},
         {{}, Controls::FAST, W::CtlFast},
     };
@@ -371,7 +371,7 @@ std::string ActionLabel(int a, int lang)
     case L: return "DS L";
     case X: return "DS X";
     case Y: return "DS Y";
-    case MENU: return Wd(lang, W::ShellPauseMenu);
+    case MENU: return Wd(lang, W::Pause);
     case FAST: return Wd(lang, W::CtlFast);
     case SWAP: return Wd(lang, W::ActSwap);
     case SAVESTATE: return Wd(lang, W::ActSaveState);
@@ -770,7 +770,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                     tx = r.x + 14 + 216 + 20;
                 }
                 const int tw = r.x + r.w - 20 - tx;
-                it.Add(1, Line({tx, r.y + 8, tw, 44}, Wd(lang, W::LaunchContinue), 34, 24, Align::Left, Weight::ExtraBold));
+                it.Add(1, Line({tx, r.y + 8, tw, 44}, Wd(lang, W::Continue), 34, 24, Align::Left, Weight::ExtraBold));
                 UiItem name = Line({tx, r.y + 50, tw, 34}, m.recents.empty() ? "" : m.recents[0], 22, 16);
                 name.colour = f ? kWarm : kTextNote;
                 it.Add(1, name);
@@ -812,7 +812,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             int right = kLaunchList.x + kLaunchList.w - 24;
             const int hy = kLaunchList.y + kLaunchList.h - 56;
             const LaunchItem k = e[std::clamp(focus, 0, (int)e.size() - 1)].kind;
-            const W aw = k == LaunchItem::Continue ? W::LaunchContinue : k == LaunchItem::Language ? W::ShellChange
+            const W aw = k == LaunchItem::Continue ? W::Continue : k == LaunchItem::Language ? W::ShellChange
                        : k == LaunchItem::Quit ? W::ShellQuit : k == LaunchItem::Choose ? W::ShellOpen : W::LaunchStart;
             right = Hint(it, right, hy, ui::Button::A, Wd(lang, aw));
             Hint(it, right, hy, ui::Button::DPadV, Wd(lang, W::HintChoose));
@@ -963,7 +963,9 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             if (focus >= 0 && focus < (int)tl.rows.size())
             {
                 const Row row = tl.rows[focus];
-                UiItem note = TextItem({c.x + 8, c.y + kSetListH, c.w - 16, c.h - kSetListH}, Wd(lang, RowHeld(row, st) ? W::SaverHolds : (W)RowNote(row)), 18);
+                std::string words = Wd(lang, RowHeld(row, st) ? W::SaverHolds : (W)RowNote(row));
+                if (row == Row::Mic) words = Fill(words, m.keyGlyph[Controls::BLOW].empty() ? "\xE2\x80\x94" : m.keyGlyph[Controls::BLOW]); // (the blow key as bound)
+                UiItem note = TextItem({c.x + 8, c.y + kSetListH, c.w - 16, c.h - kSetListH}, words, 18);
                 note.middle = true;
                 note.colour = kTextNote;
                 it.Add(1, note);
@@ -1109,8 +1111,8 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             }
             if (focus < kStateSlots)
             {
-                right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, m.used[focus] ? W::StLoad : W::StSave));
-                if (m.used[focus]) right = Hint(it, right, kHintsY, ui::Button::X, Wd(lang, W::StSave));
+                right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, m.used[focus] ? W::StLoad : W::SaveHere));
+                if (m.used[focus]) right = Hint(it, right, kHintsY, ui::Button::X, Wd(lang, W::SaveHere));
             }
             else if (m.canUndo) right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, W::StUndo));
             Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellBack));
@@ -1139,7 +1141,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         if (m.capturing >= 0)
         {
             text = Fill(Wd(lang, W::KeysPress), ActionLabel(m.capturing, lang));
-            note = std::string(Wd(lang, W::KeysCancel)) + "  (" + std::to_string(m.captureLeft) + ")";
+            note = Fill(Wd(lang, W::KeysCancel), m.pauseCombo) + "  (" + std::to_string(m.captureLeft) + ")";
         }
         else if (!m.message.empty()) text = m.message;
         else if (ask == Ask::Quit) { text = Wd(lang, W::QuitAsk); if (m.statesOk) note = Wd(lang, W::QuitNote); } // (no folder: nothing is kept)

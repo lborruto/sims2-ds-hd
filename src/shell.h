@@ -103,6 +103,7 @@ struct Model
     std::string keyGlyph[Controls::COUNT], padGlyph[Controls::COUNT];
     ui::Face padFace = ui::Face::Xbox;
     bool keyboard = true;             // the keyboard was used last (X clears its key, else the button)
+    std::string pauseCombo = "Start + Back"; // the driving pad's pause buttons as printed on it (Pads' PauseCombo)
     int capturing = -1, captureLeft = 0; // the action being captured, seconds left
     // The save states.
     bool statesOk = false;

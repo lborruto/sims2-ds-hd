@@ -78,7 +78,7 @@ struct AutopsyWords
         for (int i = 0; i < 3; i++) { tools[i] = Own(r, OwnWordId::AutopsyLaser, i); use[i] = Own(r, OwnWordId::AutopsyCut, i); }
         for (int i = 0; i < 2; i++) carry[i] = Own(r, OwnWordId::AutopsyToTray, i);
         tear = Own(r, OwnWordId::AutopsyTear);
-        quit = Own(r, OwnWordId::AutopsyQuit);
+        quit = Own(r, OwnWordId::ShellQuit);
         quitAgain = Own(r, OwnWordId::AutopsyQuitAgain);
         specimen = Own(r, OwnWordId::AutopsySpecimen);
         organ = Own(r, OwnWordId::AutopsyOrgan);
@@ -169,7 +169,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
         if (phase == 0xA)
             return AskHints(rom, askFocus, true);
         if (phase == 7)
-            return {{{C(Button::DPadV)}, own(OwnWordId::MixerChoose)}, {{C(Button::A)}, Words(rom, kStrMgMixSelect)}, {{C(Button::B)}, own(OwnWordId::MixerBack)}};
+            return {{{C(Button::DPadV)}, own(OwnWordId::HintChoose)}, {{C(Button::A)}, Words(rom, kStrMgMixSelect)}, {{C(Button::B)}, own(OwnWordId::ShellBack)}};
         // Help: the pointer and A pick the control the game explains (8); its text, A closes it (9).
         if (phase == 8) return {PointHint(rom), {{C(Button::A)}, own(OwnWordId::HelpWhat)}, {{C(Button::B)}, own(OwnWordId::HelpLeave)}};
         if (phase == 9) return {{{C(Button::A)}, own(OwnWordId::Close)}, {{C(Button::B)}, own(OwnWordId::HelpLeave)}};
@@ -184,9 +184,9 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
     }
     case Screen::MixerSave:
     {
-        if (quitArmed) return {{{C(Button::A)}, own(OwnWordId::SaveOverwrite), true}, {{C(Button::DPad)}, own(OwnWordId::MixerChoose)}};
-        return {{{C(Button::DPad)}, own(OwnWordId::MixerChoose)}, {{C(Button::A)}, own(SaveSlotAt(focus) >= 0 ? OwnWordId::SaveHere : OwnWordId::SaveType)},
-                {{C(Button::Y)}, own(OwnWordId::SaveErase)}, {{C(Button::B)}, own(OwnWordId::MixerBack)}};
+        if (quitArmed) return {{{C(Button::A)}, own(OwnWordId::SaveOverwrite), true}, {{C(Button::DPad)}, own(OwnWordId::HintChoose)}};
+        return {{{C(Button::DPad)}, own(OwnWordId::HintChoose)}, {{C(Button::A)}, own(SaveSlotAt(focus) >= 0 ? OwnWordId::SaveHere : OwnWordId::SaveType)},
+                {{C(Button::Y)}, own(OwnWordId::SaveErase)}, {{C(Button::B)}, own(OwnWordId::ShellBack)}};
     }
     case Screen::Trading: return {{{C(Button::B)}, Words(rom, kStrMgExit)}};
     case Screen::Autopsy:
@@ -249,7 +249,7 @@ std::vector<HdHint> Hints(Screen s, const GameState& game, const RomData& rom, b
                         {{C(Button::B)}, Own(rom, OwnWordId::MooGooUndoBet)}, startQuit};
             if (g.sub == 5) return {choose, {{C(Button::A)}, Own(rom, OwnWordId::MooGooPlayOn)}, {{C(Button::B)}, Own(rom, OwnWordId::MooGooTakeBack)}, startQuit};
         }
-        if (g.phase == 0) return {{{C(Button::DPadH)}, Own(rom, OwnWordId::MooGooPlayers)}, {{C(Button::A)}, Own(rom, OwnWordId::MooGooConfirm)}, quit};
+        if (g.phase == 0) return {{{C(Button::DPadH)}, Own(rom, OwnWordId::MooGooPlayers)}, {{C(Button::A)}, Own(rom, OwnWordId::ShellOk)}, quit};
         return {{{C(Button::A)}, Own(rom, OwnWordId::Continue)}, quit};
     }
     case Screen::Drencher:
@@ -661,7 +661,7 @@ int CrimeValues(Composition& c, int y, const CrimeState& k, const RomData& rom)
     const int x = kMgInnerX, wd = kMgInnerW, ix = x + 12, iw = wd - 24, h = 10 + 4 * kMgRow + 10;
     c.ui.push_back(MgWell({x, y, wd, h}));
     int yy = y + 10;
-    const std::string ready = Own(rom, OwnWordId::CrimeReady), dash = "\xE2\x80\x94";
+    const std::string ready = Own(rom, OwnWordId::MixerReady), dash = "\xE2\x80\x94";
     const std::string labels[3] = {Own(rom, OwnWordId::CrimeScare), Words(rom, kStrMgRatARang), Own(rom, OwnWordId::CrimeSubdue)};
     const bool on[3] = {k.canScare, k.armed, k.canSubdue};
     for (int i = 0; i < 3; i++, yy += kMgRow)
@@ -1475,7 +1475,7 @@ static void MeasureOwnWords(const RomData& rom, BlockMeasure& m)
     }
     for (OwnWordId w : {OwnWordId::CrimeScare, OwnWordId::CrimeSubdue, OwnWordId::CrimeAimLabel}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, iw - 110, Weight::Bold);
     me.Line(kStrMgRatARang, Words(rom, kStrMgRatARang), vs, kMgValueMin, iw - 110, Weight::Bold);
-    for (OwnWordId w : {OwnWordId::CrimeReady, OwnWordId::CrimeHit}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, 110);
+    for (OwnWordId w : {OwnWordId::MixerReady, OwnWordId::CrimeHit}) me.Line(id(w), Own(rom, w), vs, kMgValueMin, 110);
     // The lottery's, the mixer's, its save page's and the lobby's panels.
     me.Line(id(OwnWordId::ScratchTopPrize), Own(rom, OwnWordId::ScratchTopPrize), vs, kMgValueMin, iw - 130, Weight::Bold);
     me.Line(id(OwnWordId::ScratchOpened), With(Own(rom, OwnWordId::ScratchOpened), 5), vs, kMgValueMin, iw);
