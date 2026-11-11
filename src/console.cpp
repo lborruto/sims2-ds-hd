@@ -27,6 +27,7 @@
 #include "port/prompt.h"
 #include "port/ownwords.h"
 #include "romdata.h"
+#include "ui/kit.h"
 
 namespace sims2wide
 {
@@ -109,7 +110,7 @@ void AddPayout(Composition& c, Rect bar, int payout, const RomData& rom, int rig
 }
 
 // The focus ring around hotspot `focus`'s area, as the topmost touchable bottom piece showing the
-// area's centre draws it (the area clipped to that piece), 4 pixels outside it.
+// area's centre draws it (the area clipped to that piece), the kit's ring around it.
 void AddRing(Composition& c, ScreenState s, int focus)
 {
     const std::vector<Hotspot>& h = HotspotsFor(s);
@@ -126,13 +127,19 @@ void AddRing(Composition& c, ScreenState s, int focus)
         const int x1 = std::min(a.x + a.w, f.x + f.w), y1 = std::min(a.y + a.h, f.y + f.h);
         const int rx0 = q.to.x + (x0 - f.x) * q.to.w / f.w, ry0 = q.to.y + (y0 - f.y) * q.to.h / f.h;
         const int rx1 = q.to.x + (x1 - f.x) * q.to.w / f.w, ry1 = q.to.y + (y1 - f.y) * q.to.h / f.h;
-        constexpr int t = 4;
-        c.overlays.push_back({{rx0 - t, ry0 - t, rx1 - rx0 + 2 * t, ry1 - ry0 + 2 * t}, 0, 8, t, kRingArgb, -1});
+        AddKitRingOverlay(c, {rx0, ry0, rx1 - rx0, ry1 - ry0});
         return;
     }
 }}
 
 Piece ConsoleWorld(int topW, int rows, bool keepSides) { return World(topW, rows, keepSides); }
+
+void AddKitRingOverlay(Composition& c, Rect r)
+{
+    constexpr int outer = ui::kFocusOuterW, inner = ui::kFocusInnerW;
+    c.overlays.push_back({{r.x - outer, r.y - outer, r.w + 2 * outer, r.h + 2 * outer}, 0, 10 + outer, outer - inner, ui::kFocusOuter, -1});
+    c.overlays.push_back({{r.x - inner, r.y - inner, r.w + 2 * inner, r.h + 2 * inner}, 0, 10 + inner, inner, ui::kFocusInner, -1});
+}
 
 void AddHints(Composition& c, const std::vector<Hint>& hints)
 {
@@ -547,8 +554,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
             // MooGoo's focus (activities.h): a ring around what A touches.
             const Rect m = pointer->mark, to = kActivityBottomTo;
             const int x0 = to.x + m.x * to.w / SW, y0 = to.y + m.y * to.h / SH, x1 = to.x + (m.x + m.w) * to.w / SW, y1 = to.y + (m.y + m.h) * to.h / SH;
-            constexpr int t = 4;
-            c.overlays.push_back({{x0 - t, y0 - t, x1 - x0 + 2 * t, y1 - y0 + 2 * t}, 0, 8, t, kRingArgb, -1});
+            AddKitRingOverlay(c, {x0, y0, x1 - x0, y1 - y0});
         }
         if (hudHere) AddStatusBar(c, *hud, *strings, topTo.x - 6, topTo.y + topTo.h + kActivityBarGap, topTo.w + 12);
     }
