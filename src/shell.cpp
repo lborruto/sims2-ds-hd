@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 
+#include <SDL_keycode.h>
+
 #include "port/ownwords.h"
 #include "ui/font.h"
 
@@ -99,40 +101,107 @@ UiItem Button(Rect r, bool focused, bool enabled = true)
     return b;
 }
 
-// The hints at the panel's foot, right to left; returns the x left of them.
-int Hint(Items& it, int right, int y, ui::Button b, const std::string& label)
+// A hint at a page's foot: a chip and its word (withA: A's chip before it, "A, Left / Right").
+struct HintSpec
 {
-    const Rect r = ChipRect(0, 0, b, label, kHint, 0, Weight::ExtraBold);
-    it.Add(1, ChipItem(right - r.w, y + (kHintsH - r.h) / 2, b, label, kHint, 0, Weight::ExtraBold));
-    return right - r.w - 28;
+    ui::Button b;
+    std::string label;
+    bool withA = false;
+};
+int HintWidth(const HintSpec& h, float size)
+{
+    int w = ChipRect(0, 0, h.b, h.label, size, 0, Weight::ExtraBold).w;
+    if (h.withA) w += ChipRect(0, 0, ui::Button::A, "", size, 0, Weight::ExtraBold).w + 6;
+    return w;
+}
+
+// The hints (the first rightmost) right to left from `right`, and the pause chip (`pause` its
+// word, "" none) at `left`: as large as fits between the two (24 down to 18, the gaps 28 down to
+// 16); the pause chip goes first when they do not fit with it (Start + Back works on every page
+// anyway). The rectangles drawn, for the tests: never overlapping, always inside left .. right.
+void PlaceHints(Items& it, std::vector<Rect>& rects, const std::vector<HintSpec>& hints, int left, int right, int y, const std::string& pause)
+{
+    float size = kHint;
+    int gap = 28;
+    bool withPause = !pause.empty();
+    auto total = [&]() {
+        int w = 0;
+        for (const HintSpec& h : hints) w += HintWidth(h, size) + gap;
+        if (withPause) w += ChipRect(0, 0, ui::Button::Pause, pause, size, 0, Weight::ExtraBold).w;
+        else w -= hints.empty() ? 0 : gap;
+        return w;
+    };
+    if (withPause && total() > right - left) withPause = false;
+    while (total() > right - left && size > 18)
+    {
+        size -= 1;
+        gap = std::max(16, gap - 2);
+    }
+    for (const HintSpec& h : hints)
+    {
+        const int w = HintWidth(h, size);
+        const Rect r = ChipRect(0, 0, h.b, h.label, size, 0, Weight::ExtraBold);
+        int x = right - w;
+        const int cy = y + (kHintsH - r.h) / 2;
+        if (h.withA)
+        {
+            const Rect a = ChipRect(0, 0, ui::Button::A, "", size, 0, Weight::ExtraBold);
+            it.Add(1, ChipItem(x, cy, ui::Button::A, "", size, 0, Weight::ExtraBold));
+            x += a.w + 6;
+        }
+        it.Add(1, ChipItem(x, cy, h.b, h.label, size, 0, Weight::ExtraBold));
+        rects.push_back({right - w, cy, w, r.h});
+        right -= w + gap;
+    }
+    if (withPause)
+    {
+        const Rect r = ChipRect(0, 0, ui::Button::Pause, pause, size, 0, Weight::ExtraBold);
+        it.Add(1, ChipItem(left, y + (kHintsH - r.h) / 2, ui::Button::Pause, pause, size, 0, Weight::ExtraBold));
+        rects.push_back({left, y + (kHintsH - r.h) / 2, r.w, r.h});
+    }
 }
 
 bool Inside(const Rect& r, float x, float y) { return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h; }
 
 constexpr Layout kLayouts[] = {Layout::Console, Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked};
 
-// The controls card's entries: chips (a button of the current look, or a binding's glyph) and a word.
-struct CardEntry { std::vector<ui::Button> chips; int action; W word; };
-const std::vector<CardEntry>& Card()
+// The controls card's entries: chips (a button of the current look, a binding's glyph, or a
+// keycap with a word on it) and a word. The pad's and the keyboard's differ: the sticks are the
+// pad's (the right one turns the camera in town and is the cursor on the touch screen, LB / RB the
+// tabs); on the keyboard the arrows walk (the D-pad's cross: the kit draws arrows so), the DS's L /
+// R keys (Q / W) turn the camera in town and switch tabs, the mouse is the stylus.
+struct CardEntry { std::vector<ui::Button> chips; int action; W word; W keycap = W::Count; };
+const std::vector<CardEntry>& Card(bool keyboard)
 {
-    static const std::vector<CardEntry> c = {
+    static const std::vector<CardEntry> pad = {
         {{ui::Button::DPad, ui::Button::LStick}, -1, W::CtlWalk},
         {{ui::Button::A}, -1, W::CtlTouch},
         {{ui::Button::B}, -1, W::CtlBack},
         {{ui::Button::X, ui::Button::Y}, -1, W::CtlZoom},
-        {{ui::Button::RStick}, -1, W::CtlCamera}, // (in the world: it turns, and zooms up / down)
+        {{ui::Button::RStick}, -1, W::CtlCameraCursor},
+        {{ui::Button::LB, ui::Button::RB}, -1, W::CtlTabs},
         {{ui::Button::Back}, -1, W::Menu},
         {{ui::Button::Pause}, -1, W::Pause},
-        {{ui::Button::RStick}, -1, W::Cursor},
         {{}, Controls::FAST, W::CtlFast},
     };
-    return c;
+    static const std::vector<CardEntry> keys = {
+        {{ui::Button::DPad}, -1, W::CtlWalk},
+        {{ui::Button::A}, -1, W::CtlTouch},
+        {{ui::Button::B}, -1, W::CtlBack},
+        {{ui::Button::X, ui::Button::Y}, -1, W::CtlZoom},
+        {{ui::Button::LB, ui::Button::RB}, -1, W::CtlCameraTabs},
+        {{ui::Button::Back}, -1, W::Menu},
+        {{ui::Button::Pause}, -1, W::Pause},
+        {{}, -1, W::CtlStylus, W::KeyMouse},
+        {{}, Controls::FAST, W::CtlFast},
+    };
+    return keyboard ? keys : pad;
 }
 
 // The controls card in a box: one or two columns of entries.
 void AddCard(Items& it, Rect box, int columns, const Model& m)
 {
-    const std::vector<CardEntry>& c = Card();
+    const std::vector<CardEntry>& c = Card(m.keyboard);
     const int rows = ((int)c.size() + columns - 1) / columns, colW = box.w / columns;
     const int rowH = std::min(56, box.h / std::max(rows, 1));
     for (int i = 0; i < (int)c.size(); i++)
@@ -145,6 +214,13 @@ void AddCard(Items& it, Rect box, int columns, const Model& m)
             const Rect r = ChipRect(0, 0, b, "", 26, 0, Weight::ExtraBold);
             it.Add(1, ChipItem(cx, y + (rowH - r.h) / 2, b, "", 26, 0, Weight::ExtraBold));
             cx += r.w + 6;
+        }
+        if (c[i].keycap != W::Count)
+        {
+            UiItem chip = ChipItemAs(cx, 0, Face::Keyboard, Wd(m.language, c[i].keycap), "", 26, Weight::ExtraBold);
+            chip.to.y = y + (rowH - chip.to.h) / 2;
+            cx += chip.to.w + 6;
+            it.Add(1, chip);
         }
         if (c[i].action >= 0)
         {
@@ -383,6 +459,23 @@ std::string ActionLabel(int a, int lang)
     }
 }
 
+std::string KeyLabel(int k, int lang)
+{
+    switch (k)
+    {
+    case SDLK_UP: return "up"; // (the D-pad's look: an arrow on the cross)
+    case SDLK_DOWN: return "down";
+    case SDLK_LEFT: return "left";
+    case SDLK_RIGHT: return "right";
+    case SDLK_RETURN: case SDLK_KP_ENTER: return Wd(lang, W::KeyEnter);
+    case SDLK_RSHIFT: return Wd(lang, W::KeyRightShift);
+    case SDLK_LSHIFT: return Wd(lang, W::KeyLeftShift);
+    case SDLK_SPACE: return Wd(lang, W::KeySpace);
+    case SDLK_BACKSPACE: return Wd(lang, W::KeyBackspace);
+    default: return k > 0 ? Controls::KeyName(k) : "";
+    }
+}
+
 std::vector<MainItem> MainEntries(const Model& m)
 {
     std::vector<MainItem> e {MainItem::Resume, MainItem::Settings, MainItem::Controls, MainItem::States, MainItem::ChangeGame};
@@ -486,12 +579,10 @@ void Shell::Move(const Model& m, int dir)
         return;
     }
     if (dir == 2 || dir == 3) return;
+    // A list stops at its ends (as the game's own lists do; only the tab bars wrap).
     const int step = dir == 0 ? -1 : 1;
-    for (int k = 1; k <= n; k++)
-    {
-        const int f = (focus + step * k + n * 4) % n;
+    for (int f = focus + step; f >= 0 && f < n; f += step)
         if (Focusable(m, f)) { focus = f; return; }
-    }
 }
 
 Result Shell::Update(const Input& in0, Model& m)
@@ -533,10 +624,10 @@ Result Shell::Update(const Input& in0, Model& m)
         }
     }
 
-    // A message: only A closes it.
+    // A message: A (its OK) or B closes it.
     if (!m.message.empty())
     {
-        if (in.a) m.message.clear();
+        if (in.a || in.b) m.message.clear();
         return res;
     }
 
@@ -552,6 +643,8 @@ Result Shell::Update(const Input& in0, Model& m)
             if (was == Ask::Quit) res.act = Act::Quit;
             else if (was == Ask::Load) res = {Act::LoadSlot, askSlot};
             else if (was == Ask::Overwrite) res = {Act::SaveSlot, askSlot};
+            else if (was == Ask::ResetKeys) res.act = Act::ResetBindings;
+            else if (was == Ask::Undo) res.act = Act::Undo;
             else if (was == Ask::ResetTab)
             {
                 ResetTabRows(tab, *m.settings);
@@ -633,10 +726,12 @@ Result Shell::Update(const Input& in0, Model& m)
         }
         if (focus == Controls::COUNT)
         {
-            if (in.a) res.act = Act::ResetBindings;
+            if (in.a) { ask = Ask::ResetKeys; askFocus = 0; } // (asked: No first)
             break;
         }
         if (in.a) res = {Act::Capture, focus};
+        // The pause menu's key is never cleared (without it a keyboard has no way back here): said.
+        else if (in.x && focus == Controls::MENU && m.keyboard) m.message = Wd(m.language, W::KeysMenuNeeded);
         else if (in.x) res = {Act::ClearBinding, focus};
         else if (in.y) { sequence = true; res = {Act::Capture, focus}; }
         break;
@@ -645,7 +740,7 @@ Result Shell::Update(const Input& in0, Model& m)
         if (!m.statesOk) break;
         if (focus == kStateSlots)
         {
-            if (in.a && m.canUndo) res.act = Act::Undo;
+            if (in.a && m.canUndo) { ask = Ask::Undo; askFocus = 0; } // (asked: No first)
             break;
         }
         if (in.a)
@@ -712,6 +807,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
     rects_.assign(Count(m), Rect {0, 0, 0, 0});
     askRects_.clear();
     tabRects_.clear();
+    hintRects_.clear();
     const bool asking = ask != Ask::None || !m.message.empty() || m.capturing >= 0;
 
     if (page == Page::Launch)
@@ -797,7 +893,10 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 p.fill = th.frameDark;
                 p.radius = pill.h / 2.0f;
                 it.Add(1, p);
-                it.Add(1, Line({pill.x + 12, pill.y, pill.w - 24, pill.h}, RowValue(Row::Language, *m.settings, lang), 24, 16, Align::Centre));
+                // ‹ › : Left / Right (or A) change it, as on Settings' rows.
+                it.Add(1, Line({pill.x + 6, pill.y, 26, pill.h}, "\xE2\x80\xB9", 34, 34, Align::Centre, Weight::ExtraBold));
+                it.Add(1, Line({pill.x + pill.w - 32, pill.y, 26, pill.h}, "\xE2\x80\xBA", 34, 34, Align::Centre, Weight::ExtraBold));
+                it.Add(1, Line({pill.x + 34, pill.y, pill.w - 68, pill.h}, RowValue(Row::Language, *m.settings, lang), 24, 16, Align::Centre));
                 break;
             }
             case LaunchItem::Quit:
@@ -809,13 +908,18 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         // The hints under the list.
         if (!asking)
         {
-            int right = kLaunchList.x + kLaunchList.w - 24;
             const int hy = kLaunchList.y + kLaunchList.h - 56;
             const LaunchItem k = e[std::clamp(focus, 0, (int)e.size() - 1)].kind;
-            const W aw = k == LaunchItem::Continue ? W::Continue : k == LaunchItem::Language ? W::ShellChange
-                       : k == LaunchItem::Quit ? W::ShellQuit : k == LaunchItem::Choose ? W::ShellOpen : W::LaunchStart;
-            right = Hint(it, right, hy, ui::Button::A, Wd(lang, aw));
-            Hint(it, right, hy, ui::Button::DPadV, Wd(lang, W::HintChoose));
+            std::vector<HintSpec> hints;
+            if (k == LaunchItem::Language) hints.push_back({ui::Button::DPadH, Wd(lang, W::HintAdjust), true}); // (A too: as Settings' rows)
+            else
+            {
+                const W aw = k == LaunchItem::Continue ? W::Continue : k == LaunchItem::Quit ? W::ShellQuit : k == LaunchItem::Choose ? W::ShellOpen : W::LaunchStart;
+                hints.push_back({ui::Button::A, Wd(lang, aw)});
+            }
+            hints.push_back({ui::Button::DPadV, Wd(lang, W::HintChoose)});
+            if (k != LaunchItem::Quit) hints.push_back({ui::Button::B, Wd(lang, W::ShellQuit)}); // (B goes onto Quit; A there quits)
+            PlaceHints(it, hintRects_, hints, kLaunchList.x + 24, kLaunchList.x + kLaunchList.w - 24, hy, "");
         }
     }
     else
@@ -838,12 +942,9 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         it.Add(0, well);
 
         const Rect c {kContent.x + 16, kContent.y + 16, kContent.w - 32, kContent.h - 32};
-        // At the left of the hints, always: the pause buttons resume (Start + Back, Esc).
-        {
-            const Rect r = ChipRect(0, 0, ui::Button::Pause, Wd(lang, W::ShellResume), kHint, 0, Weight::ExtraBold);
-            it.Add(1, ChipItem(kPanel.x + 32, kHintsY + (kHintsH - r.h) / 2, ui::Button::Pause, Wd(lang, W::ShellResume), kHint, 0, Weight::ExtraBold));
-        }
-        int right = kPanel.x + kPanel.w - 32;
+        // The page's hints (the first rightmost), placed after the switch with the pause buttons'
+        // chip at their left (Start + Back, Esc: they resume from every page) when it fits.
+        std::vector<HintSpec> hints;
 
         switch (page)
         {
@@ -870,8 +971,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 it.Add(1, Line({r.x + 24, r.y, r.w - 48, r.h}, Wd(lang, words[(int)e[i]]), 30, 20, Align::Centre, Weight::ExtraBold));
                 rects_[i] = r;
             }
-            right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, W::Select));
-            Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellResume));
+            hints = {{ui::Button::A, Wd(lang, W::Select)}, {ui::Button::B, Wd(lang, W::ShellResume)}};
             break;
         }
         case Page::Settings:
@@ -971,9 +1071,12 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 it.Add(1, note);
             }
             const bool keysRow = focus >= 0 && focus < (int)tl.rows.size() && tl.rows[focus] == Row::Keys;
-            right = keysRow ? Hint(it, right, kHintsY, ui::Button::A, Wd(lang, W::ShellOpen)) : Hint(it, right, kHintsY, ui::Button::DPadH, Wd(lang, W::ShellChange));
-            right = Hint(it, right, kHintsY, ui::Button::Y, Wd(lang, W::ResetTab));
-            Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellBack));
+            // A value row: A or Left / Right adjust it (none while Battery saver holds it).
+            const bool heldRow = focus >= 0 && focus < (int)tl.rows.size() && RowHeld(tl.rows[focus], st);
+            if (keysRow) hints.push_back({ui::Button::A, Wd(lang, W::ShellOpen)});
+            else if (!heldRow) hints.push_back({ui::Button::DPadH, Wd(lang, W::HintAdjust), true});
+            hints.push_back({ui::Button::Y, Wd(lang, W::ResetTab)});
+            hints.push_back({ui::Button::B, Wd(lang, W::ShellBack)});
             break;
         }
         case Page::Keys:
@@ -1036,12 +1139,12 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 it.Add(1, ph);
                 if (focus < Controls::COUNT)
                 {
-                    right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, W::ShellChange));
-                    right = Hint(it, right, kHintsY, ui::Button::X, Wd(lang, W::KeysClear));
-                    right = Hint(it, right, kHintsY, ui::Button::Y, Wd(lang, W::KeysAll));
+                    hints.push_back({ui::Button::A, Wd(lang, W::ShellChange)});
+                    hints.push_back({ui::Button::X, Wd(lang, W::KeysClear)});
+                    hints.push_back({ui::Button::Y, Wd(lang, W::KeysAll)});
                 }
-                else right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, W::KeysReset));
-                Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellBack));
+                else hints.push_back({ui::Button::A, Wd(lang, W::KeysReset)});
+                hints.push_back({ui::Button::B, Wd(lang, W::ShellBack)});
             }
             break;
         }
@@ -1061,8 +1164,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             it.Add(1, Button(r, f));
             it.Add(1, Line({r.x + 24, r.y, r.w - 48, r.h}, Wd(lang, W::CtlKeys), 28, 20, Align::Centre, Weight::ExtraBold));
             rects_[0] = r;
-            right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, W::ShellOpen));
-            Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellBack));
+            hints = {{ui::Button::A, Wd(lang, W::ShellOpen)}, {ui::Button::B, Wd(lang, W::ShellBack)}};
             break;
         }
         case Page::States:
@@ -1072,7 +1174,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 UiItem t = Line({c.x, c.y, c.w, c.h}, Wd(lang, W::StNoFolder), 28, 20, Align::Centre);
                 t.colour = kTextNote;
                 it.Add(1, t);
-                Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellBack));
+                hints = {{ui::Button::B, Wd(lang, W::ShellBack)}};
                 break;
             }
             for (int i = 0; i < kStateSlots; i++)
@@ -1111,15 +1213,17 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             }
             if (focus < kStateSlots)
             {
-                right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, m.used[focus] ? W::StLoad : W::SaveHere));
-                if (m.used[focus]) right = Hint(it, right, kHintsY, ui::Button::X, Wd(lang, W::SaveHere));
+                hints.push_back({ui::Button::A, Wd(lang, m.used[focus] ? W::StLoad : W::SaveHere)});
+                if (m.used[focus]) hints.push_back({ui::Button::X, Wd(lang, W::SaveHere)});
             }
-            else if (m.canUndo) right = Hint(it, right, kHintsY, ui::Button::A, Wd(lang, W::StUndo));
-            Hint(it, right, kHintsY, ui::Button::B, Wd(lang, W::ShellBack));
+            else if (m.canUndo) hints.push_back({ui::Button::A, Wd(lang, W::StUndo)});
+            hints.push_back({ui::Button::B, Wd(lang, W::ShellBack)});
             break;
         }
         case Page::Launch: break;
         }
+        // (Under a question, a message or a capture: no hints, the box has its own buttons.)
+        if (!asking) PlaceHints(it, hintRects_, hints, kPanel.x + 32, kPanel.x + kPanel.w - 32, kHintsY, Wd(lang, W::ShellResume));
     }
 
     // A question, a message or a capture over it all: its own veil and box.
@@ -1152,6 +1256,8 @@ std::vector<UiItem> Shell::Build(const Model& m) const
         }
         else if (ask == Ask::Overwrite) text = Fill(Wd(lang, W::StOverwriteAsk), std::to_string(askSlot + 1));
         else if (ask == Ask::ResetTab) text = Fill(Wd(lang, W::ResetTabAsk), TabName(tab, lang));
+        else if (ask == Ask::ResetKeys) text = Wd(lang, W::KeysResetAsk);
+        else if (ask == Ask::Undo) text = Wd(lang, W::StUndoAsk);
         // The words, as large as the well holds them (30 down to 20).
         float size = 30;
         while (size > 20 && (float)Wrap(text, size, (float)textBox.w - 32).size() * size * 1.3f + (note.empty() ? 0 : 60) > textBox.h) size -= 1;
@@ -1239,6 +1345,7 @@ void Shell::Zoom(std::vector<UiItem>& items) const
     for (Rect& r : rects_) zoom(r);
     for (Rect& r : askRects_) zoom(r);
     for (Rect& r : tabRects_) zoom(r);
+    for (Rect& r : hintRects_) zoom(r);
     zoom(panel_);
 }
 }

@@ -505,9 +505,9 @@ constexpr const char* kWords[][5] = {
     {"MOUSE", "SOURIS", "MAUS", "MOUSE", "RATÓN"},
     {"ENTER", "ENTRÉE", "ENTER", "INVIO", "INTRO"},
     {"RIGHT SHIFT", "MAJ DROITE", "SHIFT RECHTS", "MAIUSC DESTRO", "MAYÚS DCHA"},
-    {"LEFT SHIFT", "MAJ GAUCHE", "SHIFT LINKS", "MAIUSC SINISTRO", "MAYÚS IZDA"},
+    {"LEFT SHIFT", "MAJ GAUCHE", "SHIFT LINKS", "MAIUSC SIN.", "MAYÚS IZDA"},
     {"SPACE", "ESPACE", "LEERTASTE", "SPAZIO", "ESPACIO"},
-    {"BACKSPACE", "RETOUR ARRIÈRE", "RÜCKTASTE", "BACKSPACE", "RETROCESO"},
+    {"BACKSPACE", "RET. ARRIÈRE", "RÜCKTASTE", "BACKSPACE", "RETROCESO"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

@@ -4,13 +4,16 @@
 //   Graphics, Sound, Controls, Game; rows with ‹ value › pills, Left / Right or A change them, a note
 //   under the list for the focused row, an Advanced group per tab, Y resets the tab after asking,
 //   focus on No), Controls (the controls card, and Keys and buttons: the bindings,
-//   A captures one, X clears it, Y captures them all in turn), Save states (four slots with their
+//   A captures one, X clears it (never the pause menu's key), Y captures them all in turn, the last
+//   row resets them after asking), Save states (four slots with their
 //   picture and date: A loads a used slot after asking, with focus on No, and keeps the state
-//   before the load for Undo; A on an empty slot or X saves) and Quit (asked, focus on No: the
+//   before the load for Undo, itself asked; A on an empty slot or X saves) and Quit (asked, focus on No: the
 //   host then writes a suspend state the launch panel offers as Continue).
 //   The launch panel, before the DS starts: Continue with the last ROM (and where it was left,
 //   when a suspend state is kept), Choose a file, the recent ROMs, Language, Quit, the controls
-//   card; a message (a wrong file, another cartridge) stays until A.
+//   card; a message (a wrong file, another cartridge) stays until A or B.
+//   Lists stop at their ends (only the tab bars wrap). The hints at a page's foot are fitted:
+//   the pause chip goes when they would meet it, then they shrink (shell_test checks every page).
 // Everything here is a function of a Model and the input: no SDL, no emulator. The host
 // (main.cpp) fills the model, carries out the Result and draws Build()'s items on a 1280 x 720
 // canvas (the window over the game; --compose's pictures; tests/shell_test.cpp).
@@ -29,8 +32,8 @@ namespace sims2wide::shell
 constexpr int kW = 1280, kH = 720;
 
 enum class Page { Main, Settings, Controls, Keys, States, Launch };
-// A question over the page (two buttons, No first and focused), or a message (one, OK).
-enum class Ask { None, Quit, Load, Overwrite, Message, ResetTab };
+// A question over the page (two buttons, No first and focused), or a message (one, OK; A or B closes it).
+enum class Ask { None, Quit, Load, Overwrite, Message, ResetTab, ResetKeys, Undo };
 
 // One frame's presses (edges), and the mouse in canvas pixels.
 struct Input
@@ -146,9 +149,10 @@ public:
     // Where each item was drawn by the last Build (the mouse; tests).
     const std::vector<Rect>& Rects() const { return rects_; }
     const std::vector<Rect>& TabRects() const { return tabRects_; } // (Settings: the tab bar)
+    const std::vector<Rect>& HintRects() const { return hintRects_; } // (the hints at the foot, the pause chip last when shown)
 
 private:
-    mutable std::vector<Rect> rects_, askRects_, tabRects_;
+    mutable std::vector<Rect> rects_, askRects_, tabRects_, hintRects_;
     mutable Rect panel_ {};
     void Zoom(std::vector<ui::UiItem>& items) const; // the UI's size (Build's last step)
     int hover_ = -2;
@@ -170,6 +174,10 @@ struct LaunchEntry { LaunchItem kind; int arg; };
 std::vector<LaunchEntry> LaunchEntries(const Model& m);
 // An action's name in the bindings page.
 std::string ActionLabel(int action, int language);
+// A key as its keycap prints it in the shell (the bindings, the controls card): the arrows as the
+// D-pad's arrow ("up" .. "right": ui::ChipItemAs), Enter, the Shifts, Space and Backspace in the
+// language's words, any other key by its name (Controls::KeyName); "" for none.
+std::string KeyLabel(int keycode, int language);
 // The pause menu's main page, in order (the saves' folder only with Model::canOpenFolder).
 enum class MainItem { Resume, Settings, Controls, States, ChangeGame, OpenFolder, Quit };
 std::vector<MainItem> MainEntries(const Model& m);

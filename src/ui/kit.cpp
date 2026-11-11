@@ -729,18 +729,25 @@ void DrawChip(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const 
         FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0xFFFFFFFF);
         FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0xFFFFFFFF);
     }
-    else if (rv.mark == Mark::Cross && (d == Button::DPadV || d == Button::DPadH))
+    else if (rv.mark == Mark::Cross)
     {
-        // The cross faint, an arrowhead at each end of the lit arm, pointing out: ‹ › (Left /
-        // Right), ˄ ˅ (Up / Down): it reads as two directions, not as a plus or a bar.
+        // The cross faint, an arrowhead pointing out at the end of each lit arm: ‹ › (Left /
+        // Right), ˄ ˅ (Up / Down) for the two directions, one alone for one direction (an arm
+        // alone read as a blob at chip size): it reads as directions, not as a plus or a bar.
         const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
         FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0x38FFFFFF);
         FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0x38FFFFFF);
         const float tip = a * 1.12f, base = a * 0.22f, half = a * 0.62f;
-        for (int sign : {-1, 1})
+        struct Arrow { bool v; int sign; };
+        std::vector<Arrow> arrows;
+        if (d == Button::DPadV) arrows = {{true, -1}, {true, 1}};
+        else if (d == Button::DPadH) arrows = {{false, -1}, {false, 1}};
+        else arrows = {{d == Button::DPadU || d == Button::DPadD, d == Button::DPadL || d == Button::DPadU ? -1 : 1}};
+        for (const Arrow& ar : arrows)
         {
             // A filled triangle: its apex `tip` out along the arm, its base `base` from the centre.
-            const bool v = d == Button::DPadV;
+            const bool v = ar.v;
+            const int sign = ar.sign;
             const float ax = v ? cx : cx + sign * tip, ay = v ? cy + sign * tip : cy;
             const float b1x = v ? cx - half : cx + sign * base, b1y = v ? cy + sign * base : cy - half;
             const float b2x = v ? cx + half : cx + sign * base, b2y = v ? cy + sign * base : cy + half;
@@ -756,20 +763,6 @@ void DrawChip(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const 
                              return std::max({edge(x, y, ax, ay, b1x, b1y, gx, gy), edge(x, y, b1x, b1y, b2x, b2y, gx, gy), edge(x, y, b2x, b2y, ax, ay, gx, gy)});
                          });
         }
-    }
-    else if (rv.mark == Mark::Cross)
-    {
-        // The cross faint, its one arm lit (from the centre out).
-        const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.29f * s, b = h * 0.095f * s;
-        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b * 0.5f, 0x38FFFFFF);
-        FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b * 0.5f, 0x38FFFFFF);
-        // The lit arm a little wider than the cross, from its centre out.
-        const float w = b * 1.45f;
-        const float l = d == Button::DPadL ? cx - a : d == Button::DPadR ? cx - w * 0.5f : cx - w;
-        const float r = d == Button::DPadR ? cx + a : d == Button::DPadL ? cx + w * 0.5f : cx + w;
-        const float t = d == Button::DPadU ? cy - a : d == Button::DPadD ? cy - w * 0.5f : cy - w;
-        const float u = d == Button::DPadD ? cy + a : d == Button::DPadU ? cy + w * 0.5f : cy + w;
-        FillRoundRect(L, l, t, r, u, w * 0.5f, 0xFFFFFFFF);
     }
     else if (rv.mark == Mark::PsCross || rv.mark == Mark::PsCircle || rv.mark == Mark::PsSquare || rv.mark == Mark::PsTriangle)
         DrawPsMark(L, rv.mark, (x0 + x1) / 2, (y0 + y1) / 2, h * s, rv.colour);
