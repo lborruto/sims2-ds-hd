@@ -499,6 +499,12 @@ constexpr const char* kWords[][5] = {
     {"Other target", "Autre cible", "Anderes Ziel", "Altro obiettivo", "Otro objetivo"},
     // (ux task 6) The mixer's play
     {"Play", "Jouer", "Abspielen", "Riproduci", "Reproducir"},
+    // The shop's greyed Pay: why
+    {"Not enough money", "Pas assez d'argent", "Nicht genug Geld", "Soldi insufficienti", "Falta dinero"},
+    {"No place left", "Plus de place", "Kein Platz mehr", "Nessun posto libero", "No queda sitio"},
+    {"Not taken here", "Pas repris ici", "Hier unverkäuflich", "Non si ritira qui", "Aquí no se acepta"},
+    // The shop's D-pad
+    {"Choose", "Parcourir", "Durchsuchen", "Sfoglia", "Recorrer"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

@@ -44,16 +44,16 @@ Rect ButtonHit(int x, int y) { return {x - 15, y - 15, 30, 30}; }
 int HintAWidth(const RomData& rom)
 {
     const Rect b = ChipRect(0, 0, Button::B, MenuWords(rom, kStrClose), kPmHintSize, 0, Weight::ExtraBold);
-    const Rect d = ChipRect(0, 0, Button::DPadV, OwnWord(&rom, OwnWordId::HintScroll), kPmHintSize, 0, Weight::ExtraBold);
+    const Rect d = ChipRect(0, 0, Button::DPad, OwnWord(&rom, OwnWordId::ShopBrowse), kPmHintSize, 0, Weight::ExtraBold);
     const int right = kPmHints.x + kPmHints.w - 8 - b.w - 28;
     return right - kPmHints.x - d.w - 28 - 20;
 }
 
 // An item's icon in its cell, from the record's own triple (tiles, descriptor, palette: a few
 // items' palettes are not the descriptor's neighbour), at the content's tier (ui::kTierL: the
-// store's pictures are 24 to 32 pixels, every one at the same size of pixel; kCaCell holds 32 x 3).
-// (A picture past kCaItemMax, none seen in the record table, would pass the cell at L: tier S.)
-constexpr int kCaItemMax = 32;
+// store's pictures are 24 to 32 pixels); one past kCaItemMax at tier S (2x: 64), as the cell
+// (kCaCell, its rim inside) holds 28 x 3 clear of its rim, not 32 x 3.
+constexpr int kCaItemMax = 28;
 void AddItemIcon(Composition& c, IconCache* icons, const ShopItem& it, Rect cell)
 {
     if (it.iconRes < 0 || !icons) return;
@@ -99,6 +99,16 @@ std::string PayName(const RomData* rom, const CatalogueState& ca)
     if (!rom) return {};
     const ShopItem* s = Selected(ca);
     return s ? MenuWords(*rom, s->nameId) : std::string();
+}
+// Why Pay is greyed, in the port's words: the money short, the places full, an item the store does
+// not take back (or a sale where the game buys nothing); empty without a selection.
+std::string PayWhyNot(const RomData* rom, const CatalogueState& ca)
+{
+    const ShopItem* s = Selected(ca);
+    if (!rom || !s) return {};
+    if (ca.sell) return OwnWord(rom, OwnWordId::ShopNoSale);
+    if ((int)ca.owned.size() >= kOwnedPlaces) return OwnWord(rom, OwnWordId::ShopNoPlace);
+    return ca.money < s->buyPrice ? OwnWord(rom, OwnWordId::ShopNoMoney) : std::string();
 }
 }
 
@@ -366,7 +376,8 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
         b.layer = 1;
         c.ui.push_back(b);
         const FittedText w = FitLine(PayWord(&rom, ca), kCaPaySize, kCaPayMin, g.payText.w, Weight::ExtraBold);
-        const std::string name = PayName(&rom, ca);
+        // (greyed: why, in place of the name: the info above names the item)
+        const std::string name = canPay ? PayName(&rom, ca) : PayWhyNot(&rom, ca);
         // With a selection: the mode and price, then the selection's name under them.
         const Rect top = name.empty() ? g.payText : Rect {g.payText.x, g.payText.y + 10, g.payText.w, 46};
         UiItem wt = TextItem(top, w.text, w.size, Align::Left, Weight::ExtraBold);
@@ -409,7 +420,8 @@ void BuildCatalogue(Composition& c, const MenuView& v, int focus, const GameStat
         const FittedText a = FitLine(v.items[focus].word, kPmHintSize, kPmHintSize, HintAWidth(rom), Weight::ExtraBold);
         right = AddHint(c, right, Button::A, a.text);
     }
-    if (!ca.vendor && (ca.upEnabled || ca.downEnabled)) AddHint(c, right, Button::DPadV, OwnWord(&rom, OwnWordId::HintScroll));
+    // The D-pad: it moves the focus in the grid (and scrolls the store's list past its edge).
+    AddHint(c, right, Button::DPad, OwnWord(&rom, OwnWordId::ShopBrowse));
 
     // Images: the items (the record table's sprites at tier L), the pay button, the X.
     for (int i = 0; i < kCells; i++)
@@ -440,6 +452,9 @@ void MeasureCatalogue(const RomData& rom, BlockMeasure& m)
     };
     const CatalogueGeometry store = CatalogueLayout(false), vendor = CatalogueLayout(true);
     line(9000 + (int)OwnWordId::Select, OwnWord(&rom, OwnWordId::Select), kPmHintSize, kPmHintSize, HintAWidth(rom)); // (a cell's A)
+    // Pay greyed: why, in its name's line (both layouts).
+    for (OwnWordId w : {OwnWordId::ShopNoMoney, OwnWordId::ShopNoPlace, OwnWordId::ShopNoSale})
+        for (const CatalogueGeometry* g : {&store, &vendor}) line(9000 + (int)w, OwnWord(&rom, w), kCaPayNameSize, kCaPayNameMin, g->payText.w);
     // Every item: any object may be on the list or owned. A name may end in an ellipsis (the
     // Italian table's sentence at 463, as Pockets): counted apart.
     for (int id = 0; id <= kItemIdLast; id++)

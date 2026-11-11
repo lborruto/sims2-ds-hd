@@ -198,6 +198,11 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   the keyboard. The hair colours, styles, faces and skin figures sit on the HD cells without the
   DS's frames and green rings; the scroll arrows are the menus' own; no highlight on an empty
   cell while a page comes in.
+- The title and the boot's last splash say what A / START do (Continue), the title's within the
+  screen's safe area; DS Wireless's note sits on a well; Load-a-Sim's places and times are white;
+  the credits scroll on a dark well, their headings readable; the German Settings tabs have room.
+- The shop: the items no longer touch their cells' rims; the D-pad's hint says Choose; a greyed
+  Pay says why (not enough money, no place left, not taken here).
 
 ## [0.1.1] - 2026-11-04
 

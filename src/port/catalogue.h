@@ -55,7 +55,7 @@ constexpr int kSprCaPay = 7671, kSprCaUp = 7698, kSprCaDown = 7677, kSprCaX = 76
 constexpr int kStrStore = 2518, kStrBuy = 2391, kStrSell = 2392, kStrCaMoney = 28;
 
 // HD geometry (canvas), the frame as the panel's (kPmPanel), no tab bar.
-constexpr int kCaCell = 104, kCaGap = 8;   // (a cell holds the largest item, 32 px, at tier L: 96)
+constexpr int kCaCell = 104, kCaGap = 8;   // (a cell holds an item of 28 px at tier L: 84; a larger one at S)
 constexpr Rect kCaTitle {200, 44, 880, 64};
 constexpr Rect kCaClose {1016, 48, 56, 56};      // the game's X, in the title band
 constexpr int kCaTop = 124, kCaBottom = 578;     // the content's band

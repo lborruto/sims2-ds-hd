@@ -616,7 +616,7 @@ def front_title(raw_top=True):
                     return
     expect("backdrop left", C(5, 5), BACKDROP)
     expect("backdrop right", C(1200, 300), BACKDROP)
-    plate = [C(x, y) for y in range(640, 712) for x in range(540, 740)]
+    plate = [C(x, y) for y in range(612, 684) for x in range(400, 880)]
     if sum(1 for r, g, b in plate if g > 180 and r < 160 and b < 140) < 10: errors.append("no A chip")
     if sum(1 for r, g, b in plate if max(r, g, b) < 70) < 200: errors.append("no dark plate")
 
@@ -655,8 +655,8 @@ def front_settings(page, focus):
     expect("panel", C(1240, 600), FRAME)
     expect("backdrop", C(5, 5), BACKDROP)
     for i in range(4):
-        tx, ty = 884 + (i % 2) * 152 + 2, 140 + (i // 2) * 62
-        px = [C(x, y) for y in range(ty + 4, ty + 54) for x in range(tx + 4, tx + 144)]
+        tx, ty = 872 + (i % 2) * 164 + 2, 140 + (i // 2) * 62
+        px = [C(x, y) for y in range(ty + 4, ty + 54) for x in range(tx + 4, tx + 156)]
         plate = sum(1 for p in px if p == hexrgb("9AA2E3"))
         ink = sum(1 for p in px if p == hexrgb("2E3063"))
         white = sum(1 for p in px if p == (255, 255, 255))

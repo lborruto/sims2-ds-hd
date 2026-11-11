@@ -749,7 +749,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             const FittedText w = FitLine(cs.page == 4 ? MenuWords(rom, kStrCasYes) : NextWord(rom, cs.page), kPmHintSize, 18, 220, Weight::ExtraBold);
             right = HintChip(c, right, Button::Start, w.text);
         }
-        if (!v.back.empty()) right = HintChip(c, right, Button::B, cs.page == 4 ? MenuWords(rom, kStrCasNo) : std::string(OwnWord(&rom, OwnWordId::MixerBack)));
+        if (!v.back.empty()) right = HintChip(c, right, Button::B, cs.page == 4 ? MenuWords(rom, kStrCasNo) : std::string(OwnWord(&rom, OwnWordId::ShellBack)));
         if (MenuFocusable(v, focus) && cs.drawn)
         {
             // (an item without a word of its own, a key, a swatch, a cell: Select)
@@ -784,6 +784,6 @@ void MeasureCas(const RomData& rom, BlockMeasure& m)
     // X's word beside the keyboard's pages, B's "Back" (the port's own words: kOwn + their id).
     const int x0 = CasKbPageRect(2).x + CasKbPageRect(2).w + 14;
     tally.Line(9000 + (int)OwnWordId::HintPages, OwnWord(&rom, OwnWordId::HintPages), 24, 18, kCasX + kCasW - x0 - ChipRect(0, 0, Button::X, "", 24).w - 8);
-    tally.Line(9000 + (int)OwnWordId::MixerBack, OwnWord(&rom, OwnWordId::MixerBack), kPmHintSize, kPmHintSize, 200);
+    tally.Line(9000 + (int)OwnWordId::ShellBack, OwnWord(&rom, OwnWordId::ShellBack), kPmHintSize, kPmHintSize, 200);
 }
 }
