@@ -1325,7 +1325,13 @@ static void cards_and_vacuum()
     CHECK(v.screen == GScreen::Vacuum && v.minigame.vacuum.valid && !v.minigame.vacuum.clogged && v.minigame.vacuum.earnings == 120);
     r.W8(kS + 0x158, 1);
     v = ReadGameState(r.View());
-    CHECK(v.minigame.vacuum.clogged && MinigameLine(v) == "vacuum clogged=1 earnings=120");
+    CHECK(v.minigame.vacuum.clogged && MinigameLine(v) == "vacuum clogged=1 earnings=120 session=0");
+    // The money this session (the bowl's counter, S+0x150): what the side panel shows.
+    r.W32(kS + 0x150, 75);
+    v = ReadGameState(r.View());
+    CHECK(v.minigame.vacuum.valid && v.minigame.vacuum.session == 75 && v.minigame.vacuum.earnings == 120);
+    { Ram q = r; q.W32(kS + 0x150, (u32)-1); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
+    { Ram q = r; q.W32(kS + 0x150, 100000000); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
     { Ram q = r; q.W8(kS + 0x158, 2); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
     { Ram q = r; q.W32(kMg + 0x7C, (u32)-5); CHECK(!ReadGameState(q.View()).minigame.vacuum.valid); }
     // The bowl: nine slots of 0x1C at S+0x28 (+0 the sprite, its x / y 20.12 at +0x50 / +0x54; +0x14 the scale; +0x18 active,
@@ -1346,7 +1352,7 @@ static void cards_and_vacuum()
         CHECK(b.items[0].slot == 1 && b.items[0].x == 120.5f && b.items[0].y == 80 && b.items[0].half == 10 && b.items[0].Dust() && !b.items[0].held);
         CHECK(b.items[1].slot == 4 && b.items[1].x == -10 && b.items[1].half == 15 && !b.items[1].Dust());
         CHECK(VacuumBowlLine(w) == "bowl held=-1 keeping=0 items=1:186@120,80/10,4:196@-10,150/15");
-        CHECK(MinigameLine(w) == "vacuum clogged=1 earnings=120");   // (the bowl its own line: --print-vacuum)
+        CHECK(MinigameLine(w) == "vacuum clogged=1 earnings=120 session=75");   // (the bowl its own line: --print-vacuum)
         // Held, the keep animation running.
         q.W16(kS + 0x26, 4); q.W8(kS + 0x28 + 0x1C * 4 + 0x19, 1); q.W8(kS + 0x170, 3);
         w = ReadGameState(q.View());

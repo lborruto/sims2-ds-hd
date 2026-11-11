@@ -511,6 +511,14 @@ constexpr const char* kWords[][5] = {
     // (ux task 6, the town's audit) Build Rooms with nothing left; the world's camera stick
     {"Nothing left to build", "Plus rien à construire", "Nichts mehr zu bauen", "Niente altro da costruire", "No queda nada por construir"},
     {"Camera", "Caméra", "Kamera", "Visuale", "Cámara"},
+    // (ux task 6) The mixer's play
+    {"Play", "Jouer", "Abspielen", "Riproduci", "Reproducir"},
+    // The shop's greyed Pay: why
+    {"Not enough money", "Pas assez d'argent", "Nicht genug Geld", "Soldi insufficienti", "Falta dinero"},
+    {"No place left", "Plus de place", "Kein Platz mehr", "Nessun posto libero", "No queda sitio"},
+    {"Not taken here", "Pas repris ici", "Hier unverkäuflich", "Non si ritira qui", "Aquí no se acepta"},
+    // The shop's D-pad
+    {"Choose", "Parcourir", "Durchsuchen", "Sfoglia", "Recorrer"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }

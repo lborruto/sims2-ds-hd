@@ -166,6 +166,7 @@ struct ActivityRam
     bool mixer = false;
     int mixerPhase = 0, mixerSongs = 0;
     bool mixerSave = false;
+    bool read = false;            // the game's RAM reads (GameState::valid): a part not valid then is a screen not drawn yet
     bool mixerSaveUsed[3] = {};
     // A question of the game's popup is up over the minigame (kind 2, opening, shown or closing: the
     // painting waits); it takes taps once shown: its tick and cross.
@@ -198,7 +199,8 @@ struct ActivityState
     // Vacuum: A's take (VacuumTake).
     struct Take
     {
-        int phase = 0;              // 0 none, 1 reaching (the stylus onto the find), 2 carrying to the funnel
+        int phase = 0;              // 0 none, 1 reaching (the stylus onto the find), 2 carrying to the funnel, 3 let go there
+                                    // (until the funnel's keep animation shows, kVacuumKeepWait frames at most: the hint stays "Taking")
         int slot = -1;              // the find taken
         int frames = 0, pressed = 0, rest = 0;
         int missed = 0;             // frames in a row the bowl did not read (kVacuumMissMax: given up)
@@ -273,7 +275,7 @@ constexpr Point kCardsMessage {128, 120};
 // in all).
 constexpr Point kVacuumFunnel {127, 150};
 constexpr float kVacuumCarry = 4.0f;
-constexpr int kVacuumRest = 2, kVacuumReachMax = 60, kVacuumTakeMax = 300;
+constexpr int kVacuumRest = 2, kVacuumReachMax = 60, kVacuumTakeMax = 300, kVacuumKeepWait = 4;
 // A take holds its last point (and press) through this many frames of a bowl that does not read (a
 // misread: letting go would drop the find), then gives up.
 constexpr int kVacuumMissMax = 4;

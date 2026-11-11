@@ -347,6 +347,7 @@ void BuildSettings(Composition& c, const MenuView& v, int focus, const GameState
     else if (st.page == 3)
     {
         UiItem well = WellItem(kSeCredits);
+        well.fill = kCreditsWell;
         well.radius = 16;
         well.layer = 1;
         c.ui.push_back(well);
@@ -497,8 +498,8 @@ void BuildLoad(Composition& c, const MenuView& v, int focus, const GameState& ga
             PanelText(c, {tx + tw - mw, r.y + 22, mw, 48}, money, 32, 32, Align::Right, Weight::ExtraBold);
             const std::string time = SlotTimeText(format, row, am, pm);
             const int timeW = time.empty() ? 0 : (int)TextWidth(time, 28, Weight::Bold) + 8;
-            // (the subtitles' pale lavender on a plain row; white on the focused row's light fill)
-            const u32 sub = focused ? 0xFFFFFFFF : kLabel;
+            // (the subtitles white: 4.58:1 on a row, 7.15:1 focused; the pale lavender read 3.3:1)
+            const u32 sub = 0xFFFFFFFF;
             if (row.placeNameId >= 0) PanelText(c, {tx, r.y + 74, tw - timeW - 24, 44}, MenuWords(rom, row.placeNameId), 28, 20, Align::Left, Weight::Bold, sub);
             if (!time.empty()) PanelText(c, {tx + tw - timeW, r.y + 74, timeW, 44}, time, 28, 28, Align::Right, Weight::Bold, sub);
         }

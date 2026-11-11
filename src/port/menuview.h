@@ -126,6 +126,10 @@ struct MenuView
     // B's safe landing (an index; -1 none): B first moves the focus to this item (Keep this Sim?'s
     // cross), and only B pressed again there runs `back`: one B never discards.
     int backFocus = -1;
+    // B's `back` leads to another page of the screen (Create-a-Sim's Name page: Keep this Sim?):
+    // the focus lands on the item with this id there once it is up (the cross: B again answers No);
+    // 0 none.
+    u32 backLands = 0;
     // A picture the screen shows big (Settings' concept art: the game keeps it on its top screen
     // until Settings closes): the first B closes the big picture (the navigator's PictureClosed,
     // drawing only) instead of running `back`; an A that runs opens it again.

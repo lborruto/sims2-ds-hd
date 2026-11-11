@@ -368,13 +368,15 @@ static void minigame_frame()
                 pv.y = variant == 2 ? SH - 1 : 0;
                 if (sc == Screen::MooGoo && variant == 1) pv.mark = MooGooMonkeyRect(5);
                 if (sc == Screen::Mixer && variant == 2) pv.mark = MixerRowRect(7);
-                const size_t overlays0 = 3;   // (the backdrop and the two pictures' frames)
+                // (the backdrop and the two pictures' frames; the cards: no top screen, its frame neither)
+                const size_t overlays0 = sc == Screen::Cards ? 2 : 3;
+                const size_t pieces0 = sc == Screen::Cards ? 1 : 2;
                 Composition c {kConsoleW, kConsoleH, {}, {}};
                 BuildMinigame(c, {sc, Tab::None}, top.first, top.second, &hud, &strings, g, rom, bottom, nullptr, &pv, sc == Screen::MixerSave ? (variant == 1 ? 30 : 27) : -1);
                 // The playfield and the top screen; an HD box over the playfield (port/popup.h's
                 // BuildGameBox: a minigame's question, message or help) adds its buttons' mouse
                 // pieces, inside the box's area.
-                CHECK(c.pieces.size() >= 2 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
+                CHECK(c.pieces.size() >= pieces0 && c.pieces[0].src == Src::Bottom && c.pieces[0].to.x == kActivityBottomTo.x && c.pieces[0].to.y == kActivityBottomTo.y &&
                       c.pieces[0].to.w == kActivityBottomTo.w && c.pieces[0].to.h == kActivityBottomTo.h);
                 const Piece* topPiece = nullptr;
                 std::vector<Piece> pictures {c.pieces[0]};
@@ -384,13 +386,17 @@ static void minigame_frame()
                     const Rect q = c.pieces[i].to;
                     CHECK(q.x >= kMgBoxArea.x && q.y >= kMgBoxArea.y && q.x + q.w <= kMgBoxArea.x + kMgBoxArea.w && q.y + q.h <= kMgBoxArea.y + kMgBoxArea.h);
                 }
-                CHECK(topPiece != nullptr);
-                if (!topPiece) continue;
-                const Rect topTo = topPiece->to;
-                CHECK(topTo.x == kActivityTopX && topTo.y == kActivityTopY && topTo.w == kActivityTopW);
-                // (the social game's top screen without the game's own bar rows: kMgSocialBarRows)
-                const int skip = sc == Screen::Social ? top.second * kMgSocialBarRows / SH : 0;
-                CHECK(topPiece->from.y == skip && topPiece->from.h == (sc == Screen::Cards ? top.second : HudCropRows(top.second)) - skip);
+                // (The cards: the game's score board in the DS's font not shown, the side panel in its place.)
+                CHECK((topPiece != nullptr) == (sc != Screen::Cards));
+                if (!topPiece && sc != Screen::Cards) continue;
+                const Rect topTo = topPiece ? topPiece->to : Rect {kActivityTopX, kActivityTopY - kMgSideGap, kActivityTopW, 0};
+                if (topPiece)
+                {
+                    CHECK(topTo.x == kActivityTopX && topTo.y == kActivityTopY && topTo.w == kActivityTopW);
+                    // (the social game's top screen without the game's own bar rows: kMgSocialBarRows)
+                    const int skip = sc == Screen::Social ? top.second * kMgSocialBarRows / SH : 0;
+                    CHECK(topPiece->from.y == skip && topPiece->from.h == HudCropRows(top.second) - skip);
+                }
                 bool box = false;
                 int layer = -1, prompt = 0, lit = 0, chips = 0, pointer = 0;
                 bool images = false;
@@ -421,9 +427,10 @@ static void minigame_frame()
                     if (it.kind == ui::UiItem::Panel && it.plain && it.fill == 0xFFB8323A) lit++;
                     if (it.kind == ui::UiItem::Chip && r.y >= kMgPrompt.y) chips++;
                 }
-                CHECK(prompt > 0);
+                // (The save page's part unread with the RAM reading: no hints.)
+                CHECK((prompt > 0) == !(sc == Screen::MixerSave && variant == 0));
                 // The playfield and the top screen alone, unless an HD box adds its buttons' pieces.
-                CHECK(c.pieces.size() == 2 || box);
+                CHECK(c.pieces.size() == pieces0 || box);
                 // The clog lights the blow's hint; the cards' question has two chips (Yes, No), the message one.
                 const bool litNow = (sc == Screen::Vacuum && variant == 2) || (sc == Screen::Autopsy && variant > 0) || (sc == Screen::Detector && variant == 2) ||
                                     (sc == Screen::Drencher && variant == 1) || (sc == Screen::Crime && variant == 2) ||
@@ -434,7 +441,8 @@ static void minigame_frame()
                 // under an HD box, whose answers are the buttons')
                 CHECK(pointer == (OwnScheme(sc) && !box ? 2 : 0));
                 // MooGoo's focus: one ring over the playfield, around the monkey (an overlay).
-                CHECK(c.overlays.size() == overlays0 + ((sc == Screen::MooGoo && variant == 1) || (sc == Screen::Mixer && variant == 2) ? 1 : 0));
+                // (the kit ring's look: two outlines, the green and the white line)
+                CHECK(c.overlays.size() == overlays0 + ((sc == Screen::MooGoo && variant == 1) || (sc == Screen::Mixer && variant == 2) ? 2 : 0));
                 // The lottery's popup: A alone (the game's Close); the mixer's save question (an HD
                 // box since task 3 of the polish, its focus on No): the D-pad, A, B, X; the wireless
                 // lobby: B alone.
@@ -3131,11 +3139,15 @@ int main()
                 // The pages' ends (no ring: LB on the Name page never lands on Keep this Sim?).
                 CHECK(page == 0 ? lb.empty() : lb.size() == 1 && lb[0].x == kCasTabX && lb[0].y == kCasTabY0 + kCasTabDy * (page - 1));
                 CHECK(page == 4 ? rb.empty() : rb.size() == 1 && rb[0].x == kCasTabX && rb[0].y == kCasTabY0 + kCasTabDy * (page + 1));
-                CHECK(start.empty() == (page == 4));
                 if (page < 4) CHECK(start == rb);
-                // Keep this Sim?: one B lands on the cross; only B there (or A) discards.
+                // Keep this Sim?: one B lands on the cross; only B there (or A) discards; Start the tick.
                 if (page == 4 && !v.back.empty()) CHECK(MenuFocusable(v, v.backFocus) && v.items[v.backFocus].id == kCasCrossId);
+                if (page == 4) CHECK(v.back.empty() ? start.empty() : start.size() == 1 && start[0].x == kCasTickX && start[0].y == kCasAnswerY);
                 if (page != 4) CHECK(v.backFocus == -1);
+                // B: the previous page on Hair, Face and Clothes (LB's tap); on the Name page Keep this
+                // Sim?'s tab, the focus landing on its cross there.
+                if (page >= 1 && page <= 3) CHECK(v.back == lb && v.backLands == 0);
+                if (page == 0) CHECK(v.back.size() == 1 && v.back[0].x == kCasTabX && v.back[0].y == kCasTabY0 + kCasTabDy * 4 && v.backLands == kCasCrossId);
             }
             for (int topW : {256, 341})
                 for (int focus : {-1, MenuFirst(v), (int)v.items.size() - 1})

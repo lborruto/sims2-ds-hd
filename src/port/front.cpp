@@ -165,11 +165,13 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         c.pieces.push_back(top);
         // The whole canvas is the game's big button for the mouse.
         AddMousePiece(c, kFrBigButtonFrom, {0, 0, kConsoleW, kConsoleH});
-        // At its foot, on a dark plate: the A and START chips (both start) and the game's blue ▶.
+        // At its foot, inside the safe area (5 %: its foot at 684 at most), on a dark plate: the A
+        // and START chips (both start) and their word.
+        const std::string go = OwnWord(&rom, OwnWordId::Continue);
         const Rect chip = ChipRect(0, 0, Button::A, "", 40, 0, Weight::ExtraBold);
-        const Rect start = ChipRect(0, 0, Button::Start, "", 40, 0, Weight::ExtraBold);
-        const int gap = 16, arrow = 48, pw = 28 + chip.w + gap + start.w + gap + arrow + 28, ph = 72;
-        const Rect plate {(kConsoleW - pw) / 2, kConsoleH - ph - 14, pw, ph};
+        const Rect start = ChipRect(0, 0, Button::Start, go, 40, 0, Weight::ExtraBold);
+        const int gap = 16, pw = 28 + chip.w + gap + start.w + 28, ph = 72;
+        const Rect plate {(kConsoleW - pw) / 2, kFrSafeFoot - ph, pw, ph};
         UiItem p = PanelItem(plate);
         p.plain = true;
         p.fill = kChipPlate;
@@ -178,10 +180,9 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         UiItem a = ChipItem(plate.x + 28, plate.y + (ph - chip.h) / 2, Button::A, "", 40, 0, Weight::ExtraBold);
         a.layer = 1;
         c.ui.push_back(a);
-        UiItem st = ChipItem(plate.x + 28 + chip.w + gap, plate.y + (ph - start.h) / 2, Button::Start, "", 40, 0, Weight::ExtraBold);
+        UiItem st = ChipItem(plate.x + 28 + chip.w + gap, plate.y + (ph - start.h) / 2, Button::Start, go, 40, 0, Weight::ExtraBold);
         st.layer = 1;
         c.ui.push_back(st);
-        AddTiered(c.ui, icons, SpriteRef::Of(kSprFrArrow), 0, kTierS, {plate.x + 28 + chip.w + gap + start.w + gap, plate.y + (ph - arrow) / 2, arrow, arrow});
     }
     else if (at == FrontScreen::Menu)
     {
@@ -230,11 +231,16 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         // buttons fade in).
         if (MenuFocusable(v, focus) && focus == kFrWireless)
         {
-            // DS Wireless: its note in the hints' place.
+            // DS Wireless: its note in the hints' place, on a well (white 4.58:1; the panel's fill
+            // gives small words 3.26:1 only).
             const std::string text = OwnWord(&rom, OwnWordId::WirelessNote);
+            UiItem well = WellItem(kFrNote);
+            well.layer = 1;
+            c.ui.push_back(well);
+            const Rect in = FrNoteText();
             float size = 19;
-            while (size > kMinText && Wrap(text, size, (float)kFrNote.w).size() * size * 1.3f > kFrNote.h) size -= 1;
-            UiItem note = TextItem(kFrNote, text, size, Align::Right);
+            while (size > kMinText && Wrap(text, size, (float)in.w).size() * size * 1.3f > in.h) size -= 1;
+            UiItem note = TextItem(in, text, size, Align::Centre);
             note.middle = true;
             note.layer = 1;
             c.ui.push_back(note);
@@ -260,14 +266,15 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         // The video (top) large at the left and the game's splash (the touch screen) beside it.
         FramedPiece(c, {Src::Top, TopFrom(topW, topH), FrontFit(kFrTopBox, TopFrom(topW, topH).w, topH), 255, false});
         FramedPiece(c, {Src::Bottom, {0, 0, SW, SH}, kFrSplash});
-        // Where the game waits for a touch: A and START, under the splash.
+        // Where the game waits for a touch: A and START, under the splash, and their word.
         if (!v.items.empty())
         {
+            const std::string go = OwnWord(&rom, OwnWordId::Continue);
             const Rect ar = ChipRect(0, 0, Button::A, "", 32, 0, Weight::ExtraBold);
-            const Rect sr = ChipRect(0, 0, Button::Start, "", 32, 0, Weight::ExtraBold);
+            const Rect sr = ChipRect(0, 0, Button::Start, go, 32, 0, Weight::ExtraBold);
             const int w = ar.w + 24 + sr.w, x = kFrSplash.x + (kFrSplash.w - w) / 2, y = kFrSplash.y + kFrSplash.h + 30;
             UiItem a = ChipItem(x, y + (std::max(ar.h, sr.h) - ar.h) / 2, Button::A, "", 32, 0, Weight::ExtraBold);
-            UiItem s = ChipItem(x + ar.w + 24, y + (std::max(ar.h, sr.h) - sr.h) / 2, Button::Start, "", 32, 0, Weight::ExtraBold);
+            UiItem s = ChipItem(x + ar.w + 24, y + (std::max(ar.h, sr.h) - sr.h) / 2, Button::Start, go, 32, 0, Weight::ExtraBold);
             a.layer = s.layer = 1;
             c.ui.push_back(a);
             c.ui.push_back(s);
@@ -287,6 +294,8 @@ void MeasureFront(const RomData& rom, BlockMeasure& m)
         tally.Line(kStrFrMenu[i], Label(rom, i), kPmHintSize, 18, HintAWidth(rom));   // (the A hint, beside the D-pad's word)
     }
     // DS Wireless's note in the hints' box (two lines at most).
-    tally.Block(9000 + (int)OwnWordId::WirelessNote, OwnWord(&rom, OwnWordId::WirelessNote), 19, 18, kFrNote);
+    tally.Block(9000 + (int)OwnWordId::WirelessNote, OwnWord(&rom, OwnWordId::WirelessNote), 19, 18, FrNoteText());
+    // The title's and the boot's word after the START chip (Continue).
+    tally.Line(9000 + (int)OwnWordId::Continue, OwnWord(&rom, OwnWordId::Continue), 40, 40, 400);
 }
 }

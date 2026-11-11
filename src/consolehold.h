@@ -33,6 +33,8 @@ public:
     ConsoleBranch Branch() const { return branch_; }
     ConsoleBranch ShownBranch() const { return holding_ ? lastBranch_ : branch_; }
     void Reset() { *this = ConsoleHold(); }
+    // The composition shown this frame (after Frame; empty outside CONSOLE): --print-words.
+    const Composition& ShownNow() const { return shown_; }
 
     // Counts over the run (--print-console's summary): frames whose own composition was
     // milestone 1's, frames shown so, frames held.

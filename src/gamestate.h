@@ -521,6 +521,7 @@ struct DetectorState
     int findType = -1;                // the sensed find's type (0 lead rock ... 8 sarcophagus) when inRange or the card is up (the find dug), else -1
     int findCount = 0;                // the finds the place loaded
     int earnings = 0;                 // "Metal Detector Earnings" (G)
+    int lastFind = -1;                // not RAM's: main.cpp keeps the last find a card showed while the detector stays up, else -1
     bool operator==(const DetectorState&) const = default;
 };
 
@@ -721,7 +722,8 @@ struct VacuumState
 {
     bool valid = false;
     bool clogged = false;
-    int earnings = 0;
+    int earnings = 0;                 // the lifetime "Vacuum Earnings" (G+0x7C: banked when put away)
+    int session = 0;                  // the money this session (S+0x150: the bowl's counter, §)
     bool bowl = false;
     std::vector<VacuumItem> items;
     int heldSlot = -1;

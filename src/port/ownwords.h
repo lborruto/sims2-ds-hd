@@ -116,6 +116,14 @@ enum class OwnWordId : int
     // (ux task 6, the town's audit) Build Rooms with nothing left; the world's right stick (it turns
     // the camera and zooms: the status strip's hint).
     BuildNothingLeft, HintCamera,
+    // (ux task 6, the front end and the minigames) The mixer's X: play the song (the game's word is
+    // its button's, START in German).
+    MixerPlay,
+    // The shop's Pay greyed: why (the money short, the places full, an item the store will not take).
+    ShopNoMoney, ShopNoPlace, ShopNoSale,
+    // The shop's D-pad over its grid (the focus, the list past its edge): Choose, not Scroll; in
+    // the languages where Choose is A's Select word, Browse.
+    ShopBrowse,
     Count
 };
 

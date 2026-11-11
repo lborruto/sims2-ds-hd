@@ -165,6 +165,31 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - Conversations keep the status strip under them (no black band below the world). The
   Registry's locked rooms lose the DS's light rim around their key; room info's hint box dims the
   portrait instead of emptying it; the focused volume row in Options is lit like every focused row.
+<!-- The front end, Create-a-Sim, the shop and the minigames (ux audit, task 6). -->
+- MooGoo Monkey: before the players are named, the side panel says "Player 1-3" (not the game's
+  copyright line).
+- The scratch lottery's messages no longer carry a stale "Loading" title.
+- The vacuum's side panel shows the money of this session, as the bowl does (it said §0 until
+  the vacuum was put away).
+- German music mixer: X says "Abspielen" (it said START, beside the help's own Start chip).
+- Create-a-Sim: B goes back a page (from the name page, to Keep this Sim?'s cross), Start on Keep
+  this Sim? keeps the Sim, and every page says what A, B and Start do; X says what it changes on
+  the keyboard. The hair colours, styles, faces and skin figures sit on the HD cells without the
+  DS's frames and green rings; the scroll arrows are the menus' own; no highlight on an empty
+  cell while a page comes in.
+- The title and the boot's last splash say what A / START do (Continue), the title's within the
+  screen's safe area; DS Wireless's note sits on a well; Load-a-Sim's places and times are white;
+  the credits scroll on a dark well, their headings readable; the German Settings tabs have room.
+- The shop: the items no longer touch their cells' rims; the D-pad's hint says Choose; a greyed
+  Pay says why (not enough money, no place left, not taken here).
+- The minigames: the hints' buttons one size everywhere and large enough to read (the help's
+  Start, and the painting's Back, moved up beside the title); the focus is the menus' green ring
+  everywhere; a help text open in a loaded save state is redrawn in HD; the cards no longer show
+  the DS's score screen (the side panel says it); the save page shows no hints before it is up;
+  the vacuum's hint stays "Taking it to the funnel" until the find is kept; the Metal Detector says
+  what it found after the card closes, and "None" for no signal; the painting's question stays in
+  one place; Walk and Point hints name every stick that does it; the autopsy's quit says the
+  game's Quit; Moogoo's Start (quit) is in the manual; the social answers sit on rows.
 
 ## [0.1.1] - 2026-11-04
 

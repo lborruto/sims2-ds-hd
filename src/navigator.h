@@ -201,7 +201,9 @@ private:
     int viewPage_ = 0;   // the view's page last frame (MenuView::page)
     bool viewQuestion_ = false;   // and whether it was a question
     u32 pageKeptId_ = 0; // the focused item's id when the last non-question page was left
-    int pageKeptIndex_ = -1; // and its index (the item gone when the page is back: the one in its place)
+    int pageKeptIndex_ = -1;
+    u32 landId_ = 0;     // MenuView::backLands after a B: the item the focus lands on once the next page shows it
+    int landFrames_ = 0; // frames since (it is dropped after kHoldFrames' worth of a page change) // and its index (the item gone when the page is back: the one in its place)
     bool pictureOpen_ = false; // MenuView::picture shown big: an A ran; B, LB / RB or another screen close it
     // The Save slots or the phone opened from the menu: the tab and item it was opened from, the
     // frames left to come back to the panel (returnFrames_) and to put the focus back

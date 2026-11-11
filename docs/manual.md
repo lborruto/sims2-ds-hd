@@ -160,8 +160,8 @@ after the story, and any screen not redrawn yet.
 ### Create-a-Sim
 
 Your Sim is big on the left, the game's pages on the right. LB / RB change page, Start goes to
-the next one. The right stick (or the mouse's right drag) turns your Sim, and so do X / Y after
-the first page.
+the next one and B back to the one before. The right stick (or the mouse's right drag) turns your
+Sim, and so do X / Y after the first page.
 
 - **The name** (the first page): the D-pad and A type it on the game's keyboard, seven letters at
   most; Y erases a letter and X changes the letters (ABC, abc, 123!). With the highlight on the
@@ -169,8 +169,9 @@ the first page.
   gender and skin buttons are above it.
 - **Hair, face and clothes** are picked with the D-pad and A; Left / Right past the edge show
   more, as the game's arrows do.
-- **Keep this Sim?**: pick an aspiration, then A on the tick starts the game. B first moves to the
-  cross and only a second B presses it, so one stray B never throws your Sim away.
+- **Keep this Sim?**: pick an aspiration, then A on the tick (or Start) starts the game. B first
+  moves to the cross and only a second B presses it, so one stray B never throws your Sim away.
+  B on the name page takes you there, onto the cross: the way back to the title.
 
 ## The minigames
 
@@ -216,6 +217,7 @@ have a pointer on the sticks (LT slows it).
 | Moogoo Monkey | D-pad or left stick | Left / Right | choose the monkey to bet on, the card to play, the monkey a special card goes on (a green ring shows it) |
 | | A | X | bet, play the card; otherwise go on |
 | | B | Z | take the bet or the card back; else quit (it asks) |
+| | Start | Enter | quit (it asks: No first), also while a bet or a card is chosen |
 | Super Drencher | left stick or D-pad | Arrows | walk |
 | | A (hold) / X (hold) | X / S (hold) | fire / pump |
 | | Y / RB / LB | A / W / Q | target / refill / run |

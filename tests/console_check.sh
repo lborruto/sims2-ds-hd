@@ -536,15 +536,24 @@ def front_cas(page, focus, raw_top=True):
             1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129))}[page]
         ox, oy = bx + (bw - fw * s) // 2, by + (bh - fh * s) // 2
     same = total = 0
+    # (The DS cell's frame and the panel around a figure are keyed out (ux task 6: the picture on the
+    # HD cell): the game's panel colours, its outline and the choice's green are not compared.)
+    keyed = {hexrgb(h) for h in ("383869", "414979", "51518A", "5961A2", "6171B2", "7171B2", "828ACB")}
+    compared = 0
     for dy in range(0, fh, 4):
         for dx in range(0, fw, 4):
             total += 1
             if near:
                 same += C(ox + s * dx + s // 2, oy + s * dy + s // 2) == bottom(fx + dx, fy + dy)
                 continue
-            expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), bottom(fx + dx, fy + dy))
+            want = bottom(fx + dx, fy + dy)
+            if want in keyed or want[1] > want[0] + 60 and want[1] > want[2] + 60:
+                continue
+            compared += 1
+            expect(f"crop DS {fx + dx},{fy + dy}", C(ox + s * dx + s // 2, oy + s * dy + s // 2), want)
             if len(errors) > 4:
                 return
+    if not near and fw and compared < 8: errors.append(f"the crop: {compared} of {total} points the picture's own")
     if near and same < total * 0.6: errors.append(f"the cell's sprite: {same} of {total} pixels the touch screen's")
     x, y, w, h = focus
     r, g, b = C(x + w // 2, y - 3)
@@ -607,7 +616,7 @@ def front_title(raw_top=True):
                     return
     expect("backdrop left", C(5, 5), BACKDROP)
     expect("backdrop right", C(1200, 300), BACKDROP)
-    plate = [C(x, y) for y in range(640, 712) for x in range(540, 740)]
+    plate = [C(x, y) for y in range(612, 684) for x in range(400, 880)]
     if sum(1 for r, g, b in plate if g > 180 and r < 160 and b < 140) < 10: errors.append("no A chip")
     if sum(1 for r, g, b in plate if max(r, g, b) < 70) < 200: errors.append("no dark plate")
 
@@ -646,8 +655,8 @@ def front_settings(page, focus):
     expect("panel", C(1240, 600), FRAME)
     expect("backdrop", C(5, 5), BACKDROP)
     for i in range(4):
-        tx, ty = 884 + (i % 2) * 152 + 2, 140 + (i // 2) * 62
-        px = [C(x, y) for y in range(ty + 4, ty + 54) for x in range(tx + 4, tx + 144)]
+        tx, ty = 872 + (i % 2) * 164 + 2, 140 + (i // 2) * 62
+        px = [C(x, y) for y in range(ty + 4, ty + 54) for x in range(tx + 4, tx + 156)]
         plate = sum(1 for p in px if p == hexrgb("9AA2E3"))
         ink = sum(1 for p in px if p == hexrgb("2E3063"))
         white = sum(1 for p in px if p == (255, 255, 255))
@@ -737,6 +746,13 @@ def activity(rows=192, hd=True, skip=0):
         piece("touch screen 3x", 0, 27, 256, 165, 36, 68 + 81, 3, step=9)
     else:
         piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
+    if case in ("cards", "cards-ask"):
+        # The cards in HD: no top screen (the game's score board in the DS's font; the side panel
+        # says it), the side panel in its place.
+        if any(C(858 + x, 68 + y) == top(x * 256 // 384, y * 192 // 288) for x, y in ((100, 50), (200, 120), (300, 200))) and C(855, 200) == OUTLINE:
+            errors.append("the cards' top screen shown")
+        minigame_frame(0)
+        return
     expect("world frame", C(855, 200), OUTLINE)
     # The small world, 384 wide; without the game's status bar (176 rows: 264 high) where the
     # HD bar sits under it.
@@ -1310,8 +1326,8 @@ elif case in ("cards-wide", "social-wide", "detector-wide", "drencher-wide", "mi
     # The widescreen top screen: the secondary panel shorter, the side panel under it.
     expect("background", C(10, 10), PANEL)
     piece("touch screen 3x", 0, 0, 256, 192, 36, 68, 3, step=9)
-    expect("world frame", C(855, 100), OUTLINE)
-    minigame_frame(round(384 * (192 if case == "cards-wide" else 160 if case == "social-wide" else 176) / 341) + (18 if case == "cards-wide" else 72))
+    if case != "cards-wide": expect("world frame", C(855, 100), OUTLINE)
+    minigame_frame(0 if case == "cards-wide" else round(384 * (160 if case == "social-wide" else 176) / 341) + 72)
 elif case == "s2":
     front_menu(0)
 elif case in ("menu-2x", "menu-wide", "menu-de"):
@@ -2083,7 +2099,9 @@ wait
 pad_cas pad-cas-cross s4 cas-cross 200 &
 pad_cas pad-cas-type s3 cas-type 260 &
 pad_cas pad-cas-turn s3 cas-turn 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-turn" &
-pad_cas pad-cas-still s3 cas-cross 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-still" &
+pad_cas pad-cas-still s3 cas-lb 50 --compose --shot-at 49 --shot-dir "$tmp/pad-cas-still" &
+pad_cas pad-cas-back s3 cas-back 340 --print-screen &
+pad_cas pad-cas-start s4 cas-start 360 &
 wait
 cas_name() {
     in_order pad-cas-name 'name=Si len=2 keyboard=0' 'name=SiA len=3 keyboard=0' 'name=SiA len=3 keyboard=1' 'name=SiAb len=4' 'name=SiAb len=4 keyboard=2' \
@@ -2109,6 +2127,15 @@ cas_cross() {
     local f; f=$(first_frame pad-cas-cross 'answer=2')
     [ -n "$f" ] && [ "$f" -ge 60 ] || { echo "  pad-cas-cross: one B discarded the Sim (frame $f)"; return 1; }
 }
+# B (ux task 6): the previous page from Hair; from the Name page Keep this Sim? with the focus on
+# the cross (the view's last item, 5), answered only by the next B: the title.
+cas_back() {
+    in_order pad-cas-back 'cas page=1 ' 'cas page=0 ' 'cas page=4 ' 'focus 5' 'answer=2' 'front Title' || return 1
+    local f; f=$(first_frame pad-cas-back 'answer=2')
+    [ -n "$f" ] && [ "$f" -ge 170 ] || { echo "  pad-cas-back: the Sim discarded before the third B (frame $f)"; return 1; }
+}
+# Start on Keep this Sim?: the tick, as A on it (ux task 6).
+cas_start() { in_order pad-cas-start 'aspiration=0 answer=1' 'game Panel/Interact'; }
 cas_turn() {
     "$python" -I -c '
 import sys
@@ -2122,6 +2149,8 @@ check_pad pad-cas-type cas_type
 check_pad pad-cas-looks cas_looks
 check_pad pad-cas-keep cas_keep
 check_pad pad-cas-cross cas_cross
+check_pad pad-cas-back cas_back
+check_pad pad-cas-start cas_start
 check_pad pad-cas-turn cas_turn
 # The HD screens hold through the game's swaps (src/consolehold.*, --print-console: each frame's
 # composition, milestone 1's marked -m1, and the counts at the end): Create-a-Sim's pages from s3 by
@@ -2556,6 +2585,65 @@ vacuum_none() {
     ! grep -q -E 'pointer down|clogged=1' "$tmp/mg-vacuum-none.log" || { echo "  mg-vacuum-none: pressed"; return 1; }
 }
 check_pad mg-vacuum-none vacuum_none
+# The words the HD frames say (--print-words: the composition's texts and chips' labels; ux task 6):
+# MooGoo's players before their names are set ("Player 1", never the table's string 0, its copyright
+# line); the lottery's result popup with no title (RAM's is a stale "Loading"); the vacuum's money
+# this session (§75 once the gold ring is kept, while the lifetime total waits for the put away);
+# the German mixer's X "Abspielen" (the game's word is its button's, START, beside the help's chip).
+words_run() {
+    local name=$1 state=$2 clock=$3 frames=$4
+    shift 4
+    cp "$complete_save" "$tmp/$name.sav" || return
+    "$bin" "$rom" --headless --frames "$frames" --state-load "$shots/$state.st" --save "$tmp/$name.sav" --layout console \
+        --print-words --print-minigame --print-game --clock "$clock" "$@" > "$tmp/$name.log" 2>&1 &&
+        grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
+}
+words_run words-moogoo G-B-mg-x "2026-11-05 12:05" 40 &
+words_run words-scratch G-B-sc-win-pop "2026-11-05 12:05" 40 &
+words_run words-vacuum act-vacuum "2026-01-01 14:00" 430 --input "$repo/scripts/console/vacuum-pick.txt" &
+words_run words-mixer-de G-X-music "2026-11-05 12:05" 40 --game-language 3 &
+wait
+words_run words-help-drencher G-C-wg-help-pump "2026-11-05 12:05" 10 &
+words_run words-help-crime G-C-cr-help "2026-11-05 12:05" 10 &
+words_run words-help-mixer G-D-mus-help2 "2026-11-05 12:05" 10 &
+words_run words-detector G-A-md-walk "2026-11-05 12:05" 240 --input "$repo/scripts/console/detector-dig.txt" &
+words_run words-mixersave G-X-musicsave "2026-11-05 12:05" 10 &
+wait
+last_words() { grep ': words ' "$tmp/$1.log" | tail -n 1; }
+words_moogoo() {
+    last_words words-moogoo | grep -q '| Player 1 | .*| Player 2 | .*| Player 3 |' || { echo "  words-moogoo: no Player 1-3: $(last_words words-moogoo)"; return 1; }
+    ! grep -q 'words .*Electronic Arts' "$tmp/words-moogoo.log" || { echo "  words-moogoo: the copyright line as a name"; return 1; }
+}
+check_pad words-moogoo words_moogoo
+words_scratch() {
+    last_words words-scratch | grep -q 'you won' || { echo "  words-scratch: no result: $(last_words words-scratch)"; return 1; }
+    ! grep -q 'words .*Loading' "$tmp/words-scratch.log" || { echo "  words-scratch: a stale title"; return 1; }
+}
+check_pad words-scratch words_scratch
+words_vacuum() {
+    in_order words-vacuum 'words Vacuum \| Vacuum Earnings \| §0 ' 'minigame vacuum .*session=75' 'words Vacuum \| Vacuum Earnings \| §75 '
+}
+check_pad words-vacuum words_vacuum
+words_mixer_de() {
+    last_words words-mixer-de | grep -q '| Abspielen |' || { echo "  words-mixer-de: no Abspielen: $(last_words words-mixer-de)"; return 1; }
+    ! last_words words-mixer-de | grep -q '| START |' || { echo "  words-mixer-de: START as X's word"; return 1; }
+}
+check_pad words-mixer-de words_mixer_de
+# A help text up in a loaded state (no touch since: its tail in the game's scratch buffer,
+# MinigameHelpInRam) in the HD box; the detector's last find named after its card closed, no
+# signal said None; the unread save page (G-X-musicsave: RAM reads, its part not yet): no hints.
+words_help() { last_words "$1" | grep -q "$2" || { echo "  $1: no \"$2\": $(last_words "$1")"; return 1; }; }
+check_pad words-help-drencher words_help words-help-drencher 'Pump this device'
+check_pad words-help-crime words_help words-help-crime 'scare one'
+check_pad words-help-mixer words_help words-help-mixer 'begins the song'
+words_detector() {
+    in_order words-detector 'words .*Found: \| — ' 'words .*Found: \| Lead Rock \|' || return 1
+    last_words words-detector | grep -q 'Found: | Lead Rock |' || { echo "  words-detector: the find forgotten"; return 1; }
+    ! grep -q 'words .*Signal | 0%' "$tmp/words-detector.log" || { echo "  words-detector: Signal 0%"; return 1; }
+}
+check_pad words-detector words_detector
+words_mixersave() { last_words words-mixersave | grep -q '^frame [0-9]*: words Burn Song to Cartridge | [0-9:]* [ap]m | ' || { echo "  words-mixersave: $(last_words words-mixersave)"; return 1; }; }
+check_pad words-mixersave words_mixersave
 art_palette() {
     in_order mg-art-palette 'minigame art .*swatch=3 page=0 ' 'minigame art .*page=1 ' 'minigame art .*page=2 ' 'minigame art .*swatch=4 page=2 ' \
         'popup state=2 kind=2 .*done painting'

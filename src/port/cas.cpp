@@ -51,6 +51,73 @@ void Crop(std::vector<UiItem>& images, const u32* bottom, Rect from, int k, Rect
     images.push_back(ImageItem({box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h}, bottom, SW, SH, from));
 }
 
+// A live crop as Crop, the DS cell's frame keyed out (panelmenu's KeyedCrop: its outline, bevels
+// and well in the outer band turn transparent, so the picture sits on the HD cell).
+void KeyCrop(std::vector<UiItem>& images, const u32* bottom, Rect from, int k, Rect box)
+{
+    if (!bottom) return;
+    const int w = from.w * k, h = from.h * k;
+    images.push_back(KeyedCrop(bottom, from, {box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h}));
+}
+
+// A skin figure (the Name page's four) as Crop, on the HD cell: the game's panel around the
+// silhouette keyed out from the crop's edges, through the panel's fill and bevels, the outline and
+// the chosen one's green ring (the HD cell's rim says the choice).
+void FigureCrop(std::vector<UiItem>& images, const u32* bottom, Rect from, int k, Rect box)
+{
+    if (!bottom || from.x < 0 || from.y < 0 || from.x + from.w > SW || from.y + from.h > SH) return;
+    static std::map<std::tuple<int, int, int, int>, std::vector<u32>> copies;
+    std::vector<u32>& px = copies[{from.x, from.y, from.w, from.h}];
+    px.resize((size_t)from.w * from.h);
+    for (int j = 0; j < from.h; j++)
+        for (int i = 0; i < from.w; i++)
+            px[(size_t)j * from.w + i] = bottom[(size_t)(from.y + j) * SW + from.x + i] | 0xFF000000;
+    // (the panel's fill and bevels, the outline, the ring's greens (animated): all four figures then
+    // keep the same thin bevel, #414979, around the skin)
+    auto panel = [](u32 c) {
+        const int r = (c >> 16) & 0xFF, g = (c >> 8) & 0xFF, b = c & 0xFF;
+        c &= 0xFFFFFF;
+        return c == 0x828ACB || c == 0x7171B2 || c == 0x5961A2 || c == 0x51518A || c == 0x383869 || (g > r + 60 && g > b + 60);
+    };
+    std::vector<int> todo;
+    auto push = [&](int i, int j) {
+        u32& c = px[(size_t)j * from.w + i];
+        if ((c >> 24) != 0 && panel(c)) { c = 0; todo.push_back(j * from.w + i); }
+    };
+    for (int i = 0; i < from.w; i++) { push(i, 0); push(i, from.h - 1); }
+    for (int j = 0; j < from.h; j++) { push(0, j); push(from.w - 1, j); }
+    while (!todo.empty())
+    {
+        const int q = todo.back(), i = q % from.w, j = q / from.w;
+        todo.pop_back();
+        for (int dj = -1; dj <= 1; dj++)   // (8 ways: the outline's diagonal steps)
+            for (int di = -1; di <= 1; di++)
+                if ((di || dj) && i + di >= 0 && i + di < from.w && j + dj >= 0 && j + dj < from.h) push(i + di, j + dj);
+    }
+    // (A bevel pixel the outline's corners left outside, touching no skin: keyed too.)
+    std::vector<int> stray;
+    auto skin = [&](int i, int j) { const u32 c = px[(size_t)j * from.w + i]; return (c >> 24) != 0 && (c & 0xFFFFFF) != 0x414979; };
+    for (int j = 0; j < from.h; j++)
+        for (int i = 0; i < from.w; i++)
+            if ((px[(size_t)j * from.w + i] & 0xFFFFFF) == 0x414979 && (px[(size_t)j * from.w + i] >> 24) &&
+                !((i > 0 && skin(i - 1, j)) || (i + 1 < from.w && skin(i + 1, j)) || (j > 0 && skin(i, j - 1)) || (j + 1 < from.h && skin(i, j + 1))))
+                stray.push_back(j * from.w + i);
+    for (int q : stray) px[(size_t)q] = 0;
+    const int w = from.w * k, h = from.h * k;
+    images.push_back(ImageItem({box.x + (box.w - w) / 2, box.y + (box.h - h) / 2, w, h}, px.data(), from.w, from.h, {0, 0, from.w, from.h}));
+}
+
+// The kit's scroll arrow (every list's look), a round button centred in `to`; its rectangle.
+Rect KitArrow(Composition& c, Rect to, bool left, bool on)
+{
+    const int d = std::min(40, std::min(to.w + 8, to.h));
+    const Rect r {to.x + (to.w - d) / 2, to.y + (to.h - d) / 2, d, d};
+    UiItem a = ScrollArrowItem(r, left ? UiItem::Sign::Left : UiItem::Sign::Right, on);
+    a.layer = 1;
+    c.ui.push_back(a);
+    return r;
+}
+
 // A cell: its well (raised and lighter when focused; the game's choice rimmed), the focus's halo.
 void Cell(Composition& c, Rect r, bool focused, bool chosen, float radius = 14)
 {
@@ -111,13 +178,6 @@ SpriteRef ListRef(const CasState& cs, int i, int pal = -1)
     if (i < 0 || i >= cs.spriteCount || cs.sprites[i].desc < 0) return {};
     const CasSprite& s = cs.sprites[i];
     return {s.tiles, s.desc, s.pal >= 0 ? s.pal : pal};
-}
-// A page's arrow (sprite i of its list: the game's frame, lit while pressed), the left one the
-// right one mirrored, 2x in `to`; the touch screen's pixels when the ROM's do not read.
-void Arrow(std::vector<UiItem>& images, IconCache* icons, const CasState& cs, int i, bool left, Rect to, const u32* live, Rect from, int light)
-{
-    const int frame = i < cs.spriteCount ? cs.sprites[i].frame : 0;
-    if (!AddLook(images, icons, SpriteRef::Of(kSprCasArrow), frame, kTierS, to, light, left ? Look::Flip : Look::Plain)) Crop(images, live, from, 2, to);
 }
 }
 
@@ -193,6 +253,14 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
     if (cs.page > 0) v.buttons[(int)MenuButton::LB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page - 1))};
     if (cs.page < kCasPages - 1) v.buttons[(int)MenuButton::RB] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page + 1))};
     if (cs.page < 4) v.buttons[(int)MenuButton::Start] = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * (cs.page + 1))};
+    // B: the previous page (as LB) on Hair, Face and Clothes; on the Name page the game's way out,
+    // Keep this Sim?'s cross: B goes there with the focus on it (B again answers No: the title).
+    if (cs.page >= 1 && cs.page <= 3) v.back = v.buttons[(int)MenuButton::LB];
+    if (cs.page == 0)
+    {
+        v.back = {Tap(kCasTabX, kCasTabY0 + kCasTabDy * 4)};
+        v.backLands = kCasCrossId;
+    }
     // X / Y turn the model on every page but the Name page (there the keyboard's page and the
     // backspace): the keyboard's way, with no right stick.
     v.xyTurns = cs.page != 0;
@@ -314,6 +382,8 @@ MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom)
         tick.next[1] = cross.next[1] = kNoMove;
         v.items.push_back(tick);
         v.items.push_back(cross);
+        // Start: the tick (the Sim kept), as Start goes on through the pages before.
+        if (live) v.buttons[(int)MenuButton::Start] = tick.action;
         if (live)
         {
             v.back = cross.action;
@@ -442,7 +512,8 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     if (!v.title.empty()) PanelText(c, {kCasTitle.x + 20, kCasTitle.y, kCasTitle.w - 40, kCasTitle.h}, v.title, kPmTitleSize, kPmTextMin, Align::Centre, Weight::ExtraBold);
 
     auto item = [&](int i) -> const ViewItem* { return i >= 0 && i < (int)v.items.size() ? &v.items[i] : nullptr; };
-    auto focused = [&](int i) { return focus == i && MenuFocusable(v, i); };
+    // (No focus on a cell whose picture is not there yet: through a page change, the empty cells.)
+    auto focused = [&](int i) { return cs.drawn && focus == i && MenuFocusable(v, i); };
     // An item's mouse piece: its HD rectangle onto the game's target box.
     auto mouse = [&](int i, Rect from) { if (item(i) && item(i)->enabled && !item(i)->action.empty()) AddMousePiece(c, from, v.items[i].rect); };
 
@@ -494,7 +565,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         {
             const int k = 2 + i;
             Cell(c, v.items[k].rect, focused(k), cs.skin == i);
-            Crop(images, live, Plus(kCasSkinFrom, kCasSkinDx * i, 0), 2, v.items[k].rect);
+            FigureCrop(images, live, Plus(kCasSkinFrom, kCasSkinDx * i, 0), 2, v.items[k].rect);
             mouse(k, Plus(kCasSkinFrom, kCasSkinDx * i, 0));
         }
         // The keyboard's pages (the game's labels) and X's chip: the next one.
@@ -507,8 +578,11 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             mouse(k, {kCasKbX - 12, kCasKbY[p] - 12, 24, 24});
         }
         {
-            const Rect xr = ChipRect(0, 0, Button::X, "", 26);
-            UiItem x = ChipItem(CasKbPageRect(2).x + CasKbPageRect(2).w + 14, CasKbPageRect(2).y + (48 - xr.h) / 2, Button::X, "", 26);
+            // X: the next keyboard page, its word ("Pages").
+            const int x0 = CasKbPageRect(2).x + CasKbPageRect(2).w + 14;
+            const FittedText w = FitLine(OwnWord(&rom, OwnWordId::HintPages), 24, 18, kCasX + kCasW - x0 - ChipRect(0, 0, Button::X, "", 24).w - 8, Weight::ExtraBold);
+            const Rect xr = ChipRect(0, 0, Button::X, w.text, w.size, 0, Weight::ExtraBold);
+            UiItem x = ChipItem(x0, CasKbPageRect(2).y + (48 - xr.h) / 2, Button::X, w.text, w.size, 0, Weight::ExtraBold);
             x.layer = 1;
             c.ui.push_back(x);
         }
@@ -553,7 +627,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         for (int i = 0; i < 8; i++)
         {
             Cell(c, v.items[i].rect, focused(i), cs.hairColour == i, 12);
-            Crop(images, live, Plus(kCasSwatchFrom, kCasSwatchDx * i, 0), 2, v.items[i].rect);
+            KeyCrop(images, live, Plus(kCasSwatchFrom, kCasSwatchDx * i, 0), 2, v.items[i].rect);
             mouse(i, Plus(kCasSwatchFrom, kCasSwatchDx * i, 0));
         }
         for (int cell = 0; cell < 4; cell++)
@@ -562,16 +636,16 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
             const bool chosen = cs.hairPos / 9 == row && cs.hairPos % 9 - cs.hairScroll == col;
             const Rect from = Plus(kCasHairFrom, kCasHairDx * col, kCasHairDy * row);
             Cell(c, v.items[k].rect, focused(k), chosen, 16);
-            Crop(images, live, from, 3, v.items[k].rect);
+            KeyCrop(images, live, from, 3, v.items[k].rect);
             mouse(k, from);
         }
-        // The game's arrows, where it shows them.
+        // The scroll arrows (the kit's, every list's look), lit where the game shows its own.
         for (int k = 0; k < 2; k++)
         {
-            if (!(k == 0 ? cs.canLeft : cs.canRight)) continue;
+            const bool on = k == 0 ? cs.canLeft : cs.canRight;
             const Rect to = k == 0 ? kCasHairLeft : kCasHairRight, from = k == 0 ? kCasHairLeftFrom : kCasHairRightFrom;
-            Arrow(images, icons, cs, kCasHairArrowSpr[k], k == 0, to, live, from, light);
-            AddMousePiece(c, from, to);
+            KitArrow(c, to, k == 0, on);
+            if (on) AddMousePiece(c, from, to);
         }
         break;
     }
@@ -581,7 +655,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         {
             const Rect from = Plus(kCasFaceFrom, kCasFaceDx * (i % 3), kCasFaceDy * (i / 3));
             Cell(c, v.items[i].rect, focused(i), cs.face == i, 16);
-            Crop(images, live, from, 3, v.items[i].rect);
+            KeyCrop(images, live, from, 3, v.items[i].rect);
             mouse(i, from);
         }
         break;
@@ -611,10 +685,9 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
         }
         for (int k = 12; k < 14 && k < (int)v.items.size(); k++)
         {
-            if (!v.items[k].enabled) continue;
             const Rect from = k == 12 ? kCasClothLeftFrom : kCasClothRightFrom;
-            Cell(c, v.items[k].rect, focused(k), false, 12);
-            Arrow(images, icons, cs, kCasClothArrowSpr[k - 12], k == 12, v.items[k].rect, live, from, light);
+            const Rect a = KitArrow(c, v.items[k].rect, k == 12, v.items[k].enabled);
+            if (focused(k)) AddFocusRing(c, a, a.w / 2.0f);
             mouse(k, from);
         }
         break;
@@ -666,17 +739,18 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     default: break;
     }
 
-    // The hints: Start the next page; B "No" (Keep this Sim?: the cross); A with the item's word.
+    // The hints: Start the next page (Keep this Sim?: Yes, the tick); B back (the previous page;
+    // Keep this Sim?: No, the cross); A with the item's word (the chosen aspiration's too: Select).
     if (!cs.switching)
     {
         int right = kCasHints.x + kCasHints.w - 4;
         if (!v.buttons[(int)MenuButton::Start].empty())
         {
-            const FittedText w = FitLine(NextWord(rom, cs.page), kPmHintSize, 18, 220, Weight::ExtraBold);
+            const FittedText w = FitLine(cs.page == 4 ? MenuWords(rom, kStrCasYes) : NextWord(rom, cs.page), kPmHintSize, 18, 220, Weight::ExtraBold);
             right = HintChip(c, right, Button::Start, w.text);
         }
-        if (!v.back.empty()) right = HintChip(c, right, Button::B, MenuWords(rom, kStrCasNo));
-        if (MenuFocusable(v, focus) && !v.items[focus].action.empty())
+        if (!v.back.empty()) right = HintChip(c, right, Button::B, cs.page == 4 ? MenuWords(rom, kStrCasNo) : std::string(OwnWord(&rom, OwnWordId::ShellBack)));
+        if (MenuFocusable(v, focus) && cs.drawn)
         {
             // (an item without a word of its own, a key, a swatch, a cell: Select)
             const std::string word = v.items[focus].word.empty() ? std::string(OwnWord(&rom, OwnWordId::Select)) : v.items[focus].word;
@@ -707,5 +781,9 @@ void MeasureCas(const RomData& rom, BlockMeasure& m)
     for (int p = 0; p < 3; p++)
         for (int i = 0; i < kCasKeyCount[p]; i++) tally.Line(kStrCasKeys[p] + i, CasKeyText(rom, p, i), 30, 30, kCasKeyW - 4);
     for (int id : {kStrCasYes, kStrCasNo}) tally.Line(id, MenuWords(rom, id), kPmHintSize, kPmHintSize, 200);   // (the A / B hints)
+    // X's word beside the keyboard's pages, B's "Back" (the port's own words: kOwn + their id).
+    const int x0 = CasKbPageRect(2).x + CasKbPageRect(2).w + 14;
+    tally.Line(9000 + (int)OwnWordId::HintPages, OwnWord(&rom, OwnWordId::HintPages), 24, 18, kCasX + kCasW - x0 - ChipRect(0, 0, Button::X, "", 24).w - 8);
+    tally.Line(9000 + (int)OwnWordId::ShellBack, OwnWord(&rom, OwnWordId::ShellBack), kPmHintSize, kPmHintSize, 200);
 }
 }

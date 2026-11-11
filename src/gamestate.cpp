@@ -154,8 +154,9 @@ struct EUTable
         u32 cdTotal, cdDeck, cdHand, cdOpponent, cdSlotStride, cdCardFrom, cdCardTo, cdBox, cdMessage, cdQuitAsk, cdName, cdNameMax, cdSize;
         u32 cdScore, cdOppScore, cdTreasure, cdScoreMax;   // s32 each
         u32 cdPhase, cdTurn;   // u8: the turn's step (the top screen's line), whose turn (0 the player, 1 the opponent)
-        // The vacuum (u8 clog; the earnings are the stat panel's hotel.stVacuum, from G)
-        u32 vcClog, vcSize;
+        // The vacuum (u8 clog; s32 the money this session, the bowl's counter; the lifetime earnings are the
+        // stat panel's hotel.stVacuum, from G, banked when the vacuum is put away)
+        u32 vcClog, vcSize, vcSession;
         // Its bowl: nine slots {+0 sprite pointer (its x / y at vcSpriteX / Y, 20.12), +0x14 scale (20.12), +0x18 u8 active,
         // +0x19 u8 held, +0x1A u16 kind}; u16 the slot held (vcNone none); u8 the keep animation's two flags
         u32 vcItems, vcItemStride, vcSpriteX, vcSpriteY, vcSpriteSize, vcScale, vcActive, vcHeld, vcType, vcHeldSlot, vcNone, vcKeepA, vcKeepB;
@@ -303,7 +304,7 @@ constexpr EUTable kEU = {
         0x4C, 0x4E, 0xC0, 0x188, 0x14, 0x200, 0x300, 0x306, 0x2F7, 0x307, 0x308, 8, 1000,
         0x2CC, 0x2D0, 0x2E4, 9999,
         0x2F0, 0x2F1,
-        0x158, 0x194,
+        0x158, 0x194, 0x150,
         0x28, 0x1C, 0x50, 0x54, 0x58, 0x14, 0x18, 0x19, 0x1A, 0x26, 0xA, 0x162, 0x170,
     },
     {
@@ -1653,9 +1654,9 @@ VacuumState ReadVacuum(const Reader& m, u32 S)
     ReadVacuumBowl(m, S, v);
     u32 G, clog;
     if (!m.In(S, kEU.mg.vcSize) || !m.R8(S + kEU.mg.vcClog, clog) || clog > 1 || !m.R32(kEU.gameBlock, G)) return v;
-    const int earnings = m.S32(G + kEU.hotel.stVacuum);
-    if (earnings < 0 || earnings > 99999999) return v;
-    v.clogged = clog == 1; v.earnings = earnings;
+    const int earnings = m.S32(G + kEU.hotel.stVacuum), session = m.S32(S + kEU.mg.vcSession);
+    if (earnings < 0 || earnings > 99999999 || session < 0 || session > 99999999) return v;
+    v.clogged = clog == 1; v.earnings = earnings; v.session = session;
     v.valid = true;
     return v;
 }
@@ -2187,7 +2188,7 @@ std::string MinigameLine(const GameState& g)
     {
         const VacuumState& v = a.vacuum;
         if (!v.valid) return "";
-        snprintf(b, sizeof b, "vacuum clogged=%d earnings=%d", v.clogged, v.earnings);
+        snprintf(b, sizeof b, "vacuum clogged=%d earnings=%d session=%d", v.clogged, v.earnings, v.session);
         return b;
     }
     case GScreen::ArtGallery:
