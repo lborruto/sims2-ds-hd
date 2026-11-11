@@ -1,6 +1,7 @@
 #include "port/panelmenu.h"
 
 #include <algorithm>
+#include <unordered_map>
 #include <cctype>
 #include <cmath>
 #include <map>
@@ -223,6 +224,25 @@ int PhoneButtonFrame(IconCache& icons, const u32* bottom)
     const int rest = misses(*f0, kPmPhoneSprX, kPmPhoneSprY, opaque0 / 2 + 1);
     if (rest == 0) return 0;              // (at rest: the usual case, one pass)
     if (rest > opaque0 / 2) return 0;     // (not even half of it there: no button on screen, no search)
+    // The search (every frame at every shift) runs once per distinct picture of the button: its
+    // result is kept by a hash of the crop it reads (the frames' box, 8 pixels around), so a button
+    // held lit or blinking between two pictures costs one hash a frame.
+    int maxW = 0, maxH = 0;
+    for (int k = 0; k < frames; k++)
+        if (const SpriteFrame* f = icons.Frame(ref, k)) { maxW = std::max(maxW, f->w); maxH = std::max(maxH, f->h); }
+    const int cx0 = std::max(0, kPmPhoneSprX - 8), cy0 = std::max(0, kPmPhoneSprY - 8);
+    const int cx1 = std::min(SW, kPmPhoneSprX + 8 + maxW), cy1 = std::min(SH, kPmPhoneSprY + 8 + maxH);
+    u64 hash = 14695981039346656037ull;
+    for (int y = cy0; y < cy1; y++)
+        for (int x = cx0; x < cx1; x++)
+        {
+            const u32 q = bottom[(size_t)y * SW + x] & 0xFFFFFF;
+            for (int b = 0; b < 3; b++) { hash ^= (q >> (8 * b)) & 0xFF; hash *= 1099511628211ull; }
+        }
+    static const IconCache* cachedFor = nullptr;
+    static std::unordered_map<u64, int> found;
+    if (cachedFor != &icons || found.size() > 256) { found.clear(); cachedFor = &icons; }
+    if (const auto it = found.find(hash); it != found.end()) return it->second;
     int best = 0;
     double bestShare = 1;
     for (int k = 0; k < frames; k++)
@@ -240,7 +260,9 @@ int PhoneButtonFrame(IconCache& icons, const u32* bottom)
                 if ((double)n / opaque < bestShare) { bestShare = (double)n / opaque; best = k; }
             }
     }
-    return bestShare <= 0.1 ? best : 0;
+    const int frame = bestShare <= 0.1 ? best : 0;
+    found.emplace(hash, frame);
+    return frame;
 }
 
 void AddFocusRing(Composition& c, Rect r, float radius, int layer, u32 behind)
