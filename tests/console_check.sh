@@ -2846,7 +2846,7 @@ check_pad fx-return-veil fx_return_veil
 # The HD shell (src/shell.*, src/shellhost.*, scripts/shell/), the pad alone, its files in a scratch
 # --data-dir: from s7, Start + Back opens the pause menu, slot 1 saved (its state and picture),
 # the phone closed, slot 1 loaded after its question (No first: one A closes it, then A, Right, A),
-# the phone back; Undo: the panel back; Quit asked (No first), then Yes: the suspend state written
+# the phone back; Undo, asked (Right, A): the panel back; Quit asked (No first), then Yes: the suspend state written
 # and the run ends. Then --launch from the same folder: Continue (the first item, A) starts the
 # game where it was left (the panel, from frame 5: the launch's turns count) and the suspend
 # state is gone. Pictures: each page of the pause menu over s7 (--shell) and the launch panel:

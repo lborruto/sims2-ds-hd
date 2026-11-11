@@ -1,8 +1,12 @@
-# From s7: Start + Back, Up (Quit, the last item), A (asked, No first), Right, A: the place kept,
-# the run ends.
+# From s7: Start + Back, Down x5 (Quit, the last item: the list stops at its ends), A (asked, No
+# first), Right, A: the place kept, the run ends.
 10 2 pad start
 10 2 pad menu
-20 2 pad up
-30 2 pad a
-40 2 pad right
+20 2 pad down
+26 2 pad down
+32 2 pad down
+38 2 pad down
+44 2 pad down
 50 2 pad a
+60 2 pad right
+70 2 pad a

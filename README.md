@@ -102,7 +102,7 @@ Pause, *Settings > Display > Interface size*: Auto follows your screen, or pick 
 
 **It's blurry, or slow.**
 Pause, then *Settings > Graphics*: *3D resolution* sets how sharp the 3D is, and widescreen and 60 fps can be
-switched off (*Battery saver* lowers both on a laptop). If it runs too fast, check you aren't holding
+switched off (*Battery saver* holds the 3D at 1x and 30 fps on a laptop; widescreen stays as set). If it runs too fast, check you aren't holding
 fast forward.
 
 **It pauses when I click another window.**

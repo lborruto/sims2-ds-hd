@@ -256,6 +256,22 @@ static void world_camera_bindings()
 // Input::Actions' turnL / turnR (Bindings::CameraTurns): the keyboard's L / R keys always turn; a
 // pad's L / R only on an input of the player's own (the default LB / RB, or an older file naming
 // them, never: they are the menus' pages); held both, both.
+// The pause menu's keys: the MENU key (Esc) resumes from every page, before Esc's Back takes it;
+// Backspace and the DS's B key go back; a MENU moved to another key leaves Esc as Back.
+static void menu_keys()
+{
+    Bindings b;
+    CHECK(MenuKeyOf(SDLK_ESCAPE, b.ActionOfKey(SDLK_ESCAPE)) == MenuKey::Menu);
+    CHECK(MenuKeyOf(SDLK_BACKSPACE, b.ActionOfKey(SDLK_BACKSPACE)) == MenuKey::B);
+    CHECK(MenuKeyOf(SDLK_RETURN, b.ActionOfKey(SDLK_RETURN)) == MenuKey::A);
+    CHECK(MenuKeyOf(SDLK_UP, b.ActionOfKey(SDLK_UP)) == MenuKey::Up);
+    CHECK(MenuKeyOf('z', B) == MenuKey::B && MenuKeyOf('x', A) == MenuKey::A);
+    CHECK(MenuKeyOf('q', L) == MenuKey::Lb && MenuKeyOf('w', R) == MenuKey::Rb);
+    b.SetKey(MENU, 'p');
+    CHECK(MenuKeyOf('p', b.ActionOfKey('p')) == MenuKey::Menu);
+    CHECK(MenuKeyOf(SDLK_ESCAPE, b.ActionOfKey(SDLK_ESCAPE)) == MenuKey::B);
+}
+
 static void camera_turns()
 {
     bool l = true, r = true;
@@ -311,6 +327,7 @@ int main(int, char**)
 {
     auto_ui_scale();
     camera_turns();
+    menu_keys();
     world_camera_bindings();
     controller_settings();
     upgrade_looks();

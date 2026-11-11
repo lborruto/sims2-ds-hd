@@ -242,24 +242,30 @@ what you won beside the status bar.
 ## The pause menu
 
 **Start + Back** together (press Back first: Start first may open a minigame's help on its way)
-or **Esc** pauses the game and opens the pause menu, in the game's look and your language:
+or **Esc** pauses the game and opens the pause menu, in the game's look and your language. The
+same buttons go back to the game from any of its pages (over a question they say No). Lists stop
+at their first and last rows; the hints at the bottom say what each button does there.
 
 - **Resume** (or B).
 - **Settings**: every option, in five tabs, below.
 - **Controls**: what each button does, and *Keys and buttons* to change them (the pause menu
   too: one button alone can open it): A on an action,
   then the key or button you want (Esc, or Start + Back together, keeps what it had; Backspace
-  leaves it no key); X clears it, Y sets them all one after another; the last row resets them all.
+  leaves it no key); X clears it, Y sets them all one after another; the last row resets them all
+  (it asks first). The pause menu always keeps a key: clearing it is refused, with a message. The
+  Controls page shows the buttons of what you used last: on the keyboard the arrows, Q / W and
+  the mouse; on a pad the sticks and LB / RB.
 - **Save states**: four slots, each with a picture and the date. A on a used slot loads it (it
-  asks first), A on an empty one or X saves. *Undo the last load* takes you back to just before
-  a load, even after a restart. A state made with another ROM file says so before loading.
+  asks first), A on an empty one or X saves (X on a used one asks first). *Undo the last load*
+  takes you back to just before a load, even after a restart (it asks first). A state made with another ROM file says so before loading.
 - **Change game**: keeps your place (as Quit does), then back to the launch panel.
 - **Open the saves folder**: the folder with your save states, screenshots and settings.
 - **Quit** asks first (the question opens on No) and keeps your place: *Continue* on the launch
   panel picks up right there. If the game saved after that (on another computer, say), Continue
   starts from the game's own save instead and says so.
 
-Closing the window asks the same question.
+Closing the window asks the same question. Every question opens on No, and B is No; a message
+closes with A or B.
 
 <p align="center">
   <img src="screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit" width="440">
@@ -271,7 +277,7 @@ F5 and F7 save and load one more quick state, without the menu.
 ## Settings
 
 The pause menu's Settings has five tabs: **LB / RB** (Q / W on the keyboard) go from one to the
-next, Up / Down move in the tab, Left / Right (or A) change the highlighted row, whose `‹ ›`
+next, Up / Down move in the tab, Left / Right (or A) adjust the highlighted row, whose `‹ ›`
 arrows say it can change. The line under the list says what the highlighted row does. Each tab
 puts the rarely needed rows last, under *Advanced*. **Y** puts the tab's rows back to their
 defaults (it asks first, on No); window size and place and your keys and buttons are not touched.
@@ -374,8 +380,9 @@ same places as QWERTY. Every key and button can be changed in the pause menu.
 | Q / W | LB / RB | switch tabs and pages in the menus |
 | Enter / Right Shift | Start / left stick click | the DS's Start / Select |
 | E | Back | open the menu |
-| Esc | Start + Back | the pause menu |
+| Esc | Start + Back | the pause menu (and back to the game from any of its pages) |
 | Space (hold) | RT (hold) | fast forward |
+| (the mouse's click) | LT (hold) | press with the stick cursor on the touch screen |
 | M (hold) | | blow into the microphone (Y does it in Console) |
 | F5 / F7 | | quick save state / load it |
 | F11 / F12 | | fullscreen / screenshot of the window |
@@ -415,8 +422,8 @@ on the command line):
 | **Side by side** | both screens side by side |
 | **Stacked** | as on the DS, one above the other |
 
-**Looks.** Sharper 3D, the widescreen world and 60 fps are on by default (Settings, or Battery
-saver for all three at once). Widescreen is a stretch for a game made for 4:3: the game is told to
+**Looks.** Sharper 3D, the widescreen world and 60 fps are on by default (Settings; Battery
+saver holds the 3D at 1x and 30 fps, and leaves the widescreen as it is). Widescreen is a stretch for a game made for 4:3: the game is told to
 draw a wider view, and it does in town, in conversations and in Create-a-Sim, but in places not
 checked yet something the game never meant to be seen can show at the edges. Switch it off if a
 place looks odd. All three together still run well over full speed on a recent computer.
