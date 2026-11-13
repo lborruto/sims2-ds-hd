@@ -24,8 +24,8 @@
 #include "slots.h"
 #include "ui/font.h"
 
-using namespace sims2wide;
-using namespace sims2wide::shell;
+using namespace sims2hd;
+using namespace sims2hd::shell;
 
 static int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond); failures++; } } while (0)
@@ -762,7 +762,7 @@ static void mouse()
 static void files()
 {
     namespace fs = std::filesystem;
-    const fs::path dir = fs::temp_directory_path() / "sims2wide-shell-test";
+    const fs::path dir = fs::temp_directory_path() / "sims2hd-shell-test";
     fs::remove_all(dir);
     fs::create_directories(dir);
     DataDir d;
@@ -860,7 +860,7 @@ static void platform()
           LanguageOfLocale("en_GB") == 1 && LanguageOfLocale("ja") == 1 && LanguageOfLocale("") == 1);
     // Writability: a file made in a folder and removed again; a read-only file refused; the fallback.
     namespace fs = std::filesystem;
-    const fs::path dir = fs::temp_directory_path() / ("sims2wide-shell-test-" + std::to_string((long long)SDL_GetTicks64()));
+    const fs::path dir = fs::temp_directory_path() / ("sims2hd-shell-test-" + std::to_string((long long)SDL_GetTicks64()));
     fs::create_directories(dir);
     const std::string fresh = (dir / "new.sav").string();
     CHECK(CanWrite(fresh) && !FileExists(fresh));

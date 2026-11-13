@@ -18,7 +18,7 @@
 #include "compose.h"
 #include "gamestate.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 struct BlockMeasure;

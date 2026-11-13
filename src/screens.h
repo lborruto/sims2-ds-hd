@@ -6,7 +6,7 @@
 
 #include "common.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // None: no HUD and no known screen (title, Create-a-Sim, loading): both screens matter alike.
 // Unknown: the HUD is up but the touch screen is none of the others (fades, slides, screens not

@@ -53,7 +53,7 @@
 #include "screens.h"
 #include "touchscript.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // A button that acts once, on its release, and only if `spoil` was never true while it was held:
 // the pad's TOUCH MENU on Back, since Start + Back (in either order) is the pause menu.

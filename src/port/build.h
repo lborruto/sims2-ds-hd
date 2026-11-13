@@ -25,7 +25,7 @@
 #include "port/popup.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;

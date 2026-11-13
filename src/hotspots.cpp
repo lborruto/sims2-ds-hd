@@ -4,7 +4,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace sims2wide
+namespace sims2hd
 {
 // Every point and area below was read off headless shots of the save states (European ROM) and
 // checked by tapping it (scripts/hotspots/, tests/hotspots_check.sh); CLAUDE.md lists what each

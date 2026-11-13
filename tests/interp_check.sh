@@ -17,15 +17,15 @@
 # the frames before changing the check.
 # Needs the ROM, shots/s7.st and Pillow (not in CI):
 #   bash tests/interp_check.sh
-# Override with SIMS2WIDE (the program), ROM, SHOTS (the save states' folder), PYTHON and
+# Override with SIMS2HD (the program), ROM, SHOTS (the save states' folder), PYTHON and
 # MAX_SIMS (the emulators run at once, 4).
 set -u
 repo=$(cd "$(dirname "$0")/.." && pwd)
-bin=${SIMS2WIDE:-$repo/build/sims2wide}
+bin=${SIMS2HD:-$repo/build/sims2hd}
 rom=${ROM:-$(find "$repo/roms/" -name "*.nds" 2>/dev/null | head -n 1)}
 shots=${SHOTS:-$repo/shots}
 python=${PYTHON:-python3}
-[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2wide)"; exit 2; }
+[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2hd)"; exit 2; }
 [ -f "$rom" ] || { echo "no ROM (set ROM)"; exit 2; }
 [ -f "$shots/s7.st" ] || { echo "no save state s7.st in $shots (set SHOTS)"; exit 2; }
 "$python" -c "import PIL" 2>/dev/null || { echo "no Pillow for $python (set PYTHON)"; exit 2; }

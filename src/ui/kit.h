@@ -12,7 +12,7 @@
 #include "layout.h"
 #include "ui/font.h"
 
-namespace sims2wide::ui
+namespace sims2hd::ui
 {
 // The game's palette (0xAARRGGBB) and the panels' shape, canvas pixels.
 struct Theme

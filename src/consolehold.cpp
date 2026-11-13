@@ -6,7 +6,7 @@
 #include "port/popup.h"
 #include "port/roominfo.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 Composition ConsoleFresh(const App& app, int topW, int topH, ConsoleBranch* branch)
 {

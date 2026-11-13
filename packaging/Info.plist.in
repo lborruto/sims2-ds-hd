@@ -5,10 +5,10 @@
     <key>CFBundleDevelopmentRegion</key><string>en</string>
     <key>CFBundleExecutable</key><string>${MACOSX_BUNDLE_EXECUTABLE_NAME}</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
-    <key>CFBundleIdentifier</key><string>io.github.lborruto.sims2-ds-wide</string>
+    <key>CFBundleIdentifier</key><string>io.github.lborruto.sims2-ds-hd</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
-    <key>CFBundleName</key><string>Sims 2 DS Wide</string>
-    <key>CFBundleDisplayName</key><string>Sims 2 DS Wide</string>
+    <key>CFBundleName</key><string>Sims 2 DS HD</string>
+    <key>CFBundleDisplayName</key><string>Sims 2 DS HD</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>${MACOSX_BUNDLE_SHORT_VERSION_STRING}</string>
     <key>CFBundleVersion</key><string>${MACOSX_BUNDLE_BUNDLE_VERSION}</string>

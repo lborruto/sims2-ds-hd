@@ -1,4 +1,4 @@
-// sims2wide: The Sims 2 (DS, 2005) in one window.
+// sims2hd: The Sims 2 (DS, 2005) in one window.
 //
 // The melonDS core runs the game; this frontend shows the two DS screens in one window with a
 // choice of layouts, and has a headless mode (input scripts, shots, save states) to study which
@@ -68,7 +68,7 @@
 #include "video.h"
 #include "port/ownwords.h"
 
-using namespace sims2wide;
+using namespace sims2hd;
 using melonDS::NDS;
 
 // A whole number from 0 to max, the whole text (anything else is a usage error, not a 0).
@@ -82,8 +82,8 @@ static bool WholeNumber(const std::string& v, long max, long& out)
 static void Usage()
 {
     fprintf(stderr,
-        "sims2wide " SIMS2WIDE_VERSION "\n"
-        "usage: sims2wide [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
+        "sims2hd " SIMS2HD_VERSION "\n"
+        "usage: sims2hd [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
         "  --layout console|auto|focus|side|stacked  window layout (default console)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
         "  --compose-scale N             --compose pictures N times the canvas (1 to 4; the UI drawn at that size)\n"
@@ -207,7 +207,7 @@ int main(int argc, char** argv)
         std::string a = argv[i];
         auto next = [&]() -> std::string { if (i + 1 >= argc) { Usage(); exit(1); } return argv[++i]; };
         if (a == "--help" || a == "-h") { Usage(); return 0; }
-        else if (a == "--version") { printf("sims2wide %s\n", SIMS2WIDE_VERSION); return 0; }
+        else if (a == "--version") { printf("sims2hd %s\n", SIMS2HD_VERSION); return 0; }
         else if (a == "--headless") headless = true;
         else if (a == "--compose") compose = true;
         else if (a == "--compose-scale") composeScale = std::clamp(atoi(next().c_str()), 1, 4);

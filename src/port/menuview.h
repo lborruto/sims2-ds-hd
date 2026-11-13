@@ -21,7 +21,7 @@
 #include "layout.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // One step of an action, run in order over game frames by the navigator.
 struct MenuStep

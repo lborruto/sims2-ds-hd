@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {

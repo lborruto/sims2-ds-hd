@@ -5,7 +5,7 @@
 
 #include "ui.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 Composition FromPlacement(const Placement& p, int topW, int topH)
 {

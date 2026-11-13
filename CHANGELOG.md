@@ -90,6 +90,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Changed
 
+- The project is now called sims2-ds-hd; the program is `sims2hd` (Sims 2 DS HD on a Mac); your
+  settings, saves' backups and captures move over by themselves.
 - Settings > Graphics > 3D resolution goes by familiar names instead of a factor: DS (192p),
   384p, 576p, 720p, and now also 1080p and 1440p for a fast computer.
 - The pause menu (Start + Back, or Esc, which also resumes from any of its pages) is in HD and

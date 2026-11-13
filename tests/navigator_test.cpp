@@ -24,7 +24,7 @@
 #include "navigator.h"
 #include "port/interact.h"
 
-using namespace sims2wide;
+using namespace sims2hd;
 
 static int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond); failures++; } } while (0)

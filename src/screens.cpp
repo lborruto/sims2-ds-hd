@@ -1,6 +1,6 @@
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // A row of the screen is one flat colour from x0 to x1 (sampled every 8 pixels; by default from
 // edge to edge, x 8 to 248).

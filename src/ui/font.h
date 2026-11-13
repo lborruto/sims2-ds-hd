@@ -8,7 +8,7 @@
 
 #include "common.h"
 
-namespace sims2wide::ui
+namespace sims2hd::ui
 {
 enum class Weight { Bold, ExtraBold };
 

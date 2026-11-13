@@ -2,7 +2,7 @@
 // (activities.h) read it.
 #pragma once
 
-namespace sims2wide
+namespace sims2hd
 {
 // What the player holds this frame, after the bindings (controls.h): the DS's buttons by their
 // action, MENU the in-game menu's action (Controls::PANEL), the sticks and triggers as read.

@@ -9,7 +9,7 @@
 extern const unsigned char gamecontrollerdb[];
 extern const unsigned long gamecontrollerdb_size;
 
-namespace sims2wide
+namespace sims2hd
 {
 using namespace Controls;
 
@@ -33,7 +33,7 @@ void Pads::Hints()
 
 std::string Pads::UserMappingsPath()
 {
-    char* dir = SDL_GetPrefPath("", "sims2-ds-wide");
+    char* dir = SDL_GetPrefPath("", "sims2-ds-hd");
     if (!dir) return "";
     std::string f = std::string(dir) + "gamecontrollerdb.txt";
     SDL_free(dir);

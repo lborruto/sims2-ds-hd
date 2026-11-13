@@ -17,14 +17,14 @@
 # need a Python with Pillow (PYTHON=).
 # Needs the ROM (not in git, so not in CI):
 #   RESEARCH=/path/to/research/rom PYTHON=python3 bash tests/romdata_check.sh
-# Override with SIMS2WIDE (the program) and ROM; they default to this checkout's build/ and roms/.
+# Override with SIMS2HD (the program) and ROM; they default to this checkout's build/ and roms/.
 set -u
 repo=$(cd "$(dirname "$0")/.." && pwd)
-bin=${SIMS2WIDE:-$repo/build/sims2wide}
+bin=${SIMS2HD:-$repo/build/sims2hd}
 rom=${ROM:-$(find "$repo/roms/" -name "*.nds" 2>/dev/null | head -n 1)}
 research=${RESEARCH:-}
 python=${PYTHON:-python3}
-[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2wide)"; exit 2; }
+[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2hd)"; exit 2; }
 [ -f "$rom" ] || { echo "no ROM (set ROM)"; exit 2; }
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT

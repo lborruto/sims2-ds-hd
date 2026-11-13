@@ -1,4 +1,4 @@
-# sims2-ds-wide: notes for Claude
+# sims2-ds-hd: notes for Claude
 
 The Sims 2 (Nintendo DS, 2005) played on a computer like a console game, in the spirit of
 [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex). The melonDS 1.1 core (submodule,
@@ -30,8 +30,8 @@ writes RAM. The full per-module notes, traps and known limits are in
 ## Build and test
 
     cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release   # CMake 3.21 to 4.x
-    ninja -C build sims2wide
-    ./build/sims2wide roms/<rom>.nds --headless --frames 400 --state-load shots/s7.st \
+    ninja -C build sims2hd
+    ./build/sims2hd roms/<rom>.nds --headless --frames 400 --state-load shots/s7.st \
         --save shots/scratch.sav --compose --shot-at 399 --shot-dir shots/c
 
 - Automated runs always pass `--headless --frames N` (without it a window opens and waits) and a

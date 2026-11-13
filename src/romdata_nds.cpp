@@ -4,7 +4,7 @@
 
 #include "NDS.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 int GameLanguage(melonDS::NDS& nds)
 {

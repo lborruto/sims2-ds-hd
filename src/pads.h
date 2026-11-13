@@ -14,7 +14,7 @@
 #include "controls.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // A controller's inputs as read (the navigator's PadState is the actions they make): the
 // buttons in Controls::PadInput's order (the triggers past their threshold), the sticks in

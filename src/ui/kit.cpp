@@ -14,7 +14,7 @@
 
 #include "xbrz/xbrz.h"
 
-namespace sims2wide::ui
+namespace sims2hd::ui
 {
 const Theme& GameTheme()
 {

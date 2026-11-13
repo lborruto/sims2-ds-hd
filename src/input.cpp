@@ -8,7 +8,7 @@
 #include <cmath>
 #include <cstdio>
 
-namespace sims2wide
+namespace sims2hd
 {
 using namespace Controls;
 

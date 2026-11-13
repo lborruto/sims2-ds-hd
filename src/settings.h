@@ -9,7 +9,7 @@
 #include "controls.h"
 #include "layout.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 enum class MicMode { Off, BlowKey, Real }; // Real: the computer's microphone (asks permission)
 // How the window scales the DS's pictures: Sharp (nearest to the next whole factor, then smooth to

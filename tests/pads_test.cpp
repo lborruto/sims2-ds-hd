@@ -20,7 +20,7 @@
 #include "pads.h"
 #include "ui/kit.h"
 
-using namespace sims2wide;
+using namespace sims2hd;
 using namespace Controls;
 
 static int failures = 0;
@@ -568,7 +568,7 @@ static void mappings()
     }
     // The player's file wins over what is there.
     const std::filesystem::path dir = std::filesystem::temp_directory_path();
-    const std::string user = (dir / "sims2wide_pads_test_db.txt").string();
+    const std::string user = (dir / "sims2hd_pads_test_db.txt").string();
     {
         std::ofstream f(user);
         f << "# a comment\n" << Line(guid, "Player Pad", 0) << "\n";

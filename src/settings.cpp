@@ -8,11 +8,11 @@
 #include <cstdlib>
 #include <fstream>
 
-namespace sims2wide
+namespace sims2hd
 {
 std::string Settings::DefaultPath()
 {
-    char* dir = SDL_GetPrefPath("", "sims2-ds-wide");
+    char* dir = SDL_GetPrefPath("", "sims2-ds-hd");
     if (!dir) return "";
     std::string f = std::string(dir) + "settings.ini";
     SDL_free(dir);

@@ -4,7 +4,7 @@
 
 #include "romdata.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {

@@ -10,7 +10,7 @@
 
 namespace melonDS { class NDS; }
 
-namespace sims2wide
+namespace sims2hd
 {
 // A compressed resource: a 4-byte header (byte 0: bits 4-6 the kind, bit 7 a 16-bit delta
 // undone after; bytes 1-3 the unpacked size), then the stream: kind 0 stored, 1 LZ10 (the

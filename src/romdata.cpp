@@ -9,7 +9,7 @@
 #include <cstring>
 #include <iterator>
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -603,7 +603,7 @@ bool DecodeSpriteFrame(const std::vector<u8>& tiles, const std::vector<u8>& desc
     return true;
 }
 
-int RomData::SpriteFrames(int desc) const { return sims2wide::SpriteFrames(Resource(desc)); }
+int RomData::SpriteFrames(int desc) const { return sims2hd::SpriteFrames(Resource(desc)); }
 
 bool RomData::Sprite(int tiles, int desc, int pal, int frame, SpriteFrame& out) const
 {

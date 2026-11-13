@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 
-namespace sims2wide
+namespace sims2hd
 {
 MenuStep TapStep(int x, int y)
 {

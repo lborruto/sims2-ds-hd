@@ -1,4 +1,4 @@
-// sims2wide: a sharper and wider picture of the DS's 3D scene. See GPU3D_Wide.h.
+// sims2hd: a sharper and wider picture of the DS's 3D scene. See GPU3D_Wide.h.
 //
 // Ported from Pokemon FullDex (https://github.com/mamesj/pokemon-fulldex, GPLv3), whose
 // melonDS/src/GPU3D_Wide.cpp this is, trimmed to what runs on the processor: the graphics chip
@@ -1065,7 +1065,7 @@ struct WideAccess
             // (6 cores, 12 threads) 3-5 threads were quicker overall than 10.
             n = (int)std::thread::hardware_concurrency() / 2 - 1;
 #endif
-            if (const char* forced = getenv("SIMS2WIDE_WIDE_THREADS")) n = atoi(forced);
+            if (const char* forced = getenv("SIMS2HD_WIDE_THREADS")) n = atoi(forced);
             Pool = std::make_unique<Workers>(std::clamp(n, 1, 16));
         }
 

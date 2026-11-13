@@ -15,7 +15,7 @@
 
 #include "settings.h"
 
-using namespace sims2wide;
+using namespace sims2hd;
 using namespace Controls;
 
 static int failures = 0;

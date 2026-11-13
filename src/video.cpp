@@ -18,7 +18,7 @@
 #include "ui/font.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // The screens' textures: raw pixels drawn nearest (Sharp and Nearest) or bilinear (Smooth).
 static void ScreenScaleMode(SDL_Texture* t, Scaling c)
@@ -63,7 +63,7 @@ bool Video::Open(const Settings& s)
         // A remembered place with a size made here (or shrunk): the whole window on that screen.
         if (x != SDL_WINDOWPOS_CENTERED) FitPlace(usable.x, usable.y, usable.w, usable.h, w, h, x, y);
     }
-    win = SDL_CreateWindow("The Sims 2 DS - one screen", x, y, w, h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    win = SDL_CreateWindow("Sims 2 DS HD", x, y, w, h, SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     if (!win) { fprintf(stderr, "SDL window: %s\n", SDL_GetError()); return false; }
     ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_TARGETTEXTURE);
     if (!ren) ren = SDL_CreateRenderer(win, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
@@ -613,7 +613,7 @@ float Video::AutoUiScale() const
     std::copy(key, key + kAutoKey, autoKey);
     float mm, diag;
     // (the canvas as the window fits it: millimetres a canvas pixel)
-    autoScale = DisplayMetrics(mm, diag) ? sims2wide::AutoUiScale(mm * CanvasFit::For(1280, 720, ow, oh).scale, diag) : 1;
+    autoScale = DisplayMetrics(mm, diag) ? sims2hd::AutoUiScale(mm * CanvasFit::For(1280, 720, ow, oh).scale, diag) : 1;
     return autoScale;
 }
 }

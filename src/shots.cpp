@@ -8,7 +8,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 void WriteShot(const std::string& path, const u32* top, const u32* bottom)
 {

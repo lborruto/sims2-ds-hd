@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-namespace sims2wide
+namespace sims2hd
 {
 // A DS frame: 60 Hz near enough (59.8261); the sound is 48 kHz stereo, 4 bytes a sample.
 static constexpr double kFrameTime = 1.0 / 59.8261;

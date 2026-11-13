@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/lborruto/sims2-ds-wide/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/lborruto/sims2-ds-wide/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://github.com/lborruto/sims2-ds-hd/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/lborruto/sims2-ds-hd/actions/workflows/ci.yml/badge.svg?branch=main"></a>
   <a href="LICENSE"><img alt="Licence: GPL v3" src="https://img.shields.io/badge/licence-GPLv3-blue.svg"></a>
 </p>
 
@@ -53,7 +53,7 @@
    (an `.nds` file). Nothing of the game is included here.
 2. **Download** the program for Windows, Mac or Linux from the [releases page](../../releases)
    and unzip it.
-3. **Open it** (`sims2wide`, or *Sims 2 DS Wide* on a Mac), choose your game file or drop it on
+3. **Open it** (`sims2hd`, or *Sims 2 DS HD* on a Mac), choose your game file or drop it on
    the window. Next time, *Continue* starts where you quit.
 
 The program isn't signed, so the first time Windows wants *More info > Run anyway*, and a Mac a
@@ -115,7 +115,7 @@ No. Trading and wireless games need a second DS; the game's screen says so and B
 
 - The [manual](docs/manual.md): every control, the pause menu, the settings, the layouts and what
   is still rough.
-- Found a bug? [Open an issue](https://github.com/lborruto/sims2-ds-wide/issues) with your
+- Found a bug? [Open an issue](https://github.com/lborruto/sims2-ds-hd/issues) with your
   system and what happened. Never attach a game file, a save or a save state.
 - Want to help? [CONTRIBUTING.md](CONTRIBUTING.md). Security: [SECURITY.md](SECURITY.md).
   What changed: [CHANGELOG.md](CHANGELOG.md).

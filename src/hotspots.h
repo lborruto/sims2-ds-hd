@@ -8,7 +8,7 @@
 #include "layout.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 struct Hotspot
 {

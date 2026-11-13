@@ -61,7 +61,7 @@ representative at an online or offline event.
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement privately through
 GitHub, without opening a public issue: use **Security › Report a vulnerability**
-(https://github.com/lborruto/sims2-ds-wide/security/advisories/new) and say that the
+(https://github.com/lborruto/sims2-ds-hd/security/advisories/new) and say that the
 report is about conduct, or contact the maintainer
 ([@lborruto](https://github.com/lborruto)) on GitHub.
 All complaints will be reviewed and investigated promptly and fairly.

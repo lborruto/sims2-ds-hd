@@ -65,17 +65,17 @@
 # recording saved into a slot, the microphone recorded, the save page left, the lobby left.
 # Needs the ROM, the save states and Pillow (not in git, so not in CI):
 #   bash tests/console_check.sh
-# Override with SIMS2WIDE, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh),
+# Override with SIMS2HD, ROM, SHOTS, MORE_SHOTS, COMPLETE_SAVE (as tests/screens_check.sh),
 # PYTHON (a Python with Pillow) and MAX_SIMS (the emulators run at once, 4).
 set -u
 repo=$(cd "$(dirname "$0")/.." && pwd)
-bin=${SIMS2WIDE:-$repo/build/sims2wide}
+bin=${SIMS2HD:-$repo/build/sims2hd}
 rom=${ROM:-$(find "$repo/roms" -name "*.nds" 2>/dev/null | head -n 1)}
 shots=${SHOTS:-$repo/shots}
 more_shots=${MORE_SHOTS:-$repo/shots}
 complete_save=${COMPLETE_SAVE:-$repo/saves/complete-play.sav}
 python=${PYTHON:-python3}
-[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2wide)"; exit 2; }
+[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2hd)"; exit 2; }
 [ -f "$rom" ] || { echo "no ROM (set ROM)"; exit 2; }
 "$python" -c "import PIL" 2>/dev/null || { echo "no Pillow for $python (set PYTHON)"; exit 2; }
 tmp=$(mktemp -d)
@@ -85,7 +85,7 @@ trap 'rm -rf "$tmp"' EXIT
 max_sims=${MAX_SIMS:-4}
 [ "$max_sims" -ge 1 ] 2>/dev/null || max_sims=1
 real_bin=$bin
-sims2wide_slot() {
+sims2hd_slot() {
     local i slot=
     while [ -z "$slot" ]; do
         for i in $(seq 1 "$max_sims"); do mkdir "$tmp/slot$i" 2>/dev/null && { slot=$tmp/slot$i; break; }; done
@@ -96,7 +96,7 @@ sims2wide_slot() {
     rmdir "$slot"
     return $rc
 }
-bin=sims2wide_slot
+bin=sims2hd_slot
 
 # The game's text by its string id (this script holds no text of the game's): gtext ID [LANG [PART
 # [WORDS]]] prints string ID of language LANG (1, English, by default), from --dump-strings (one dump

@@ -18,7 +18,7 @@
 #include "gamestate.h"
 #include "port/menuview.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;

@@ -10,7 +10,7 @@
 #include "shots.h"
 #include "state.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -30,7 +30,7 @@ Recorder::Recorder(std::string dir) : dir_(std::move(dir))
 {
     if (dir_.empty())
     {
-        if (char* p = SDL_GetPrefPath("", "sims2-ds-wide")) { dir_ = std::string(p) + "captures"; SDL_free(p); }
+        if (char* p = SDL_GetPrefPath("", "sims2-ds-hd")) { dir_ = std::string(p) + "captures"; SDL_free(p); }
     }
 }
 

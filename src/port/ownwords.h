@@ -5,7 +5,7 @@
 // English file, so English). "@1" is filled by the caller.
 #pragma once
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 

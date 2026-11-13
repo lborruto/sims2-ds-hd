@@ -7,7 +7,7 @@
 #include "common.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 enum class GScreen { Unknown, FrontEnd /*title or main menu*/, CreateASim, Panel, Popup, Phone, Dialogue, Gift, Catalogue, Build, Vacuum, Social, Cards, SaveSlots, Drencher,
                // The minigames (milestone 6; MinigameState): CONSOLE knows none of them yet (the stick cursor's screens).

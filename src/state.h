@@ -7,7 +7,7 @@
 
 #include "NDS.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 bool SaveState(melonDS::NDS& nds, const std::string& path);
 bool LoadState(melonDS::NDS& nds, const std::string& path);

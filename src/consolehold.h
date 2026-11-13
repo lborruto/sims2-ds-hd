@@ -9,7 +9,7 @@
 #include "compose.h"
 #include "console.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 struct App;
 

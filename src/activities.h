@@ -103,7 +103,7 @@
 #include "screens.h"
 #include "touchscript.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // One line of an activity's hints: the button (as printed on a controller) and what it does,
 // in capitals (the 5 x 7 font), its lines split by hand with '\n' (14 characters fit beside a

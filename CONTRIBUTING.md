@@ -1,6 +1,6 @@
-# Contributing to sims2-ds-wide
+# Contributing to sims2-ds-hd
 
-Thanks for helping. sims2-ds-wide plays The Sims 2 (DS) on a computer like a console game: one
+Thanks for helping. sims2-ds-hd plays The Sims 2 (DS) on a computer like a console game: one
 window, the melonDS core, and the touch screen's screens redrawn in HD from what the game shows
 in its memory. The bar is: nothing of the game ever in the repository, CONSOLE as the default,
 and every change checked on real pictures of the game.
@@ -32,19 +32,19 @@ IOKit, GameController.framework, HIDAPI; Linux: evdev, HIDAPI).
 On a Mac, Xcode's command line tools are enough (plus CMake and Ninja, from Homebrew or
 `pip install cmake ninja`; CMake 3.21 to 4.x work).
 
-    git clone --recursive https://github.com/lborruto/sims2-ds-wide.git && cd sims2-ds-wide
+    git clone --recursive https://github.com/lborruto/sims2-ds-hd.git && cd sims2-ds-hd
     cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-    ninja -C build sims2wide
+    ninja -C build sims2hd
 
 The first build compiles melonDS and SDL (a few minutes); after that, changing `src/` rebuilds
 in seconds. Configuring also applies `patches/melonDS/*.patch` to the submodule's files (see
 [How it works](#how-it-works)): `git status` does not show that (`ignore = dirty` in
 `.gitmodules`), and `git -C melonDS checkout -- .` gives the pristine files back until the next
-configure. `build/sims2wide` is a plain program for the command line on every system.
+configure. `build/sims2hd` is a plain program for the command line on every system.
 
-- **The Mac app**: add `-DSIMS2WIDE_MAC_APP=ON` (and `"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+- **The Mac app**: add `-DSIMS2HD_MAC_APP=ON` (and `"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0` for both kinds of Mac, as the release does) to get
-  `build/Sims 2 DS Wide.app`, with the icon made from `packaging/icon.png`.
+  `build/Sims 2 DS HD.app`, with the icon made from `packaging/icon.png`.
 - **Windows**: MinGW (UCRT64) from [MSYS2](https://www.msys2.org/), the toolchain melonDS itself
   uses there: `pacman -S mingw-w64-ucrt-x86_64-{gcc,cmake,ninja}`, then the same commands in the
   UCRT64 shell. The `.exe` is linked statically (no DLL beside it) and opens no console window;
@@ -55,7 +55,7 @@ configure. `build/sims2wide` is a plain program for the command line on every sy
 Before opening a pull request, build with no warnings from `src/` and run the unit tests (no ROM
 needed; CI runs them too):
 
-    ninja -C build sims2wide
+    ninja -C build sims2hd
     for t in layout touchscript hotspots screens navigator controls gamestate romdata uikit shell; do
         ninja -C build ${t}_test && ./build/${t}_test || break
     done
@@ -184,7 +184,7 @@ The headless mode runs the game without a window, about four times faster than r
 | `--print-console` | CONSOLE's composition (which branch, a held picture) when it changes, and the counts at the end: how many frames showed milestone 1's picture |
 | `--print-words` | The words CONSOLE's picture shows (its texts and chips' labels, in order, ` \| ` between) when they change: what a screen says, for the checks |
 | `--shell PAGE [--shell-at N]`, `--launch`, `--data-dir DIR`, `--print-shell` | the pause menu opened on a page, the launch panel first, where the save states and recent games go (none headless without it), and what they do |
-| `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
+| `SIMS2HD_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
 
 Every `*_check.sh` runs at most `MAX_SIMS` emulators at once (4 by default: set it lower on a
 slow or hot machine). Their pictures and runs of the minigames use the research's `G-*` states in
@@ -255,8 +255,8 @@ are kept.
    `## [Unreleased]` above it.
 3. Merge to `main`, then tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 4. `release.yml` checks the tagged commit is on `main`, runs CI on it, checks that
-   `CMakeLists.txt` says `X.Y.Z`, builds `sims2-ds-wide-X.Y.Z-linux-x86_64.tar.gz`,
-   `sims2-ds-wide-X.Y.Z-macos-universal.zip` (the app, ad-hoc signed, not notarised) and
-   `sims2-ds-wide-X.Y.Z-windows-x86_64.zip`, attests their build provenance and creates the GitHub
+   `CMakeLists.txt` says `X.Y.Z`, builds `sims2-ds-hd-X.Y.Z-linux-x86_64.tar.gz`,
+   `sims2-ds-hd-X.Y.Z-macos-universal.zip` (the app, ad-hoc signed, not notarised) and
+   `sims2-ds-hd-X.Y.Z-windows-x86_64.zip`, attests their build provenance and creates the GitHub
    release from the changelog section. A tag without its section, or with another version in
    `CMakeLists.txt`, fails on purpose.

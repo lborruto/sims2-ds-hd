@@ -2,7 +2,7 @@
 <!-- Windows: the program's narrow strings (paths from the file picker, a dropped file, the
      settings folder, recent.txt) are UTF-8, so a ROM or a user folder with accents opens. -->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity type="win32" name="sims2wide" version="1.0.0.0"/>
+  <assemblyIdentity type="win32" name="sims2hd" version="1.0.0.0"/>
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>

@@ -1,4 +1,4 @@
-// melonDS Platform interface for sims2wide. Adapted from mamesj/pokemon-fulldex (GPLv3), frontend/platform.cpp.
+// melonDS Platform interface for sims2hd. Adapted from mamesj/pokemon-fulldex (GPLv3), frontend/platform.cpp.
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>
@@ -199,9 +199,9 @@ void Camera_Stop(int, void*) {}
 void Camera_CaptureFrame(int, u32*, int, int, bool, void*) {}
 
 // The microphone lives in mic.cpp (blow key, the computer's microphone, or silence).
-void Mic_Start(void*) { sims2wide::mic::Start(); }
-void Mic_Stop(void*) { sims2wide::mic::Stop(); }
-int Mic_ReadInput(s16* data, int maxlength, void*) { return sims2wide::mic::Read(data, maxlength); }
+void Mic_Start(void*) { sims2hd::mic::Start(); }
+void Mic_Stop(void*) { sims2hd::mic::Stop(); }
+int Mic_ReadInput(s16* data, int maxlength, void*) { return sims2hd::mic::Read(data, maxlength); }
 
 AACDecoder* AAC_Init() { return nullptr; }
 void AAC_DeInit(AACDecoder*) {}

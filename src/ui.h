@@ -9,7 +9,7 @@
 
 #include "common.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // The font's 5 x 7 glyph for c (lower case drawn as capitals), one row per byte, bit 4 the
 // leftmost pixel; nullptr for a sign it does not have. (Also CONSOLE's hints, compose.cpp.)

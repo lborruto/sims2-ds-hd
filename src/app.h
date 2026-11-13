@@ -20,7 +20,7 @@
 #include "screens.h"
 #include "settings.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 struct App
 {

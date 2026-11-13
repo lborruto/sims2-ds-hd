@@ -5,7 +5,7 @@
 
 #include "RTC.h"
 
-namespace sims2wide::clock
+namespace sims2hd::clock
 {
 namespace
 {

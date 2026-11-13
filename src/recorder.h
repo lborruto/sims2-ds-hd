@@ -9,7 +9,7 @@
 #include "NDS.h"
 #include "app.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class Recorder
 {

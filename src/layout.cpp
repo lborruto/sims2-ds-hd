@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace sims2wide
+namespace sims2hd
 {
 static int Wide(int h, float aspect) { return (int)std::lround(h * aspect); }
 

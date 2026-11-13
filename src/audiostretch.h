@@ -15,7 +15,7 @@
 #include <cstdint>
 #include <vector>
 
-namespace sims2wide
+namespace sims2hd
 {
 class AudioStretch
 {

@@ -29,7 +29,7 @@
 #include "romdata.h"
 #include "ui/kit.h"
 
-using namespace sims2wide;
+using namespace sims2hd;
 
 using Bytes = std::vector<u8>;
 static void W16(Bytes& b, size_t at, u32 v) { b[at] = (u8)v; b[at + 1] = (u8)(v >> 8); }
