@@ -164,12 +164,17 @@ void BuildWorldPrompt(Composition& c, const WorldPrompt& p, const RomData* rom)
     if (!l.hints.empty())
     {
         const int hx = x0 + leftW + kGap;
-        // One hint: level with the verb; two: one a row.
+        // One hint: on the verb's baseline (the kit's: a text item's in its box, a chip label's on
+        // the cap height's middle), not its box's middle: the smaller words sat 3 pixels higher;
+        // two: one a row.
         const int rows = (int)l.hints.size();
+        const LineMetrics vm = Metrics(l.verb.size, Weight::ExtraBold);
+        const float vlh = std::round(l.verb.size * 1.3f);
+        const float verbBase = y0 + kVerbY + std::round((vlh - (vm.ascent + vm.descent)) / 2 + vm.ascent) + std::round((kVerbH - vlh) / 2);
         for (int i = 0; i < rows; i++)
         {
             const Rect r = l.hintRects[i];
-            const int rowY = rows == 1 ? y0 + kVerbY + (kVerbH - r.h) / 2 : y0 + 10 + i * 36 + (34 - r.h) / 2;
+            const int rowY = rows == 1 ? (int)std::lround(verbBase - (r.h + kPromptHintSize * 0.70f) / 2) : y0 + 10 + i * 36 + (34 - r.h) / 2;
             UiItem chip = ChipItem(hx, rowY, l.hints[i].button, l.hints[i].label, kPromptHintSize);
             chip.colour = kHintColour;
             c.ui.push_back(chip);

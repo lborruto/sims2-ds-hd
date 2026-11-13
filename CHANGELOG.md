@@ -202,6 +202,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   other buttons (the - read as a dot).
 - The pause menu's Settings: the Advanced heading and the note under the list start where the rows'
   names do (three edges 12 pixels apart before).
+- The world's plate: "Hold for more" sits on the same line as the action's word (it was 3 pixels
+  higher).
 
 ## [0.1.1] - 2026-11-04
 
