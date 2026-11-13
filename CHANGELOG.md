@@ -198,6 +198,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The front end and Create-a-Sim: the picture and the panel sit as far from the screen's left and
   right edges as from each other (they were 6 pixels off); their hints end where every other
   panel's do.
+- A Nintendo controller's + and - buttons in the hints are round with a clear sign, like its
+  other buttons (the - read as a dot).
 
 ## [0.1.1] - 2026-11-04
 
