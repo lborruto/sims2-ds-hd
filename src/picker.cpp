@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <fstream>
 
+#include "prefdir.h"
 #include "tinyfiledialogs.h"
 
 namespace sims2hd
@@ -22,11 +23,8 @@ void Tell(bool dialog, const std::string& msg)
 // The ROM chosen last time, kept in the per-user settings folder (SDL's pref path).
 static std::string LastRomFile()
 {
-    char* dir = SDL_GetPrefPath("", "sims2-ds-hd");
-    if (!dir) return "";
-    std::string f = std::string(dir) + "last-rom.txt";
-    SDL_free(dir);
-    return f;
+    const std::string dir = PrefDir();
+    return dir.empty() ? "" : dir + "last-rom.txt";
 }
 
 // Whether a path may go to the file picker. tinyfiledialogs runs osascript, zenity or kdialog

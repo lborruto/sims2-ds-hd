@@ -37,6 +37,7 @@
 #include "looks.h"
 #include "mic.h"
 #include "picker.h"
+#include "prefdir.h"
 #include "romdata.h"
 #include "ui/font.h"
 #include "port/front.h"
@@ -335,7 +336,10 @@ int main(int argc, char** argv)
     app.consoleFocus = consoleFocus;
     app.consolePinned = consolePinned;
     app.uiDemo = uiDemo;
-    // The settings file (not headless: those runs stay the same on every machine).
+    // The settings file (not headless: those runs stay the same on every machine). The per-user
+    // folder of the project's old name moves over on its first use (prefdir.h), in the window
+    // alone: never headless, nor in a tool run (--measure-menu and the like, which the checks make).
+    if (window) AllowPrefMove();
     const std::string settingsPath = headless ? "" : Settings::DefaultPath();
     if (!settingsPath.empty() && app.settings.Load(settingsPath)) fprintf(stderr, "settings: %s\n", settingsPath.c_str());
     // The HD interface's size and the game's pictures (ui/kit.h): headless 100 % and Pixel unless the
@@ -415,7 +419,7 @@ int main(int argc, char** argv)
     if (!inputPath.empty()) script = LoadScript(inputPath);
     bool winShots = false;
     for (const InputEvent& e : script) winShots |= e.winShot;
-    if (!shotAt.empty() || shotEvery || winShots) { std::string cmd = "mkdir -p '" + shotDir + "'"; (void)system(cmd.c_str()); }
+    if (!shotAt.empty() || shotEvery || winShots) { std::error_code ec; std::filesystem::create_directories(std::filesystem::path(std::u8string(shotDir.begin(), shotDir.end())), ec); }
 
     // The launch panel, before the DS starts: in the window without a ROM (a double click on
     // the app), with a ROM that is not The Sims 2, or with --launch (headless too, from the

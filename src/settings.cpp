@@ -1,5 +1,7 @@
 #include "settings.h"
 
+#include "prefdir.h"
+
 #include <SDL.h>
 
 #include <algorithm>
@@ -12,11 +14,8 @@ namespace sims2hd
 {
 std::string Settings::DefaultPath()
 {
-    char* dir = SDL_GetPrefPath("", "sims2-ds-hd");
-    if (!dir) return "";
-    std::string f = std::string(dir) + "settings.ini";
-    SDL_free(dir);
-    return f;
+    const std::string dir = PrefDir();
+    return dir.empty() ? "" : dir + "settings.ini";
 }
 
 static const char* MicKey(MicMode m) { return m == MicMode::Off ? "off" : m == MicMode::Real ? "real" : "blow"; }

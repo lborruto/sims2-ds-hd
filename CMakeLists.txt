@@ -138,7 +138,7 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb_embedded
         "-DFILES=${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake"
     DEPENDS cmake/embed.cmake "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt"
     COMMENT "Embedding the controller mappings" VERBATIM)
-add_library(pads STATIC src/pads.cpp src/controls.cpp "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb_embedded.cpp")
+add_library(pads STATIC src/pads.cpp src/controls.cpp src/prefdir.cpp "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb_embedded.cpp")
 target_include_directories(pads PUBLIC melonDS/src src)
 target_link_libraries(pads PUBLIC uikit SDL2::SDL2-static)
 
@@ -228,7 +228,7 @@ add_executable(navigator_test EXCLUDE_FROM_ALL tests/navigator_test.cpp src/acti
 target_include_directories(navigator_test PRIVATE melonDS/src src)
 
 # Checks of the bindings and the settings file's loading (not built by default): ninja -C build controls_test && ./build/controls_test
-add_executable(controls_test EXCLUDE_FROM_ALL tests/controls_test.cpp src/controls.cpp src/settings.cpp src/layout.cpp)
+add_executable(controls_test EXCLUDE_FROM_ALL tests/controls_test.cpp src/controls.cpp src/settings.cpp src/prefdir.cpp src/layout.cpp)
 target_include_directories(controls_test PRIVATE melonDS/src src)
 target_link_libraries(controls_test PRIVATE SDL2::SDL2-static)
 
@@ -249,7 +249,7 @@ target_link_libraries(romdata_test PRIVATE uikit)
 
 # Checks of the HD shell: the pause menu, the launch panel, the save states' files (not built by
 # default): ninja -C build shell_test && ./build/shell_test
-add_executable(shell_test EXCLUDE_FROM_ALL tests/shell_test.cpp src/shell.cpp src/slots.cpp src/settings.cpp src/controls.cpp src/layout.cpp src/port/ownwords.cpp src/romdata.cpp)
+add_executable(shell_test EXCLUDE_FROM_ALL tests/shell_test.cpp src/shell.cpp src/slots.cpp src/settings.cpp src/prefdir.cpp src/controls.cpp src/layout.cpp src/port/ownwords.cpp src/romdata.cpp)
 target_include_directories(shell_test PRIVATE melonDS/src src)
 target_link_libraries(shell_test PRIVATE uikit SDL2::SDL2-static)
 

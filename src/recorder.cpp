@@ -7,6 +7,7 @@
 #include <ctime>
 #include <filesystem>
 
+#include "prefdir.h"
 #include "shots.h"
 #include "state.h"
 
@@ -30,7 +31,7 @@ Recorder::Recorder(std::string dir) : dir_(std::move(dir))
 {
     if (dir_.empty())
     {
-        if (char* p = SDL_GetPrefPath("", "sims2-ds-hd")) { dir_ = std::string(p) + "captures"; SDL_free(p); }
+        if (const std::string p = PrefDir(); !p.empty()) dir_ = p + "captures";
     }
 }
 

@@ -4,6 +4,7 @@
 // Where each target is and what tapping it does was measured headless (scripts/hotspots/).
 //   ninja -C build hotspots_test && ./build/hotspots_test
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "hotspots.h"

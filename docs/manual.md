@@ -409,6 +409,9 @@ the camera.
   `~/.local/share/sims2-ds-hd`. It holds `settings.ini` (delete it to start over), the save
   states and the place kept when you quit (`states/`), your recent games, screenshots
   (`screenshots/`, F12) and `gamecontrollerdb.txt` if you add one.
+  Coming from a version called sims2-ds-wide (0.1.x)? The first time it opens, the program moves
+  that folder's content (`sims2-ds-wide` beside it) over by itself; a file the new folder already
+  has stays in the old one.
 - **A save state holds a copy of the game's memory**: never share one, nor attach one to an issue.
 
 ## Layouts and looks

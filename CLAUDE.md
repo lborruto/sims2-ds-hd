@@ -73,7 +73,7 @@ writes RAM. The full per-module notes, traps and known limits are in
 - `screens.*`, `hotspots.*`, `scene.*`: the pixel rules (AUTO, and CONSOLE without RAM) and touch targets.
 - `touchscript.*`: queued taps, holds and drags. `script.*`, `shots.*`, `state.*`: headless scripts, PNGs, states.
 - `looks.*`, `melonds_ext/`, `patches/melonDS/`: sharper / widescreen 3D and 60 fps (from FullDex).
-- `audio.*`, `audiostretch.h`, `mic.*`, `clock.*`, `backup.*`, `recorder.*`, `picker.*`, `platform.cpp`.
+- `audio.*`, `audiostretch.h`, `mic.*`, `clock.*`, `backup.*`, `recorder.*`, `picker.*`, `platform.cpp`; `prefdir.*` the per-user folder (and the move from the old name's).
 
 ## Key traps
 
