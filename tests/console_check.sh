@@ -1290,7 +1290,7 @@ elif case in ("s5-hd", "s5-hd-wide"):
 elif case in ("s5-hd-75", "s5-hd-150", "casino-menu-75", "casino-menu-150"):
     # The UI's size: the same picture as at 100 % (the case without the suffix, run beside it), its
     # HD group zoomed about its anchor (the conversation about the canvas's bottom centre, 75 % or as
-    # wide as the canvas holds, 120 %; the menu about 640,338, 75 % or never larger), the world
+    # wide as the canvas holds 16 pixels in a side, 118 %; the menu about 640,338, 75 % or never larger), the world
     # unchanged where the group no longer lies; the strip's status at its own size (75 %, or the
     # strip's 108 %) at the strip's left.
     from PIL import ImageStat
@@ -1298,7 +1298,7 @@ elif case in ("s5-hd-75", "s5-hd-150", "casino-menu-75", "casino-menu-150"):
     base = Image.open(comp_path.replace(f"/{case}/", f"/{base_name}/")).convert("RGB")
     z = 0.75 if case.endswith("-75") else 1.0
     dialogue = case.startswith("s5")
-    if dialogue and case.endswith("-150"): z = 636 / 530
+    if dialogue and case.endswith("-150"): z = 624 / 530   # (to 16 pixels from the sides: console.cpp's kUiEdge)
     ax, ay = (640, 720) if dialogue else (640, 338)
     box = (110, 426, 1170, 706) if dialogue else (176, 30, 1104, 646)
     T = lambda x, y: (ax + z * (x - ax), ay + z * (y - ay))

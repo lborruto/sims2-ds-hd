@@ -204,6 +204,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   names do (three edges 12 pixels apart before).
 - The world's plate: "Hold for more" sits on the same line as the action's word (it was 3 pixels
   higher).
+- At the largest interface sizes, conversations, popups and the world's plate stop 16 pixels short
+  of the screen's edges (a conversation ran to 4).
 - On the Steam Deck the automatic interface size reads the Deck's own 7" screen (130 %) rather
   than whatever size the system reports for it.
 

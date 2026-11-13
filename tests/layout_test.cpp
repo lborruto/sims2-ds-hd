@@ -713,6 +713,7 @@ static void ui_scale()
                         if (it.layer == kStatusBarLayer || it.layer == kPopLayer + 1) continue; // (the strip's)
                         const Rect r = ui::Placed(it);
                         CHECK(r.y + r.h <= kStripY);
+                        CHECK(r.x >= 16 && r.y >= 16 && r.x + r.w <= kConsoleW - 16); // (kUiEdge)
                         most = std::max(most, it.zoom);
                         least = std::min(least, it.zoom);
                     }
@@ -738,6 +739,8 @@ static void ui_scale()
                     x1 = std::max(x1, ui::Placed(it).x + ui::Placed(it).w);
                 }
                 CHECK(strip > 0);
+                // Grown, never nearer than 16 pixels to the canvas's sides (console.cpp's kUiEdge).
+                CHECK(x0 >= 16 && x1 <= kConsoleW - 16);
                 const float want = z < 1 ? 1060 * z : z == 1 ? 1060 : 1060 * (636.0f / 530);
                 CHECK(std::abs((x1 - x0) - want) < 40 && std::abs((x0 + x1) / 2.0f - 640) < 4);
                 for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
