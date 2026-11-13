@@ -29,6 +29,8 @@ int ListTop(Page) { return 40; }
 // Settings: a row, the Advanced heading, the list's height (every tab fits: no scrolling; the UI's
 // size zooms the whole panel, held to the canvas), the note under it, the tab bar in the title band.
 constexpr int kSetRowH = 50, kSetRowStep = 54, kSetHeadH = 32, kSetListH = 410;
+// The rows' labels, the Advanced heading and the note under the list start at one x (was 20, 12 and 8).
+constexpr int kSetTextX = 20;
 constexpr int kTabBarY = kPanel.y + 20, kTabBarH = 48;
 constexpr Rect kAskBox {280, 200, 720, 320};
 // The TV's safe area (the outer 5 % left clear: x 64-1216, y 36-684); the launch panel inside it
@@ -1034,7 +1036,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             {
                 if (i == tl.advanced)
                 {
-                    UiItem h = Line({c.x + 12, y, c.w - 24, kSetHeadH}, Wd(lang, W::SetAdvanced), 20, 16);
+                    UiItem h = Line({c.x + kSetTextX, y, c.w - 2 * kSetTextX, kSetHeadH}, Wd(lang, W::SetAdvanced), 20, 16);
                     h.colour = kTextNote;
                     it.Add(1, h);
                     y += kSetHeadH;
@@ -1050,7 +1052,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 rects_[i] = r;
                 const Rect pill {r.x + r.w - 14 - 250, r.y + 6, 250, r.h - 12};
                 const int tagW = row == Row::Language ? 200 : 0;
-                UiItem label = Line({r.x + 20, r.y, pill.x - 16 - tagW - (r.x + 20), r.h}, RowLabel(row, lang), 24, 17);
+                UiItem label = Line({r.x + kSetTextX, r.y, pill.x - 16 - tagW - (r.x + kSetTextX), r.h}, RowLabel(row, lang), 24, 17);
                 if (held) label.colour = kTextInactive;
                 it.Add(1, label);
                 if (row == Row::Keys)
@@ -1087,7 +1089,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 const Row row = tl.rows[focus];
                 std::string words = Wd(lang, RowHeld(row, st) ? W::SaverHolds : (W)RowNote(row));
                 if (row == Row::Mic) words = Fill(words, m.keyGlyph[Controls::BLOW].empty() ? "\xE2\x80\x94" : m.keyGlyph[Controls::BLOW]); // (the blow key as bound)
-                UiItem note = TextItem({c.x + 8, c.y + kSetListH, c.w - 16, c.h - kSetListH}, words, 18);
+                UiItem note = TextItem({c.x + kSetTextX, c.y + kSetListH, c.w - kSetTextX - 8, c.h - kSetListH}, words, 18);
                 note.middle = true;
                 note.colour = kTextNote;
                 it.Add(1, note);

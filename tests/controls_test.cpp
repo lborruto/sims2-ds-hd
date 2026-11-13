@@ -330,6 +330,15 @@ static void auto_ui_scale()
     CHECK(AutoUiScale(1, 800) == 0.6f);          // (the floor: 60 %)
     CHECK(AutoUiScale(0, 0) == 1 && AutoUiScale(0.5f, 0) == 1 && AutoUiScale(0.5f, 5000) == 1 && AutoUiScale(10, 500) == 1);
     CHECK(UiZoomOf(0, 0.8f) == 0.8f && UiZoomOf(125, 0.8f) == 1.25f);
+    // The Steam Deck's own screen by its DMI product name (gamescope's reported size is not
+    // trusted there): 7" (LCD) and 7.4" (OLED) at 1280 x 800 either way round, Auto 130 % and 125 %
+    // full screen; docked (another display size) or another machine: not known.
+    float d = 0;
+    CHECK(HandheldPanel("Jupiter\n", 1280, 800, d) && std::abs(d - 177.8f) < 0.1f);
+    CHECK(std::lround(AutoUiScale(d / std::hypot(1280.0f, 800.0f), d) * 100) == 130);
+    CHECK(HandheldPanel("Galileo", 800, 1280, d) && std::abs(d - 187.96f) < 0.1f);
+    CHECK(std::lround(AutoUiScale(d / std::hypot(1280.0f, 800.0f), d) * 100) == 125);
+    CHECK(!HandheldPanel("Jupiter", 1920, 1080, d) && !HandheldPanel("MacBookPro18,1", 1280, 800, d) && !HandheldPanel("", 1280, 800, d));
 }
 
 int main(int, char**)

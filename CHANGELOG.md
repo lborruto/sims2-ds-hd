@@ -197,6 +197,23 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   game's Quit; Moogoo's Start (quit) is in the manual; the social answers sit on rows.
 - The pause menu: a Menu key moved to Enter, Space or the DS's A key resumes the game again
   instead of choosing the row.
+- The front end and Create-a-Sim: the picture and the panel sit as far from the screen's left and
+  right edges as from each other (they were 6 pixels off); their hints end where every other
+  panel's do.
+- A Nintendo controller's + and - buttons in the hints are round with a clear sign, like its
+  other buttons (the - read as a dot).
+- The pause menu's Settings: the Advanced heading and the note under the list start where the rows'
+  names do (three edges 12 pixels apart before).
+- The world's plate: "Hold for more" sits on the same line as the action's word (it was 3 pixels
+  higher).
+- The main menu's hints stay inside the panel in German ("Einen Sim erstellen" pushed them past
+  its left edge).
+- Create-a-Sim's hints never cut A's word: in Italian and Spanish the hair and name pages showed
+  "…" or "E…"; the row tightens its gaps, then its size, until the words fit.
+- At the largest interface sizes, conversations, popups and the world's plate stop 16 pixels short
+  of the screen's edges (a conversation ran to 4).
+- On the Steam Deck the automatic interface size reads the Deck's own 7" screen (130 %) rather
+  than whatever size the system reports for it.
 
 ## [0.1.1] - 2026-11-04
 

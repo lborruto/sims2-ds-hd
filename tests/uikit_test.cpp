@@ -196,6 +196,35 @@ static void chips()
             seen.push_back(px);
         }
     }
+    // Every face's chips one height (a row of hints shares its baseline whatever the device); a
+    // Nintendo pad's + (Start) and - (Back) round like its face buttons, their sign white bars in
+    // the chip's middle (the "-" was a dot in a pill).
+    {
+        for (Face f : {Face::Xbox, Face::PlayStation, Face::Nintendo, Face::Keyboard})
+        {
+            ChipLook look;
+            look.face = f;
+            if (f == Face::Keyboard) look.glyph[(int)Button::A] = "Enter", look.glyph[(int)Button::Start] = "Return";
+            SetChipLook(look);
+            for (Button b : {Button::A, Button::B, Button::X, Button::Y, Button::LB, Button::RB, Button::Start, Button::Back, Button::Pause, Button::LT,
+                             Button::DPadV, Button::RStick})
+                CHECK(ChipRect(0, 0, b, "Go", 24).h == a1.h);
+        }
+        ChipLook nin;
+        nin.face = Face::Nintendo;
+        SetChipLook(nin);
+        for (Button b : {Button::Start, Button::Back})
+        {
+            const Rect r = ChipRect(0, 0, b, "", 24);
+            CHECK(r.w == a.w && r.h == a.h);
+            std::vector<u32> px(48 * 48);
+            Rasterise({ChipItem(8, 8, b, "", 24)}, 1, px.data(), 48, 48);
+            const int cx = 8 + r.w / 2, cy = 8 + r.h / 2;
+            CHECK((px[(size_t)cy * 48 + cx] & 0xFFFFFF) == 0xFFFFFF);                              // the bar's middle
+            CHECK(((px[(size_t)(cy - 7) * 48 + cx] & 0xFFFFFF) == 0xFFFFFF) == (b == Button::Start)); // the upright: + only
+        }
+        SetChipLook({});
+    }
     // A column of hints: the label starts where asked, whatever the chip.
     CHECK(ChipRect(0, 0, Button::A, "Go", 24, 100).w == ChipRect(0, 0, Button::Start, "Go", 24, 100).w);
     CHECK(ChipRect(0, 0, Button::A, "Go", 24, 100).w > a1.w);

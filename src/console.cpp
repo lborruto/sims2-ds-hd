@@ -44,15 +44,19 @@ constexpr int kCasFadeBlack = 16, kCasFadeWhite = 245, kCasFadeLayer = 9;
 // about the canvas's bottom centre; the strip's status at its left and hints at its right, about
 // the strip's content row, as large as the strip's height lets them (the strip itself, the world's
 // foot, keeps its place).
-constexpr Rect kUiLimit {4, 4, kConsoleW - 8, kConsoleH - 8};
-constexpr Rect kMenuLimit {4, 4, kConsoleW - 8, kStripY - 8};
+// (Grown, a group stops kUiEdge from the canvas's sides and top, as far in as the 100 % screens'
+// own outer margins (Create-a-Sim's panel, the front end's 20): a conversation at 150 % no longer
+// runs to 4 pixels of the screen's edge.)
+constexpr int kUiEdge = 16;
+constexpr Rect kUiLimit {kUiEdge, kUiEdge, kConsoleW - 2 * kUiEdge, kConsoleH - 2 * kUiEdge};
+constexpr Rect kMenuLimit {kUiEdge, kUiEdge, kConsoleW - 2 * kUiEdge, kStripY - 4 - kUiEdge};
 constexpr float kMenuAnchorY = 338; // (the menu's 30..646, centred)
 constexpr Rect kStripInside {0, kStripY + 1 + kStripBand, kConsoleW, kConsoleH - kStripY - 1 - kStripBand};
 constexpr float kStripAnchorY = kStripContentY + kStatusBarH / 2.0f;
 float StripZoom(float z) { return std::min(z, (kStripAnchorY - kStripInside.y) / (kStatusBarH / 2.0f)); }
 float MenuZoom(float z) { return std::min(z, 1.0f); }
 // The world's prompt (port/prompt.h): its plate's bottom and its drop shadow above the strip.
-constexpr Rect kPromptLimit {4, 4, kConsoleW - 8, kStripY - kPromptShadow - 4};
+constexpr Rect kPromptLimit {kUiEdge, kUiEdge, kConsoleW - 2 * kUiEdge, kStripY - kPromptShadow - 4 - kUiEdge};
 // The stick cursor's screens (the touch screen at kMenuTo in its frame, FrameAround: 6 pixels):
 // the hints and the HD status bar below the frame (10 pixels below the touch screen, where they sit
 // at 100 %), the pause panel right of it (6 pixels clear, above the hints).

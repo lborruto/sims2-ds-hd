@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <fstream>
+#include <string>
 #include <vector>
 
 #ifdef __APPLE__
@@ -577,6 +579,20 @@ bool Video::DisplayMetrics(float& mm, float& diag) const
     mm = 25.4f / hdpi;
     const float k = (float)ow / ww;
     diag = std::hypot(b.w * k, b.h * k) * mm;
+#ifdef __linux__
+    // A handheld's own screen (the Steam Deck): its known size, whatever the compositor reports.
+    static const std::string product = [] {
+        std::ifstream f("/sys/class/dmi/id/product_name");
+        std::string s;
+        std::getline(f, s);
+        return s;
+    }();
+    if (float d2 = 0; HandheldPanel(product, (int)std::lround(b.w * k), (int)std::lround(b.h * k), d2))
+    {
+        diag = d2;
+        mm = d2 / std::hypot(b.w * k, b.h * k);
+    }
+#endif
     return true;
 #endif
 }
