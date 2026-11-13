@@ -56,8 +56,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - Settings: Interface size (Auto, the default, follows your screen's size and the window's; or 60
   to 150 %), Screen scaling (Sharp, the default, Smooth or Pixels), Game icons (Pixels, the DS's
   own, the default; or Smooth, redrawn by xBRZ), Hide the idle pointer (on), Battery saver (3D at
-  1x and 30 fps while on), Mute, Pause in the background (on), Sound in fast forward, Stick
-  cursor, Cursor speed (50 to 200 %), Swap the sticks (left-handed), Stick dead zone, Trigger
+  the DS's own 192p and 30 fps while on), Mute, Pause in the background (on), Sound in fast
+  forward, Stick cursor, Cursor speed (50 to 200 %), Swap the sticks (left-handed), Stick dead zone, Trigger
   press at, Buzz on connect (on), Microphone (off, the blow key or a real microphone), Fast
   forward speed (2×, 3×, 4× or as fast as it goes), Fast forward key (Hold or Toggle), Fast boot
   (on: the boot's splashes, which wait for no button, at full speed). The window comes back where
@@ -88,6 +88,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Changed
 
+- Settings > Graphics > 3D resolution goes by familiar names instead of a factor: DS (192p),
+  384p, 576p, 720p, and now also 1080p and 1440p for a fast computer.
 - The pause menu (Start + Back, or Esc, which also resumes from any of its pages) is in HD and
   five languages, with the buttons of the controller you hold. Its Settings have five tabs
   (Display, Graphics, Sound, Controls, Game) changed with LB / RB (Q / W), the rarely needed rows
@@ -136,8 +138,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Fixed
 
-- A settings file with a 3D resolution above 4 showed it, and Right then lowered it to 4: it is
-  now read as 4.
+- A settings file with a 3D resolution off the row's steps showed it, and Right then went
+  elsewhere: it is now read as the step at or below it.
 - Create-a-Sim: changing page no longer flashes the last page's pictures in the new page's cells
   (letters in the hair styles, text over the clothes); they stay empty until the game has drawn them.
 - Create-a-Sim: the aspirations' pictures fade out with the screen instead of staying bright.

@@ -335,11 +335,11 @@ constexpr const char* kWords[][5] = {
     {"Smooth", "Lisse", "Weich", "Morbido", "Suave"},
     {"Pixels", "Pixels", "Pixel", "Pixel", "Píxeles"},
     // The rows' notes
-    {"3D at 1x and 30 fps, whatever the rows below say: lighter on the battery and the fans.",
-     "3D en 1x et 30 i/s, quoi que disent les lignes dessous : moins de batterie et de ventilation.",
-     "3D in 1x und 30 fps, egal was unten steht: schont Akku und Lüfter.",
-     "3D a 1x e 30 fps, qualunque cosa dicano le righe sotto: meno batteria e ventole.",
-     "3D a 1x y 30 fps, digan lo que digan las filas de abajo: menos batería y ventilador."},
+    {"3D at the DS's own 192p and 30 fps, whatever the rows below say: lighter on the battery and the fans.",
+     "3D comme la DS (192p) à 30 i/s, quoi que disent les lignes dessous : moins de batterie et de ventilation.",
+     "3D wie die DS (192p) mit 30 fps, egal was unten steht: schont Akku und Lüfter.",
+     "3D come il DS (192p) a 30 fps, qualunque cosa dicano le righe sotto: meno batteria e ventole.",
+     "3D como la DS (192p) a 30 fps, digan lo que digan las filas de abajo: menos batería y ventilador."},
     {"On: the game pauses and goes quiet while its window is not in front.",
      "Oui : le jeu se met en pause et se tait quand sa fenêtre n'est pas devant.",
      "An: das Spiel pausiert und schweigt, solange sein Fenster nicht vorne ist.",
@@ -394,11 +394,11 @@ constexpr const char* kWords[][5] = {
     {"Fill the whole screen. F11 also switches it.", "Remplir tout l'écran. F11 le bascule aussi.",
      "Den ganzen Bildschirm füllen. F11 schaltet es auch um.", "Riempi tutto lo schermo. Anche F11 lo cambia.",
      "Ocupar toda la pantalla. F11 también lo cambia."},
-    {"How sharp the 3D world is drawn. Higher needs a faster computer.",
-     "La netteté du monde en 3D. Plus haut demande un ordinateur plus rapide.",
-     "Wie scharf die 3D-Welt gezeichnet wird. Höher braucht einen schnelleren Computer.",
-     "Quanto è nitido il mondo 3D. Più alto richiede un computer più veloce.",
-     "La nitidez del mundo en 3D. Más alto necesita un ordenador más rápido."},
+    {"How sharp the 3D world is drawn, from the DS's own to 1440p. High values need a fast computer.",
+     "La netteté du monde en 3D, de celle de la DS au 1440p. Les plus hautes demandent un ordinateur rapide.",
+     "Wie scharf die 3D-Welt gezeichnet wird, von der DS bis 1440p. Hohe Werte brauchen einen schnellen Computer.",
+     "Quanto è nitido il mondo 3D, da quello del DS a 1440p. I valori alti richiedono un computer veloce.",
+     "La nitidez del mundo en 3D, de la de la DS a 1440p. Los valores altos necesitan un ordenador rápido."},
     {"See more of the town at the sides. Switch it off if a place looks odd at the edges.",
      "Voir plus de la ville sur les côtés. À couper si un lieu semble étrange aux bords.",
      "Mehr von der Stadt an den Seiten. Ausschalten, wenn ein Ort am Rand seltsam aussieht.",
@@ -519,6 +519,8 @@ constexpr const char* kWords[][5] = {
     {"Not taken here", "Pas repris ici", "Hier unverkäuflich", "Non si ritira qui", "Aquí no se acepta"},
     // The shop's D-pad
     {"Choose", "Parcourir", "Durchsuchen", "Sfoglia", "Recorrer"},
+    // The 3D resolution's first step: the DS's own lines
+    {"DS (192p)", "DS (192p)", "DS (192p)", "DS (192p)", "DS (192p)"},
 };
 static_assert(std::size(kWords) == (size_t)OwnWordId::Count, "one row per OwnWordId");
 }
