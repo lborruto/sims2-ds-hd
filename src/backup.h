@@ -3,7 +3,7 @@
 #pragma once
 #include <string>
 
-namespace sims2wide
+namespace sims2hd
 {
 struct Backups
 {

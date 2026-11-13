@@ -27,7 +27,7 @@
 #include "slots.h"
 #include "ui/kit.h"
 
-namespace sims2wide::shell
+namespace sims2hd::shell
 {
 constexpr int kW = 1280, kH = 720;
 

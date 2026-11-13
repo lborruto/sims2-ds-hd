@@ -1,5 +1,5 @@
-// Create-a-Sim in HD (milestone 5), driven by the controller (GameState::front.cas, research
-// m5-front-end §4). The game's own screen (CCreateASim, overlay 3) does all the work: every item
+// Create-a-Sim in HD, driven by the controller (GameState::front.cas;
+// docs/research/ram-map.md). The game's own screen (CCreateASim, overlay 3) does all the work: every item
 // here is one of its touch targets, and what the HD shows is read back from RAM every frame, so
 // the HD page is the game's page (S+0x74) and follows it the frame its page object (S+0x58)
 // swaps; while a page change is in flight (`CasState::switching`, 2-4 frames) the panel shows the
@@ -52,7 +52,7 @@
 #include "port/menuview.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;
@@ -169,7 +169,7 @@ CasType CasTypeAction(const CasState& cs, const RomData& rom, const std::string&
 constexpr int kCasTypeWait = 6; // frames after a tap before the next character (the game reads a tap within 4-6)
 
 // The view (valid when the RAM's part reads, the screen is Create-a-Sim's and the game's strings
-// are there: CONSOLE's HD Create-a-Sim; else milestone 1's picture); the Of form without the
+// are there: CONSOLE's HD Create-a-Sim; else the framed screens); the Of form without the
 // strings' check (tests; rom null leaves the words and the keys' characters empty).
 MenuView CasView(ScreenState s, const GameState* game, const RomData* rom);
 MenuView CasViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);

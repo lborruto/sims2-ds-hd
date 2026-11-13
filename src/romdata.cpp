@@ -9,7 +9,7 @@
 #include <cstring>
 #include <iterator>
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -352,9 +352,10 @@ struct BitReader
     u32 Number() { u32 n = 0; while (n < 7 && Bit()) n++; return (1u << n) | Bits(n); }
 };
 
-// Kind 6, the game's own, ported from the routine the game keeps at 0x01FF8000 (ITCM; read
-// in its disassembly, checked against its output under an emulator on every compressed
-// resource of the European game). The stream's first word: byte 0 the size N of a table of
+// Kind 6, the game's own format: a clean re-implementation, written from its observed
+// behaviour (the routine the game keeps at 0x01FF8000, ITCM, was read in a disassembler to
+// learn the format) and checked against that routine's output under an emulator on every
+// compressed resource of the European game. The stream's first word: byte 0 the size N of a table of
 // run bytes (4 to 32, a multiple of 4), byte 1 the prefix K, byte 2 the extra offset bits
 // B2 (0 in the game's data), byte 3 the prefix's width B3 (1 to 4 in the game's data); then
 // the table; then codes. A code starts with B3 bits: not K, they are the top of a literal
@@ -603,7 +604,7 @@ bool DecodeSpriteFrame(const std::vector<u8>& tiles, const std::vector<u8>& desc
     return true;
 }
 
-int RomData::SpriteFrames(int desc) const { return sims2wide::SpriteFrames(Resource(desc)); }
+int RomData::SpriteFrames(int desc) const { return sims2hd::SpriteFrames(Resource(desc)); }
 
 bool RomData::Sprite(int tiles, int desc, int pal, int frame, SpriteFrame& out) const
 {

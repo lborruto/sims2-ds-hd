@@ -19,9 +19,10 @@ layout** (CONSOLE, AUTO, FOCUS, SIDE, STACKED)
 
 **What the program printed** in the terminal (copy the text)
 
-**A screenshot** (F12 makes `<rom>-shot.png` beside the ROM) if it helps
+**A screenshot** (F12 saves the window's picture into `screenshots/` in the settings folder; the
+manual says where that is) if it helps
 
-**Version** (the release tag, `v0.1.0`…, or the commit: `git rev-parse --short HEAD`)
+**Version** (the release tag, `v0.2.0`…, `sims2hd --version`, or the commit: `git rev-parse --short HEAD`)
 
 **Your copy of the game:** its region code (`ASJP` for the European one, shown in the game's
 header by most ROM tools), not the file

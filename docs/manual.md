@@ -1,4 +1,4 @@
-# The Sims 2 DS, one screen: the manual
+# Sims 2 DS HD: the manual
 
 Everything the [README](../README.md) leaves out: how to start, every control, the pause menu
 and its settings, the controllers, where your files go, the other layouts and what is still
@@ -22,13 +22,13 @@ You need your own copy of the game, dumped from your cartridge (an `.nds` file).
 game is included here. The European version is the one the HD screens are made for (see
 [Good to know](#good-to-know)).
 
-**Download** from the [releases page](https://github.com/lborruto/sims2-ds-wide/releases):
+**Download** from the [releases page](https://github.com/lborruto/sims2-ds-hd/releases):
 
 | Where you play | Download | Start it |
 |---|---|---|
-| **Windows** (64-bit) | `sims2-ds-wide-…-windows-x86_64.zip` | unzip, double-click `sims2wide.exe`; the first time, *More info > Run anyway* |
-| **Mac** (Apple silicon or Intel, macOS 11+) | `sims2-ds-wide-…-macos-universal.zip` | unzip, move *Sims 2 DS Wide* to Applications; the first time, right click > *Open* |
-| **Linux** (x86_64) | `sims2-ds-wide-…-linux-x86_64.tar.gz` | unpack, run `./sims2wide` (the file picker needs zenity or kdialog) |
+| **Windows** (64-bit) | `sims2-ds-hd-…-windows-x86_64.zip` | unzip, double-click `sims2hd.exe`; the first time, *More info > Run anyway* |
+| **Mac** (Apple silicon or Intel, macOS 11+) | `sims2-ds-hd-…-macos-universal.zip` | unzip, move *Sims 2 DS HD* to Applications; the first time, open it once, then *System Settings > Privacy & Security > Open Anyway* (macOS 14 and earlier: right click > *Open*) |
+| **Linux** (x86_64; a 2024 or newer distribution, glibc 2.39: Ubuntu 24.04, Fedora 40, SteamOS 3.6…) | `sims2-ds-hd-…-linux-x86_64.tar.gz` | unpack, run `./sims2hd` (the file picker needs zenity or kdialog) |
 
 **The launch panel** opens first. *Choose a file* (or drop your `.nds` on the window) starts the
 game. Next time, *Continue* picks up exactly where you quit, with a picture of that moment; your
@@ -37,10 +37,10 @@ is not The Sims 2 is said right there; another region's cartridge plays, but wit
 small screens (said once, until you press A).
 
 <p align="center">
-  <img src="screenshots/launch.webp" alt="The launch panel: Continue with a picture of where you quit, Choose a file, Language and Quit on the left; the controls on the right" width="700">
+  <img src="screenshots/launch.webp" alt="The launch panel under the title Sims 2 DS HD: Continue with a picture of where you quit, Choose a file, Language and Quit on the left; the controls on the right" width="700">
 </p>
 
-A ROM on the command line (`sims2wide path/to/your-sims2.nds`) skips the panel.
+A ROM on the command line (`sims2hd path/to/your-sims2.nds`) skips the panel.
 
 **The game's language** follows your computer's (English, French, German, Italian or Spanish),
 or the one you pick on the launch panel or in the pause menu's Settings. It is the game's own
@@ -53,10 +53,10 @@ speed. The title still waits for you.
 **Or build it** (a few minutes):
 
 ```bash
-git clone --recursive https://github.com/lborruto/sims2-ds-wide.git && cd sims2-ds-wide
+git clone --recursive https://github.com/lborruto/sims2-ds-hd.git && cd sims2-ds-hd
 cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-ninja -C build sims2wide
-./build/sims2wide path/to/your-sims2.nds
+ninja -C build sims2hd
+./build/sims2hd path/to/your-sims2.nds
 ```
 
 You need CMake (3.21 or later), Ninja and a C++20 compiler (Xcode's command line tools on a
@@ -271,7 +271,7 @@ Closing the window asks the same question. Every question opens on No, and B is 
 closes with A or B.
 
 <p align="center">
-  <img src="screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit; the hints say how to resume and select" width="440">
+  <img src="screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit (in the window, Open the saves folder sits above Quit); the hints say how to resume and select" width="440">
   <img src="screenshots/save-states.webp" alt="The save states page: slot 1 with its picture and date, three empty slots, Undo the last load" width="440">
 </p>
 
@@ -287,7 +287,7 @@ defaults (it asks first, on No); window size and place and your keys and buttons
 Everything is kept between runs.
 
 <p align="center">
-  <img src="screenshots/settings.webp" alt="The pause menu's settings on the Display tab: Fullscreen, Interface size, Screen scaling, Game icons, Hide the idle pointer, and Layout under Advanced" width="700">
+  <img src="screenshots/settings.webp" alt="The pause menu's settings on the Graphics tab: Battery saver, 3D resolution at 384p, 60 fps, and Widescreen world under Advanced; the line under the list says what Battery saver does" width="700">
 </p>
 
 **Display**
@@ -351,7 +351,7 @@ pause menu is Start + Back. A controller plugged in says so at the top of the wi
 to pause.
 
 **Steam and the Steam Deck.** In Steam, *Add a Game > Add a Non-Steam Game*, pick
-`sims2wide.exe` (or `sims2wide` on Linux and the Deck) and leave Steam Input on with its default
+`sims2hd.exe` (or `sims2hd` on Linux and the Deck) and leave Steam Input on with its default
 *Gamepad* layout. To skip the launch panel, put the ROM's path in the game's *Properties >
 Launch Options*, in quotes: `"C:\Games\Sims 2.nds"`. The pad shows up as an Xbox controller, so
 the buttons are labelled the Xbox way; the Steam Controller's right pad works as the right stick.
@@ -405,10 +405,13 @@ the camera.
   saves to `saves/` in the settings folder instead, and the pause menu says where. Once the ROM's
   folder can be written again, the newer save goes back beside the ROM by itself.
 - **The settings folder** (also *Open the saves folder* in the pause menu): on Windows
-  `%APPDATA%\sims2-ds-wide`, on a Mac `~/Library/Application Support/sims2-ds-wide`, on Linux
-  `~/.local/share/sims2-ds-wide`. It holds `settings.ini` (delete it to start over), the save
+  `%APPDATA%\sims2-ds-hd`, on a Mac `~/Library/Application Support/sims2-ds-hd`, on Linux
+  `~/.local/share/sims2-ds-hd`. It holds `settings.ini` (delete it to start over), the save
   states and the place kept when you quit (`states/`), your recent games, screenshots
   (`screenshots/`, F12) and `gamecontrollerdb.txt` if you add one.
+  Coming from a version called sims2-ds-wide (0.1.x)? The first time it opens, the program moves
+  that folder's content (`sims2-ds-wide` beside it) over by itself; a file the new folder already
+  has stays in the old one.
 - **A save state holds a copy of the game's memory**: never share one, nor attach one to an issue.
 
 ## Layouts and looks
@@ -431,7 +434,7 @@ draw a wider view, and it does in town, in conversations and in Create-a-Sim, bu
 checked yet something the game never meant to be seen can show at the edges. Switch it off if a
 place looks odd. All three together still run well over full speed on a recent computer.
 
-`sims2wide --help` lists every command line option, including the headless mode used to study the
+`sims2hd --help` lists every command line option, including the headless mode used to study the
 game's screens ([CONTRIBUTING.md](../CONTRIBUTING.md#studying-the-screens)).
 
 ## Good to know
@@ -458,4 +461,4 @@ game's screens ([CONTRIBUTING.md](../CONTRIBUTING.md#studying-the-screens)).
   frames it as best it can and, once for that screen, saves a picture and a save state into a
   `captures` folder in the settings folder (at most 20 a run, 200 in all). If you see odd screens,
   send the `.png` files and what you were doing in an
-  [issue](https://github.com/lborruto/sims2-ds-wide/issues). Never send the `.st` files.
+  [issue](https://github.com/lborruto/sims2-ds-hd/issues). Never send the `.st` files.

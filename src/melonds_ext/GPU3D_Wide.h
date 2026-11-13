@@ -1,5 +1,7 @@
-// sims2wide: a sharper and wider picture of the DS's 3D scene, drawn beside melonDS's own.
+// sims2hd: a sharper and wider picture of the DS's 3D scene, drawn beside melonDS's own.
 //
+// Adapted from Pokémon FullDex (GPLv3), melonDS/src/GPU3D_Wide.h; modified for this project, 2026.
+// https://github.com/mamesj/pokemon-fulldex
 // Ported from Pokemon FullDex (https://github.com/mamesj/pokemon-fulldex, GPLv3), whose
 // melonDS/src/GPU3D_Wide.h this is. The DS draws its 3D scene 256x192 pixels large through a
 // 4:3 view. Here the frame's polygons are submitted a second time, with the horizontal clip

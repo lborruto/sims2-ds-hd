@@ -1,4 +1,4 @@
-// The HD minigame frame (milestone 6): every minigame keeps its playfield, the game's own art (it
+// The HD minigame frame: every minigame keeps its playfield, the game's own art (it
 // is the gameplay), shown big at its shape on the left (the touch screen 3x, the stylus's piece:
 // the mouse plays it as the DS's stylus), the top screen (the world, or the game's own top part:
 // the cards' score board) as a secondary panel at the top right, and around them an HD frame in
@@ -10,14 +10,14 @@
 // questions (and the game's popup over a minigame) are HD boxes over the playfield (BuildGameBox).
 // The hints and the side panels' labels the game has no word for are the port's own, translated
 // into the game's five languages (port/ownwords.*, by RomData::Language).
-// Without the game's strings or RAM: milestone 1's activity layout (console.cpp, the 5 x 7 hints).
+// Without the game's strings or RAM: the framed-screen activity layout (console.cpp, the 5 x 7 hints).
 // With them but a minigame's own part of RAM not reading (its `valid` false): the frame stays
 // (playfield, top screen, title, prompts as with nothing known) and the side panel is left out.
 // The cards' help ("?" on the table, tapped by A on it or the mouse) sets only RAM's `box`: the
 // deck's thumbnail is hidden under it and the prompts stay the table's (its pages are the game's
 // own, in the playfield; not redrawn).
 // Today: Keelhaulin' Cards, the vacuum and the social reaction games (their schemes from
-// milestone 1: activities.*), and the pointing games (milestone 6): Alien Autopsy, the Metal
+// the framed screens: activities.*), and the pointing games: Alien Autopsy, the Metal
 // Detector and the Art Gallery's painting, their pointer drawn over the playfield (a ring, gold
 // while the stylus is down); the timing games (MooGoo Monkey, the Super Drencher, the crime game);
 // the Scratch lottery (the ticket, its prize, each box's scratching, the game's result), the music
@@ -33,7 +33,7 @@
 #include "gamestate.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;
@@ -87,7 +87,7 @@ constexpr int kStrMgTurnOf = 1740, kStrMgMooShuffling = 1741, kStrMgMooDealing =
 constexpr int kStrMgQuitAsk = 2589, kStrMgDrHelp0 = 1661, kStrMgCrHelp0 = 1667, kStrMgMixHelp0 = 1778, kStrMgMixHelpEnd = 1804;
 constexpr int kStrMgMax = kStrMgQuitAsk;   // the largest id used
 
-// The frame's geometry (canvas pixels). The playfield stays milestone 1's kActivityBottomTo (36,68,
+// The frame's geometry (canvas pixels). The playfield stays the framed-screen kActivityBottomTo (36,68,
 // 768 x 576, framed), the secondary panel kActivityTopX/Y (384 wide); the title plate over the
 // playfield's frame; the side panel under the secondary one (and the status bar), to the canvas's
 // foot less a margin, as wide as the secondary panel's frame.

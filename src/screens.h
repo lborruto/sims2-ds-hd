@@ -1,12 +1,12 @@
 // Which screen the game shows on the touch screen, read from the two screens' pixels. Every rule
-// is a flat row or fixed samples measured on save states of the situation (CLAUDE.md, traps),
+// is a flat row or fixed samples measured on save states of the situation (docs/dev-notes.md, traps),
 // never motion. AUTO (scene.*) uses the activity rules; CONSOLE uses the whole answer.
 #pragma once
 #include <string>
 
 #include "common.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // None: no HUD and no known screen (title, Create-a-Sim, loading): both screens matter alike.
 // Unknown: the HUD is up but the touch screen is none of the others (fades, slides, screens not
@@ -16,7 +16,7 @@ namespace sims2wide
 // Loading comes only from RAM and the pixels together (ConsoleScreenOf: a black load).
 enum class Screen { None, Panel, Phone, Dialogue, Popup, Gift, Social, Vacuum, Cards, Catalogue, Build,
                     FrontEnd, CreateASim, SaveSlots, Drencher, Unknown, Loading,
-                    // The minigames with a scheme of their own (milestone 6, from RAM only): the pointing games
+                    // The minigames with a scheme of their own (from RAM only): the pointing games
                     // (GScreen::Autopsy, Detector, ArtGallery) and the timing games (GScreen::MooGoo, Crime; the
                     // Super Drencher is Drencher above, GScreen::Drencher, Pockets > the item in hand); the
                     // Scratch lottery, the music mixer and its save page (GScreen::Scratch, Mixer, MixerSave)

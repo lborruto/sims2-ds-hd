@@ -15,63 +15,55 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   window, widescreen, sharper and at 60 fps, and everything the touch screen did opens big over
   it, redrawn in HD in the game's own colours, icons and words (read from your copy of the game at
   run time, in its five languages; nothing of the game is in the program). It reads what the game
-  shows from its memory (the European version); on another version it falls back to recognising
-  the screens by their pixels, with the game's own small pictures.
+  shows from its memory (the European version); on another version it falls back to the game's
+  own small screens, framed.
 - The status bar in HD (the time, money and Sanity) on a strip the window's whole width, with the
   camera and menu hints at its right; what you just won or paid shows beside the money.
-- Conversations in HD: the speaker's name, the words in large type and their portrait (without the
-  DS's bevelled corners); A "Continue" turns the page.
+- Conversations in HD: the speaker's name, the words in large type and their portrait; A
+  "Continue" turns the page.
 - What A does, in the world: near someone or something, a plate says it ("A Buy", and who or
   what); hold A for the other actions, Left / Right "Other target" for the next thing nearby.
 - The camera on the right stick: left / right turns, up / down zooms (the keyboard's Q / W and S /
   A as before).
 - The whole town in HD with a controller: the menu's five tabs (Interact, Pockets, Goals,
   Relationships, Options), Give Gift, the game's save slots, popups, notes and the phone.
-- The shops and the hotel in HD: the shop's catalogue (buy and sell), Build Rooms, the Registry
-  and a guest's check-in, a room's page and its hints, the music panel and the stat panel (its
-  pages on white paper, as the game drew them, its tabs named).
+- The shops and the hotel in HD: the shop's catalogue (buy and sell; a greyed Pay says why), Build
+  Rooms (it asks before a purchase, the room and the sum in the question), the Registry and a
+  guest's check-in, a room's page and its hints, the music panel and the stat panel.
 - The front end in HD: the intro, the title, the main menu, the game's Settings (volumes, concept
-  art, credits, its four pages named in a tab bar), Load-a-Sim and Create-a-Sim (your Sim big, the
-  name on the game's keyboard or typed on yours, gender, skin, hair, face, clothes, aspiration),
-  drawn with the game's own pictures.
-- Every minigame on the controller, in an HD frame of its own: the game's name, its numbers on
-  dark wells, a bar of hints that follows what the game asks, and its messages and questions
-  redrawn. The Alien Autopsy, the Metal Detector, the painting and the scratch tickets have a
-  pointer on the sticks; Moogoo Monkey a green ring; every minigame can be left with a button,
-  and the Drencher's, the Rat-A-Rang's and the mixer's help open with Start.
-- The vacuum on a controller: A takes the find in the green ring (the one nearest the hand; the
-  right stick moves the hand) to the funnel at the bowl's bottom and lets go when the funnel is
-  ready, so it is kept and the filter never clogs; the D-pad drives (the keyboard still moves the
-  hand with S and the arrows).
-- Alien Autopsy on a controller: with the hand, A takes a freed organ to the tray by itself; with
-  the tweezers, A takes the nearest parasite (an eating one first) to the flask. The laser still
-  cuts with A held.
-- The HD screens' look: the game's small pictures at two sizes, each pixel a whole block of screen
-  pixels at any window size (with *Game icons* on Pixels); round list arrows; greyed buttons
-  where nothing can be done; the focused row a deep blue with white words inside a green ring
-  with a light line; no text under 18 points at 100 %. Every button hint names what it does
-  (Choose, Scroll, Pages, Adjust, Turn, View), and the D-pad chips show arrowheads for the
-  directions they mean.
+  art, credits), Load-a-Sim and Create-a-Sim (your Sim big, the name on the game's keyboard or
+  typed on yours, gender, skin, hair, face, clothes, aspiration; B goes back a page, Start on
+  *Keep this Sim?* keeps it), drawn with the game's own pictures.
+- Every minigame on the controller, in an HD frame of its own: the game's name, its numbers, a bar
+  of hints that follows what the game asks, and its messages and questions redrawn. The Alien
+  Autopsy, the Metal Detector, the painting and the scratch tickets have a pointer on the sticks;
+  Moogoo Monkey a green ring; every minigame can be left with a button, and the Drencher's, the
+  Rat-A-Rang's and the mixer's help open with Start. The vacuum: A takes the find in the green ring
+  to the funnel and lets go when it is ready, so the filter never clogs. The autopsy: A carries a
+  freed organ to the tray, or the nearest parasite to the flask.
+- No dead ends on a controller: the furniture editor, the painting (all 240 colours), the
+  minigames' help and every popup can be used and left without the mouse.
+- The HD screens' look: the game's small pictures in whole blocks of pixels at any window size,
+  no text under 18 points at 100 % (the town's and the hotel's words at 4.5:1 or more on their
+  wells), the focused row in a green ring, round list arrows, greyed buttons where nothing can be done, and a hint on every button
+  saying what it does, with the labels of the controller you hold.
 - A launch panel before the game: Continue (where you quit, with its picture), choose a file or
-  drop a `.nds` on the window, your recent games, the language, kept inside a TV's safe area. A
-  file that is not The Sims 2 is said there; another region's cartridge is said once over the game.
-- Settings: Interface size (Auto, the default, follows your screen's size and the window's; or 60
-  to 150 %), Screen scaling (Sharp, the default, Smooth or Pixels), Game icons (Pixels, the DS's
-  own, the default; or Smooth, redrawn by xBRZ), Hide the idle pointer (on), Battery saver (3D at
-  the DS's own 192p and 30 fps while on), Mute, Pause in the background (on), Sound in fast
-  forward, Stick cursor, Cursor speed (50 to 200 %), Swap the sticks (left-handed), Stick dead zone, Trigger
-  press at, Buzz on connect (on), Microphone (off, the blow key or a real microphone), Fast
-  forward speed (2×, 3×, 4× or as fast as it goes), Fast forward key (Hold or Toggle), Fast boot
-  (on: the boot's splashes, which wait for no button, at full speed). The window comes back where
-  it was; its first size fits the screen.
+  drop a `.nds` on the window, your recent games, the language. A file that is not The Sims 2 is
+  said there; another region's cartridge is said once over the game.
+- Settings: Interface size (Auto, the default, follows your screen, the Steam Deck's own 7" one
+  too; or 60 to 150 %), Screen scaling (Sharp, the default, Smooth or Pixels), Game icons (Pixels,
+  the DS's own, the default; or Smooth), Hide the idle pointer, Battery saver (3D at the DS's 192p
+  and 30 fps), Mute, Pause in the background, Sound in fast forward, Stick cursor and its speed,
+  Swap the sticks, Stick dead zone, Trigger press at, Buzz on connect, Microphone, Fast forward
+  speed and key (Hold or Toggle), Fast boot. The window comes back where it was; its first size
+  fits the screen.
 - The game's language is the DS's own, set from your computer's (or the one you pick): the
   game's text, its keyboards and the HD screens follow it.
 - Every controller, natively or through Steam: XInput, DirectInput, PlayStation, Switch, 8BitDo
   and the rest SDL knows, plugged in or out at any time; SDL_GameControllerDB built in, and your
   own `gamecontrollerdb.txt` in the settings folder. The Steam Controller and the Steam Deck work
   through Steam's default Gamepad layout (added as a non-Steam game); without Steam, the Steam
-  Controller needs `SDL_JOYSTICK_HIDAPI_STEAM=1`. The on-screen hints show the controller you used
-  last, or your keys when you last typed.
+  Controller needs `SDL_JOYSTICK_HIDAPI_STEAM=1`.
 - When the ROM's folder cannot be written, the game saves to the settings folder's `saves/`
   instead, and the pause menu says where; once it can be written again, the newer save goes back
   beside the ROM.
@@ -82,39 +74,30 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - AUTO: Keelhaulin' Cards shows the cards big, and the hotel's vacuum its bowl, clogged or not
   (the blow key, M, clears the filter).
 - Windows: the window is sharp on high-DPI screens.
-- Tools and checks: `--print-game`, `--print-hud`, `--print-town`, `--print-hotel`,
-  `--print-front`, `--print-minigame`, `--print-console`, `--print-shell`, `--measure-menu`,
-  `--measure-string`, `--dump-string`, `--dump-resource`, `--dump-sprite`, `--language`,
-  `--game-language`, `--ui-scale`, `--game-pictures`, `--shell`, `--launch`, `--data-dir`,
-  `--compose-scale`, `--no-romdata`; the check scripts run at most `MAX_SIMS` emulators at once.
 
 ### Changed
 
+- The project is now called sims2-ds-hd; the program is `sims2hd` (Sims 2 DS HD on a Mac); your
+  settings, saves' backups and captures move over by themselves.
+- CONSOLE is the default layout; AUTO, FOCUS, SIDE and STACKED stay in the pause menu's Settings
+  (keys 0 to 4). Sharper 3D, widescreen and 60 fps are on by default; a settings file from 0.1.1
+  that still holds the old defaults is moved to the new ones once, and a file that names a layout
+  is never touched.
+- The pause menu (Start + Back, or Esc) is in HD and five languages. Its Settings have five tabs
+  (Display, Graphics, Sound, Controls, Game) changed with LB / RB, the rarely needed rows under
+  *Advanced*, a line saying what each row does, and Y to put a tab back to its defaults. Controls
+  shows what each button does on your device, and Keys and buttons changes any of them. Four save
+  states with their picture and date: loading one asks first and can be undone, even after a
+  restart. Change game, Open the saves folder, and Quit, which asks first and keeps your place.
 - Settings > Graphics > 3D resolution goes by familiar names instead of a factor: DS (192p),
   384p, 576p, 720p, and now also 1080p and 1440p for a fast computer.
-- The pause menu (Start + Back, or Esc, which also resumes from any of its pages) is in HD and
-  five languages, with the buttons of the controller you hold. Its Settings have five tabs
-  (Display, Graphics, Sound, Controls, Game) changed with LB / RB (Q / W), the rarely needed rows
-  under *Advanced*, a line saying what each row does, `‹ ›` on what Left / Right (or A) adjust,
-  and Y to put a tab back to its defaults. Controls shows what each button does on your device,
-  and Keys and buttons changes any of them (A to change one, X to clear it, Y to set them all in
-  turn, the last row to reset them; the pause menu keeps a key and can have one button of its
-  own). Four save states with their picture and date: loading one asks first and can be undone
-  (asked too), even after a restart. Change game, Open the saves folder, and Quit, which asks
-  first and keeps your place. Every question opens on No and B says No; a message closes with A
-  or B. Lists stop at their ends.
-- CONSOLE is the default layout; AUTO, FOCUS, SIDE and STACKED stay in the pause menu's Settings
-  (keys 0 to 4). Sharper 3D, widescreen and 60 fps are on by default; a settings file from before
-  CONSOLE that still holds the old defaults is moved to the new ones once, and a file that names a
-  layout is never touched.
 - The pad's Back button opens the menu, and Select moved to the left stick's click. The Guide /
   PS / Home button no longer opens the pause menu (it belongs to Steam, the Deck and the system):
   Start + Back does.
 - LB / RB switch the menus' tabs and pages; in town they no longer turn the camera (the right stick
   does), unless you give L / R buttons of your own.
 - With several controllers, the one used last plays (before, every pad's buttons counted at once).
-- The game's questions (a minigame's, Create-a-Sim's) open on No: two quick presses of A never say
-  yes. In Create-a-Sim's last page, the first B only moves to the cross.
+- The game's questions open on No: two quick presses of A never say yes.
 - The quick save state (F5 / F7) moved from beside the ROM to the settings folder; F12 saves the
   window as you see it, at full resolution, named by the date and time, in `screenshots/` there.
 - The DS buttons' keys follow their position on any keyboard layout (AZERTY: B on W, Y on Q, L on
@@ -123,107 +106,22 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - The game pauses and goes quiet when its window is not in front (Settings > Pause in the
   background). The Steam overlay does not pause it.
 - The volume moves by 5 %.
-- Town and hotel screens: every word reads at 4.5:1 or more (what you just won or paid on a dark
-  pill beside the money, Build Rooms' permits you cannot pay red on a dark plate, places, guests
-  and slot details in white). The D-pad's hint says "Choose" wherever it moves the highlight, and
-  every list that scrolls has its up and down arrows at its right (Goals, Relationships, the
-  phone, Build Rooms, music). B says "Back" where it goes up a level (the phone's pages, the stat
-  panel's) and "Close" where it leaves. The camera hint says "Camera" (the stick turns and zooms).
-- Build Rooms asks before a purchase in a box like every other question, the room and the sum in
-  it, on No first; with nothing left to build it says so.
-- Pockets: a tool not found yet and a collection at 0 look the same, faint. The world's prompt
-  keeps its width while you choose an action with A held.
-- The README is short and for players; the full manual is `docs/manual.md`.
-- The cards', the social game's and the song save page's keyboard focus is the menus' ring too
-  (green with a white line inside), as in the other minigames.
-- The pictures in the README and the manual are taken again with today's look.
 
 ### Fixed
 
-- A settings file with a 3D resolution off the row's steps showed it, and Right then went
-  elsewhere: it is now read as the step at or below it.
-- The A plate no longer disappears after you close the menu on Pockets, Goals, Relationships or
-  Options: the menu now always hands the world back on Interact, so the plate shows again and a
-  single A uses what you stand at (before, the first A only switched tabs, with no plate meanwhile).
-- No plate for someone or something walking out of reach while the game no longer offers its
-  actions (A did nothing there).
-- The A plate in the world also shows for the third kind of target the game lets A use (one it
-  gives no name: the plate says the verb alone), and something of that kind nearby no longer hides
-  the plate of the object you stand at.
-- Create-a-Sim: changing page no longer flashes the last page's pictures in the new page's cells
-  (letters in the hair styles, text over the clothes); they stay empty until the game has drawn them.
-- Create-a-Sim: the aspirations' pictures fade out with the screen instead of staying bright.
-- The HD menus no longer lag on a 4K screen: a tab change takes about 10 ms instead of 150, a
-  focus move about 3 instead of 38.
-- The HD screens never flash the DS's own pictures while the game swaps its screens (tabs, the
-  phone, Give Gift, the Registry, loading a slot).
-- No dead ends on a controller: the vacuum, the furniture editor, the painting (all 240 colours),
-  the minigames' help and every popup can be left or used without the mouse.
-- Presses on sliders (the volumes) all count, however fast; the focus no longer flickers onto the
-  wrong item when a popup comes or goes; the save slots and the phone come back to the menu where
-  you were; the phone's B goes back one page instead of hanging up.
-- The intro's last screen took A or Start only about three times in four: the touch is now held
-  long enough for the game to see it.
-- A quick click or a trackpad tap on the touch screen was often lost: every press now holds the
-  stylus down for three frames.
-- In the casino the screens swapped size now and then (AUTO): a guessed rule is gone.
 - The game ran twice too fast on 120 Hz screens: the window keeps the DS's own pace, 59.83
   frames a second.
+- A quick click or a trackpad tap on the touch screen was often lost: every press now holds the
+  stylus down for three frames.
 - A mouse drag that started on the touch screen no longer lifts the stylus when it overshoots
   the screen's edge.
-- AUTO no longer flashes the touch screen big at the hotel's doors.
+- AUTO: in the casino the screens no longer swap size now and then, and the touch screen no longer
+  flashes big at the hotel's doors.
 - Widescreen: no more thin cracks of light across the curtain in Create-a-Sim.
 - 60 fps: a Sim no longer tears apart for a frame when they start, stop or turn; a model moves
   in one piece, or, the rare time it cannot be followed, takes that one step at 30 fps.
 - A failed state load puts back the game as it was a moment before; save states and the place
   kept on quitting are written safely (a failed write keeps the old one).
-- Conversations keep the status strip under them (no black band below the world). The
-  Registry's locked rooms lose the DS's light rim around their key; room info's hint box dims the
-  portrait instead of emptying it; the focused volume row in Options is lit like every focused row.
-<!-- The front end, Create-a-Sim, the shop and the minigames (ux audit, task 6). -->
-- MooGoo Monkey: before the players are named, the side panel says "Player 1-3" (not the game's
-  copyright line).
-- The scratch lottery's messages no longer carry a stale "Loading" title.
-- The vacuum's side panel shows the money of this session, as the bowl does (it said §0 until
-  the vacuum was put away).
-- German music mixer: X says "Abspielen" (it said START, beside the help's own Start chip).
-- Create-a-Sim: B goes back a page (from the name page, to Keep this Sim?'s cross), Start on Keep
-  this Sim? keeps the Sim, and every page says what A, B and Start do; X says what it changes on
-  the keyboard. The hair colours, styles, faces and skin figures sit on the HD cells without the
-  DS's frames and green rings; the scroll arrows are the menus' own; no highlight on an empty
-  cell while a page comes in.
-- The title and the boot's last splash say what A / START do (Continue), the title's within the
-  screen's safe area; DS Wireless's note sits on a well; Load-a-Sim's places and times are white;
-  the credits scroll on a dark well, their headings readable; the German Settings tabs have room.
-- The shop: the items no longer touch their cells' rims; the D-pad's hint says Choose; a greyed
-  Pay says why (not enough money, no place left, not taken here).
-- The minigames: the hints' buttons one size everywhere and large enough to read (the help's
-  Start, and the painting's Back, moved up beside the title); the focus is the menus' green ring
-  everywhere; a help text open in a loaded save state is redrawn in HD; the cards no longer show
-  the DS's score screen (the side panel says it); the save page shows no hints before it is up;
-  the vacuum's hint stays "Taking it to the funnel" until the find is kept; the Metal Detector says
-  what it found after the card closes, and "None" for no signal; the painting's question stays in
-  one place; Walk and Point hints name every stick that does it; the autopsy's quit says the
-  game's Quit; Moogoo's Start (quit) is in the manual; the social answers sit on rows.
-- The pause menu: a Menu key moved to Enter, Space or the DS's A key resumes the game again
-  instead of choosing the row.
-- The front end and Create-a-Sim: the picture and the panel sit as far from the screen's left and
-  right edges as from each other (they were 6 pixels off); their hints end where every other
-  panel's do.
-- A Nintendo controller's + and - buttons in the hints are round with a clear sign, like its
-  other buttons (the - read as a dot).
-- The pause menu's Settings: the Advanced heading and the note under the list start where the rows'
-  names do (three edges 12 pixels apart before).
-- The world's plate: "Hold for more" sits on the same line as the action's word (it was 3 pixels
-  higher).
-- The main menu's hints stay inside the panel in German ("Einen Sim erstellen" pushed them past
-  its left edge).
-- Create-a-Sim's hints never cut A's word: in Italian and Spanish the hair and name pages showed
-  "…" or "E…"; the row tightens its gaps, then its size, until the words fit.
-- At the largest interface sizes, conversations, popups and the world's plate stop 16 pixels short
-  of the screen's edges (a conversation ran to 4).
-- On the Steam Deck the automatic interface size reads the Deck's own 7" screen (130 %) rather
-  than whatever size the system reports for it.
 
 ## [0.1.1] - 2026-11-04
 
@@ -274,3 +172,8 @@ First release: The Sims 2 (DS) in one window on Windows, Mac and Linux.
 
 Tagged, never released: the release workflow could not check the tag against `main` in a
 private repository (fixed in 0.1.1).
+
+[Unreleased]: https://github.com/lborruto/sims2-ds-hd/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/lborruto/sims2-ds-hd/compare/v0.1.1...v0.2.0
+[0.1.1]: https://github.com/lborruto/sims2-ds-hd/releases/tag/v0.1.1
+[0.1.0]: https://github.com/lborruto/sims2-ds-hd/releases/tag/v0.1.0

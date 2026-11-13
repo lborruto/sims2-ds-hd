@@ -13,7 +13,7 @@
 extern const unsigned char nunito_bold[];
 extern const unsigned char nunito_extrabold[];
 
-namespace sims2wide::ui
+namespace sims2hd::ui
 {
 namespace
 {

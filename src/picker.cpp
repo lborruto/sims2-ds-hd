@@ -5,9 +5,10 @@
 #include <cstdio>
 #include <fstream>
 
+#include "prefdir.h"
 #include "tinyfiledialogs.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // A message for whoever started the program: on the terminal always, and in a dialog box too
 // when there may be no terminal (started by a double click). SDL's message box, not
@@ -16,17 +17,14 @@ namespace sims2wide
 void Tell(bool dialog, const std::string& msg)
 {
     fprintf(stderr, "%s\n", msg.c_str());
-    if (dialog) SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "The Sims 2 DS, one screen", msg.c_str(), nullptr);
+    if (dialog) SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Sims 2 DS HD", msg.c_str(), nullptr);
 }
 
 // The ROM chosen last time, kept in the per-user settings folder (SDL's pref path).
 static std::string LastRomFile()
 {
-    char* dir = SDL_GetPrefPath("", "sims2-ds-wide");
-    if (!dir) return "";
-    std::string f = std::string(dir) + "last-rom.txt";
-    SDL_free(dir);
-    return f;
+    const std::string dir = PrefDir();
+    return dir.empty() ? "" : dir + "last-rom.txt";
 }
 
 // Whether a path may go to the file picker. tinyfiledialogs runs osascript, zenity or kdialog

@@ -2,10 +2,11 @@
 name: Release
 
 # A tag vX.Y.Z on main runs CI on the tagged commit, builds the program for Linux x86_64, macOS
-# (Sims 2 DS Wide.app, Apple silicon and Intel in one) and Windows x86_64, attests the archives'
+# (Sims 2 DS HD.app, Apple silicon and Intel in one) and Windows x86_64, attests the archives'
 # build provenance, then creates the GitHub release with that version's section of CHANGELOG.md as
 # notes and the three archives attached. The version in CMakeLists.txt must be the tag's. The
-# archives hold the program, README.md, LICENSE, the embedded font's licence (OFL-Nunito.txt) and
+# archives hold the program, README.md, LICENSE, THIRD-PARTY.md (every component's licence and the
+# notices they ask for), the embedded font's licence (OFL-Nunito.txt) and
 # the embedded controller mappings' (LICENSE-SDL_GameControllerDB.txt, zlib); xBRZ (src/thirdparty/xbrz,
 # the game pictures' scaler) is GPLv3 like the program: LICENSE covers it, no file of its own:
 # never a ROM, a save or anything from the game.
@@ -73,7 +74,7 @@ jobs:
           persist-credentials: false
       - name: CMakeLists.txt version is the tag's
         run: |
-          version="$(sed -n 's/^project(sims2wide VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
+          version="$(sed -n 's/^project(sims2hd VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
           if [ "v$version" != "$TAG" ]; then
             echo "::error::CMakeLists.txt says $version but the tag is $TAG; bump the version before tagging"
             exit 1
@@ -138,32 +139,33 @@ jobs:
       - name: Configure
         run: |
           if [ "$RUNNER_OS" = macOS ]; then
-            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSIMS2WIDE_MAC_APP=ON \
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSIMS2HD_MAC_APP=ON \
               "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
           else
             cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           fi
-      - run: ninja -C build sims2wide
+      - run: ninja -C build sims2hd
       - name: Pack
         run: |
           version="${TAG#v}"
-          name="sims2-ds-wide-${version}-${PLATFORM}"
+          name="sims2-ds-hd-${version}-${PLATFORM}"
           out="$RUNNER_TEMP/dist"
           mkdir -p "$out/$name"
-          cp README.md LICENSE "$out/$name/"
+          cp README.md LICENSE THIRD-PARTY.md "$out/$name/"
           cp assets/fonts/OFL.txt "$out/$name/OFL-Nunito.txt"
           cp assets/controllers/LICENSE.txt "$out/$name/LICENSE-SDL_GameControllerDB.txt"
           if [ "$RUNNER_OS" = Linux ]; then
-            cp build/sims2wide "$out/$name/"
+            cp build/sims2hd "$out/$name/"
             cd "$out"
             tar -czf "$name.tar.gz" "$name"
             sha256sum "$name.tar.gz" | tee "$name.sha256"
           else
             # Not notarised (that needs a paid Apple developer account): an ad-hoc signature,
-            # which Apple silicon needs to run it at all. First start: right click > Open.
-            cp -R "build/Sims 2 DS Wide.app" "$out/$name/"
-            codesign --force --deep -s - "$out/$name/Sims 2 DS Wide.app"
-            codesign -v "$out/$name/Sims 2 DS Wide.app"
+            # which Apple silicon needs to run it at all. First start: open it once, then System
+            # Settings > Privacy & Security > Open Anyway (macOS 14 and earlier: right click > Open).
+            cp -R "build/Sims 2 DS HD.app" "$out/$name/"
+            codesign --force --deep -s - "$out/$name/Sims 2 DS HD.app"
+            codesign -v "$out/$name/Sims 2 DS HD.app"
             cd "$out"
             ditto -c -k --keepParent "$name" "$name.zip"
             shasum -a 256 "$name.zip" | tee "$name.sha256"
@@ -203,14 +205,14 @@ jobs:
             mingw-w64-ucrt-x86_64-ninja
             zip
       - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-      - run: ninja -C build sims2wide
+      - run: ninja -C build sims2hd
       - name: Pack
         run: |
           version="${TAG#v}"
-          name="sims2-ds-wide-${version}-windows-x86_64"
+          name="sims2-ds-hd-${version}-windows-x86_64"
           out="$(cygpath -u "$RUNNER_TEMP")/dist"
           mkdir -p "$out/$name"
-          cp build/sims2wide.exe README.md LICENSE "$out/$name/"
+          cp build/sims2hd.exe README.md LICENSE THIRD-PARTY.md "$out/$name/"
           cp assets/fonts/OFL.txt "$out/$name/OFL-Nunito.txt"
           cp assets/controllers/LICENSE.txt "$out/$name/LICENSE-SDL_GameControllerDB.txt"
           cd "$out"
@@ -248,8 +250,8 @@ jobs:
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2 (2026-08-06)
         with:
           subject-path: |
-            dist/sims2-ds-wide-*.tar.gz
-            dist/sims2-ds-wide-*.zip
+            dist/sims2-ds-hd-*.tar.gz
+            dist/sims2-ds-hd-*.zip
 
   release:
     name: GitHub release
@@ -289,10 +291,15 @@ jobs:
               echo "Check an archive's build provenance with"
               echo "\`gh attestation verify <archive> --repo $GITHUB_REPOSITORY\`."
             fi
-            echo "The programs are not signed by Apple or Microsoft: the first time, right click >"
-            echo "Open on a Mac, and More info > Run anyway on Windows."
+            echo "The programs are not signed by Apple or Microsoft. The first time on a Mac, open it once,"
+            echo "then System Settings > Privacy & Security > Open Anyway (macOS 14 and earlier: right"
+            echo "click > Open); on Windows, More info > Run anyway. Linux: a 2024 or newer distribution"
+            echo "(glibc 2.39: Ubuntu 24.04, Fedora 40, SteamOS 3.6...)."
+            echo
+            echo "Source: this tag, \`git clone --recursive\` (GitHub's source archives lack the melonDS"
+            echo "submodule)."
           } >>notes/notes.md
           set --
           case "$TAG" in *-*) set -- --prerelease ;; esac
-          gh release create "$TAG" dist/sims2-ds-wide-*.tar.gz dist/sims2-ds-wide-*.zip \
+          gh release create "$TAG" dist/sims2-ds-hd-*.tar.gz dist/sims2-ds-hd-*.zip \
             --verify-tag --title "$TAG" --notes-file notes/notes.md "$@"

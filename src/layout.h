@@ -4,7 +4,7 @@
 #pragma once
 #include "common.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // Console: one 16:9 screen built per recognised bottom screen (console.h); Place() gives it
 // FOCUS's placement, which nothing draws.

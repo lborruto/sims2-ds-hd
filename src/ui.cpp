@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cstring>
 
-namespace sims2wide
+namespace sims2hd
 {
 const u8* Glyph(char c)
 {

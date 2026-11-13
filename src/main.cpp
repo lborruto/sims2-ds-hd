@@ -1,4 +1,4 @@
-// sims2wide: The Sims 2 (DS, 2005) in one window.
+// sims2hd: The Sims 2 (DS, 2005) in one window.
 //
 // The melonDS core runs the game; this frontend shows the two DS screens in one window with a
 // choice of layouts, and has a headless mode (input scripts, shots, save states) to study which
@@ -37,6 +37,7 @@
 #include "looks.h"
 #include "mic.h"
 #include "picker.h"
+#include "prefdir.h"
 #include "romdata.h"
 #include "ui/font.h"
 #include "port/front.h"
@@ -68,7 +69,7 @@
 #include "video.h"
 #include "port/ownwords.h"
 
-using namespace sims2wide;
+using namespace sims2hd;
 using melonDS::NDS;
 
 // A whole number from 0 to max, the whole text (anything else is a usage error, not a 0).
@@ -82,15 +83,15 @@ static bool WholeNumber(const std::string& v, long max, long& out)
 static void Usage()
 {
     fprintf(stderr,
-        "sims2wide " SIMS2WIDE_VERSION "\n"
-        "usage: sims2wide [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
+        "sims2hd " SIMS2HD_VERSION "\n"
+        "usage: sims2hd [rom.nds] [options]   (no ROM: a file picker asks for one)\n"
         "  --layout console|auto|focus|side|stacked  window layout (default console)\n"
         "  --compose                     shots show the window picture (the layout), not the two screens\n"
         "  --compose-scale N             --compose pictures N times the canvas (1 to 4; the UI drawn at that size)\n"
         "  --ui-demo                     (checks) the HD interface kit's demonstration over the picture\n"
         "  --ui-scale N                  the HD interface's size, 60 to 150 percent by 5 (default: the settings', Auto; 100 headless)\n"
         "  --game-pictures smooth|pixel  the game's icons and portraits in the HD interface: the pixel-art scaler or\n"
-        "                                nearest pixels (default: the settings', smooth; pixel headless)\n"
+        "                                nearest pixels (default: the settings', pixel; pixel headless)\n"
         "  --res3d N                     3D drawn N times sharper, 1 to 12 (1 = the DS's 192 lines, 4 ~ 720p, 6 ~ 1080p,\n"
         "                                8 ~ 1440p, 12: 2304 lines, slow; default 2 in the window, 1 headless)\n"
         "  --wide                        widescreen 16:9 world\n"
@@ -110,7 +111,7 @@ static void Usage()
         "  --print-minigame              print the minigame the bottom screen shows (Alien Autopsy, Metal Detector, MooGoo Monkey, scratch lottery, Super Drencher, Crime, Music Mixer and its save menu, Art Gallery), read from RAM, when it changes\n"
         "  --print-vacuum                print the vacuum's bowl (its things, the one held, the funnel's keep animation), read from RAM, when it changes\n"
         "  --print-front                 print the front end (title, Settings, Load-a-Sim, Create-a-Sim, boot screens, video), read from RAM, when it changes\n"
-        "  --print-console               print CONSOLE's composition (which branch; milestone 1's marked m1, a held picture) when it changes, and the counts at the end\n"
+        "  --print-console               print CONSOLE's composition (which branch, the framed screens' ending in -m1; a held picture) when it changes, and the counts at the end\n"
         "  --print-words                 print the words CONSOLE's picture shows (its texts, chips' labels) when they change\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
@@ -138,7 +139,7 @@ static void Usage()
         "                                words follow it); default: the settings' (automatic: the computer's) in the\n"
         "                                window, the built-in firmware's (English) headless\n"
         "  --fast-boot                   (checks) the boot's splashes at full speed, as the window does (logged)\n"
-        "  --no-romdata                  (checks) do not read the game's text: milestone 1's CONSOLE\n"
+        "  --no-romdata                  (checks) do not read the game's text: CONSOLE shows the framed screens\n"
         "  --launch                      the launch panel first (shown anyway in the window without a ROM)\n"
         "  --data-dir DIR                where the save states, the suspend state and the recent ROMs go (default: the\n"
         "                                settings folder in the window; none headless unless given)\n"
@@ -207,7 +208,7 @@ int main(int argc, char** argv)
         std::string a = argv[i];
         auto next = [&]() -> std::string { if (i + 1 >= argc) { Usage(); exit(1); } return argv[++i]; };
         if (a == "--help" || a == "-h") { Usage(); return 0; }
-        else if (a == "--version") { printf("sims2wide %s\n", SIMS2WIDE_VERSION); return 0; }
+        else if (a == "--version") { printf("sims2hd %s\n", SIMS2HD_VERSION); return 0; }
         else if (a == "--headless") headless = true;
         else if (a == "--compose") compose = true;
         else if (a == "--compose-scale") composeScale = std::clamp(atoi(next().c_str()), 1, 4);
@@ -335,7 +336,10 @@ int main(int argc, char** argv)
     app.consoleFocus = consoleFocus;
     app.consolePinned = consolePinned;
     app.uiDemo = uiDemo;
-    // The settings file (not headless: those runs stay the same on every machine).
+    // The settings file (not headless: those runs stay the same on every machine). The per-user
+    // folder of the project's old name moves over on its first use (prefdir.h), in the window
+    // alone: never headless, nor in a tool run (--measure-menu and the like, which the checks make).
+    if (window) AllowPrefMove();
     const std::string settingsPath = headless ? "" : Settings::DefaultPath();
     if (!settingsPath.empty() && app.settings.Load(settingsPath)) fprintf(stderr, "settings: %s\n", settingsPath.c_str());
     // The HD interface's size and the game's pictures (ui/kit.h): headless 100 % and Pixel unless the
@@ -415,7 +419,7 @@ int main(int argc, char** argv)
     if (!inputPath.empty()) script = LoadScript(inputPath);
     bool winShots = false;
     for (const InputEvent& e : script) winShots |= e.winShot;
-    if (!shotAt.empty() || shotEvery || winShots) { std::string cmd = "mkdir -p '" + shotDir + "'"; (void)system(cmd.c_str()); }
+    if (!shotAt.empty() || shotEvery || winShots) { std::error_code ec; std::filesystem::create_directories(std::filesystem::path(std::u8string(shotDir.begin(), shotDir.end())), ec); }
 
     // The launch panel, before the DS starts: in the window without a ROM (a double click on
     // the app), with a ROM that is not The Sims 2, or with --launch (headless too, from the
@@ -761,7 +765,7 @@ relaunch:
     }
     // The game's words for the HD status bar and conversations, once, in the game's language
     // (--language: another, a layout check only): a ROM whose data does not read keeps
-    // milestone 1's CONSOLE (the game's own HUD in the world, its own dialogue box). The
+    // CONSOLE's framed screens (the game's own HUD in the world, its own dialogue box). The
     // archive stays open: the HD menus' icons are decoded from it as they are needed.
     if (!noRomData)
     {
@@ -1770,7 +1774,7 @@ relaunch:
     if (app.settings.interpolate60) fprintf(stderr, "looks: %u in-between frames\n", melonDS::Looks3D.InterpolatedFrames);
     if (!stateSave.empty()) fprintf(stderr, "state save %s: %s\n", stateSave.c_str(), SaveState(nds, stateSave) ? "ok" : "failed");
     if (printConsole)
-        fprintf(stderr, "console: %ld frames, %ld milestone-1 compositions, %ld held, %ld milestone-1 shown\n", app.consoleHold.frames,
+        fprintf(stderr, "console: %ld frames, %ld framed-screen compositions, %ld held, %ld framed-screen shown\n", app.consoleHold.frames,
                 app.consoleHold.fresh1, app.consoleHold.held, app.consoleHold.shown1);
     if (headless)
     {

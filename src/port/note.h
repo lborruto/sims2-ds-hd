@@ -2,12 +2,12 @@
 // in HD: a parchment panel over the dimmed world with the note's text (its string id S+0x2C,
 // GameState::town.note; @1 the player's name for the three letters that carry it, as the game)
 // centred as the game centres it, and the game's blue X (sprite 7683, 2x). A and B close it:
-// the game closes a note on its own A (research m3 §4.2), so both press the DS's A. The mouse:
+// the game closes a note on its own A (docs/research/ram-map.md), so both press the DS's A. The mouse:
 // the X maps onto the game's close button (234,171, its CActorStylusPushbutton's place: from
 // the code only). The game's parchment backgrounds (4161 / 4162) are BG images the port does
 // not decode: the panel is drawn in the parchment's colours instead.
 //
-// No save state reaches a note (the research found it in the code only): the view is checked on
+// No save state reaches a note (it was found in the game's code only): the view is checked on
 // made-up states (layout_test, navigator_test) and its words by --measure-menu.
 #pragma once
 #include "compose.h"
@@ -15,7 +15,7 @@
 #include "port/menuview.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;

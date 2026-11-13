@@ -1,5 +1,5 @@
-// The front end's Settings and Load-a-Sim in HD (milestone 5), driven by the controller
-// (GameState::front, research m5-front-end §2, §3).
+// The front end's Settings and Load-a-Sim in HD, driven by the controller
+// (GameState::front).
 //
 // Settings (COptionsMenu in the bottom slot, the title's backdrop on the top): the top screen at
 // the left as the main menu shows it (a concept art the game puts there shows large), a panel at
@@ -26,8 +26,8 @@
 // money 28, the place 67 + place, the time the slot was saved as the game prints it: its format
 // string 2432 with the decoded header time; "No Data" 11 for an empty slot). A on a used slot
 // taps its tick (231, 66 / 112 / 158): the game loads it (its "Loading" popup, port/popup.h, then
-// the town); on DS Wireless the tick opens the game's wireless lobby (out of scope: milestone 1's
-// picture, its X back). Empty slots are drawn, never focused (the game shows no tick there). B
+// the town); on DS Wireless the tick opens the game's wireless lobby (out of scope: the framed
+// screen, its X back). Empty slots are drawn, never focused (the game shows no tick there). B
 // taps the game's X (231,22): the title. Never replayed (MenuView::replay false): a late A loads.
 //
 // Mouse: the tabs, the concept cells, the slider's track and the slots' rows map onto the game's
@@ -41,7 +41,7 @@
 #include "port/menuview.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;

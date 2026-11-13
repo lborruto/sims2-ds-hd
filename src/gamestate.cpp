@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <cstdio>
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -43,7 +43,7 @@ struct EUTable
         u32 saveUsed, saveCurrent, saveHeader, saveHeaderSize;              // absolute: u8[3], s32, headers
         u32 saveMoney, saveTime, saveName, saveNameMax, savePlace;
     } town;
-    // The menus' lists (§1-§4 of the milestone-3 research). Tab objects hang off S; each is checked by its vtable.
+    // The menus' lists (docs/research/ram-map.md). Tab objects hang off S; each is checked by its vtable.
     struct Menus
     {
         u32 tabInteract, tabGoals, bigPortrait;             // from S (the pockets and relationships tabs: pocketsObj, relObj)
@@ -80,7 +80,7 @@ struct EUTable
         u32 noteVt, noteOverlay, noteText, noteNameIds[3];
         u32 stringMax;                                       // string ids stay below the table's count (3127 in the EU ROM)
     } menus;
-    // Milestone 3's popups' boxes and the phone's pages (research m3-town §3.4, §4.1).
+    // Popups' boxes and the phone's pages (docs/research/ram-map.md).
     struct
     {
         u32 popBoxY, popBoxW, popBoxTiles;                       // from P
@@ -90,7 +90,7 @@ struct EUTable
         u32 guests, guestStride, guestSim, guestN, simState, simPlace, guestState, awayPlace, noSim;
         u32 tones, toneStride, toneNamed, toneN;                 // from G
     } x;
-    // Milestone 4: the hotel and the shops (research m4-hotel-shops §1-§7).
+    // The hotel and the shops (docs/research/ram-map.md).
     struct
     {
         // The hotel block, from G
@@ -123,7 +123,7 @@ struct EUTable
         u32 stMaxPage, stMaxTransition, stMaxLevel, stMaxPoints;   // stat panel bounds (the aspiration level 3 is the top)
         u32 buildTimers;                                     // from G: u32 per place, the time its building ends (vs `clock`; noCheckOut: never set)
     } hotel;
-    // The minigames (milestone 6; docs/research/ram-map.md, "The minigames"): every screen's (overlay, vtable) and the offsets from S.
+    // The minigames (docs/research/ram-map.md, "The minigames"): every screen's (overlay, vtable) and the offsets from S.
     struct Minigames
     {
         OvScreen screens[11];                                 // ov kAnyOverlay: the class has no overlay of its own (its vtable says it)
@@ -161,7 +161,7 @@ struct EUTable
         // +0x19 u8 held, +0x1A u16 kind}; u16 the slot held (vcNone none); u8 the keep animation's two flags
         u32 vcItems, vcItemStride, vcSpriteX, vcSpriteY, vcSpriteSize, vcScale, vcActive, vcHeld, vcType, vcHeldSlot, vcNone, vcKeepA, vcKeepB;
     } mg;
-    // Milestone 5: the front end (research m5-front-end §0-§5). T = *(P+topObj) the top slot's object, S the bottom's.
+    // The front end (docs/research/ram-map.md). T = *(P+topObj) the top slot's object, S the bottom's.
     struct
     {
         u32 topObj;                                          // from P
@@ -972,7 +972,7 @@ NoteState ReadNote(const Reader& m, u32 S)
     return v;
 }
 
-// ---- The hotel and the shops (milestone 4). Each part reads apart from the others, from G or from its screen object.
+// ---- The hotel and the shops. Each part reads apart from the others, from G or from its screen object.
 bool Bits(const Reader& m, u32 a, u64& out)
 {
     u32 lo, hi;
@@ -1310,7 +1310,7 @@ StatState ReadStat(const Reader& m, u32 S, const HotelState& hotel)
     return v;
 }
 
-// ---- The minigames (milestone 6). Each reader is given the screen object S (vtable already checked)
+// ---- The minigames. Each reader is given the screen object S (vtable already checked)
 // and answers an invalid part, never a partial one, when a field is out of its range.
 int Fix12(u32 raw) { return (int)raw >> 12; }   // a 20.12 fixed value, whole units
 // The game's raw text for a log line: printable ASCII as it is, the rest \xNN.
@@ -1376,7 +1376,7 @@ DetectorState ReadDetector(const Reader& m, u32 S)
         !m.R32(G + q.mdFinds, finds))
         return v;
     // (The finds' count is the place's table: a dig with none in it, the casino's empty table in the
-    // research's states, leaves it at -1. It says nothing of the screen: 0 then, the part still read.)
+    // save states, leaves it at -1. It says nothing of the screen: 0 then, the part still read.)
     if (finds == 0xFFFFFFFFu) finds = 0;
     else if (finds > 150) return v;
     const int charge = m.S32(S + q.mdCharge);
@@ -1698,7 +1698,7 @@ void ReadMinigame(const Reader& m, u32 S, u32 vt, GameState& g)
     }
 }
 
-// ---- The front end (milestone 5). Heap objects: re-read every frame, vtable checked; each part reads apart from the others.
+// ---- The front end. Heap objects: re-read every frame, vtable checked; each part reads apart from the others.
 TitleState ReadTitle(const Reader& m, u32 T)
 {
     const auto& f = kEU.front;
@@ -2073,7 +2073,7 @@ GameState ReadGameState(RamView ram)
     case GScreen::Cards: g.selection = m.S32(S + kEU.cardsSel); break;
     default: break;
     }
-    // The hotel's own screens have no GScreen (the milestone-1 layouts do not know them): their vtable and overlay say it.
+    // The hotel's own screens have no GScreen (the framed-screen layouts do not know them): their vtable and overlay say it.
     {
         const auto& h = kEU.hotel;
         const int ov = g.overlay;

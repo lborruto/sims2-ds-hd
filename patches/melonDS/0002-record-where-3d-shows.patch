@@ -6,7 +6,7 @@ index 2f8afcb..fbb21db 100644
  
  namespace melonDS
  {
-+GPU2DLooks Looks2D; // sims2wide
++GPU2DLooks Looks2D; // sims2hd
 +
  namespace GPU2D
  {
@@ -15,7 +15,7 @@ index 2f8afcb..fbb21db 100644
      if (line == 0 && CurUnit->CaptureCnt & (1 << 31) && !forceblank)
          CurUnit->CaptureLatch = true;
  
-+    // sims2wide: no 3D on this line unless DrawScanline_BGOBJ finds some (GPU2DLooks).
++    // sims2hd: no 3D on this line unless DrawScanline_BGOBJ finds some (GPU2DLooks).
 +    if (CurUnit->Num == 0 && line < 192 && Looks2D.Record3D)
 +    {
 +        memset(&Looks2D.Pixel3D[line * 256], 0, 256);
@@ -31,7 +31,7 @@ index 2f8afcb..fbb21db 100644
      // always render regular graphics
      DrawScanline_BGOBJ(line);
      CurUnit->UpdateMosaicCounters(line);
-+    // sims2wide: the 3D layer is only shown in the regular display mode.
++    // sims2hd: the 3D layer is only shown in the regular display mode.
 +    if (CurUnit->Num == 0 && line < 192 && Looks2D.Record3D && dispmode != 1)
 +        memset(&Looks2D.Pixel3D[line * 256], 0, 256);
  
@@ -41,7 +41,7 @@ index 2f8afcb..fbb21db 100644
  
      if (!GPU.GPU3D.IsRendererAccelerated())
      {
-+        // sims2wide: where the 3D layer is on top, record how it is shown (GPU2DLooks).
++        // sims2hd: where the 3D layer is on top, record how it is shown (GPU2DLooks).
 +        u8* pixel3D = (CurUnit->Num == 0 && line < 192 && Looks2D.Record3D) ? &Looks2D.Pixel3D[line * 256] : nullptr;
 +        const u32 blendCnt = CurUnit->BlendCnt;
          for (int i = 0; i < 256; i++)
@@ -75,7 +75,7 @@ index 4beaf8f..4690303 100644
  {
  class GPU;
  
-+// sims2wide: how the top screen's picture used the 3D layer, so that the frontend can put a
++// sims2hd: how the top screen's picture used the 3D layer, so that the frontend can put a
 +// sharper or wider 3D picture in its place. Per pixel of engine A's last frame: 0 not the 3D
 +// layer (or blended with what is under it), 1 the 3D layer as it is, 2 brightened, 3 darkened
 +// (by LineEVY). Per line: the brightness factor, the blend control and the master brightness

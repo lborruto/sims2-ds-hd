@@ -3,22 +3,22 @@
 ## Reporting a vulnerability
 
 Please report privately through GitHub: **Security › Report a vulnerability**
-(https://github.com/lborruto/sims2-ds-wide/security/advisories/new). Do not open a public
+(https://github.com/lborruto/sims2-ds-hd/security/advisories/new). Do not open a public
 issue. Include the version (the release tag or the commit), what an attacker needs (a file you
 open, code running as you) and the steps. Never attach a ROM or anything from the game: describe
-it instead. sims2-ds-wide is maintained in spare time: reports are handled on a best-effort
+it instead. sims2-ds-hd is maintained in spare time: reports are handled on a best-effort
 basis, with no guaranteed response time.
 
 ## Supported versions
 
 The latest release only: the most recent `vX.Y.Z` tag and its downloads on the
-[releases page](https://github.com/lborruto/sims2-ds-wide/releases). Fixes land on `main` and in
-the next release; older tags are not patched. Each download comes with a build provenance
-attestation once the repository is public: `gh attestation verify <file> --repo lborruto/sims2-ds-wide`.
+[releases page](https://github.com/lborruto/sims2-ds-hd/releases). Fixes land on `main` and in
+the next release; older tags are not patched. From v0.2.0 on, each download comes with a build
+provenance attestation (v0.1.1's have none): `gh attestation verify <file> --repo lborruto/sims2-ds-hd`.
 
 ## Security model
 
-sims2-ds-wide is a local program: the melonDS emulator core and a window. It is not affiliated
+sims2-ds-hd is a local program: the melonDS emulator core and a window. It is not affiliated
 with, endorsed by or supported by Electronic Arts, Maxis, Nintendo or the melonDS team.
 
 - **No network at all.** It opens no port and makes no connection: no update check, no
@@ -29,8 +29,8 @@ with, endorsed by or supported by Electronic Arts, Maxis, Nintendo or the melonD
   your own `gamecontrollerdb.txt`. melonDS parses the ROM, the save and the save states: treat
   ones from other people as untrusted files, as you would any file an emulator opens.
 - **It writes in a few known places.** Beside the ROM: the game's save (or `--save`) and its
-  `backups/`. In its per-user settings folder (`%APPDATA%\sims2-ds-wide`, `~/Library/Application
-  Support/sims2-ds-wide` or `~/.local/share/sims2-ds-wide`): `settings.ini`, `recent.txt` and
+  `backups/`. In its per-user settings folder (`%APPDATA%\sims2-ds-hd`, `~/Library/Application
+  Support/sims2-ds-hd` or `~/.local/share/sims2-ds-hd`): `settings.ini`, `recent.txt` and
   `last-rom.txt` (the paths of your recent ROMs and of the file picker's folder), `states/` (save states, their pictures, the place kept on quitting),
   `screenshots/` (F12), `saves/` (the game's save when the ROM's folder cannot be written) and
   `captures/`, a picture and a save state of each screen the game shows that the program does not
@@ -38,7 +38,7 @@ with, endorsed by or supported by Electronic Arts, Maxis, Nintendo or the melonD
   `--data-dir`. Nothing else.
 - **Not signed by Apple or Microsoft.** The Mac app is ad-hoc signed and not notarised, the
   Windows program not signed: the systems warn the first time. Check a download with
-  `gh attestation verify <archive> --repo lborruto/sims2-ds-wide` instead.
+  `gh attestation verify <archive> --repo lborruto/sims2-ds-hd` instead.
 - **The microphone only if you ask.** By default the DS hears a key (the blow key) or nothing;
   your real microphone is opened only with the Microphone setting (or `--mic real`) and only while
   the game listens (the vacuum, the music mixer). Nothing is recorded or kept. The camera is a stub.

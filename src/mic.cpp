@@ -9,7 +9,7 @@
 #include "host.h"
 #include "settings.h"
 
-namespace sims2wide::mic
+namespace sims2hd::mic
 {
 namespace
 {

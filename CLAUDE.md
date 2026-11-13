@@ -1,12 +1,13 @@
-# sims2-ds-wide: notes for Claude
+# sims2-ds-hd: notes for Claude
 
 The Sims 2 (Nintendo DS, 2005) played on a computer like a console game, in the spirit of
 [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex). The melonDS 1.1 core (submodule,
 plus small looks hooks in `patches/melonDS/`) runs the game; a C++20 / SDL2 frontend (`src/`)
 shows it in one 1280 × 720 window. CONSOLE, the default layout, reads what the game shows from
 its RAM (European ROM, `ASJP`) and redraws each touch-screen screen in HD (`src/port/`), driven by
-a controller. No decompilation: the port reads RAM and the ROM's own data at run time and never
-writes RAM. The full per-module notes, traps and known limits are in
+a controller. No game code or data is in the repository. Addresses and formats were worked out by
+watching RAM and reading the game's code in a disassembler, for interoperability; the port reads
+RAM and the ROM's own data at run time and never writes RAM. The full per-module notes, traps and known limits are in
 [docs/dev-notes.md](docs/dev-notes.md); the RAM map in [docs/research/ram-map.md](docs/research/ram-map.md).
 
 ## Permanent rules
@@ -30,8 +31,8 @@ writes RAM. The full per-module notes, traps and known limits are in
 ## Build and test
 
     cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release   # CMake 3.21 to 4.x
-    ninja -C build sims2wide
-    ./build/sims2wide roms/<rom>.nds --headless --frames 400 --state-load shots/s7.st \
+    ninja -C build sims2hd
+    ./build/sims2hd roms/<rom>.nds --headless --frames 400 --state-load shots/s7.st \
         --save shots/scratch.sav --compose --shot-at 399 --shot-dir shots/c
 
 - Automated runs always pass `--headless --frames N` (without it a window opens and waits) and a
@@ -73,7 +74,7 @@ writes RAM. The full per-module notes, traps and known limits are in
 - `screens.*`, `hotspots.*`, `scene.*`: the pixel rules (AUTO, and CONSOLE without RAM) and touch targets.
 - `touchscript.*`: queued taps, holds and drags. `script.*`, `shots.*`, `state.*`: headless scripts, PNGs, states.
 - `looks.*`, `melonds_ext/`, `patches/melonDS/`: sharper / widescreen 3D and 60 fps (from FullDex).
-- `audio.*`, `audiostretch.h`, `mic.*`, `clock.*`, `backup.*`, `recorder.*`, `picker.*`, `platform.cpp`.
+- `audio.*`, `audiostretch.h`, `mic.*`, `clock.*`, `backup.*`, `recorder.*`, `picker.*`, `platform.cpp`; `prefdir.*` the per-user folder (and the move from the old name's).
 
 ## Key traps
 
@@ -83,7 +84,7 @@ writes RAM. The full per-module notes, traps and known limits are in
 2. `GameState::settled` is the only "the game is ready" signal: a tap before it lands on the old
    screen. The navigator's gate holds presses until settled; a view with `replay` false drops them.
 3. Every part of `GameState` is range-checked and valid on its own; garbage makes only that part
-   invalid. An invalid part means milestone 1's picture, never a guess.
+   invalid. An invalid part means the framed screens (docs/dev-notes.md), never a guess.
 4. Touch mapping goes through the same `Composition` as drawing: change one, the other follows.
    Invisible (alpha 0) pieces carry the mouse onto the game's own targets.
 5. The UI raster must stay deterministic (premultiplied floats, banded threads giving the same

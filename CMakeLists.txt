@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 # The release workflow checks that this version is the tag's (vX.Y.Z).
-project(sims2wide VERSION 0.2.0 LANGUAGES CXX C)
+project(sims2hd VERSION 0.2.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -16,9 +16,9 @@ set(ENABLE_OGLRENDERER OFF CACHE BOOL "" FORCE)
 # files here, in order. Idempotent: a patch that already reverses cleanly is applied already.
 # To get the pristine files back: git -C melonDS checkout -- . (then configure again).
 find_package(Git REQUIRED)
-file(GLOB SIMS2WIDE_MELONDS_PATCHES "${CMAKE_CURRENT_SOURCE_DIR}/patches/melonDS/*.patch")
-list(SORT SIMS2WIDE_MELONDS_PATCHES)
-foreach(patch IN LISTS SIMS2WIDE_MELONDS_PATCHES)
+file(GLOB SIMS2HD_MELONDS_PATCHES "${CMAKE_CURRENT_SOURCE_DIR}/patches/melonDS/*.patch")
+list(SORT SIMS2HD_MELONDS_PATCHES)
+foreach(patch IN LISTS SIMS2HD_MELONDS_PATCHES)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${patch}")
     execute_process(COMMAND "${GIT_EXECUTABLE}" apply --reverse --check "${patch}"
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/melonDS" RESULT_VARIABLE already OUTPUT_QUIET ERROR_QUIET)
@@ -26,7 +26,7 @@ foreach(patch IN LISTS SIMS2WIDE_MELONDS_PATCHES)
         execute_process(COMMAND "${GIT_EXECUTABLE}" apply --whitespace=nowarn "${patch}"
             WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/melonDS" RESULT_VARIABLE failed ERROR_VARIABLE why)
         if(failed)
-            message(FATAL_ERROR "Cannot apply ${patch} to melonDS: ${why}Is the submodule at the 1.1 tag? (git submodule update --init)")
+            message(FATAL_ERROR "Cannot apply ${patch} to melonDS: ${why}Is the submodule at the 1.1 tag? (git submodule update --init) Patched by older patches? (git -C melonDS checkout -- .)")
         endif()
         get_filename_component(name "${patch}" NAME)
         message(STATUS "melonDS: applied ${name}")
@@ -72,11 +72,11 @@ FetchContent_MakeAvailable(sdl2)
 # configure time; a build without its platform's main backends stops here. (The header SDL
 # installs is made by file(GENERATE), after this file has run: its configure_file'd
 # SDL_config.h.intermediate exists already, on the first configure too.)
-set(SIMS2WIDE_SDL_CONFIG "${sdl2_BINARY_DIR}/SDL_config.h.intermediate")
-if(NOT EXISTS "${SIMS2WIDE_SDL_CONFIG}")
-    message(WARNING "SDL's ${SIMS2WIDE_SDL_CONFIG} not found: its controller drivers are not checked")
+set(SIMS2HD_SDL_CONFIG "${sdl2_BINARY_DIR}/SDL_config.h.intermediate")
+if(NOT EXISTS "${SIMS2HD_SDL_CONFIG}")
+    message(WARNING "SDL's ${SIMS2HD_SDL_CONFIG} not found: its controller drivers are not checked")
 else()
-    file(STRINGS "${SIMS2WIDE_SDL_CONFIG}" sdl_drivers REGEX "^#define SDL_(JOYSTICK|HAPTIC)_[A-Z0-9_]+ 1")
+    file(STRINGS "${SIMS2HD_SDL_CONFIG}" sdl_drivers REGEX "^#define SDL_(JOYSTICK|HAPTIC)_[A-Z0-9_]+ 1")
     string(REGEX REPLACE "#define SDL_([A-Z0-9_]+) 1" "\\1" sdl_drivers "${sdl_drivers}")
     message(STATUS "SDL controllers: ${sdl_drivers}")
     if(WIN32)
@@ -92,7 +92,7 @@ else()
         endif()
     endforeach()
     if(NOT WIN32 AND NOT APPLE)
-        file(STRINGS "${SIMS2WIDE_SDL_CONFIG}" sdl_udev REGEX "^#define HAVE_LIBUDEV_H 1")
+        file(STRINGS "${SIMS2HD_SDL_CONFIG}" sdl_udev REGEX "^#define HAVE_LIBUDEV_H 1")
         if(NOT sdl_udev)
             message(WARNING "SDL without libudev (install libudev-dev): HIDAPI pads and hot-plug are poorer on Linux")
         endif()
@@ -105,11 +105,11 @@ endif()
 # The UI kit (src/ui): the HD interface's panels, text and chips, rasterised in software. Its
 # font (assets/fonts, Nunito, SIL OFL 1.1) is embedded as byte arrays generated at build time
 # by cmake/embed.cmake, so the program stays one file.
-set(SIMS2WIDE_FONT_NAMES "nunito_bold|nunito_extrabold")
-set(SIMS2WIDE_FONT_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Nunito-Bold.ttf|${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Nunito-ExtraBold.ttf")
+set(SIMS2HD_FONT_NAMES "nunito_bold|nunito_extrabold")
+set(SIMS2HD_FONT_FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Nunito-Bold.ttf|${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/Nunito-ExtraBold.ttf")
 add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp"
-    COMMAND "${CMAKE_COMMAND}" "-DOUT=${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp" "-DNAMES=${SIMS2WIDE_FONT_NAMES}"
-        "-DFILES=${SIMS2WIDE_FONT_FILES}" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake"
+    COMMAND "${CMAKE_COMMAND}" "-DOUT=${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp" "-DNAMES=${SIMS2HD_FONT_NAMES}"
+        "-DFILES=${SIMS2HD_FONT_FILES}" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake"
     DEPENDS cmake/embed.cmake assets/fonts/Nunito-Bold.ttf assets/fonts/Nunito-ExtraBold.ttf
     COMMENT "Embedding the UI's font" VERBATIM)
 add_library(uikit STATIC src/ui/kit.cpp src/ui/font.cpp src/thirdparty/xbrz/xbrz.cpp "${CMAKE_CURRENT_BINARY_DIR}/fonts_embedded.cpp")
@@ -121,15 +121,15 @@ target_link_libraries(uikit PUBLIC Threads::Threads)
 # The controllers (src/pads.*) and their mappings: SDL_GameControllerDB (assets/controllers,
 # zlib licence, LICENSE.txt beside it), this platform's lines only, embedded like the font.
 if(WIN32)
-    set(SIMS2WIDE_DB_PLATFORM "Windows")
+    set(SIMS2HD_DB_PLATFORM "Windows")
 elseif(APPLE)
-    set(SIMS2WIDE_DB_PLATFORM "Mac OS X")
+    set(SIMS2HD_DB_PLATFORM "Mac OS X")
 else()
-    set(SIMS2WIDE_DB_PLATFORM "Linux")
+    set(SIMS2HD_DB_PLATFORM "Linux")
 endif()
-set(SIMS2WIDE_DB "${CMAKE_CURRENT_SOURCE_DIR}/assets/controllers/gamecontrollerdb.txt")
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${SIMS2WIDE_DB}")
-file(STRINGS "${SIMS2WIDE_DB}" db_lines REGEX "platform:${SIMS2WIDE_DB_PLATFORM},")
+set(SIMS2HD_DB "${CMAKE_CURRENT_SOURCE_DIR}/assets/controllers/gamecontrollerdb.txt")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${SIMS2HD_DB}")
+file(STRINGS "${SIMS2HD_DB}" db_lines REGEX "platform:${SIMS2HD_DB_PLATFORM},")
 list(JOIN db_lines "\n" db_lines)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt.new" "${db_lines}\n")
 file(COPY_FILE "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt.new" "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt" ONLY_IF_DIFFERENT)
@@ -138,60 +138,66 @@ add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb_embedded
         "-DFILES=${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt" -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed.cmake"
     DEPENDS cmake/embed.cmake "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb-platform.txt"
     COMMENT "Embedding the controller mappings" VERBATIM)
-add_library(pads STATIC src/pads.cpp src/controls.cpp "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb_embedded.cpp")
+add_library(pads STATIC src/pads.cpp src/controls.cpp src/prefdir.cpp "${CMAKE_CURRENT_BINARY_DIR}/gamecontrollerdb_embedded.cpp")
 target_include_directories(pads PUBLIC melonDS/src src)
 target_link_libraries(pads PUBLIC uikit SDL2::SDL2-static)
 
-add_executable(sims2wide
+add_executable(sims2hd
     src/main.cpp src/platform.cpp
     src/activities.cpp src/audio.cpp src/backup.cpp src/clock.cpp src/compose.cpp src/console.cpp src/consolehold.cpp src/gamestate.cpp src/hotspots.cpp src/input.cpp src/layout.cpp
     src/looks.cpp src/mic.cpp src/navigator.cpp src/picker.cpp src/port/dialogue.cpp src/port/icons.cpp src/port/gift.cpp src/port/interact.cpp src/port/prompt.cpp src/port/menuview.cpp src/port/panelmenu.cpp src/port/pockets.cpp src/port/goals.cpp src/port/relations.cpp src/port/options.cpp src/port/popup.cpp src/port/phone.cpp src/port/note.cpp src/port/catalogue.cpp src/port/build.cpp src/port/checkin.cpp src/port/roominfo.cpp src/port/music.cpp src/port/statpanel.cpp src/port/minigame.cpp src/port/ownwords.cpp src/port/front.cpp src/port/frontmenus.cpp src/port/cas.cpp src/port/statusbar.cpp src/recorder.cpp src/romdata.cpp src/romdata_nds.cpp src/scene.cpp src/screens.cpp src/script.cpp
     src/settings.cpp src/shell.cpp src/shellhost.cpp src/shots.cpp src/slots.cpp src/state.cpp src/touchscript.cpp src/ui.cpp src/video.cpp
     src/thirdparty/tinyfiledialogs.c)
-target_include_directories(sims2wide PRIVATE melonDS/src src src/thirdparty)
-target_link_libraries(sims2wide PRIVATE core pads)
+target_include_directories(sims2hd PRIVATE melonDS/src src src/thirdparty)
+target_link_libraries(sims2hd PRIVATE core pads)
 if(APPLE)
     # (The display's physical size for the UI's Auto size: CGDisplayScreenSize, video.cpp.)
-    target_link_libraries(sims2wide PRIVATE "-framework ApplicationServices")
+    target_link_libraries(sims2hd PRIVATE "-framework ApplicationServices")
 endif()
-target_compile_definitions(sims2wide PRIVATE SIMS2WIDE_VERSION="${PROJECT_VERSION}")
+target_compile_definitions(sims2hd PRIVATE SIMS2HD_VERSION="${PROJECT_VERSION}")
 
 # macOS: an app to double-click (the release builds it, for Apple silicon and Intel at once with
-# -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"). Off by default, so that build/sims2wide stays a
+# -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"). Off by default, so that build/sims2hd stays a
 # plain program for the command line.
-option(SIMS2WIDE_MAC_APP "Build Sims 2 DS Wide.app instead of a plain program (macOS)" OFF)
-if(APPLE AND SIMS2WIDE_MAC_APP)
+option(SIMS2HD_MAC_APP "Build Sims 2 DS HD.app instead of a plain program (macOS)" OFF)
+if(APPLE AND SIMS2HD_MAC_APP)
     set(ICNS "${CMAKE_CURRENT_BINARY_DIR}/AppIcon.icns")
     add_custom_command(OUTPUT "${ICNS}"
         COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/packaging/make_icns.sh" "${CMAKE_CURRENT_SOURCE_DIR}/packaging/icon.png" "${ICNS}"
         DEPENDS packaging/icon.png packaging/make_icns.sh)
-    target_sources(sims2wide PRIVATE "${ICNS}")
+    target_sources(sims2hd PRIVATE "${ICNS}")
     set_source_files_properties("${ICNS}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-    set_target_properties(sims2wide PROPERTIES
+    set_target_properties(sims2hd PROPERTIES
         MACOSX_BUNDLE TRUE
-        OUTPUT_NAME "Sims 2 DS Wide"
+        OUTPUT_NAME "Sims 2 DS HD"
         MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/packaging/Info.plist.in"
         MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
+endif()
+
+# Linux: GCC's C++ runtime linked in, so the program needs only the system's C library (glibc 2.39
+# for the release, built on Ubuntu 24.04) and the libraries SDL opens at run time.
+if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(sims2hd PRIVATE -static-libstdc++ -static-libgcc)
 endif()
 
 # Windows: a program that opens no console window when double-clicked (main.cpp attaches to the
 # terminal it was started from, if any), with its icon, linked statically so that the .exe needs
 # no DLL beside it. The file picker uses comdlg32 and ole32.
 if(WIN32)
-    target_sources(sims2wide PRIVATE packaging/sims2wide.rc)
-    # The manifest is the .rc's (packaging/sims2wide.manifest): MSVC's linker must not add its own.
+    target_sources(sims2hd PRIVATE packaging/sims2hd.rc)
+    # The manifest is the .rc's (packaging/sims2hd.manifest): MSVC's linker must not add its own.
     if(MSVC)
-        target_link_options(sims2wide PRIVATE /MANIFEST:NO)
+        target_link_options(sims2hd PRIVATE /MANIFEST:NO)
     endif()
-    set_property(SOURCE packaging/sims2wide.rc APPEND PROPERTY OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/sims2wide.manifest")
-    set_target_properties(sims2wide PROPERTIES WIN32_EXECUTABLE TRUE)
+    set_property(SOURCE packaging/sims2hd.rc APPEND PROPERTY OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/packaging/sims2hd.manifest")
+    set_target_properties(sims2hd PROPERTIES WIN32_EXECUTABLE TRUE)
     if(TARGET SDL2::SDL2main)
-        target_link_libraries(sims2wide PRIVATE SDL2::SDL2main)
+        target_link_libraries(sims2hd PRIVATE SDL2::SDL2main)
     endif()
-    target_link_libraries(sims2wide PRIVATE comdlg32 ole32)
+    target_link_libraries(sims2hd PRIVATE comdlg32 ole32)
     if(MINGW)
-        target_link_options(sims2wide PRIVATE -static)
+        target_link_options(sims2hd PRIVATE -static)
     endif()
 endif()
 
@@ -228,7 +234,7 @@ add_executable(navigator_test EXCLUDE_FROM_ALL tests/navigator_test.cpp src/acti
 target_include_directories(navigator_test PRIVATE melonDS/src src)
 
 # Checks of the bindings and the settings file's loading (not built by default): ninja -C build controls_test && ./build/controls_test
-add_executable(controls_test EXCLUDE_FROM_ALL tests/controls_test.cpp src/controls.cpp src/settings.cpp src/layout.cpp)
+add_executable(controls_test EXCLUDE_FROM_ALL tests/controls_test.cpp src/controls.cpp src/settings.cpp src/prefdir.cpp src/layout.cpp)
 target_include_directories(controls_test PRIVATE melonDS/src src)
 target_link_libraries(controls_test PRIVATE SDL2::SDL2-static)
 
@@ -249,7 +255,7 @@ target_link_libraries(romdata_test PRIVATE uikit)
 
 # Checks of the HD shell: the pause menu, the launch panel, the save states' files (not built by
 # default): ninja -C build shell_test && ./build/shell_test
-add_executable(shell_test EXCLUDE_FROM_ALL tests/shell_test.cpp src/shell.cpp src/slots.cpp src/settings.cpp src/controls.cpp src/layout.cpp src/port/ownwords.cpp src/romdata.cpp)
+add_executable(shell_test EXCLUDE_FROM_ALL tests/shell_test.cpp src/shell.cpp src/slots.cpp src/settings.cpp src/prefdir.cpp src/controls.cpp src/layout.cpp src/port/ownwords.cpp src/romdata.cpp)
 target_include_directories(shell_test PRIVATE melonDS/src src)
 target_link_libraries(shell_test PRIVATE uikit SDL2::SDL2-static)
 

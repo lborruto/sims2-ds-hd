@@ -8,7 +8,7 @@
 
 #include "layout.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 static const std::map<std::string, int> kKeyNames = {
     {"a", kA}, {"b", kB}, {"select", kSelect}, {"start", kStart}, {"right", kRight}, {"left", kLeft},
@@ -129,7 +129,7 @@ bool ScriptWindowShot(const std::vector<InputEvent>& script, long iter)
 }
 }
 
-namespace sims2wide
+namespace sims2hd
 {
 std::string ScriptText(const std::vector<InputEvent>& script, long frame)
 {

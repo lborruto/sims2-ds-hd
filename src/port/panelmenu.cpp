@@ -19,7 +19,7 @@
 #include "port/statusbar.h"
 #include "romdata.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -337,7 +337,7 @@ MenuView PanelMenuViewOf(ScreenState s, const GameState& game, const RomData* ro
         if (!game.town.options.valid) return v;
         AddOptionsView(v, game.town.options, rom);
         break;
-    default: return v; // (no tab: milestone 1's composition)
+    default: return v; // (no tab: the framed-screen composition)
     }
     // The phone button, after the tab's own items (the first focus is the tab's), linked to them
     // explicitly: the geometry alone puts it at the edge of the 60° cone from the rows.

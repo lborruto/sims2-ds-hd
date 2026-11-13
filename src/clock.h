@@ -9,7 +9,7 @@
 
 #include "NDS.h"
 
-namespace sims2wide::clock
+namespace sims2hd::clock
 {
 // A civil date and time, the RTC's resolution (local time, no zone: the DS has none).
 struct Time

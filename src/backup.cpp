@@ -8,7 +8,7 @@
 #include <iterator>
 #include <vector>
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace fs = std::filesystem;
 static constexpr unsigned kEvery = 30 * 60 * 1000; // ms

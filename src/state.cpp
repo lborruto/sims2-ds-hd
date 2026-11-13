@@ -15,7 +15,7 @@
 #include "Savestate.h"
 #include "clock.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {

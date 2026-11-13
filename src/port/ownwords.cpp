@@ -4,7 +4,7 @@
 
 #include "romdata.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -291,7 +291,7 @@ constexpr const char* kWords[][5] = {
      "@1 no es Los Sims 2 para DS. Elige tu copia del juego."},
     {"Cannot read @1.", "Impossible de lire @1.", "@1 lässt sich nicht lesen.", "Impossibile leggere @1.", "No se puede leer @1."},
     {"Start", "Démarrer", "Starten", "Avvia", "Empezar"},
-    {"The Sims 2 DS, one screen", "Les Sims 2 DS, un seul écran", "Die Sims 2 DS, ein Bildschirm", "The Sims 2 DS, uno schermo", "Los Sims 2 DS, una pantalla"},
+    {"Sims 2 DS HD", "Sims 2 DS HD", "Sims 2 DS HD", "Sims 2 DS HD", "Sims 2 DS HD"},
     // DS Wireless on the main menu
     {"Needs a second DS: not in this port.", "Demande une deuxième DS : absent de ce portage.", "Braucht eine zweite DS: nicht in dieser Portierung.",
      "Serve un secondo DS: non in questo port.", "Necesita otra DS: no está en esta versión."},
@@ -508,10 +508,10 @@ constexpr const char* kWords[][5] = {
     {"LEFT SHIFT", "MAJ GAUCHE", "SHIFT LINKS", "MAIUSC SIN.", "MAYÚS IZDA"},
     {"SPACE", "ESPACE", "LEERTASTE", "SPAZIO", "ESPACIO"},
     {"BACKSPACE", "RET. ARRIÈRE", "RÜCKTASTE", "BACKSPACE", "RETROCESO"},
-    // (ux task 6, the town's audit) Build Rooms with nothing left; the world's camera stick
+    // (the town's audit) Build Rooms with nothing left; the world's camera stick
     {"Nothing left to build", "Plus rien à construire", "Nichts mehr zu bauen", "Niente altro da costruire", "No queda nada por construir"},
     {"Camera", "Caméra", "Kamera", "Visuale", "Cámara"},
-    // (ux task 6) The mixer's play
+    // The mixer's play
     {"Play", "Jouer", "Abspielen", "Riproduci", "Reproducir"},
     // The shop's greyed Pay: why
     {"Not enough money", "Pas assez d'argent", "Nicht genug Geld", "Soldi insufficienti", "Falta dinero"},

@@ -23,7 +23,7 @@
 #include "ui/font.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -160,7 +160,7 @@ MenuView ConsoleView(ScreenState s, const GameState* game, const RomData* rom)
 {
     if (MenuView v = PopupView(s, game, rom); v.valid) return v;
     // The game's own popup is up over a screen but its HD view does not read (no strings, a box that
-    // does not fit): not the screen's view (milestone 1's picture, the popup in it).
+    // does not fit): not the screen's view (the framed screens, the popup in it).
     if (game && PopupOver(s, *game)) return {};
     return ScreenView(s, game, rom);
 }
@@ -387,7 +387,7 @@ void BuildGameBox(Composition& c, Rect box, const std::string& title, const std:
 
 void MeasurePopups(const RomData& rom, BlockMeasure& m)
 {
-    // The popups the game opens (0x0205871C's callers, research m3 §3.4) and the Save slots'.
+    // The popups the game opens (0x0205871C's callers) and the Save slots'.
     static const int kTexts[] = {23, 65, 313, 413, 1158, 1159, 1191, 1761, 2423, 2427, 2429, 2430, 2431, 2435, 2436, 2437, 2438,
                                  2440, 2441, 2443, 2444, 2445, 2446, 2447, 2448, 2449, 2450, 2586};
     static const int kTitles[] = {22, 2424, 2425, 2426, 2428, 2434, 2442};

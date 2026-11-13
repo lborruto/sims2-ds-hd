@@ -9,7 +9,7 @@
 #include <iterator>
 #include <cstdlib>
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace fs = std::filesystem;
 

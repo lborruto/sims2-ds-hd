@@ -7,15 +7,17 @@
 
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 #include <string>
 
 #include "controls.h"
 
+#include "prefdir.h"
 #include "settings.h"
 
-using namespace sims2wide;
+using namespace sims2hd;
 using namespace Controls;
 
 static int failures = 0;
@@ -341,8 +343,66 @@ static void auto_ui_scale()
     CHECK(!HandheldPanel("Jupiter", 1920, 1080, d) && !HandheldPanel("MacBookPro18,1", 1280, 800, d) && !HandheldPanel("", 1280, 800, d));
 }
 
+// The per-user folder of the project's old name (sims2-ds-wide) moved into the new one: every
+// entry, folders too, renamed; nothing when the new folder has settings already or the old one is
+// missing; an entry the new folder has stays in the old one, which is then kept.
+static void move_old_prefs()
+{
+    namespace fs = std::filesystem;
+    const fs::path root = fs::temp_directory_path() / ("sims2hd-prefdir-test-" + std::to_string((unsigned long long)SDL_GetPerformanceCounter()));
+    auto put = [](const fs::path& p, const std::string& text) { fs::create_directories(p.parent_path()); std::ofstream(p, std::ios::binary) << text; };
+    auto read = [](const fs::path& p) { std::ifstream in(p, std::ios::binary); return std::string(std::istreambuf_iterator<char>(in), {}); };
+    const fs::path old = root / "sims2-ds-wide", now = root / "sims2-ds-hd";
+
+    // The usual first run: SDL made the new folder, empty; everything moves, the old folder goes.
+    put(old / "settings.ini", "volume=40\n");
+    put(old / "recent.txt", "a\n");
+    put(old / "captures" / "c1.png", "png");
+    fs::create_directories(now);
+    PrefMove m = MoveOldPrefs(old, now);
+    CHECK(m.moved == 3 && m.copied == 0 && m.kept == 0 && m.failed == 0 && m.removedOld);
+    CHECK(!fs::exists(old));
+    CHECK(read(now / "settings.ini") == "volume=40\n" && read(now / "recent.txt") == "a\n" && read(now / "captures" / "c1.png") == "png");
+
+    // Again: the old folder is gone, nothing happens.
+    m = MoveOldPrefs(old, now);
+    CHECK(m.moved + m.copied + m.kept + m.failed == 0 && !m.removedOld);
+
+    // The new folder has settings already: the old folder is left alone.
+    put(old / "settings.ini", "volume=10\n");
+    m = MoveOldPrefs(old, now);
+    CHECK(m.moved + m.copied + m.kept + m.failed == 0 && !m.removedOld);
+    CHECK(read(old / "settings.ini") == "volume=10\n" && read(now / "settings.ini") == "volume=40\n");
+
+    // No settings yet but a file of the same name (the mappings): that one stays in the old folder,
+    // never overwritten, and the old folder is kept; the rest moves. The new folder made if missing.
+    fs::remove_all(now);
+    put(now / "gamecontrollerdb.txt", "new");
+    put(old / "gamecontrollerdb.txt", "old");
+    m = MoveOldPrefs(old, now);
+    CHECK(m.moved == 1 && m.kept == 1 && m.failed == 0 && !m.removedOld);
+    CHECK(read(now / "gamecontrollerdb.txt") == "new" && read(old / "gamecontrollerdb.txt") == "old");
+    CHECK(read(now / "settings.ini") == "volume=10\n" && !fs::exists(old / "settings.ini"));
+    fs::remove_all(now);
+    m = MoveOldPrefs(old, root / "deeper" / "sims2-ds-hd");
+    CHECK(m.moved == 1 && m.removedOld && read(root / "deeper" / "sims2-ds-hd" / "gamecontrollerdb.txt") == "old");
+
+    // The old name is a file, not a folder; or the same folder twice: nothing.
+    put(old, "not a folder");
+    m = MoveOldPrefs(old, now);
+    CHECK(m.moved + m.copied + m.kept + m.failed == 0 && fs::is_regular_file(old) && !fs::exists(now));
+    fs::remove(old);
+    put(old / "recent.txt", "b\n");
+    m = MoveOldPrefs(old, old);
+    CHECK(m.moved + m.copied + m.kept + m.failed == 0 && read(old / "recent.txt") == "b\n");
+
+    std::error_code ec;
+    fs::remove_all(root, ec);
+}
+
 int main(int, char**)
 {
+    move_old_prefs();
     auto_ui_scale();
     camera_turns();
     menu_keys();

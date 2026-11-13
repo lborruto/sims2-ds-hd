@@ -5,7 +5,7 @@
 #include <deque>
 #include <vector>
 
-namespace sims2wide
+namespace sims2hd
 {
 struct Point
 {

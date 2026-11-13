@@ -29,7 +29,7 @@
 #include "romdata.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -454,11 +454,11 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
         b = ConsoleBranch::Town;
         c.pieces.push_back(World(topW, worldRows, bar));
         // (The HD town whenever RAM and the game's strings read: a frame whose tab does not read yet,
-        // the panel coming back from a minigame, never flashes milestone 1's rail.)
+        // the panel coming back from a minigame, never flashes the framed-screen rail.)
         const bool hd = ConsoleView(s, game, rom).valid || (game && game->valid && rom && rom->StringCount() > 0 && bar);
         if (!hd)
         {
-            // Milestone 1 (no strings, another ROM): the rail, the only way to see the tabs.
+            // The framed screens (no strings, another ROM): the rail, the only way to see the tabs.
             c.overlays.push_back(Frame(kRailFrame, 1));
             c.pieces.push_back(Bottom(kRailPhoneFrom, kRailPhoneTo));
             c.pieces.push_back(Bottom(kRailTabsFrom, kRailTabsTo));

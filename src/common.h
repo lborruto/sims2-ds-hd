@@ -4,7 +4,7 @@
 
 #include "types.h" // melonDS: u8, u16, u32, s16…
 
-namespace sims2wide
+namespace sims2hd
 {
 using melonDS::u8;
 using melonDS::u16;

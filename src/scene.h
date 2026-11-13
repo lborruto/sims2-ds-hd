@@ -4,10 +4,10 @@
 #include "layout.h"
 #include "screens.h" // the rules AUTO uses: HudVisible, SocialVisible, WarmMenuVisible, VacuumVisible, CardsVisible
 
-namespace sims2wide
+namespace sims2hd
 {
 // A screen sampled on a coarse grid: its brightness, and how much of it changed since the last
-// take (SIMS2WIDE_PROBE=N prints both every N frames, to study a situation).
+// take (SIMS2HD_PROBE=N prints both every N frames, to study a situation).
 struct Sample
 {
     static constexpr int kW = 32, kH = 24, kN = kW * kH; // one sample every 8 pixels

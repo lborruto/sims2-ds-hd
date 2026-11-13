@@ -4,12 +4,14 @@
 #include <cmath>
 #include <cstdio>
 
+#include "prefdir.h"
+
 // The bundled SDL_GameControllerDB (assets/controllers, this platform's lines), embedded at build
 // time by cmake/embed.cmake.
 extern const unsigned char gamecontrollerdb[];
 extern const unsigned long gamecontrollerdb_size;
 
-namespace sims2wide
+namespace sims2hd
 {
 using namespace Controls;
 
@@ -33,11 +35,8 @@ void Pads::Hints()
 
 std::string Pads::UserMappingsPath()
 {
-    char* dir = SDL_GetPrefPath("", "sims2-ds-wide");
-    if (!dir) return "";
-    std::string f = std::string(dir) + "gamecontrollerdb.txt";
-    SDL_free(dir);
-    return f;
+    const std::string dir = PrefDir();
+    return dir.empty() ? "" : dir + "gamecontrollerdb.txt";
 }
 
 int Pads::AddUnmapped(const char* text, size_t size)

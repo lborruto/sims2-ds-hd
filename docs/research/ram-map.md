@@ -90,7 +90,7 @@ table is reported as `Unknown(ov=N,vt=0x...)`: log it, it is a new screen to map
 | Cards | `S+0x2E0` | s32 | lifted card 0..8, -1 none | medium |
 | Cards | `S+0xD0 + 0x14*i` | | card i lifted flag | medium |
 | Cards | `S+0x4C` / `S+0x4E` | u16 | the game's total of cards (60) / the draw deck's count (`GameState::minigame.cards`, below) | high |
-| Cards | `S+0x306` / `S+0x307` / `S+0x2F7` | u8 | a box up (help, quit, message) / the quit question / the end-of-turn message (milestone 6: `S+0x2F7` is not the question) | high |
+| Cards | `S+0x306` / `S+0x307` / `S+0x2F7` | u8 | a box up (help, quit, message) / the quit question / the end-of-turn message (`S+0x2F7` is not the question) | high |
 | Social | `Q = *(0x0213E70C)`; `Q+4/+8/+0xC` | | answers left/middle/right; byte `+2` = 1 when chosen; stale after the game | low-medium |
 
 ## Status bar and conversation (`HudState`, `DialogueState`)
@@ -126,7 +126,7 @@ Read by `ReadGameState` into `GameState::town` (any screen; each part valid on i
 | Popup | `P + 0x8` state (1 opening, 2 shown, 3 closing), `P + 0x10` kind (0 one X, 2 cross + tick, 3 none) | text `P + 0x34` (0x400 bytes), title `P + 0x434` (0x100), both NUL-terminated game text bytes (`GameTextToUtf8` in `romdata.h` decodes them); `P + 0xD88` pressed button, `P + 0xD8C` stylus down |
 | Save slots | used `0x0213D848 + i` u8, current `0x0213D84C` s32 (-1 none) | headers `0x0213D7B8 + 0x30 * i`: +0x14 time word, +0x18 money s32, +0x1C name char[16], +0x2C place (string 0x43 + place) |
 
-Held-out states for the checks are listed in `CLAUDE.md`; the full field map is in the research notes (milestone 3, town).
+Held-out states for the checks are listed in [docs/dev-notes.md](../dev-notes.md#build-states-and-checks).
 
 ## The menus' lists (`TownState::interact` ... `::note`)
 
@@ -301,13 +301,13 @@ tap must last two frames or more. Fields are from `S` unless said; the values ar
 | Art Gallery painting | none | 0x02134D70 | 0xB | `ArtGallery` |
 | The wireless lobby ("DS Wireless", the title's way to trading) / its trading screen | none | 0x02136AEC / 0x02136B7C | 0x1E | `Trading` (no part: out of scope, shown safely; its X at 236,178) |
 
-The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the social games and the vacuum keep their screens (milestone 1); the cards and the vacuum have a part each (the HD frame's values, `port/minigame.*`):
+The arm9 classes (no overlay) match on the vtable alone. Keelhaulin' Cards, the social games and the vacuum keep their own screens, framed; the cards and the vacuum have a part each (the HD frame's values, `port/minigame.*`):
 
 - **Cards** (`CardsState`, module 0x10, vtable 0x0212F98C): `S+0x4C` u16 total (60), `S+0x4E` u16 deck left; the hands: ten places each, `S+0xC0 + 0x14 i` (the player's)
   and `S+0x188 + 0x14 i` (the opponent's), a pointer into the object's own card table (`S+0x200..0x300`) or 0 when empty: their counts are the score board's; `S+0x2CC` /
   `S+0x2D0` s32 the scores (a cannon takes them below 0), `S+0x2E4` s32 the treasure chest; `S+0x306` a box up, `S+0x307` the quit question, `S+0x2F7` the end-of-turn message
   ("Touch for @1's turn.", 1695: any touch goes on); `S+0x2F0` u8 the turn's step (the top screen's line: 0 draw, 1 play or discard, 2
-  discard, 3 the plank, 4 the cannon, 5 two cards drawn, 6 the turn ending, 7 the deal, 8 a card drawn), `S+0x2F1` u8 whose turn (0 the player, 1 the opponent); `S+0x308` the player's name (ASCII, as the board shows it). Found on the owner's `act-cards` (draw, discard, the message,
+  discard, 3 the plank, 4 the cannon, 5 two cards drawn, 6 the turn ending, 7 the deal, 8 a card drawn), `S+0x2F1` u8 whose turn (0 the player, 1 the opponent); `S+0x308` the player's name (ASCII, as the board shows it). Found on the `act-cards` save state (draw, discard, the message,
   quit, help: states saved by `--state-save`, the board's numbers compared on the same frames), checked on the research's `G-cas-next-row1` / `G-X-pirate`.
 - **Vacuum** (`VacuumState`, overlay 17, vtable 0x0214C658): `S+0x158` u8 the filter clogged (1 from touching dust to 17 frames after a 7-frame blow: `act-vacuum-clog`, the
   blow script), the stat panel's "Vacuum Earnings" `G+0x7C` (the lifetime total: banked when the vacuum is put away), `S+0x150` s32 the money this session (the
@@ -353,7 +353,7 @@ The screen request that brings one up (`P + 0xDF0 + 0x20 * slot`: module, r3, ..
 - **Mixer** (`MixerState`): `S+8` mode, `S+0xA55` phase (0 idle, 1 playing, 2 recording, 5 VOX, 7 song select, 8 / 9 help, 0xA save prompt), `S+0x8E2` track mask, `S+0x8E3` u8[3] keys held
   (0xD none), `S+0x8E6` s8 octave, `S+0x8E7` instrument (1, 2, 3, 5), `S+0x8E9` sustain, `S+0x8EA / EB` sliders 0..26, `S+0x8EC` tempo, `S+0x8ED` variation, `S+0xA5C` song 0..8,
   `S+0xA4C / A4E` u16 control / note events, `S+0xA52` flags (4 PREP, 0x10 playing), `S+0xA6C` (2 mic buffer full), `S+0xA63` u8[8] unlocked songs, count `S+0xA6B`. Stylus: the 39 regions of
-  the table at 0x0212564C (research: m6-minigames §8). **Save menu** (`MixerSaveState`): `S+8` mode, `S+0x28` slot (0xFF none), `S+0x88` the typed name, `S+0xC` the mixer's context (null:
+  the table at 0x0212564C (the game's code: m6-minigames §8). **Save menu** (`MixerSaveState`): `S+8` mode, `S+0x28` slot (0xFF none), `S+0x88` the typed name, `S+0xC` the mixer's context (null:
   the screen draws black), names and used flags from `G+0x46AC + 16 j` (songs) / `G+0x46DC + 64 j` (ringtones), byte 15 the used flag.
 - **ArtGallery** (`ArtState`): `S+0x2C` stroke 0 idle / 1 drawing / 2 outside, `S+0x30` tool button, `S+0x34` tool (0 pencil, 1 eraser, 2 line, 3 bucket, 4 rect, 5 filled rect), `S+0x38` swatch,
   `S+0x3C` palette page, `S+0x40` brush, `S+0x650` u8[32][48] the working canvas (palette index 1..15, 1 white; each cell 4x4 px at (32 + 4 col, 8 + 4 row)), `S+0xC68` stylus on canvas
@@ -372,7 +372,7 @@ Popup share 0x0009. Kept as a cross-check; the manager above is the source.
 
 ## Unknown
 
-Not seen in any state: other shops, the minigames' launches by play (the research wrote the screen request), later towns, the phonebook, the messages'
+Not seen in any state: other shops, the minigames' launches by play (the screen request written into RAM), later towns, the phonebook, the messages'
 own pages (only the phone's page value as Messages opened), Goals and Relationships sub-pages, save slot and Quit choices, Build and Gift selections,
 game over, the end credits and the Tan page (code only). Not found: the highlighted Social answer, the dialogue's
 page count, the Pockets counted item or slot, the Relationships list index, the title/menu

@@ -7,7 +7,7 @@
 
 #include "hotspots.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {

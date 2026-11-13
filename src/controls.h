@@ -2,13 +2,14 @@
 // buttons and the frontend's own actions. Changed in the pause menu's CONTROLS page and kept in
 // settings.ini as key_<action>=<SDL keycode> and pad_<action>=<input> lines.
 //
-// Adapted from Pokémon FullDex's frontend/controls.h (GPLv3, https://github.com/mamesj/pokemon-fulldex).
+// Adapted from Pokémon FullDex (GPLv3), frontend/controls.h; modified for this project, 2026.
+// https://github.com/mamesj/pokemon-fulldex
 // The bindings form a permutation: giving an action a key that another one had swaps the two, so
 // no key ever does two things and none is lost.
 #pragma once
 #include <string>
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace Controls
 {

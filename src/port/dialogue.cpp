@@ -12,11 +12,11 @@
 #include "romdata.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
-// The game's speaker codes (research: 0x3F no speaker, 0x40 the player) and its am / pm.
+// The game's speaker codes (the game's code: 0x3F no speaker, 0x40 the player) and its am / pm.
 constexpr int kSpeakerNone = 0x3F, kSpeakerPlayer = 0x40;
 // The game's own colours around the portrait on the touch screen: its frame's inner bevels (the
 // rest are the panel's: console.h, the kit's theme).

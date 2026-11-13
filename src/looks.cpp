@@ -7,7 +7,7 @@
 #include "GPU3D.h"
 #include "GPU3D_Wide.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {

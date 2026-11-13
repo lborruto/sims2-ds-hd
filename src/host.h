@@ -15,7 +15,7 @@ inline std::string SavePath;
 
 // The microphone (mic.cpp reads these; main.cpp sets them every frame from the settings, the
 // blow key and the script's "blow").
-inline sims2wide::MicMode MicMode = sims2wide::MicMode::BlowKey;
+inline sims2hd::MicMode MicMode = sims2hd::MicMode::BlowKey;
 inline bool MicBlow = false;
 inline bool MicForce = false; // the CONSOLE vacuum's Y: a blow in any mic mode
 

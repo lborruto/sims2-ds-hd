@@ -9,7 +9,7 @@
 #include "romdata.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -207,7 +207,7 @@ void BuildInteract(Composition& c, const MenuView& v, int focus, const GameState
 }
 }
 
-namespace sims2wide
+namespace sims2hd
 {
 MenuMeasure MeasureInteract(const RomData& rom)
 {

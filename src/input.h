@@ -17,7 +17,7 @@
 #include "touchscript.h"
 #include "video.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 struct Input
 {

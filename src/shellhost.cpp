@@ -16,7 +16,7 @@
 #include "shots.h"
 #include "state.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 using W = OwnWordId;
 using shell::Act;

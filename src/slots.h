@@ -9,7 +9,7 @@
 
 #include "common.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 constexpr int kStateSlots = 4;
 constexpr int kThumbW = 320; // a thumbnail's width (its height from the picture's shape)

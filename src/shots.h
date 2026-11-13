@@ -6,7 +6,7 @@
 #include "common.h"
 #include "compose.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 void WriteShot(const std::string& path, const u32* top, const u32* bottom);
 // Any RGB picture (the window's, from video.cpp).

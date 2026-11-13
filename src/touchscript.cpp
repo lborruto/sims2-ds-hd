@@ -4,7 +4,7 @@
 
 #include "common.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 static int Clamp(int v, int hi) { return std::clamp(v, 0, hi); }
 

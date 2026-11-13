@@ -11,7 +11,7 @@
 #include "romdata.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // A sprite in the archive, as the game's own 8-byte sprite definitions name one: the tiles,
 // the descriptor and the palette resource. The game's definitions put the three side by side

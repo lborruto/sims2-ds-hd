@@ -1,6 +1,6 @@
 // The unmapped-screen recorder: the first time the game shows a screen the RAM map does not
 // know (an (overlay, vtable) pair gamestate.cpp has no name for), save a state and a picture, so
-// the owner's normal play collects the screens still to map. Window runs only (or --record-dir).
+// the maintainer's normal play collects the screens still to map. Window runs only (or --record-dir).
 #pragma once
 #include <set>
 #include <string>
@@ -9,7 +9,7 @@
 #include "NDS.h"
 #include "app.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class Recorder
 {

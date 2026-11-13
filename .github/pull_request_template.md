@@ -2,7 +2,7 @@
 
 ## How it was checked
 
-- [ ] `ninja -C build sims2wide` builds with no new warnings
+- [ ] `ninja -C build sims2hd` builds with no new warnings
 - [ ] The unit tests pass; ran the game headless from the situations it touches (`--compose` shots for a picture change)
 - [ ] Played it in the window, if it changes controls or the window
 

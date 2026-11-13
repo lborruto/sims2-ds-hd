@@ -3,20 +3,20 @@
 # taps targets from a save state headless, and the run must show the tap's effect: either the
 # recognised screens (--print-screen, the whole sequence) or a last picture that differs from
 # the same run without that tap (a base script). Targets whose tap shows nothing (an empty slot,
-# a list with one entry) are placed from shots only: CLAUDE.md, traps.
+# a list with one entry) are placed from shots only: docs/dev-notes.md, traps.
 # Needs the ROM and the save states (not in git, so not in CI):
 #   bash tests/hotspots_check.sh
-# Override with SIMS2WIDE, ROM, SHOTS and COMPLETE_SAVE (or CARDS_SAVE) as for
+# Override with SIMS2HD, ROM, SHOTS and COMPLETE_SAVE (or CARDS_SAVE) as for
 # tests/screens_check.sh. The casino checks start from act-cards on its complete save and quit
 # the card game first (the casino's panel reads Panel/Interact).
 set -u
 repo=$(cd "$(dirname "$0")/.." && pwd)
-bin=${SIMS2WIDE:-$repo/build/sims2wide}
+bin=${SIMS2HD:-$repo/build/sims2hd}
 rom=${ROM:-$(find "$repo/roms" -name "*.nds" 2>/dev/null | head -n 1)}
 shots=${SHOTS:-$repo/shots}
 complete_save=${COMPLETE_SAVE:-${CARDS_SAVE:-$repo/saves/complete-play.sav}}
 dir=$repo/scripts/hotspots
-[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2wide)"; exit 2; }
+[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2hd)"; exit 2; }
 [ -f "$rom" ] || { echo "no ROM (set ROM)"; exit 2; }
 [ -f "$complete_save" ] || { echo "no $complete_save (COMPLETE_SAVE): the card game and casino checks need it"; exit 2; }
 tmp=$(mktemp -d)
@@ -27,7 +27,7 @@ tmp=$(mktemp -d)
 max_sims=${MAX_SIMS:-4}
 [ "$max_sims" -ge 1 ] 2>/dev/null || max_sims=1
 real_bin=$bin
-sims2wide_slot() {
+sims2hd_slot() {
     local i slot=
     while [ -z "$slot" ]; do
         for i in $(seq 1 "$max_sims"); do mkdir "$tmp/slot$i" 2>/dev/null && { slot=$tmp/slot$i; break; }; done
@@ -38,7 +38,7 @@ sims2wide_slot() {
     rmdir "$slot"
     return $rc
 }
-bin=sims2wide_slot
+bin=sims2hd_slot
 
 # script:state:frames:expect, expect = "screens=A B C" (the screens printed, in order) or
 # "differs=BASE" (the last picture differs from the run of scripts/hotspots/BASE.txt).
@@ -127,7 +127,7 @@ run() {
     mkdir -p "$out"
     if [ ! -f "$shots/$state.st" ]; then echo "no save state $shots/$state.st" > "$out.log"; : > "$out.out"; return; fi
     # The town's states on the clock their output is compared with; act-cards after the time it
-    # was saved at (never earlier: CLAUDE.md, the clock), or the pictures would differ by the
+    # was saved at (never earlier: docs/dev-notes.md, the clock), or the pictures would differ by the
     # second the run started.
     local opts=(--clock "2026-01-01 12:00")
     [ "$state" = act-cards ] && { cp "$complete_save" "$out.sav"; opts=(--clock "2026-11-05 12:00"); }

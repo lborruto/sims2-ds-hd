@@ -156,12 +156,12 @@ jobs:
       - name: Configure
         run: |
           if [ "$RUNNER_OS" = macOS ]; then
-            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSIMS2WIDE_MAC_APP=ON \
+            cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DSIMS2HD_MAC_APP=ON \
               "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
           else
             cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
           fi
-      - run: ninja -C build sims2wide
+      - run: ninja -C build sims2hd
       # The unit tests (plain executables; no ROM needed). On a Mac the app is universal but these
       # are built for the host (Intel here), so they run as they are. controls_test opens SDL.
       - name: Unit tests
@@ -179,15 +179,15 @@ jobs:
       # halves; the Intel runner can only run its own (the Apple silicon one is checked present).
       - name: Version check
         run: |
-          want="sims2wide $(sed -n 's/^project(sims2wide VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
+          want="sims2hd $(sed -n 's/^project(sims2hd VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
           if [ "$RUNNER_OS" = macOS ]; then
-            bin="build/Sims 2 DS Wide.app/Contents/MacOS/Sims 2 DS Wide"
+            bin="build/Sims 2 DS HD.app/Contents/MacOS/Sims 2 DS HD"
             lipo "$bin" -verify_arch arm64 x86_64
             got="$(arch -x86_64 "$bin" --version)"
             echo "x86_64: $got"
             test "$got" = "$want"
           else
-            got="$(build/sims2wide --version)"
+            got="$(build/sims2hd --version)"
             echo "$got"
             test "$got" = "$want"
           fi
@@ -219,15 +219,15 @@ jobs:
             mingw-w64-ucrt-x86_64-cmake
             mingw-w64-ucrt-x86_64-ninja
       - run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-      - run: ninja -C build sims2wide
+      - run: ninja -C build sims2hd
       - name: Version check, and no DLL needed beyond Windows' own
         run: |
-          want="sims2wide $(sed -n 's/^project(sims2wide VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
-          got="$(build/sims2wide.exe --version)"
+          want="sims2hd $(sed -n 's/^project(sims2hd VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
+          got="$(build/sims2hd.exe --version)"
           echo "$got"
           test "$got" = "$want"
           # Every DLL the program imports must be part of Windows itself.
-          objdump -p build/sims2wide.exe | sed -n 's/^\s*DLL Name: //p' | tee dlls.txt
+          objdump -p build/sims2hd.exe | sed -n 's/^\s*DLL Name: //p' | tee dlls.txt
           if grep -viE '^(kernel32|user32|gdi32|winmm|imm32|ole32|oleaut32|version|advapi32|setupapi|shell32|comdlg32|ws2_32|iphlpapi|dinput8|dxguid|cfgmgr32|hid|msvcrt|ucrtbase|api-ms-win-[a-z0-9-]+)\.dll$' dlls.txt; then
             echo "::error::the program needs a DLL that is not part of Windows"
             exit 1

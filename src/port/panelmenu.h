@@ -5,7 +5,7 @@
 // module builds its MenuView (port/menuview.h) from the game's state; the navigator moves the
 // focus over it and performs the items' actions; this file draws the same view with that focus.
 // A tab whose data does not read (its part of GameState not valid, no ROM strings) gets no view:
-// CONSOLE keeps milestone 1's composition (the touch screen 3x) for it.
+// CONSOLE keeps the framed-screen composition (the touch screen 3x) for it.
 //
 // Mouse: invisible touchable pieces (alpha 0) lie over the HD items and map them onto the game's
 // own touch targets (a row onto its arrow, a tab onto its icon), so a click does what the item
@@ -20,7 +20,7 @@
 #include "screens.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;

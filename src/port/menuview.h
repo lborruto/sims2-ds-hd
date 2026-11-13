@@ -21,7 +21,7 @@
 #include "layout.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 // One step of an action, run in order over game frames by the navigator.
 struct MenuStep
@@ -100,7 +100,7 @@ enum class MenuButton { Left, Right, X, Y, LB, RB, Start, Count };
 
 struct MenuView
 {
-    bool valid = false;               // false: the screen keeps milestone 1's composition and HotspotsFor
+    bool valid = false;               // false: the screen keeps the framed-screen composition and HotspotsFor
     std::vector<ViewItem> items;
     // Left / Right, X, Y, LB / RB: performed whatever the focus (Interact: Left / Right the previous
     // / next target; the stat panel: LB / RB its pages); an empty Left / Right moves the focus

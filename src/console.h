@@ -1,6 +1,6 @@
 // CONSOLE: the game on one 16:9 screen. Per recognised bottom screen (screens.h), a composition
 // of pieces of the two DS screens on a 1280 x 720 canvas, as in the approved mockup: in town (the
-// panel) the world fills the canvas (a small hint for the HD menu; milestone 1: a rail of the touch
+// panel) the world fills the canvas (a small hint for the HD menu; the framed screens: a rail of the touch
 // screen's tab icons and phone at the right); the menu, the phone, popups and Give Item are the whole touch screen 3x over the dimmed
 // world (framed for SaveSlots and Unknown); a black load is the bare backdrop; without a
 // HUD (the front end) the top screen at the left and the touch screen 2.5x at the right, each in its frame; a conversation is the world with the
@@ -15,7 +15,7 @@
 #include "port/statusbar.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;
@@ -28,7 +28,7 @@ constexpr u32 kDimArgb = 0x8C000000;
 
 // Town with the game's words (RomData and RAM reading): no rail, the HD menu (Back / E) has the
 // tabs; a hint chip (the button, the word) sits at the canvas's right edge level with the status bar.
-// Without them (milestone 1) the rail stays, the only way to see the tabs: at the canvas's right
+// Without them (the framed screens) the rail stays, the only way to see the tabs: at the canvas's right
 // edge, vertically centred, the phone icon above the tab column, both 2x, in a frame.
 constexpr Rect kRailFrame {1168, 130, 88, 460};
 constexpr Rect kRailPhoneFrom {222, 4, 30, 30}, kRailPhoneTo {1182, 144, 60, 60};
@@ -94,18 +94,18 @@ void AddHints(Composition& c, const std::vector<Hint>& hints);
 // (port/statusbar.h) wherever the world shows the game's HUD, the game's own bar (the top
 // picture's last 16 of 192 rows) cropped off that world: town, the menu over the dimmed world,
 // and under the small world of the activities that keep the HUD (Social, Vacuum, Catalogue,
-// Build; not Cards). Without them: milestone 1's compositions, the game's HUD left in the world.
+// Build; not Cards). Without them: the framed-screen compositions, the game's HUD left in the world.
 // game, rom, bottom (the RAM's state, read, the game's strings, the DS's touch screen; all
 // given): a conversation is the HD one (port/dialogue.h; its panel alone while the game has no
-// page drawn, dialogue not valid); without them, milestone 1's (the game's own box rebuilt wide
+// page drawn, dialogue not valid); without them, the framed-screen one (the game's own box rebuilt wide
 // from pieces). The panel's menu (menuOpen on the panel) is the HD one (port/panelmenu.h) when
 // its tab's view is valid (PanelMenuView: game and rom given, the tab's data read); focus is then
 // an index in that view's items; icons (null: none drawn) gives the game's icons. Else
-// milestone 1's: the touch screen 3x over the dimmed world. armed: the view item whose X is
+// the framed screens: the touch screen 3x over the dimmed world. armed: the view item whose X is
 // armed (the navigator's Armed(): Pockets' bin asking), 0 none. pointer: a pointing minigame's
 // pointer (port/minigame.h draws it; null: none).
 // Which of BuildConsole's compositions a frame got (--print-console; ConsoleHold, consolehold.h).
-// The *M1 ones are milestone 1's (the game's own screen framed): FrontM1 the front end's two
+// The *M1 ones are the framed-screen ones (the game's own screen framed): FrontM1 the front end's two
 // screens, CursorM1 the touch screen 3x over the dimmed world, DialogueM1 the game's box rebuilt,
 // ActivityM1 an activity's two screens; the rest are the HD ones (Backdrop the bare canvas of a
 // black load, WorldOnly / Veiled the world while the panel comes).
@@ -122,7 +122,7 @@ Composition BuildConsole(ScreenState s, bool menuOpen, int focus, int topW, int 
 // opened from it, the game passing through Interact first): the dimmed world and the status bar
 // alone while the panel shows with its menu closed, never the world's flash. worldOnlyFrames: the
 // frames in a row the panel was coming without its tab read, or no bottom object at all
-// (App::consoleWorldOnly): the town's world for kWorldOnlyMax of them, then milestone 1's framed
+// (App::consoleWorldOnly): the town's world for kWorldOnlyMax of them, then the framed
 // touch screen and the cursor's hints (an unforeseen screen is never a dead end).
 constexpr int kWorldOnlyMax = 10;
 // prompt: the Interact target's steadiness (App::consolePrompt, port/prompt.h; null: none): the

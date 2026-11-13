@@ -2,7 +2,7 @@
 #pragma once
 #include <string>
 
-namespace sims2wide
+namespace sims2hd
 {
 // On the terminal always, and in a dialog box too when dialog is set (started by a double click).
 void Tell(bool dialog, const std::string& msg);

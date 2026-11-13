@@ -9,7 +9,7 @@
 #include "layout.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 enum class Src { Top, Bottom };
 

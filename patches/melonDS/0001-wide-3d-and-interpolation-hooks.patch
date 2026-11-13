@@ -10,7 +10,7 @@ index 1204741..9374df5 100644
  
  namespace melonDS
  {
-+GPU3DLooks Looks3D; // sims2wide
++GPU3DLooks Looks3D; // sims2hd
  using Platform::Log;
  using Platform::LogLevel;
  
@@ -18,7 +18,7 @@ index 1204741..9374df5 100644
      // TODO: work out how it works on the real thing
      // the normalization part is a wild guess
  
-+    // sims2wide: recorded so that the frame can be submitted again (GPU3D_Wide.cpp).
++    // sims2hd: recorded so that the frame can be submitted again (GPU3D_Wide.cpp).
 +    if ((Looks3D.InterpolationEnabled || Wide.Owner == this) && !Looks3D.InReplay)
 +    {
 +        GPU3DLooks::RawPolygon& raw = Looks3D.RawCurrent.emplace_back();
@@ -48,7 +48,7 @@ index 1204741..9374df5 100644
          cube[i].Position[3] = ((s64)x*ClipMatrix[3] + (s64)y*ClipMatrix[7] + (s64)z*ClipMatrix[11] + (s64)0x1000*ClipMatrix[15]) >> 12;
      }
  
-+    // sims2wide (from Pokemon FullDex): with the widescreen picture on, the test is made against
++    // sims2hd (from Pokemon FullDex): with the widescreen picture on, the test is made against
 +    // the wide view, so that the game also draws what is only visible beside the DS's own
 +    // picture. The one place where widescreen changes what the game itself sees.
 +    if (Wide.Owner == this && Wide.ViewWidth > 256)
@@ -64,7 +64,7 @@ index 1204741..9374df5 100644
      return a->SortKey < b->SortKey;
  }
  
-+// sims2wide: replays the frame just submitted with every vertex moved halfway back towards
++// sims2hd: replays the frame just submitted with every vertex moved halfway back towards
 +// where the same polygon was in the previous frame.
 +void GPU3D::BuildInterpolatedFrame() noexcept
 +{
@@ -96,7 +96,7 @@ index 1204741..9374df5 100644
                  RenderNumPolygons = NumPolygons;
                  RenderFrameIdentical = false;
 +
-+                // sims2wide: interpolate only on a steady every-other-frame cadence, and never
++                // sims2hd: interpolate only on a steady every-other-frame cadence, and never
 +                // while the 3D picture is being captured into video memory.
 +                Looks3D.InterpPending = false;
 +                Looks3D.InterpShowReal = false;
@@ -118,7 +118,7 @@ index 1204741..9374df5 100644
                      && memcmp(RenderFogDensityTable + 1, FogDensityTable, 32) == 0
                      && memcmp(RenderToonTable, ToonTable, 32*2) == 0;
 +
-+                // sims2wide: the previous display frame showed the in-between picture.
++                // sims2hd: the previous display frame showed the in-between picture.
 +                if (Looks3D.InterpShowReal)
 +                {
 +                    RenderFrameIdentical = false;
@@ -131,12 +131,12 @@ index 1204741..9374df5 100644
  
  void GPU3D::VCount215(GPU& gpu) noexcept
  {
-+    // sims2wide: the wide picture drawn in the background reads texture memory, which rendering
++    // sims2hd: the wide picture drawn in the background reads texture memory, which rendering
 +    // a frame is about to bring up to date.
 +    WideWaitForTextures();
 +    if (Looks3D.InterpPending)
 +    {
-+        // sims2wide: draw the in-between frame now; the real one follows on the next display frame.
++        // sims2hd: draw the in-between frame now; the real one follows on the next display frame.
 +        std::array<Polygon*,2048> realList = RenderPolygonRAM;
 +        const u32 realCount = RenderNumPolygons;
 +        RenderPolygonRAM = Looks3D.InterpRenderPolygonRAM;
@@ -171,7 +171,7 @@ index 08c2208..49e1028 100644
  class Renderer3D;
  class NDS;
  
-+struct WideAccess; // sims2wide: the sharper and widescreen 3D picture (src/melonds_ext/GPU3D_Wide.cpp)
++struct WideAccess; // sims2hd: the sharper and widescreen 3D picture (src/melonds_ext/GPU3D_Wide.cpp)
 +
  class GPU3D
  {
@@ -183,7 +183,7 @@ index 08c2208..49e1028 100644
      void Write16(u32 addr, u16 val) noexcept;
      void Write32(u32 addr, u32 val) noexcept;
      void Blit(const GPU& gpu) noexcept;
-+    // sims2wide: in-between frames (GPU3D.cpp, GPU3DLooks below).
++    // sims2hd: in-between frames (GPU3D.cpp, GPU3DLooks below).
 +    void BuildInterpolatedFrame() noexcept;
  private:
      melonDS::NDS& NDS;
@@ -192,7 +192,7 @@ index 08c2208..49e1028 100644
      u32 ScrolledLine[256]; // not part of the hardware state, don't serialize
  };
  
-+// sims2wide (from Pokemon FullDex): what the sharper and widescreen 3D picture and the
++// sims2hd (from Pokemon FullDex): what the sharper and widescreen 3D picture and the
 +// in-between frames need, kept outside GPU3D so that melonDS's own objects keep their memory
 +// layout (with everything off, the output stays byte for byte melonDS's). One console.
 +struct GPU3DLooks
@@ -240,7 +240,7 @@ index 9f6e2d7..c074c75 100644
          Platform::Semaphore_Wait(Sema_RenderDone);
  }
  
-+// sims2wide: the list the render thread draws, a copy: interpolation swaps the GPU's list for
++// sims2hd: the list the render thread draws, a copy: interpolation swaps the GPU's list for
 +// one call of RenderFrame and puts it back before the thread is done. (Not a member, so that
 +// the renderer's memory layout stays melonDS's own.)
 +static Polygon* ThreadPolygons[2048];
@@ -253,7 +253,7 @@ index 9f6e2d7..c074c75 100644
  
      if (RenderThreadRunning.load(std::memory_order_relaxed))
      {
-+        // sims2wide: the thread draws a copy of the list (ThreadPolygons).
++        // sims2hd: the thread draws a copy of the list (ThreadPolygons).
 +        ThreadNumPolygons = (int)gpu.GPU3D.RenderNumPolygons;
 +        memcpy(ThreadPolygons, &gpu.GPU3D.RenderPolygonRAM[0], ThreadNumPolygons * sizeof(Polygon*));
          // "Render thread, you're up! Get moving."
@@ -263,7 +263,7 @@ index 9f6e2d7..c074c75 100644
  void SoftRenderer::RestartFrame(GPU& gpu)
  {
      SetupRenderThread(gpu);
-+    // sims2wide: the list the thread draws (see RenderFrame).
++    // sims2hd: the list the thread draws (see RenderFrame).
 +    ThreadNumPolygons = (int)gpu.GPU3D.RenderNumPolygons;
 +    memcpy(ThreadPolygons, &gpu.GPU3D.RenderPolygonRAM[0], ThreadNumPolygons * sizeof(Polygon*));
      EnableRenderThread();
@@ -286,7 +286,7 @@ index a201c6a..34a65dc 100644
      void StopRenderThread();
  private:
      friend void GPU3D::DoSavestate(Savestate* file) noexcept;
-+    friend struct WideAccess; // sims2wide: the wide picture shares texture decoding
++    friend struct WideAccess; // sims2hd: the wide picture shares texture decoding
      // Notes on the interpolator:
      //
      // This is a theory on how the DS hardware interpolates values. It matches hardware output

@@ -8,7 +8,7 @@
 // 2461), then the daily cost: the room's base value (2463), the furniture's service charge (2464),
 // the hotel score's bonus (2465) and the total (2467), in simoleons ("$@1" 28).
 //
-// What performs, always the game's own taps (the research's touch points, m4 §3): A on a line taps
+// What performs, always the game's own taps (the touch points measured in the game): A on a line taps
 // it (x 40, the line's row): the game opens its hint box (2594..2603), drawn in HD in the popups'
 // look (port/popup.h, BuildHintBox) with the line's words as its title; while it is up A and B
 // close it (a tap on the game's screen away from the lines, which closes it) and the focus comes
@@ -19,7 +19,7 @@
 #include "port/menuview.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;
@@ -64,14 +64,14 @@ constexpr u32 kRiLineId = kModRoomInfo | (1u << 20), kRiHintCloseId = kModRoomIn
 constexpr u32 RoomInfoLineId(int place, int line) { return kRiLineId | ((u32)place << 8) | (u32)line; }
 
 // Which hint the game opens for a stylus-down at DS (x, y) on the room info (its own rectangles,
-// research m4 §3), -1 none: what the frame loop fills RoomInfoState::hintId with.
+// docs/research/ram-map.md), -1 none: what the frame loop fills RoomInfoState::hintId with.
 int RoomInfoHintAt(int x, int y, bool occupied);
 
 // The view (valid when RAM's room info reads and the game's strings are there). No hint up: one
 // item per line the game shows (the vacant room: name, Vacant and the four costs), A its tap; B
 // the X. A hint up (its string known): a popup of the screen's own, one Close item, A and B a tap
 // away from the lines; its string unknown (the box was up before the port saw a touch): no view
-// (milestone 1's picture).
+// (the framed screens).
 MenuView RoomInfoView(ScreenState s, const GameState* game, const RomData* rom);
 MenuView RoomInfoViewOf(ScreenState s, const GameState& game, const RomData* rom = nullptr);
 // Whether the hint box is up (and its view is the box's).

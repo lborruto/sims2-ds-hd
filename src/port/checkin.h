@@ -12,7 +12,7 @@
 //     "Vacant" (2462); a room not built is flat;
 //   beside it, the focused room: its picture 3x, its name, who stays there (2458) or "Vacant".
 //
-// What performs, always the game's own taps (the research's touch points, m4 §2):
+// What performs, always the game's own taps (the touch points measured in the game):
 //   A on a room: its row button (20, 39 + 33 i). The Registry opens the room's info (port/roominfo.h)
 //     for a built room; a guest's check-in checks the guest into a built, vacant room (the game
 //     then talks: the guest's speech). A room the game refuses stays focusable (its line is read)
@@ -24,7 +24,7 @@
 #include "port/menuview.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;

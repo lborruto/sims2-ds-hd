@@ -1,6 +1,6 @@
 // The touch targets of the game's screens, in DS bottom-screen pixels: where to tap each button
 // and the area the focus ring frames. Measured on save states and checked by tapping each one
-// headless (scripts/hotspots/, tests/hotspots_check.sh); CLAUDE.md lists what each tap does.
+// headless (scripts/hotspots/, tests/hotspots_check.sh); docs/dev-notes.md lists what each tap does.
 // CONSOLE's navigator moves a focus between them and taps the focused one.
 #pragma once
 #include <vector>
@@ -8,7 +8,7 @@
 #include "layout.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 struct Hotspot
 {

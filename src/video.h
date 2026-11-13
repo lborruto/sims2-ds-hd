@@ -9,7 +9,7 @@
 #include "console.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 struct Video
 {

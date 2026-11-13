@@ -8,7 +8,7 @@
 #include "port/ownwords.h"
 #include "ui/font.h"
 
-namespace sims2wide::shell
+namespace sims2hd::shell
 {
 using namespace ui;
 using W = OwnWordId;

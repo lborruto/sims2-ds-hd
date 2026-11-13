@@ -9,7 +9,7 @@
 #pragma once
 #include "common.h"
 
-namespace sims2wide::mic
+namespace sims2hd::mic
 {
 void Start();
 void Stop();

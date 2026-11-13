@@ -1,5 +1,5 @@
-// The front end's first screens in HD (milestone 5): the boot screens, the intro video, the title
-// and the main menu, driven by the controller (GameState::front, research m5-front-end §1, §5).
+// The front end's first screens in HD: the boot screens, the intro video, the title
+// and the main menu, driven by the controller (GameState::front).
 //
 // Boot (CBGDisplayMenu in the bottom slot, the intro video CVideoScreenMenu in the top one from
 // the first splash on): the video large at the left, framed, and the game's own splash (the
@@ -8,7 +8,7 @@
 // ends the video and opens the title: there A or Start tap the splash (an A and a START chip
 // under it); the earlier splashes take no touch (measured: a tap during them changes nothing), so
 // they have no item: the DS's own Start and A are passed on there (MenuView::passKeys), as before
-// the view. A popup splash (mode 4) has no view (milestone 1's picture).
+// the view. A popup splash (mode 4) has no view (the framed screens).
 //
 // The title (CTitleSceenMenu phase 0, "Touch the Touch Screen to begin"): the game's own top
 // screen (its backdrop and logo) as large as the canvas holds it, an A chip with the game's blue
@@ -23,7 +23,7 @@
 // 1-2 and is dead after a choice (phase 4): the buttons are drawn but disabled then (no focus, A
 // dropped), so no press lands mid-fade. DS Wireless opens the game's own Wireless screen (out of
 // scope beyond it: a partner DS); Settings, Load-a-Sim and Wireless are later tasks' screens or
-// milestone 1's, whose B (the game's own) goes back to the title at phase 0.
+// the framed-screen one, whose B (the game's own) goes back to the title at phase 0.
 //
 // Mouse: the title's whole canvas maps onto the game's big button; each HD button onto the
 // game's button box; the boot's splash is the touch screen itself.
@@ -33,7 +33,7 @@
 #include "port/menuview.h"
 #include "screens.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 class RomData;
 class IconCache;
@@ -78,7 +78,7 @@ constexpr int kFrArrow = 64, kFrIconW = 56;   // the ▶'s box at the button's r
 constexpr Rect FrontButtonRect(int i) { return {kFrButtonX, kFrButtonY0 + i * kFrButtonDy, kFrButtonW, kFrButtonH}; }
 
 // Whether the front end shows one of this file's screens, and its view (valid false otherwise:
-// milestone 1's front-end picture): the boot (a splash 0-3, 5, 6), the title, the main menu, read
+// the framed front end): the boot (a splash 0-3, 5, 6), the title, the main menu, read
 // from RAM, with the game's strings. Built every frame by the navigator's caller and CONSOLE.
 // The boot goes by on its own: nothing up yet, the intro video, or a splash that takes no touch
 // (the legal, EA and Maxis ones, modes 1-3, and the zoom and blank between, 5-6). False from the

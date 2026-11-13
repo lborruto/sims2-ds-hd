@@ -1,5 +1,5 @@
-// CONSOLE's picture held through the game's swaps: when a frame would fall to one of milestone
-// 1's compositions (the game's own screen framed: ConsoleBranch's *M1) for a moment (an object
+// CONSOLE's picture held through the game's swaps: when a frame would fall to one of the
+// framed-screen compositions (the game's own screen framed: ConsoleBranch's *M1) for a moment (an object
 // swap, a page in flight, a part of RAM not reading for a frame), the last HD picture stays up,
 // for kMaxFrames frames at most, and takes no input (the navigator does not run, no piece takes
 // the mouse): a tap never lands on a stale picture.
@@ -9,7 +9,7 @@
 #include "compose.h"
 #include "console.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 struct App;
 
@@ -37,7 +37,7 @@ public:
     const Composition& ShownNow() const { return shown_; }
 
     // Counts over the run (--print-console's summary): frames whose own composition was
-    // milestone 1's, frames shown so, frames held.
+    // the framed-screen one, frames shown so, frames held.
     long fresh1 = 0, shown1 = 0, held = 0, frames = 0;
 
 private:
@@ -48,7 +48,7 @@ private:
     std::vector<u32> bottom_, top_;   // the held picture's pixels (its images' live crops)
 };
 
-// Where milestone 1's picture is the design, not a swap (never held): the furniture editor, DS
+// Where the framed screens are the design, not a swap (never held): the furniture editor, DS
 // Wireless's slots, an in-game video, the boot's popup splash, the in-game Create-a-Sim pages without their view, a room hint not known,
 // RAM or the game's words not reading.
 bool ConsoleM1ByDesign(const App& app);

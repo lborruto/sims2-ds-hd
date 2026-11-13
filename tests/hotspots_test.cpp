@@ -4,11 +4,12 @@
 // Where each target is and what tapping it does was measured headless (scripts/hotspots/).
 //   ninja -C build hotspots_test && ./build/hotspots_test
 #include <cstdio>
+#include <cstring>
 #include <vector>
 
 #include "hotspots.h"
 
-using namespace sims2wide;
+using namespace sims2hd;
 
 static int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond); failures++; } } while (0)

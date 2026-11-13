@@ -5,7 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace Controls
 {

@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-namespace sims2wide
+namespace sims2hd
 {
 void Sample::Take(const u32* screen, float& changed, float& luma)
 {
@@ -55,7 +55,7 @@ Layout AutoLayout::Update(const u32* topPx, const u32* bottomPx, bool& mainIsTop
         mainIsTop = !bottomBig;
     }
 
-    static const char* probe = getenv("SIMS2WIDE_PROBE");
+    static const char* probe = getenv("SIMS2HD_PROBE");
     static const int probeEvery = probe ? atoi(probe) : 0;
     if (probeEvery > 0 && frame % probeEvery == 0)
         fprintf(stderr, "probe frame %ld: hud %d social %d warm %d vacuum %d | top motion %.4f luma %.0f | bottom motion %.4f luma %.0f\n",

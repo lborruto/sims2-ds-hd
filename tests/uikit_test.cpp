@@ -11,8 +11,8 @@
 
 #include "ui/kit.h"
 
-using namespace sims2wide;
-using namespace sims2wide::ui;
+using namespace sims2hd;
+using namespace sims2hd::ui;
 
 static int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond); failures++; } } while (0)

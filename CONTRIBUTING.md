@@ -1,6 +1,6 @@
-# Contributing to sims2-ds-wide
+# Contributing to sims2-ds-hd
 
-Thanks for helping. sims2-ds-wide plays The Sims 2 (DS) on a computer like a console game: one
+Thanks for helping. sims2-ds-hd plays The Sims 2 (DS) on a computer like a console game: one
 window, the melonDS core, and the touch screen's screens redrawn in HD from what the game shows
 in its memory. The bar is: nothing of the game ever in the repository, CONSOLE as the default,
 and every change checked on real pictures of the game.
@@ -32,19 +32,19 @@ IOKit, GameController.framework, HIDAPI; Linux: evdev, HIDAPI).
 On a Mac, Xcode's command line tools are enough (plus CMake and Ninja, from Homebrew or
 `pip install cmake ninja`; CMake 3.21 to 4.x work).
 
-    git clone --recursive https://github.com/lborruto/sims2-ds-wide.git && cd sims2-ds-wide
+    git clone --recursive https://github.com/lborruto/sims2-ds-hd.git && cd sims2-ds-hd
     cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
-    ninja -C build sims2wide
+    ninja -C build sims2hd
 
 The first build compiles melonDS and SDL (a few minutes); after that, changing `src/` rebuilds
 in seconds. Configuring also applies `patches/melonDS/*.patch` to the submodule's files (see
 [How it works](#how-it-works)): `git status` does not show that (`ignore = dirty` in
 `.gitmodules`), and `git -C melonDS checkout -- .` gives the pristine files back until the next
-configure. `build/sims2wide` is a plain program for the command line on every system.
+configure. `build/sims2hd` is a plain program for the command line on every system.
 
-- **The Mac app**: add `-DSIMS2WIDE_MAC_APP=ON` (and `"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+- **The Mac app**: add `-DSIMS2HD_MAC_APP=ON` (and `"-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
   -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0` for both kinds of Mac, as the release does) to get
-  `build/Sims 2 DS Wide.app`, with the icon made from `packaging/icon.png`.
+  `build/Sims 2 DS HD.app`, with the icon made from `packaging/icon.png`.
 - **Windows**: MinGW (UCRT64) from [MSYS2](https://www.msys2.org/), the toolchain melonDS itself
   uses there: `pacman -S mingw-w64-ucrt-x86_64-{gcc,cmake,ninja}`, then the same commands in the
   UCRT64 shell. The `.exe` is linked statically (no DLL beside it) and opens no console window;
@@ -55,7 +55,7 @@ configure. `build/sims2wide` is a plain program for the command line on every sy
 Before opening a pull request, build with no warnings from `src/` and run the unit tests (no ROM
 needed; CI runs them too):
 
-    ninja -C build sims2wide
+    ninja -C build sims2hd
     for t in layout touchscript hotspots screens navigator controls gamestate romdata uikit shell; do
         ninja -C build ${t}_test && ./build/${t}_test || break
     done
@@ -121,10 +121,12 @@ issue.
   ignores. Screenshots in `docs/screenshots` are fine. Nothing that tells people where to get a
   ROM. The game's words and pictures are read from the player's ROM at run time.
 - **CONSOLE is the default.** The other layouts are there by choice.
-- **Read the game, never change it.** No decompilation: the port reads the game's RAM (and only
-  reads it) and the ROM's own data, and every address comes with the save states that show it
-  holds ([docs/research/ram-map.md](docs/research/ram-map.md)). Without them (another version of
-  the game) it falls back to the pixel rules.
+- **Read the game, never change it.** No game code or data is in the repository. Addresses and
+  formats were worked out by watching RAM and reading the game's code in a disassembler, for
+  interoperability; the port reads RAM (and only reads it) and the ROM's own data at run time,
+  and every address comes with the save states that show it holds
+  ([docs/research/ram-map.md](docs/research/ram-map.md)). Without them (another version of the
+  game) it falls back to the pixel rules.
 - **melonDS as it is.** The core is the upstream 1.1 release. The only changes are the small
   hooks in `patches/melonDS/` for the looks, applied at configure time; with the looks off they
   change nothing (the identity check). Another change to it needs an issue first; most belong
@@ -133,7 +135,8 @@ issue.
   stb_truetype, tinyfiledialogs, xBRZ (`src/thirdparty/xbrz`, 1.8 from its SourceForge release,
   unchanged: GPLv3 like the program, which is why it may be used; its licence beside it as
   `LICENSE.txt`; the release archives' `LICENSE` covers it), the Nunito font, SDL_GameControllerDB
-  (and Pillow for the scripts and `tools/sheet.py`).
+  (and Pillow for the scripts and `tools/sheet.py`). Each is in [THIRD-PARTY.md](THIRD-PARTY.md)
+  with its licence and the notices it asks for; a new one goes there too.
 - **The port's own words in five languages.** Where the game's string table has no word, the
   word goes in `src/port/ownwords.*` in English, French, German, Italian and Spanish, short.
 - **Measure performance claims**, more than once, on the same save state, with `--headless` (or
@@ -175,19 +178,20 @@ The headless mode runs the game without a window, about four times faster than r
 | `--dialogue-string ID` | (checks) the HD conversation shows string ID on every page (the longest strings' pictures) |
 | `--game-unknown-after N` | (checks) fake a new unmapped screen every 200 frames from frame N, to drive the recorder |
 | `--print-minigame` | print the minigame the bottom screen shows (the autopsy, detector, MooGoo, lottery, Drencher, crime game, mixer, save page, painting, cards, vacuum), read from RAM, when it changes |
-| `--no-romdata` | do not read the game's text: CONSOLE as in milestone 1 (the old status bar and conversation) |
+| `--print-vacuum` | print the vacuum's bowl (its things, the one held, the funnel's keep animation), read from RAM, when it changes |
+| `--no-romdata` | do not read the game's text: CONSOLE shows the framed screens (the game's own status bar and conversation) |
 | `--compose-scale N` | `--compose` pictures N times the canvas (1 to 4), the UI drawn at that size |
 | `--ui-demo` | the UI kit's demonstration drawn over the picture |
 | `--ui-scale N`, `--game-pictures smooth\|pixel` | the HD interface's size (60 to 150 %) and its game pictures' look; headless defaults to 100 % and Pixel |
 | `--game-language N` | the game's own language (the DS firmware's), 1 English to 5 Spanish; headless keeps English otherwise |
 | `--fast-boot` | the boot's splashes at full speed, as the window does |
-| `--print-console` | CONSOLE's composition (which branch, a held picture) when it changes, and the counts at the end: how many frames showed milestone 1's picture |
+| `--print-console` | CONSOLE's composition (which branch, a held picture) when it changes, and the counts at the end: how many frames showed the framed screens |
 | `--print-words` | The words CONSOLE's picture shows (its texts and chips' labels, in order, ` \| ` between) when they change: what a screen says, for the checks |
 | `--shell PAGE [--shell-at N]`, `--launch`, `--data-dir DIR`, `--print-shell` | the pause menu opened on a page, the launch panel first, where the save states and recent games go (none headless without it), and what they do |
-| `SIMS2WIDE_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
+| `SIMS2HD_PROBE=N` (environment) | print AUTO's signals every N frames: HUD, social, warm menu, each screen's motion and brightness |
 
 Every `*_check.sh` runs at most `MAX_SIMS` emulators at once (4 by default: set it lower on a
-slow or hot machine). Their pictures and runs of the minigames use the research's `G-*` states in
+slow or hot machine). Their pictures and runs of the minigames use the `G-*` save states in
 `shots/` and copies of the complete save.
 
 A headless run ends with a line that says what the DS clock reads, how often the hold wrote
@@ -236,8 +240,9 @@ limit are in [docs/dev-notes.md](docs/dev-notes.md). In short:
 | [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md) | what changed; how to report a vulnerability |
 
 The pictures in `docs/screenshots` are 1280 × 720 webp (quality 82), made headless from save
-states: `--headless --layout console --compose --wide --res3d 2 --interp --game-pictures smooth
---ui-scale 100`, the PNG saved with Pillow. Only the pictures README.md and docs/manual.md show
+states with the defaults' look: `--headless --layout console --compose --wide --res3d 2 --interp
+--game-pictures pixel --ui-scale 100`, the PNG saved with Pillow; all sixteen are taken again
+together (the states and clocks: [docs/dev-notes.md](docs/dev-notes.md#build-states-and-checks)). Only the pictures README.md and docs/manual.md show
 are kept.
 
 ## Commits and pull requests
@@ -255,8 +260,11 @@ are kept.
    `## [Unreleased]` above it.
 3. Merge to `main`, then tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 4. `release.yml` checks the tagged commit is on `main`, runs CI on it, checks that
-   `CMakeLists.txt` says `X.Y.Z`, builds `sims2-ds-wide-X.Y.Z-linux-x86_64.tar.gz`,
-   `sims2-ds-wide-X.Y.Z-macos-universal.zip` (the app, ad-hoc signed, not notarised) and
-   `sims2-ds-wide-X.Y.Z-windows-x86_64.zip`, attests their build provenance and creates the GitHub
-   release from the changelog section. A tag without its section, or with another version in
-   `CMakeLists.txt`, fails on purpose.
+   `CMakeLists.txt` says `X.Y.Z`, builds `sims2-ds-hd-X.Y.Z-linux-x86_64.tar.gz`,
+   `sims2-ds-hd-X.Y.Z-macos-universal.zip` (the app, ad-hoc signed, not notarised) and
+   `sims2-ds-hd-X.Y.Z-windows-x86_64.zip`, attests their build provenance and creates the GitHub
+   release from the changelog section, followed by the archives' checksums, how to open unsigned
+   programs the first time (a Mac: open it once, then *System Settings > Privacy & Security >
+   Open Anyway*; macOS 14 and earlier: right click > *Open*) and that the source is the tag
+   cloned with `--recursive` (GitHub's source archives lack the melonDS submodule). A tag
+   without its section, or with another version in `CMakeLists.txt`, fails on purpose.

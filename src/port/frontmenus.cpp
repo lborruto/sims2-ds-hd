@@ -12,7 +12,7 @@
 #include "romdata.h"
 #include "ui/kit.h"
 
-namespace sims2wide
+namespace sims2hd
 {
 namespace
 {
@@ -398,7 +398,7 @@ MenuView LoadViewOf(ScreenState s, const GameState& game, const RomData* rom)
 {
     MenuView v;
     const LoadScreen& ld = game.front.load;
-    // DS Wireless (the same slot list) keeps milestone 1's view: its tick opens the wireless lobby.
+    // DS Wireless (the same slot list) keeps the framed-screen view: its tick opens the wireless lobby.
     if (!FrontScreenState(s) || !game.valid || !ld.valid || ld.wireless) return v;
     if (rom) v.title = MenuWords(*rom, kStrLdTitle);
     // A popup over the slots (the game's "Loading"): the slots wait under it (port/popup.h).

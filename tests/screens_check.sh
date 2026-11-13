@@ -5,19 +5,19 @@
 # sit-storebuy, items whose description takes two lines are selected in the catalogue.
 # Needs the ROM and the save states (not in git, so not in CI):
 #   bash tests/screens_check.sh
-# Override with SIMS2WIDE (the program), ROM, SHOTS (the save states' folder), MORE_SHOTS (a
-# second folder, looked in when SHOTS lacks a state: a worktree's own shots/ besides the main
+# Override with SIMS2HD (the program), ROM, SHOTS (the save states' folder), MORE_SHOTS (a
+# second folder, looked in when SHOTS lacks a state: a second checkout's own shots/ besides the main
 # checkout's) and COMPLETE_SAVE (the downloaded complete save the casino and late hotel states
 # were made on; CARDS_SAVE is its old name); they default to this checkout's build/, roms/,
 # shots/, shots/ and saves/complete-play.sav.
 set -u
 repo=$(cd "$(dirname "$0")/.." && pwd)
-bin=${SIMS2WIDE:-$repo/build/sims2wide}
+bin=${SIMS2HD:-$repo/build/sims2hd}
 rom=${ROM:-$(find "$repo/roms" -name "*.nds" 2>/dev/null | head -n 1)}
 shots=${SHOTS:-$repo/shots}
 more_shots=${MORE_SHOTS:-$repo/shots}
 complete_save=${COMPLETE_SAVE:-${CARDS_SAVE:-$repo/saves/complete-play.sav}}
-[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2wide)"; exit 2; }
+[ -x "$bin" ] || { echo "no program at $bin (ninja -C build sims2hd)"; exit 2; }
 [ -f "$rom" ] || { echo "no ROM (set ROM)"; exit 2; }
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -26,7 +26,7 @@ trap 'rm -rf "$tmp"' EXIT
 max_sims=${MAX_SIMS:-4}
 [ "$max_sims" -ge 1 ] 2>/dev/null || max_sims=1
 real_bin=$bin
-sims2wide_slot() {
+sims2hd_slot() {
     local i slot=
     while [ -z "$slot" ]; do
         for i in $(seq 1 "$max_sims"); do mkdir "$tmp/slot$i" 2>/dev/null && { slot=$tmp/slot$i; break; }; done
@@ -37,7 +37,7 @@ sims2wide_slot() {
     rmdir "$slot"
     return $rc
 }
-bin=sims2wide_slot
+bin=sims2hd_slot
 
 # run NAME STATE FRAMES [options...]: the whole log in NAME.log, the screens printed (one
 # "frame N: screen X" per line) in NAME.out, and NAME.ok only if the run went to its end (exit
