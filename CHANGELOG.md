@@ -204,6 +204,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   names do (three edges 12 pixels apart before).
 - The world's plate: "Hold for more" sits on the same line as the action's word (it was 3 pixels
   higher).
+- The main menu's hints stay inside the panel in German ("Einen Sim erstellen" pushed them past
+  its left edge).
 - Create-a-Sim's hints never cut A's word: in Italian and Spanish the hair and name pages showed
   "…" or "E…"; the row tightens its gaps, then its size, until the words fit.
 - At the largest interface sizes, conversations, popups and the world's plate stop 16 pixels short

@@ -65,9 +65,19 @@ static void EvenSides(const Composition& comp, Rect panel, const char* what, boo
         failures++;
     }
     if (!hints) return;
-    int end = 0;
+    int end = 0, start = kConsoleW;
     for (const ui::UiItem& u : comp.ui)
-        if (u.kind == ui::UiItem::Chip && u.to.y > panel.y + panel.h - 80 && u.to.x >= panel.x) end = std::max(end, u.to.x + u.to.w);
+        if (u.kind == ui::UiItem::Chip && u.to.y > panel.y + panel.h - 80 && u.to.x + u.to.w > panel.x)
+        {
+            end = std::max(end, u.to.x + u.to.w);
+            start = std::min(start, u.to.x);
+        }
+    // (and never out of the panel's inside at the left: the German main menu's ran off it)
+    if (start < panel.x + 20)
+    {
+        fprintf(stderr, "%s: the hints start at %d, past the panel's inside (%d)\n", what, start, panel.x + 20);
+        failures++;
+    }
     if (end != panel.x + panel.w - 32)
     {
         fprintf(stderr, "%s: the hints end at %d (want %d)\n", what, end, panel.x + panel.w - 32);
@@ -2729,6 +2739,20 @@ int main()
             }
         };
         const ScreenState fe {Screen::FrontEnd, Tab::None}, none {Screen::None, Tab::None};
+        {
+            // The hints with a long word on the focused button (German's "Einen Sim erstellen" ran
+            // out of the panel at the left): inside the panel's inside, its margins even.
+            RomData longRom;
+            std::vector<std::string> words(3127, "Word");
+            for (int i : kStrFrMenu) words[i] = "Einen Sim erstellen, lang";
+            longRom.SetStringsForTest(words, 3);
+            const GameState g = front(3, -1);
+            const MenuView v = FrontView(fe, &g, &longRom);
+            CHECK(v.valid && MenuFocusable(v, 0));
+            Composition comp {kConsoleW, kConsoleH, {}, {}};
+            BuildFront(comp, v, 0, fe, g, longRom, nullptr, 256, 192);
+            EvenSides(comp, kFrPanel, "main menu (a long word)");
+        }
         for (int phase = 0; phase <= 4; phase++)
         {
             const GameState g = front(phase, -1);
