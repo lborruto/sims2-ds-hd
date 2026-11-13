@@ -200,6 +200,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   panel's do.
 - A Nintendo controller's + and - buttons in the hints are round with a clear sign, like its
   other buttons (the - read as a dot).
+- The pause menu's Settings: the Advanced heading and the note under the list start where the rows'
+  names do (three edges 12 pixels apart before).
 
 ## [0.1.1] - 2026-11-04
 
