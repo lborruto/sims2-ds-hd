@@ -48,6 +48,43 @@ using namespace sims2wide;
 static int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond); failures++; } } while (0)
 
+// The whole-canvas screens with a framed picture at the left and a panel at the right (the main
+// menu, Settings, the boot, Create-a-Sim): the canvas's left edge to the picture's frame (6 pixels
+// outside the piece), the frame to the panel and the panel to the canvas's right edge the same;
+// the hints' row (the chips in the panel's foot) ending 32 pixels inside the panel's right edge, as
+// every panel's (the town's menus: kPmPanel's right less 32).
+static void EvenSides(const Composition& comp, Rect panel, const char* what, bool hints = true)
+{
+    Rect top {};
+    for (const Piece& q : comp.pieces)
+        if (q.src == Src::Top) top = q.to;
+    const int left = top.x - 6, gap = panel.x - (top.x + top.w + 6), right = kConsoleW - (panel.x + panel.w);
+    if (!(left == gap && gap == right && left >= 16))
+    {
+        fprintf(stderr, "%s: margins %d | %d | %d (want one, 16 or more)\n", what, left, gap, right);
+        failures++;
+    }
+    if (!hints) return;
+    int end = 0, start = kConsoleW;
+    for (const ui::UiItem& u : comp.ui)
+        if (u.kind == ui::UiItem::Chip && u.to.y > panel.y + panel.h - 80 && u.to.x + u.to.w > panel.x)
+        {
+            end = std::max(end, u.to.x + u.to.w);
+            start = std::min(start, u.to.x);
+        }
+    // (and never out of the panel's inside at the left: the German main menu's ran off it)
+    if (start < panel.x + 20)
+    {
+        fprintf(stderr, "%s: the hints start at %d, past the panel's inside (%d)\n", what, start, panel.x + 20);
+        failures++;
+    }
+    if (end != panel.x + panel.w - 32)
+    {
+        fprintf(stderr, "%s: the hints end at %d (want %d)\n", what, end, panel.x + panel.w - 32);
+        failures++;
+    }
+}
+
 static void TestLayout(Layout l, bool mainIsTop, float aspect, int ow, int oh)
 {
     const Placement p = Place(l, mainIsTop, aspect);
@@ -686,6 +723,7 @@ static void ui_scale()
                         if (it.layer == kStatusBarLayer || it.layer == kPopLayer + 1) continue; // (the strip's)
                         const Rect r = ui::Placed(it);
                         CHECK(r.y + r.h <= kStripY);
+                        CHECK(r.x >= 16 && r.y >= 16 && r.x + r.w <= kConsoleW - 16); // (kUiEdge)
                         most = std::max(most, it.zoom);
                         least = std::min(least, it.zoom);
                     }
@@ -711,6 +749,8 @@ static void ui_scale()
                     x1 = std::max(x1, ui::Placed(it).x + ui::Placed(it).w);
                 }
                 CHECK(strip > 0);
+                // Grown, never nearer than 16 pixels to the canvas's sides (console.cpp's kUiEdge).
+                CHECK(x0 >= 16 && x1 <= kConsoleW - 16);
                 const float want = z < 1 ? 1060 * z : z == 1 ? 1060 : 1060 * (636.0f / 530);
                 CHECK(std::abs((x1 - x0) - want) < 40 && std::abs((x0 + x1) / 2.0f - 640) < 4);
                 for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
@@ -2699,6 +2739,20 @@ int main()
             }
         };
         const ScreenState fe {Screen::FrontEnd, Tab::None}, none {Screen::None, Tab::None};
+        {
+            // The hints with a long word on the focused button (German's "Einen Sim erstellen" ran
+            // out of the panel at the left): inside the panel's inside, its margins even.
+            RomData longRom;
+            std::vector<std::string> words(3127, "Word");
+            for (int i : kStrFrMenu) words[i] = "Einen Sim erstellen, lang";
+            longRom.SetStringsForTest(words, 3);
+            const GameState g = front(3, -1);
+            const MenuView v = FrontView(fe, &g, &longRom);
+            CHECK(v.valid && MenuFocusable(v, 0));
+            Composition comp {kConsoleW, kConsoleH, {}, {}};
+            BuildFront(comp, v, 0, fe, g, longRom, nullptr, 256, 192);
+            EvenSides(comp, kFrPanel, "main menu (a long word)");
+        }
         for (int phase = 0; phase <= 4; phase++)
         {
             const GameState g = front(phase, -1);
@@ -2717,6 +2771,7 @@ int main()
                     layers(comp);
                     for (const Piece& q : comp.pieces)
                         if (q.src == Src::Top) CHECK(!q.touch && q.from.w == 256 && q.from.x == (topW - 256) / 2); // (the 2D part)
+                    if (phase > 0 && focus == 0) EvenSides(comp, kFrPanel, "main menu", MenuFocusable(v, 0));
                     if (focus != 0 || topW != 256) continue;
                     for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
                         TestConsoleRoundtrip(fe, false, 256, 192, o.first, o.second, false, &comp);
@@ -2897,6 +2952,7 @@ int main()
                             Composition comp {kConsoleW, kConsoleH, {}, {}};
                             BuildSettings(comp, v, focus, g, rom, bottom.data(), nullptr, topW, 192);
                             layers(comp);
+                            EvenSides(comp, kFrPanel, "Settings");
                             if (focus != 0 || topW != 256 || vol != 1296) continue;
                             for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
                                 TestConsoleRoundtrip(none, false, 256, 192, o.first, o.second, false, &comp);
@@ -3160,6 +3216,7 @@ int main()
                     Composition comp {kConsoleW, kConsoleH, {}, {}};
                     BuildCas(comp, v, focus, g, rom, nullptr, bottom.data(), topW, 192);
                     layers(comp);
+                    if (!g.front.cas.switching) EvenSides(comp, kCasPanel, "Create-a-Sim");
                     int tops = 0;
                     for (const Piece& q : comp.pieces)
                         if (q.src == Src::Top) { tops++; CHECK(q.touch && q.from.w == topW && q.to.x + q.to.w <= kCasPanel.x); }
@@ -3389,6 +3446,10 @@ int main()
         CHECK(!WorldPromptOf(after, nullptr).shown);
         InteractState invalid = in; invalid.valid = false;
         CHECK(!WorldPromptOf(invalid, nullptr).shown);
+        // A target the game names with nothing (the picker's third type): the plate, no name.
+        InteractState unnamed = in; unnamed.target = {}; unnamed.target.kind = TargetRef::Unnamed; unnamed.target.index = 3;
+        p = WorldPromptOf(unnamed, nullptr);
+        CHECK(p.shown && p.name.empty());
         InteractState many = in; many.actions = {act(2, true), act(6, false), act(71, false)}; many.prev.kind = TargetRef::Object; many.prev.nameId = 492;
         p = WorldPromptOf(many, nullptr);
         CHECK(p.shown && p.more && p.others && !p.held);

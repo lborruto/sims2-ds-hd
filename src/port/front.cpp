@@ -57,7 +57,7 @@ std::string Label(const RomData& rom, int i) { return MenuWords(rom, kStrFrMenu[
 int HintAWidth(const RomData& rom)
 {
     const Rect d = ChipRect(0, 0, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose), kPmHintSize, 0, Weight::ExtraBold);
-    return kFrHints.w - d.w - 28 - 40;
+    return kFrHints.w - 8 - d.w - 28 - 40;
 }
 }
 
@@ -247,15 +247,26 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
         }
         else if (MenuFocusable(v, focus))
         {
+            // The D-pad's "Choose" and A with the button's word, right to left from the hints' right
+            // edge (as every panel's: Settings', the town's), inside the band: the gap 28, else 16,
+            // else the row smaller (German's "Einen Sim erstellen" ran out of the panel), the size
+            // both chips are drawn at.
             const std::string choose = OwnWord(&rom, OwnWordId::HintChoose);
-            const Rect dr = ChipRect(0, 0, Button::DPadV, choose, kPmHintSize, 0, Weight::ExtraBold);
-            const FittedText w = FitLine(v.items[focus].word, kPmHintSize, 18, HintAWidth(rom), Weight::ExtraBold);
-            const Rect ar = ChipRect(0, 0, Button::A, w.text, kPmHintSize, 0, Weight::ExtraBold);
-            const int right = kFrHints.x + kFrHints.w;
-            UiItem a = ChipItem(right - ar.w, kFrHints.y + (kFrHints.h - ar.h) / 2, Button::A, w.text, kPmHintSize, 0, Weight::ExtraBold);
+            const int right = kFrHints.x + kFrHints.w - 8;
+            float size = kPmHintSize;
+            int gap = 28;
+            auto width = [&](float sz, int g) {
+                return ChipRect(0, 0, Button::DPadV, choose, sz, 0, Weight::ExtraBold).w + g + ChipRect(0, 0, Button::A, v.items[focus].word, sz, 0, Weight::ExtraBold).w;
+            };
+            if (width(size, gap) > right - kFrHints.x) gap = 16;
+            while (size > 18 && width(size, gap) > right - kFrHints.x) size -= 1;
+            const Rect dr = ChipRect(0, 0, Button::DPadV, choose, size, 0, Weight::ExtraBold);
+            const FittedText w = FitLine(v.items[focus].word, size, size, right - kFrHints.x - dr.w - gap - (ChipRect(0, 0, Button::A, "", size, 0, Weight::ExtraBold).w + (int)std::round(size / 2)), Weight::ExtraBold);
+            const Rect ar = ChipRect(0, 0, Button::A, w.text, size, 0, Weight::ExtraBold);
+            UiItem a = ChipItem(right - ar.w, kFrHints.y + (kFrHints.h - ar.h) / 2, Button::A, w.text, size, 0, Weight::ExtraBold);
             a.layer = 1;
             c.ui.push_back(a);
-            UiItem d = ChipItem(right - ar.w - 28 - dr.w, kFrHints.y + (kFrHints.h - dr.h) / 2, Button::DPadV, choose, kPmHintSize, 0, Weight::ExtraBold);
+            UiItem d = ChipItem(right - ar.w - gap - dr.w, kFrHints.y + (kFrHints.h - dr.h) / 2, Button::DPadV, choose, size, 0, Weight::ExtraBold);
             d.layer = 1;
             c.ui.push_back(d);
         }

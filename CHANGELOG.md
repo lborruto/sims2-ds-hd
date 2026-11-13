@@ -7,6 +7,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-11
+
 ### Added
 
 - CONSOLE, the new default layout: the game played like a console game. The town fills the
@@ -56,8 +58,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 - Settings: Interface size (Auto, the default, follows your screen's size and the window's; or 60
   to 150 %), Screen scaling (Sharp, the default, Smooth or Pixels), Game icons (Pixels, the DS's
   own, the default; or Smooth, redrawn by xBRZ), Hide the idle pointer (on), Battery saver (3D at
-  1x and 30 fps while on), Mute, Pause in the background (on), Sound in fast forward, Stick
-  cursor, Cursor speed (50 to 200 %), Swap the sticks (left-handed), Stick dead zone, Trigger
+  the DS's own 192p and 30 fps while on), Mute, Pause in the background (on), Sound in fast
+  forward, Stick cursor, Cursor speed (50 to 200 %), Swap the sticks (left-handed), Stick dead zone, Trigger
   press at, Buzz on connect (on), Microphone (off, the blow key or a real microphone), Fast
   forward speed (2×, 3×, 4× or as fast as it goes), Fast forward key (Hold or Toggle), Fast boot
   (on: the boot's splashes, which wait for no button, at full speed). The window comes back where
@@ -88,6 +90,8 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Changed
 
+- Settings > Graphics > 3D resolution goes by familiar names instead of a factor: DS (192p),
+  384p, 576p, 720p, and now also 1080p and 1440p for a fast computer.
 - The pause menu (Start + Back, or Esc, which also resumes from any of its pages) is in HD and
   five languages, with the buttons of the controller you hold. Its Settings have five tabs
   (Display, Graphics, Sound, Controls, Game) changed with LB / RB (Q / W), the rarely needed rows
@@ -136,8 +140,16 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Fixed
 
-- A settings file with a 3D resolution above 4 showed it, and Right then lowered it to 4: it is
-  now read as 4.
+- A settings file with a 3D resolution off the row's steps showed it, and Right then went
+  elsewhere: it is now read as the step at or below it.
+- The A plate no longer disappears after you close the menu on Pockets, Goals, Relationships or
+  Options: the menu now always hands the world back on Interact, so the plate shows again and a
+  single A uses what you stand at (before, the first A only switched tabs, with no plate meanwhile).
+- No plate for someone or something walking out of reach while the game no longer offers its
+  actions (A did nothing there).
+- The A plate in the world also shows for the third kind of target the game lets A use (one it
+  gives no name: the plate says the verb alone), and something of that kind nearby no longer hides
+  the plate of the object you stand at.
 - Create-a-Sim: changing page no longer flashes the last page's pictures in the new page's cells
   (letters in the hair styles, text over the clothes); they stay empty until the game has drawn them.
 - Create-a-Sim: the aspirations' pictures fade out with the screen instead of staying bright.
@@ -195,6 +207,23 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   game's Quit; Moogoo's Start (quit) is in the manual; the social answers sit on rows.
 - The pause menu: a Menu key moved to Enter, Space or the DS's A key resumes the game again
   instead of choosing the row.
+- The front end and Create-a-Sim: the picture and the panel sit as far from the screen's left and
+  right edges as from each other (they were 6 pixels off); their hints end where every other
+  panel's do.
+- A Nintendo controller's + and - buttons in the hints are round with a clear sign, like its
+  other buttons (the - read as a dot).
+- The pause menu's Settings: the Advanced heading and the note under the list start where the rows'
+  names do (three edges 12 pixels apart before).
+- The world's plate: "Hold for more" sits on the same line as the action's word (it was 3 pixels
+  higher).
+- The main menu's hints stay inside the panel in German ("Einen Sim erstellen" pushed them past
+  its left edge).
+- Create-a-Sim's hints never cut A's word: in Italian and Spanish the hair and name pages showed
+  "…" or "E…"; the row tightens its gaps, then its size, until the words fit.
+- At the largest interface sizes, conversations, popups and the world's plate stop 16 pixels short
+  of the screen's edges (a conversation ran to 4).
+- On the Steam Deck the automatic interface size reads the Deck's own 7" screen (130 %) rather
+  than whatever size the system reports for it.
 
 ## [0.1.1] - 2026-11-04
 

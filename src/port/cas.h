@@ -115,7 +115,9 @@ constexpr int kSprCasAsp = 362, kCasAspTier = ui::kTierS;
 constexpr const char* kCasKbLabel[3] = {"ABC", "abc", "123!"};
 
 // HD geometry (canvas).
-constexpr Rect kCasTopBox {16, 16, 664, 640};                  // the model, fitted at its shape
+// The model's frame (6 pixels outside its box), the panel and the canvas's edges 16 apart: the left
+// margin, the gap and the right margin the same.
+constexpr Rect kCasTopBox {22, 16, 652, 640};                  // the model, fitted at its shape
 // The game's "L" / "R" pills over its turn arrows on the top screen (DS pixels, measured on s3):
 // covered by the pad's chips.
 constexpr Rect kCasTurnPill[2] = {{29, 144, 28, 13}, {200, 144, 28, 13}};

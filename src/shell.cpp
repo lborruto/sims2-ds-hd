@@ -29,6 +29,8 @@ int ListTop(Page) { return 40; }
 // Settings: a row, the Advanced heading, the list's height (every tab fits: no scrolling; the UI's
 // size zooms the whole panel, held to the canvas), the note under it, the tab bar in the title band.
 constexpr int kSetRowH = 50, kSetRowStep = 54, kSetHeadH = 32, kSetListH = 410;
+// The rows' labels, the Advanced heading and the note under the list start at one x (was 20, 12 and 8).
+constexpr int kSetTextX = 20;
 constexpr int kTabBarY = kPanel.y + 20, kTabBarH = 48;
 constexpr Rect kAskBox {280, 200, 720, 320};
 // The TV's safe area (the outer 5 % left clear: x 64-1216, y 36-684); the launch panel inside it
@@ -277,7 +279,15 @@ void ChangeRow(Row r, int dir, Settings& s)
         else s.uiScale = std::clamp(s.uiScale + 5 * d, 60, 150);
         break;
     case Row::Pictures: s.smoothPictures = !s.smoothPictures; break;
-    case Row::Res3D: s.resolution3D = std::clamp(s.resolution3D + d, 1, 4); break;
+    case Row::Res3D:
+    {
+        // The steps (kRes3DSteps), stopping at their ends; from a factor between two (--res3d),
+        // Left goes to the one below it, Right to the one above.
+        const int i = Res3DStepIndex(s.resolution3D);
+        const int to = kRes3DSteps[i] != s.resolution3D && d < 0 ? i : i + d;
+        s.resolution3D = kRes3DSteps[std::clamp(to, 0, kRes3DStepCount - 1)];
+        break;
+    }
     case Row::Wide: s.widescreen = !s.widescreen; break;
     case Row::Fps60: s.interpolate60 = !s.interpolate60; break;
     case Row::Battery: s.batterySaver = !s.batterySaver; break;
@@ -384,6 +394,20 @@ int RowNote(Row r)
     return (int)r >= 0 && (int)r < kRows ? (int)notes[(int)r] : (int)W::Count;
 }
 
+std::string Res3DName(int n, int lang)
+{
+    // By the lines they draw: 192 x n, by the nearest familiar name past 4 (768 is 720p's
+    // class, 1152 1080p's, 1536 1440p's).
+    switch (n)
+    {
+    case 1: return Wd(lang, W::Res3DDs);
+    case 4: return "720p";
+    case 6: return "1080p";
+    case 8: return "1440p";
+    default: return std::to_string(192 * n) + "p";
+    }
+}
+
 std::string RowValue(Row r, const Settings& s, int lang)
 {
     auto onOff = [&](bool b) { return std::string(Wd(lang, b ? W::ShellOn : W::ShellOff)); };
@@ -400,7 +424,7 @@ std::string RowValue(Row r, const Settings& s, int lang)
     case Row::Scaling: return Wd(lang, s.scaling == Scaling::Smooth ? W::ScaleSmooth : s.scaling == Scaling::Nearest ? W::ScaleNearest : W::ScaleSharp);
     case Row::UiSize: return s.uiScale == 0 ? std::string(Wd(lang, W::UiAuto)) : std::to_string(s.uiScale) + " %";
     case Row::Pictures: return Wd(lang, s.smoothPictures ? W::ScaleSmooth : W::ScaleNearest);
-    case Row::Res3D: return std::to_string(s.Res3D()) + "\xC3\x97"; // "2×" (Battery saver's 1× while it holds the row)
+    case Row::Res3D: return Res3DName(s.Res3D(), lang); // (Battery saver's DS while it holds the row)
     case Row::Wide: return onOff(s.widescreen);
     case Row::Fps60: return onOff(s.Interpolate60());
     case Row::Battery: return onOff(s.batterySaver);
@@ -1012,7 +1036,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
             {
                 if (i == tl.advanced)
                 {
-                    UiItem h = Line({c.x + 12, y, c.w - 24, kSetHeadH}, Wd(lang, W::SetAdvanced), 20, 16);
+                    UiItem h = Line({c.x + kSetTextX, y, c.w - 2 * kSetTextX, kSetHeadH}, Wd(lang, W::SetAdvanced), 20, 16);
                     h.colour = kTextNote;
                     it.Add(1, h);
                     y += kSetHeadH;
@@ -1028,7 +1052,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 rects_[i] = r;
                 const Rect pill {r.x + r.w - 14 - 250, r.y + 6, 250, r.h - 12};
                 const int tagW = row == Row::Language ? 200 : 0;
-                UiItem label = Line({r.x + 20, r.y, pill.x - 16 - tagW - (r.x + 20), r.h}, RowLabel(row, lang), 24, 17);
+                UiItem label = Line({r.x + kSetTextX, r.y, pill.x - 16 - tagW - (r.x + kSetTextX), r.h}, RowLabel(row, lang), 24, 17);
                 if (held) label.colour = kTextInactive;
                 it.Add(1, label);
                 if (row == Row::Keys)
@@ -1065,7 +1089,7 @@ std::vector<UiItem> Shell::Build(const Model& m) const
                 const Row row = tl.rows[focus];
                 std::string words = Wd(lang, RowHeld(row, st) ? W::SaverHolds : (W)RowNote(row));
                 if (row == Row::Mic) words = Fill(words, m.keyGlyph[Controls::BLOW].empty() ? "\xE2\x80\x94" : m.keyGlyph[Controls::BLOW]); // (the blow key as bound)
-                UiItem note = TextItem({c.x + 8, c.y + kSetListH, c.w - 16, c.h - kSetListH}, words, 18);
+                UiItem note = TextItem({c.x + kSetTextX, c.y + kSetListH, c.w - kSetTextX - 8, c.h - kSetListH}, words, 18);
                 note.middle = true;
                 note.colour = kTextNote;
                 it.Add(1, note);

@@ -39,7 +39,9 @@ float GlyphText(float size, float f) { return size >= kMinText / 0.75f ? std::ma
 float PillText(float size) { return GlyphText(size, 0.56f); }
 
 // What a chip's face shows, from its button, face and glyph (UiItem::face / glyph).
-enum class Mark { Letter, Pill, Key, Stick, Cross, PsCross, PsCircle, PsSquare, PsTriangle };
+// NinPlus / NinMinus: Nintendo's + and - (Start, Select): round, the sign drawn as bars (a "-" in a
+// pill read as a dot at the hints' size).
+enum class Mark { Letter, Pill, Key, Stick, Cross, PsCross, PsCircle, PsSquare, PsTriangle, NinPlus, NinMinus };
 struct Resolved
 {
     Mark mark = Mark::Pill;
@@ -91,6 +93,7 @@ Resolved Resolve(Button b, Face face, const std::string& glyph)
         r.text = g;
         for (const N& n : names)
             if (g == n.key) r.text = ps ? n.ps : nin ? n.nin : n.xbox;
+        if (nin && (r.text == "+" || r.text == "-")) r.mark = r.text == "+" ? Mark::NinPlus : Mark::NinMinus;
     }
     return r;
 }
@@ -521,7 +524,7 @@ Prepared Prepare(const UiItem& it, float s0, float ox0, float oy0, int W, int H)
         const float shift = it.labelAt > 0 ? std::max(0.0f, std::round((it.labelAt - LabelGap(size) - cw) / 2)) : 0;
         const float x0 = (it.to.x + shift - ox) * s, y0 = (it.to.y - oy) * s + (it.to.h - h) / 2 * s;
         const float x1 = x0 + cw * s, y1 = y0 + h * s;
-        if (rv.mark != Mark::Cross && !PsMarkOf(rv.mark))
+        if (rv.mark != Mark::Cross && !PsMarkOf(rv.mark) && rv.mark != Mark::NinPlus && rv.mark != Mark::NinMinus)
         {
             const float ts = rv.mark == Mark::Stick ? GlyphText(size, 0.6f) : rv.mark == Mark::Letter ? GlyphText(size, 0.82f)
                            : rv.mark == Mark::Key   ? KeyText(size, rv.text) : PillText(size);
@@ -766,6 +769,13 @@ void DrawChip(Layer& L, const UiItem& it, float s0, float ox0, float oy0, const 
     }
     else if (rv.mark == Mark::PsCross || rv.mark == Mark::PsCircle || rv.mark == Mark::PsSquare || rv.mark == Mark::PsTriangle)
         DrawPsMark(L, rv.mark, (x0 + x1) / 2, (y0 + y1) / 2, h * s, rv.colour);
+    else if (rv.mark == Mark::NinPlus || rv.mark == Mark::NinMinus)
+    {
+        // Nintendo's + / -: the sign as the D-pad's cross is drawn, its bars a little thinner.
+        const float cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, a = h * 0.25f * s, b = h * 0.075f * s;
+        FillRoundRect(L, cx - a, cy - b, cx + a, cy + b, b, 0xFFFFFFFF);
+        if (rv.mark == Mark::NinPlus) FillRoundRect(L, cx - b, cy - a, cx + b, cy + a, b, 0xFFFFFFFF);
+    }
     else
     {
         // The face buttons in their face's colours; the others white.

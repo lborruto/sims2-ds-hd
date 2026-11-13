@@ -1,0 +1,7 @@
+# From sit-shower (the complete save, the penthouse's shower the target), CONSOLE: MENU opens the
+# HD menu, RB goes to Pockets, B closes the menu there: the port taps Interact's icon, the plate
+# comes back; one A takes the shower.
+30 3 pad menu
+80 3 pad rb
+130 3 pad b
+200 4 pad a

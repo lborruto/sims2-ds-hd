@@ -29,6 +29,15 @@ static int UiScaleKey(const std::string& v)
 }
 static const char* ScalingKey(Scaling c) { return c == Scaling::Smooth ? "smooth" : c == Scaling::Nearest ? "nearest" : "sharp"; }
 
+int Res3DStepIndex(int n)
+{
+    int i = 0;
+    while (i + 1 < kRes3DStepCount && kRes3DSteps[i + 1] <= n) i++;
+    return i;
+}
+
+int Res3DStep(int n) { return kRes3DSteps[Res3DStepIndex(n)]; }
+
 int LanguageOfLocale(const std::string& l)
 {
     const std::string p = l.substr(0, 2);
@@ -82,7 +91,7 @@ bool Settings::Load(const std::string& path)
             for (Layout l : {Layout::Console, Layout::Auto, Layout::Focus, Layout::Side, Layout::Stacked})
                 if (v == LayoutName(l)) layout = l;
         }
-        else if (k == "resolution_3d") resolution3D = std::clamp(atoi(v.c_str()), 1, 4); // (the row's range: past it, Right went down)
+        else if (k == "resolution_3d") resolution3D = Res3DStep(atoi(v.c_str())); // (one of the row's steps: else Right went elsewhere)
         else if (k == "widescreen") widescreen = on;
         else if (k == "interpolate_60") interpolate60 = on;
         else if (k == "fullscreen") fullscreen = on;
@@ -204,6 +213,17 @@ float AutoViewMm(float d)
             return kTable[i - 1][1] + t * (kTable[i][1] - kTable[i - 1][1]);
         }
     return kTable[5][1];
+}
+
+bool HandheldPanel(const std::string& product, int w, int h, float& diagonalMm)
+{
+    std::string p = product;
+    while (!p.empty() && (p.back() == '\n' || p.back() == '\r' || p.back() == ' ')) p.pop_back();
+    const bool panel = (w == 1280 && h == 800) || (w == 800 && h == 1280);
+    if (!panel) return false;
+    if (p == "Jupiter") { diagonalMm = 7.0f * 25.4f; return true; }
+    if (p == "Galileo") { diagonalMm = 7.4f * 25.4f; return true; }
+    return false;
 }
 
 float AutoUiScale(float mmPerPixel, float diagonalMm)

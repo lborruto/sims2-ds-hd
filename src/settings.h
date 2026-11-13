@@ -16,6 +16,16 @@ enum class MicMode { Off, BlowKey, Real }; // Real: the computer's microphone (a
 // the size: crisp pixels without uneven ones), Smooth (bilinear) or Nearest (raw pixels).
 enum class Scaling { Sharp, Smooth, Nearest };
 
+// The 3D resolution's steps (factors of the DS's 192 lines): 192, 384, 576, 768 (~720p), 1152
+// (~1080p), 1536 (~1440p) lines. Not 12 (2304, ~4K): it works (--res3d 12) but drew at under
+// half the game's speed on an M3 Pro (widescreen, 60 fps); 8 at about 90 %.
+inline constexpr int kRes3DSteps[] = {1, 2, 3, 4, 6, 8};
+inline constexpr int kRes3DStepCount = (int)(sizeof(kRes3DSteps) / sizeof(kRes3DSteps[0]));
+// The step at or below factor n (below the first step: the first; past the last: the last).
+int Res3DStep(int n);
+// Its index in kRes3DSteps.
+int Res3DStepIndex(int n);
+
 struct Settings
 {
     // Playable
@@ -24,7 +34,9 @@ struct Settings
     // Looks: on by default, for CONSOLE; headless runs never load settings and start with them
     // off (main.cpp), so the checks' output stays the same.
     Layout layout = Layout::Console; // the window's layout (--layout overrides it for one run)
-    int resolution3D = 2;      // 1 = DS (192 lines), 2, 3, 4 times sharper (the row's range; a file is held to it)
+    // The 3D's lines as a factor of the DS's 192: one of kRes3DSteps (the row shows them by their
+    // lines: 192p, 384p, 576p, 720p, 1080p, 1440p); a file's other value snaps to the step below.
+    int resolution3D = 2;
     bool widescreen = true;    // 16:9 world when the game's 3D allows it
     bool interpolate60 = true; // 60 fps in-between frames
 
@@ -84,6 +96,12 @@ void FitPlace(int bx, int by, int bw, int bh, int w, int h, int& x, int& y);
 // 0.705 em) as large as 0.53 degrees of sight at the distance a display that size is seen from
 // (AutoViewMm); 1 when either is unknown (0) or not believable.
 float AutoUiScale(float mmPerPixel, float diagonalMm);
+// A handheld PC's own screen, known by its maker's product name (Linux's DMI product_name) and the
+// display's size in pixels (either way round: the Deck's panel is a portrait one turned): its
+// diagonal (mm), so Auto does not depend on what the compositor says of its size (gamescope may
+// report none, or the portrait panel's): the Steam Deck LCD ("Jupiter", 7") and OLED ("Galileo",
+// 7.4") at 1280 x 800. false for anything else (the Deck docked to a TV: the TV's own size).
+bool HandheldPanel(const std::string& product, int displayW, int displayH, float& diagonalMm);
 // The distance (mm) a display diagonalMm across is seen from: 35 cm at 7", 50 at 13", 70 at 24",
 // 80 at 32", 2 m at 43", 2.5 m from 55"; straight lines between.
 float AutoViewMm(float diagonalMm);

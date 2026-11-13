@@ -91,7 +91,8 @@ static void Usage()
         "  --ui-scale N                  the HD interface's size, 60 to 150 percent by 5 (default: the settings', Auto; 100 headless)\n"
         "  --game-pictures smooth|pixel  the game's icons and portraits in the HD interface: the pixel-art scaler or\n"
         "                                nearest pixels (default: the settings', smooth; pixel headless)\n"
-        "  --res3d N                     3D drawn N times sharper (1 = the DS's own; default 2 in the window, 1 headless)\n"
+        "  --res3d N                     3D drawn N times sharper, 1 to 12 (1 = the DS's 192 lines, 4 ~ 720p, 6 ~ 1080p,\n"
+        "                                8 ~ 1440p, 12: 2304 lines, slow; default 2 in the window, 1 headless)\n"
         "  --wide                        widescreen 16:9 world\n"
         "  --interp                      60 fps in-between frames for the 3D\n"
         "  --headless                    no window; with --frames and the shot options\n"
@@ -223,7 +224,7 @@ int main(int argc, char** argv)
             if (v != "smooth" && v != "pixel") { Usage(); return 1; }
             picturesArg = v == "smooth";
         }
-        else if (a == "--res3d") res3d = std::clamp(atoi(next().c_str()), 1, 8);
+        else if (a == "--res3d") res3d = std::clamp(atoi(next().c_str()), 1, 12);
         else if (a == "--wide") wide = true;
         else if (a == "--interp") interp = true;
         else if (a == "--frames") frames = atol(next().c_str());
@@ -1416,7 +1417,7 @@ relaunch:
             {   // the menus' lists (gamestate.h), one line per part when it changes
                 const TownState& t = app.game.town;
                 const TownState& b = before.town;
-                auto tgt = [](const TargetRef& r) { return r.kind == TargetRef::None ? std::string("-") : std::string(r.kind == TargetRef::Sim ? "sim" : "obj") + std::to_string(r.index) + ":" + std::to_string(r.nameId) + ":" + std::to_string(r.portraitRes); };
+                auto tgt = [](const TargetRef& r) { return r.kind == TargetRef::None ? std::string("-") : std::string(r.kind == TargetRef::Sim ? "sim" : r.kind == TargetRef::Object ? "obj" : "other") + std::to_string(r.index) + ":" + std::to_string(r.nameId) + ":" + std::to_string(r.portraitRes); };
                 if (!(t.interact == b.interact) || frame == 0)
                 {
                     const InteractState& v = t.interact;

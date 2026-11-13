@@ -82,7 +82,8 @@ you last typed). The mouse works everywhere too.
 - **What A does here.** Near someone or something you can use, a small plate at the bottom says
   what A does ("A Buy", and who or what). Tap A to do it. Hold A for the other things you can do
   (Up / Down choose, let go to do it); while A is held, Left / Right pick the next person or thing
-  nearby.
+  nearby. Closing the menu on another tab (Pockets, Goals...) brings the game back to Interact, so
+  the plate is there as soon as you walk on.
 - **The status bar** runs along the bottom of the window: the time, your money and your Sanity,
   with the camera and menu hints at the right. What you just won (green) or paid (red) shows
   beside the money for a few seconds. The bar stays under conversations too.
@@ -304,8 +305,8 @@ Everything is kept between runs.
 
 | Setting | What it does |
 |---|---|
-| Battery saver | the 3D at 1x and 30 fps whatever the two rows below say: lighter on a laptop's battery and fans. While it is on, those two rows are dimmed and show what it holds them at |
-| 3D resolution | the 3D world 1 to 4 times sharper (default 2) |
+| Battery saver | the 3D at the DS's own 192p and 30 fps whatever the two rows below say: lighter on a laptop's battery and fans. While it is on, those two rows are dimmed and show what it holds them at |
+| 3D resolution | how sharp the 3D world is drawn: DS (192p, the DS's own), 384p (the default), 576p, 720p, 1080p or 1440p. The high ones need a fast computer |
 | 60 fps | in-between frames for the 3D, which the game draws at 30 a second (default on) |
 | *Advanced:* Widescreen world | more of the town left and right, 16:9 instead of 4:3 (default on) |
 
@@ -425,7 +426,7 @@ on the command line):
 | **Stacked** | as on the DS, one above the other |
 
 **Looks.** Sharper 3D, the widescreen world and 60 fps are on by default (Settings; Battery
-saver holds the 3D at 1x and 30 fps, and leaves the widescreen as it is). Widescreen is a stretch for a game made for 4:3: the game is told to
+saver holds the 3D at the DS's own 192p and 30 fps, and leaves the widescreen as it is). Widescreen is a stretch for a game made for 4:3: the game is told to
 draw a wider view, and it does in town, in conversations and in Create-a-Sim, but in places not
 checked yet something the game never meant to be seen can show at the edges. Switch it off if a
 place looks odd. All three together still run well over full speed on a recent computer.

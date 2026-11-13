@@ -52,7 +52,7 @@ struct EUTable
         u32 itTarget, itNext, itPrev, itMode, itHighlight, itSelectors, selDisabled;
         u32 entActor, entKind, actIndex, actType, actIface;  // entry E, its actor, the actor's fields
         u32 ifCount, ifCodes, maxActions, maxCode;           // IInteractable
-        u32 actionLabel, unknownName, typeSim, typeObject, maxSimIndex;   // label 1845 + code, name 321, actor types, Sim record rows
+        u32 actionLabel, unknownName, typeSim, typeObject, typeUnnamed, maxSimIndex;   // label 1845 + code, name 321, actor types (typeUnnamed: the picker's third, named by nothing), Sim record rows
         u32 greyCodes[4];
         // The verbs whose label holds an amount (@1), as the game's own label methods set it
         // (0x0208B708, 0x02093588, 0x020960E8, 0x02097554): Buy (2 x the object's record price,
@@ -226,7 +226,7 @@ constexpr EUTable kEU = {
         0x300, 0x308, 0x30C, 0x314, 0x318, 0x6C, 0x94,
         0, 4, 0xA, 0xC, 0x130,
         8, 0x10, 4, 106,
-        1845, 321, 2, 0xB, 57,
+        1845, 321, 2, 0xB, 0xD, 57,
         {2, 0x3A, 0x3B, 0x3C},
         4, 0x5E, 0x4F, 0x5F, 7, 1500, 200, 0x2FA4 + 0x78, 3,
         0x74, 0x34, 4, 0x50, 109, 29,
@@ -588,6 +588,16 @@ bool ReadTarget(const Reader& m, u32 entry, TargetRef& t)
         if (!row.valid || row.nameId != (int)(tw.itemName + idx)) return false;
         t.kind = TargetRef::Object;
     }
+    else if (type == q.typeUnnamed)
+    {
+        // The game's picker takes this type too (0x02086240: types 2, 0xD and 0xB) and A runs its
+        // rows, but its name method (0x0208B230) names only Sims and objects: a target, no name.
+        t.kind = TargetRef::Unnamed;
+        t.index = (int)idx;
+        t.nameId = -1;
+        t.portraitRes = -1;
+        return true;
+    }
     else return false;
     t.index = (int)idx;
     t.unknown = t.kind == TargetRef::Sim && kind == 2;
@@ -637,9 +647,14 @@ InteractState ReadInteract(const Reader& m, u32 S)
     int n = 0;
     if (E != 0)
     {
-        u32 actor, iface, count;
-        if (!m.In(E, 8) || !ReadTarget(m, E, v.target) || !m.R32(E + q.entActor, actor) || !m.R32(actor + q.actIface, iface)) return InteractState{};
-        if (iface != 0)   // an actor with no IInteractable has no actions
+        u32 actor, iface, count, state;
+        if (!m.In(E, 8) || !ReadTarget(m, E, v.target) || !m.R32(E + q.entActor, actor) || !m.R32(actor + q.actIface, iface) ||
+            !m.R32(E + q.entKind, state))
+            return InteractState{};
+        // An actor with no IInteractable has no actions; nor has an entry in state 2 (leaving the
+        // picker's range, or a Sim titled "???"): the game builds no rows for it (0x0206A288) and its
+        // A does nothing.
+        if (iface != 0 && state != 2)
         {
             if (!m.In(iface, 0x20) || !m.R32(iface + q.ifCount, count) || count > q.maxActions) return InteractState{};
             n = (int)count;
@@ -663,9 +678,10 @@ InteractState ReadInteract(const Reader& m, u32 S)
         if (!m.R32(T + (w ? q.itPrev : q.itNext), e)) return InteractState{};
         if (e != 0 && (!m.In(e, 8) || !ReadTarget(m, e, w ? v.prev : v.next))) return InteractState{};
     }
-    if (E != 0 && ((int)hl < -1 || (int)hl >= (n > 0 ? n : 1))) return InteractState{};
+    // (no rows: the lit row means nothing, the game's may be stale; none)
+    if (n > 0 && ((int)hl < -1 || (int)hl >= n)) return InteractState{};
     v.padMode = (int)mode;
-    v.highlighted = E != 0 ? (int)hl : -1;   // raw: the lit row is drawn only in pad mode (padMode 0), which the reader reports apart
+    v.highlighted = n > 0 ? (int)hl : -1;   // raw: the lit row is drawn only in pad mode (padMode 0), which the reader reports apart
     v.bigPortraitRes = big == 0xFFFF ? -1 : (int)big;
     v.valid = true;
     return v;

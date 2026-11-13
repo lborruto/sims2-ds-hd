@@ -36,6 +36,9 @@ constexpr int kReturnFrames = 900, kReturnFocusFrames = 900, kLeftFrames = 60;
 // The dimmed world instead of the town while the menu comes back (Returning): this many frames
 // at most once the panel is back (the tab's tap takes about 5).
 constexpr int kReturnVeilFrames = 60;
+// The world on another tab than Interact: Interact's icon tapped, then again after this many
+// frames if the game still shows the other tab (a tab change takes about 5).
+constexpr int kInteractBackFrames = 30;
 
 enum class Mode
 {
@@ -325,6 +328,7 @@ int Navigator::Arrive(const MenuView& v) const
 void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u32& dsKeys, bool settled, const MenuView* view)
 {
     view_ = view;
+    const bool menuWas = menuOpen_;
     if (fresh_)
     {
         prev_ = pad;
@@ -504,6 +508,7 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     if (veilFrames_ > 0) veilFrames_--;
     if (leftFrames_ > 0) leftFrames_--;
     if (returnFocus_ > 0) returnFocus_--;
+    if (interactBack_ > 0) interactBack_--;
     if (returnTap_ && s.screen == Screen::Panel && settled && canTap && running_.empty())
     {
         touch.Tap(kTabIcon[(int)returnTab_ - (int)Tab::Interact].x, kTabIcon[(int)returnTab_ - (int)Tab::Interact].y);
@@ -523,6 +528,17 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
         if (s.screen == Screen::Panel) dsKeys |= WorldKeys(pad); // (the town, no HD menu open: the camera on the right stick)
         else dsKeys |= DsKeys(pad, true);
         if (s.screen == Screen::Panel && pressed(&PadState::menu)) menuOpen_ = true;
+        // The HD menu closed with the game's panel on another tab (Pockets, Goals, ...): the game has
+        // no Interact object there, so no target, no prompt, and its A only brings Interact back.
+        // The port's own tap on Interact's icon, settled (again after kInteractBackFrames if the
+        // game did not take it), until the panel shows Interact or the player opens the menu.
+        if (s.screen != Screen::Panel || s.tab == Tab::Interact || menuOpen_) toInteract_ = false;
+        if (toInteract_ && s.tab != Tab::None && settled && canTap && running_.empty() && returnFrames_ == 0 && !returnTap_ &&
+            interactBack_ == 0)
+        {
+            touch.Tap(kTabIcon[0].x, kTabIcon[0].y);
+            interactBack_ = kInteractBackFrames;
+        }
         break;
     case Mode::Focus: // (the taps here are listed again in WouldTap, for the gate)
     {
@@ -757,6 +773,8 @@ void Navigator::Update(ScreenState s, const PadState& pad, TouchScript& touch, u
     // An armed X lasts while its item keeps the focus on the same HD view (a move, a tab change,
     // the item going, the menu closing: disarmed).
     if (!viewFocus_ || focusId_ != armed_) armed_ = 0;
+    // (the menu just closed over the panel: the world wants the Interact tab back, Mode::Pass)
+    if (menuWas && !menuOpen_ && s.screen == Screen::Panel && s.tab != Tab::Interact) { toInteract_ = true; interactBack_ = 0; }
     popupUp_ = popupNow;
     prev_ = pad;
     view_ = nullptr; // (the caller's view lives for this call only)

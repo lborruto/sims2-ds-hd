@@ -217,6 +217,10 @@ private:
     u32 leftId_ = 0;
     int leftFrames_ = 0;
     bool returnTap_ = false; // the panel came back on another tab than returnTab_: tap returnTab_'s icon first
+    // The HD menu closed on another tab than Interact: Interact's icon still to tap (toInteract_), and
+    // the frames before it may be tapped again (navigator.cpp's kInteractBackFrames).
+    bool toInteract_ = false;
+    int interactBack_ = 0;
     // A slider's presses (ViewItem::queues): the steps still owed in the order pressed (-1 Left,
     // +1 Right; 16 at most, one entry a press: nothing is merged, so Left then Right is a step
     // there and one back), its item's id, the Left / Right it had when the last step ran, and how

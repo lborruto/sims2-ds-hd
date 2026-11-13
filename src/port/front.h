@@ -61,14 +61,17 @@ constexpr int kSprFrArrow = 2506, kSprFrArrowOn = 2503, kSprFrWireless = 8769;
 
 // HD geometry (canvas): the menu's and the boot's top screen box (the picture fitted at its shape),
 // the menu's panel and its buttons, the boot's splash (the touch screen 1.5x) and its hints' row.
-constexpr Rect kFrTopBox {24, 72, 768, 576};   // 3x the DS's 4:3
-constexpr Rect kFrPanel {816, 48, 440, 624};
+// The picture's frame (6 pixels outside its box), the panel and the canvas's edges 20 apart: the
+// left margin, the gap between them and the right margin the same (kFrMargin).
+constexpr int kFrMargin = 20;
+constexpr Rect kFrTopBox {kFrMargin + 6, 72, 768, 576};   // 3x the DS's 4:3
+constexpr Rect kFrPanel {kFrTopBox.x + kFrTopBox.w + 6 + kFrMargin, 48, 440, 624};
 constexpr int kFrButtonX = kFrPanel.x + 24, kFrButtonW = kFrPanel.w - 48, kFrButtonY0 = 84, kFrButtonDy = 128, kFrButtonH = 100;
 constexpr Rect kFrHints {kFrPanel.x + 24, kFrPanel.y + kFrPanel.h - 64, kFrPanel.w - 48, 40};
 constexpr Rect kFrNote {kFrHints.x, kFrHints.y - 16, kFrHints.w, kFrHints.h + 20}; // DS Wireless's note (between the last button and the panel's foot), on a well
 constexpr Rect FrNoteText() { return {kFrNote.x + 12, kFrNote.y + 4, kFrNote.w - 24, kFrNote.h - 8}; }   // (its words inside the well)
 constexpr int kFrSafeFoot = 684;   // the title's chip plate ends here: the canvas's 5 % safe area (720 - 36)
-constexpr Rect kFrSplash {838, 216, 384, 288};
+constexpr Rect kFrSplash {kFrPanel.x + (kFrPanel.w - 384) / 2, 216, 384, 288}; // (centred where the panel is)
 constexpr float kFrLabelSize = 34, kFrLabelMin = 24;
 constexpr int kFrArrow = 64, kFrIconW = 56;   // the ▶'s box at the button's right end; DS Wireless's icon before its label
 // The HD button i (canvas).

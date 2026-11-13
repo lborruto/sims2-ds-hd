@@ -144,14 +144,18 @@ void Text(Composition& c, Rect r, const std::string& s, float size, Align a = Al
 std::string Title(const RomData& rom, int page) { return MenuWords(rom, page == 4 ? kStrCasKeep : kStrCasTitle0 + page); }
 // Start's word: the next page's name (Hair Style, Face Style, Clothes, Confirm).
 std::string NextWord(const RomData& rom, int page) { return page >= 0 && page < 4 ? MenuWords(rom, kStrCasTitle0 + page + 1) : ""; }
-// A hint chip right-aligned at `right` in the panel's hints band; the next right edge.
-int HintChip(Composition& c, int right, Button b, const std::string& label)
+// A hint chip right-aligned at `right` in the panel's hints band (none drawn without `c`); the next
+// right edge, `gap` further left.
+int HintChip(Composition* c, int right, Button b, const std::string& label, int gap = 28, float size = kPmHintSize)
 {
-    const Rect r = ChipRect(0, 0, b, label, kPmHintSize, 0, Weight::ExtraBold);
-    UiItem it = ChipItem(right - r.w, kCasHints.y + (kCasHints.h - r.h) / 2, b, label, kPmHintSize, 0, Weight::ExtraBold);
-    it.layer = 1;
-    c.ui.push_back(it);
-    return right - r.w - 28;
+    const Rect r = ChipRect(0, 0, b, label, size, 0, Weight::ExtraBold);
+    if (c)
+    {
+        UiItem it = ChipItem(right - r.w, kCasHints.y + (kCasHints.h - r.h) / 2, b, label, size, 0, Weight::ExtraBold);
+        it.layer = 1;
+        c->ui.push_back(it);
+    }
+    return right - r.w - gap;
 }
 int Slot(int aspiration) { for (int j = 0; j < 4; j++) if (kCasAspOfSlot[j] == aspiration) return j; return -1; }
 
@@ -743,20 +747,28 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     // Keep this Sim?: No, the cross); A with the item's word (the chosen aspiration's too: Select).
     if (!cs.switching)
     {
-        int right = kCasHints.x + kCasHints.w - 4;
-        if (!v.buttons[(int)MenuButton::Start].empty())
-        {
-            const FittedText w = FitLine(cs.page == 4 ? MenuWords(rom, kStrCasYes) : NextWord(rom, cs.page), kPmHintSize, 18, 220, Weight::ExtraBold);
-            right = HintChip(c, right, Button::Start, w.text);
-        }
-        if (!v.back.empty()) right = HintChip(c, right, Button::B, cs.page == 4 ? MenuWords(rom, kStrCasNo) : std::string(OwnWord(&rom, OwnWordId::ShellBack)));
-        if (MenuFocusable(v, focus) && cs.drawn)
-        {
-            // (an item without a word of its own, a key, a swatch, a cell: Select)
-            const std::string word = v.items[focus].word.empty() ? std::string(OwnWord(&rom, OwnWordId::Select)) : v.items[focus].word;
-            const FittedText w = FitLine(word, kPmHintSize, 18, std::max(0, right - kCasHints.x - 60), Weight::ExtraBold);
-            HintChip(c, right, Button::A, w.text);
-        }
+        // The gaps 28, or 16 when A's word would not fit whole beside the others (Spanish's long
+        // page names), then the row a little smaller (21: Italian's "Forma del viso"), as a crowded
+        // prompt bar's chips: never a word cut.
+        const std::string bWord = cs.page == 4 ? MenuWords(rom, kStrCasNo) : std::string(OwnWord(&rom, OwnWordId::ShellBack));
+        const std::string startWord = cs.page == 4 ? MenuWords(rom, kStrCasYes) : NextWord(rom, cs.page);
+        const bool hasA = MenuFocusable(v, focus) && cs.drawn;
+        // (an item without a word of its own, a key, a swatch, a cell: Select)
+        const std::string aWord = !hasA ? "" : v.items[focus].word.empty() ? std::string(OwnWord(&rom, OwnWordId::Select)) : v.items[focus].word;
+        // (A's room: the band's left to `right`, less A's chip and the gap to its word)
+        auto row = [&](Composition* to, int gap, float size) {
+            const int chipW = ChipRect(0, 0, Button::A, "", size, 0, Weight::ExtraBold).w + (int)std::round(size / 2);
+            int right = kCasHints.x + kCasHints.w - 12; // (32 from the panel's edge, as every panel's hints)
+            if (!v.buttons[(int)MenuButton::Start].empty())
+                right = HintChip(to, right, Button::Start, FitLine(startWord, size, size, 220, Weight::ExtraBold).text, gap, size);
+            if (!v.back.empty()) right = HintChip(to, right, Button::B, bWord, gap, size);
+            const FittedText w = FitLine(aWord, size, size, std::max(0, right - kCasHints.x - chipW), Weight::ExtraBold);
+            if (hasA && to) HintChip(to, right, Button::A, w.text, gap, size);
+            return w.fits;
+        };
+        if (!hasA || row(nullptr, 28, kPmHintSize)) row(&c, 28, kPmHintSize);
+        else if (row(nullptr, 16, kPmHintSize)) row(&c, 16, kPmHintSize);
+        else row(&c, 16, 21);
     }
     for (UiItem& im : images) c.ui.push_back(im);
     SortUi(c.ui, first);

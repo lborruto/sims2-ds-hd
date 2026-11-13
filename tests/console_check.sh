@@ -142,11 +142,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" || return ;; esac
+    case $state in act-cards|sit-casino|sit-shower|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" ;; esac
+    case $state in act-cards|sit-casino|sit-shower|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -317,6 +317,9 @@ run prompt-store L-sit-store-none-250 "${late[@]}" &
 run prompt-concierge D-hotel-down "${hotel[@]}" &
 run prompt-none L-sit-cityhall-none-250 "${late[@]}" &
 run prompt-pockets A-pk-town-cnt1 "${late[@]}" &
+# The penthouse's shower (sit-shower, the complete save's own furniture: "Take a Shower" and the
+# hold hint, its name above), the playtest's report of an object A uses with no plate.
+run prompt-shower sit-shower "${late[@]}" --print-words &
 wait
 # The prompt at the UI's sizes (its own group: bottom centre, above the strip).
 run prompt-store-150 L-sit-store-none-250 "${late[@]}" --ui-scale 150 &
@@ -336,7 +339,7 @@ for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-
     registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint \
     music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats \
     s5-hd-75 s5-hd-150 casino-menu-75 casino-menu-150 pockets-smooth shop-smooth shop-smooth-2x \
-    prompt-store prompt-concierge prompt-none prompt-pockets prompt-store-150 prompt-store-75; do
+    prompt-store prompt-concierge prompt-none prompt-pockets prompt-store-150 prompt-store-75 prompt-shower; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -521,26 +524,26 @@ def front():
 BACKDROP = (16, 18, 24)
 
 def front_cas(page, focus, raw_top=True):
-    """HD Create-a-Sim (src/port/cas.*): the top screen (the model) at its shape in 16,16 664 x 640
-    (4:3: 664 x 498 at 16,87), framed; the panel at the right; the game's five tabs = the touch
+    """HD Create-a-Sim (src/port/cas.*): the top screen (the model) at its shape in 22,16 652 x 640
+    (4:3: 652 x 489 at 22,91), framed; the panel at the right; the game's five tabs = the touch
     screen's pixels 2x in the tab bar; one live crop of the page = the touch screen's pixels (the
     gender button 2x, a hair cell, a face, a clothes cell 3x, an aspiration 2x); the focus's green
     halo just outside `focus` (x, y, w, h); white words in the title's well (the name's letters on
     page 0, the page's title on 1-4); the hints."""
     expect("canvas", comp.size, (1280, 720))
     if raw_top:
-        k = 664 / 256
+        k = 652 / 256
         for x in range(0, 256, 11):
             for y in range(0, 192, 11):
                 # (the game's "L" / "R" pills on its turn arrows: covered by the pad's turn chips)
                 if (26 <= x <= 59 or 197 <= x <= 230) and 141 <= y <= 159:
                     continue
-                expect(f"top DS {x},{y}", C(16 + int((x + 0.5) * k), 87 + int((y + 0.5) * k)), top(x, y))
+                expect(f"top DS {x},{y}", C(22 + int((x + 0.5) * k), 91 + int((y + 0.5) * k)), top(x, y))
                 if len(errors) > 4:
                     return
         # The game's "L" pill (DS 29-56, 144-156) under the pad's chip's dark plate (#5961A2).
-        expect("turn pill covered", C(16 + int(31 * k), 87 + int(150 * k)), hexrgb("5961A2"))
-    expect("top frame", C(12, 300), OUTLINE)
+        expect("turn pill covered", C(22 + int(31 * k), 91 + int(150 * k)), hexrgb("5961A2"))
+    expect("top frame", C(18, 300), OUTLINE)
     expect("backdrop", C(5, 5), BACKDROP)
     expect("panel", C(704, 640), FRAME)
     # The tabs: round kit buttons, the page's green, the others the cells' blue.
@@ -600,7 +603,7 @@ def front_cas(page, focus, raw_top=True):
     if sum(1 for p in hints if p != FRAME) < 40: errors.append("no hints")
 
 def front_menu(focus, raw_top=True):
-    """The HD main menu (src/port/front.*): the top screen 3x at 24,72 framed, the panel at the
+    """The HD main menu (src/port/front.*): the top screen 3x at 26,72 framed, the panel at the
     right with four buttons, each a white label, the focused one ringed in green with the game's
     green arrow, the others' arrows blue; DS Wireless (button 3) greyed: its label dim, no arrow;
     the hints under them."""
@@ -608,34 +611,34 @@ def front_menu(focus, raw_top=True):
     if raw_top:
         for x in range(0, 256, 9):
             for y in range(0, 192, 9):
-                expect(f"top 3x DS {x},{y}", C(24 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
+                expect(f"top 3x DS {x},{y}", C(26 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
                 if len(errors) > 4:
                     return
-    expect("top frame", C(20, 300), OUTLINE)
+    expect("top frame", C(22, 300), OUTLINE)
     expect("panel", C(1240, 600), FRAME)
     expect("backdrop", C(5, 5), BACKDROP)
     for i in range(4):
         y0 = 84 + 128 * i
-        white = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (255, 255, 255))
-        arrow = [C(x, y) for y in range(y0 + 18, y0 + 82) for x in range(1164, 1228)]
+        white = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(872, 1154) if C(x, y) == (255, 255, 255))
+        arrow = [C(x, y) for y in range(y0 + 18, y0 + 82) for x in range(1168, 1232)]
         if i == 3:
             # Greyed: a dim label (no white: the kit's inactive #D4D7F2), no arrow.
-            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (0xD4, 0xD7, 0xF2))
+            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(872, 1154) if C(x, y) == (0xD4, 0xD7, 0xF2))
             if white or dim < 30: errors.append(f"button 3: not greyed ({white} white, {dim} dim pixels)")
             if sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40) > 300: errors.append("button 3: an arrow")  # (an arrow: about 1100; the rim alone: under 100)
-            r, g, b = C(835, y0 + 50)
-            if (i == focus) != (RINGED(835, y0 + 50)): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
+            r, g, b = C(839, y0 + 50)
+            if (i == focus) != (RINGED(839, y0 + 50)): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
             continue
         if white < 30: errors.append(f"button {i}: no label ({white} white pixels)")
         green = sum(1 for r, g, b in arrow if g > r + 60 and g > b + 40)
         blue = sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40)
         if i == focus:
-            r, g, b = C(835, y0 + 50)
-            if not (RINGED(835, y0 + 50)): errors.append(f"button {i}: no focus ring ({r}, {g}, {b})")
+            r, g, b = C(839, y0 + 50)
+            if not (RINGED(839, y0 + 50)): errors.append(f"button {i}: no focus ring ({r}, {g}, {b})")
             if green < 50: errors.append(f"button {i}: the arrow is not green ({green})")
         else:
-            r, g, b = C(835, y0 + 50)
-            if RINGED(835, y0 + 50): errors.append(f"button {i}: ringed")
+            r, g, b = C(839, y0 + 50)
+            if RINGED(839, y0 + 50): errors.append(f"button {i}: ringed")
             if blue < 50: errors.append(f"button {i}: the arrow is not blue ({blue})")
     hints = [C(x, y) for y in range(616, 656) for x in range(1100, 1232)]
     if sum(1 for p in hints if p != FRAME) < 40: errors.append("no hints")
@@ -657,22 +660,22 @@ def front_title(raw_top=True):
     if sum(1 for r, g, b in plate if max(r, g, b) < 70) < 200: errors.append("no dark plate")
 
 def front_boot(raw=True):
-    """The boot: the video (top) 3x at 24,72 and the splash (the touch screen) 1.5x at 838,216,
+    """The boot: the video (top) 3x at 26,72 and the splash (the touch screen) 1.5x at 848,216,
     both framed; the A and START chips under the splash."""
     expect("canvas", comp.size, (1280, 720))
     if raw:
         for x in range(0, 256, 9):
             for y in range(0, 192, 9):
-                expect(f"video 3x DS {x},{y}", C(24 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
+                expect(f"video 3x DS {x},{y}", C(26 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
         for x in range(0, 256, 6):
             for y in range(0, 192, 6):
-                expect(f"splash 1.5x DS {x},{y}", C(838 + x * 3 // 2, 216 + y * 3 // 2), bottom(x, y))
+                expect(f"splash 1.5x DS {x},{y}", C(848 + x * 3 // 2, 216 + y * 3 // 2), bottom(x, y))
                 if len(errors) > 4:
                     return
-    expect("top frame", C(20, 300), OUTLINE)
-    expect("splash frame", C(834, 300), OUTLINE)
+    expect("top frame", C(22, 300), OUTLINE)
+    expect("splash frame", C(844, 300), OUTLINE)
     expect("backdrop", C(5, 5), BACKDROP)
-    chips = [C(x, y) for y in range(534, 590) for x in range(838, 1222)]
+    chips = [C(x, y) for y in range(534, 590) for x in range(848, 1232)]
     if sum(1 for p in chips if p != BACKDROP) < 300: errors.append("no A / START chips")
 
 def front_settings(page, focus):
@@ -685,13 +688,13 @@ def front_settings(page, focus):
     expect("canvas", comp.size, (1280, 720))
     for x in range(0, 256, 11):
         for y in range(0, 192, 11):
-            expect(f"top 3x DS {x},{y}", C(24 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
+            expect(f"top 3x DS {x},{y}", C(26 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
             if len(errors) > 4:
                 return
     expect("panel", C(1240, 600), FRAME)
     expect("backdrop", C(5, 5), BACKDROP)
     for i in range(4):
-        tx, ty = 872 + (i % 2) * 164 + 2, 140 + (i // 2) * 62
+        tx, ty = 876 + (i % 2) * 164 + 2, 140 + (i // 2) * 62
         px = [C(x, y) for y in range(ty + 4, ty + 54) for x in range(tx + 4, tx + 156)]
         plate = sum(1 for p in px if p == hexrgb("9AA2E3"))
         ink = sum(1 for p in px if p == hexrgb("2E3063"))
@@ -702,28 +705,28 @@ def front_settings(page, focus):
     if len(errors) > 4:
         return
     if page == 0:
-        well = [C(x, y) for y in range(338, 402) for x in range(950, 1130)]
+        well = [C(x, y) for y in range(338, 402) for x in range(954, 1134)]
         if sum(1 for p in well if p == (255, 255, 255)) < 100: errors.append("no percent text")
-        r, g, b = C(1192, 444)
+        r, g, b = C(1196, 444)
         if not ((r > 120 and b > 180) or (r, g, b) == (74, 82, 150)): errors.append(f"knob not at 100 %: {(r, g, b)}")
-        r, g, b = C(1036, 318)
-        if not (RINGED(1036, 318)): errors.append(f"slider not focused: {(r, g, b)}")
+        r, g, b = C(1040, 318)
+        if not (RINGED(1040, 318)): errors.append(f"slider not focused: {(r, g, b)}")
     elif page == 2:
         for i in range(12):
-            gx, gy = 842 + (i % 4) * 100 + 4, 292 + (i // 4) * 88 + 4
+            gx, gy = 846 + (i % 4) * 100 + 4, 292 + (i // 4) * 88 + 4
             fx, fy = 56 + (i % 4) * 48, 72 + (i // 4) * 40
             orange = sum(1 for y in range(gy, gy + 64, 2) for x in range(gx, gx + 80, 2) if (lambda p: p[0] > 180 and 70 < p[1] < 180 and p[2] < 90)(C(x, y)))
             if orange < 50:   # (an unlocked picture: the art, its frame left out, centred 2x)
                 for dy in range(0, 24, 5):
                     for dx in range(0, 32, 5):
                         expect(f"cell {i} DS {fx + 4 + dx},{fy + 4 + dy}", C(gx + 8 + 2 * dx, gy + 8 + 2 * dy), bottom(fx + 4 + dx, fy + 4 + dy))
-            r, g, b = C(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
-            ringed = RINGED(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
+            r, g, b = C(846 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
+            ringed = RINGED(846 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
             if ringed != (i == focus): errors.append(f"cell {i}: ring {ringed}")
             if len(errors) > 4:
                 return
     elif page == 3:
-        well = [C(x, y) for y in range(286, 582) for x in range(850, 1222)]
+        well = [C(x, y) for y in range(286, 582) for x in range(854, 1226)]
         if sum(1 for p in well if p == (255, 255, 255)) < 200: errors.append("no white credits lines")
         if sum(1 for p in well if p == (0x79, 0xFB, 0x00)) < 100: errors.append("no green credits headings")
     hints = [C(x, y) for y in range(612, 644) for x in range(1100, 1232)]
@@ -1290,7 +1293,7 @@ elif case in ("s5-hd", "s5-hd-wide"):
 elif case in ("s5-hd-75", "s5-hd-150", "casino-menu-75", "casino-menu-150"):
     # The UI's size: the same picture as at 100 % (the case without the suffix, run beside it), its
     # HD group zoomed about its anchor (the conversation about the canvas's bottom centre, 75 % or as
-    # wide as the canvas holds, 120 %; the menu about 640,338, 75 % or never larger), the world
+    # wide as the canvas holds 16 pixels in a side, 118 %; the menu about 640,338, 75 % or never larger), the world
     # unchanged where the group no longer lies; the strip's status at its own size (75 %, or the
     # strip's 108 %) at the strip's left.
     from PIL import ImageStat
@@ -1298,7 +1301,7 @@ elif case in ("s5-hd-75", "s5-hd-150", "casino-menu-75", "casino-menu-150"):
     base = Image.open(comp_path.replace(f"/{case}/", f"/{base_name}/")).convert("RGB")
     z = 0.75 if case.endswith("-75") else 1.0
     dialogue = case.startswith("s5")
-    if dialogue and case.endswith("-150"): z = 636 / 530
+    if dialogue and case.endswith("-150"): z = 624 / 530   # (to 16 pixels from the sides: console.cpp's kUiEdge)
     ax, ay = (640, 720) if dialogue else (640, 338)
     box = (110, 426, 1170, 706) if dialogue else (176, 30, 1104, 646)
     T = lambda x, y: (ax + z * (x - ax), ay + z * (y - ay))
@@ -1482,7 +1485,12 @@ elif case.startswith("prompt-"):
     # -75 / -150: the UI's size (its own group, zoomed about its bottom centre, x 640 row 640).
     z = 1.5 if case.endswith("-150") else 0.75 if case.endswith("-75") else 1.0
     cols = [x for x in range(0, 1280) if any(C(x, y) == FRAME for y in range(644 - int(88 * z), 640, 6))]
-    if case.startswith(("prompt-store", "prompt-concierge")):
+    if case == "prompt-shower":
+        # The words the plate says, as the game's own strings: the object's name, its first verb.
+        words = [l for l in open(log_path, errors="replace") if " words " in l]
+        if not words or "White Shower | Take a Shower | Hold for more" not in words[-1]:
+            errors.append(f"the shower's plate does not say White Shower / Take a Shower: {words[-1].strip() if words else 'no words'}")
+    if case.startswith(("prompt-store", "prompt-concierge", "prompt-shower")):
         if not cols:
             errors.append("no prompt plate")
         else:
@@ -1491,7 +1499,7 @@ elif case.startswith("prompt-"):
             if lo < 4 or hi > 1275: errors.append(f"the plate outside the canvas: {lo}..{hi}")
             if case.startswith("prompt-store") and not 120 * z < hi - lo < 320 * z:
                 errors.append(f"the store's plate (A Buy, the clerk) at {z}: {lo}..{hi}")
-            if case == "prompt-concierge" and hi - lo < 340: errors.append(f"no hint beside the concierge's verb: {lo}..{hi}")
+            if case in ("prompt-concierge", "prompt-shower") and hi - lo < 340: errors.append(f"no hint beside the {case[7:]}'s verb: {lo}..{hi}")
             if (255, 255, 255) not in [C(x, y) for y in range(640 - int(88 * z), 640) for x in range(lo, hi)]: errors.append("no verb")
             # Nothing of it from row 648 to the strip, its drop shadow (7 rows, zoomed) neither:
             # the world's own pixels there.
@@ -1595,6 +1603,11 @@ pad_build pad-build-double BD-list build-double 200 &
 pad_build pad-build-poor BD-down3 build-poor 120 &
 pad_late pad-hotseat sit-casino interact-hotseat 300 &
 pad_late pad-target D-cas-right2 interact-target 220 &
+# (the words too: the plate's)
+cp "$complete_save" "$tmp/pad-interact-back.sav"
+"$bin" "$rom" --headless --frames 300 --state-load "$shots/sit-shower.st" --save "$tmp/pad-interact-back.sav" --layout console \
+    --print-screen --print-game --print-town --print-words "${late[@]}" --input "$repo/scripts/console/interact-back.txt" \
+    > "$tmp/pad-interact-back.log" 2>&1 && grep -q '^clock: ' "$tmp/pad-interact-back.log" && touch "$tmp/pad-interact-back.ok" &
 pad pad-buy sit-store interact-buy 200 &
 pad_late pad-drencher A-pk-slot1-key2 pockets-drencher 200 &
 pad_late pad-bin A-pk-slot1-key2 pockets-bin 240 &
@@ -1678,6 +1691,14 @@ target() { in_order pad-target 'interact target=obj15' 'console menu open' 'inte
 buy() { in_order pad-buy 'console menu open, focus 0' 'game Catalogue'; }
 check_pad pad-hotseat hotseat
 check_pad pad-target target
+# The menu closed on Pockets (sit-shower): the port's tap brings Interact back before A, the
+# shower's plate shows again, and the one A press takes the shower (its row becomes Exit, 49).
+interact_back() {
+    in_order pad-interact-back 'game Panel/Pockets' 'console menu closed' 'game Panel/Interact' \
+        'words .*White Shower \| Take a Shower \| Hold for more' 'interact target=obj185.* pad=0 ' 'interact target=obj185.*actions=49:1894' || return 1
+    [ "$(grep -c 'pad=0 ' "$tmp/pad-interact-back.log")" = 1 ] || { echo "  pad-interact-back: A taken more than once"; return 1; }
+}
+check_pad pad-interact-back interact_back
 check_pad pad-buy buy
 # Pockets and Give Gift (src/port/pockets.*, gift.*): from A-pk-slot1-key2 (the Super Drencher
 # selected), MENU, A → the Super Drencher's game (overlay 18, Drencher: CONSOLE's Drencher); MENU, Left (slot 1), X →
