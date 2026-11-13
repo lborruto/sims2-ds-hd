@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 # The release workflow checks that this version is the tag's (vX.Y.Z).
-project(sims2wide VERSION 0.1.1 LANGUAGES CXX C)
+project(sims2wide VERSION 0.2.0 LANGUAGES CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
