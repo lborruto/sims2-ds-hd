@@ -136,6 +136,9 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Fixed
 
+- The A plate in the world also shows for the third kind of target the game lets A use (one it
+  gives no name: the plate says the verb alone), and something of that kind nearby no longer hides
+  the plate of the object you stand at.
 - A settings file with a 3D resolution above 4 showed it, and Right then lowered it to 4: it is
   now read as 4.
 - Create-a-Sim: changing page no longer flashes the last page's pictures in the new page's cells

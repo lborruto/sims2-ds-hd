@@ -1416,7 +1416,7 @@ relaunch:
             {   // the menus' lists (gamestate.h), one line per part when it changes
                 const TownState& t = app.game.town;
                 const TownState& b = before.town;
-                auto tgt = [](const TargetRef& r) { return r.kind == TargetRef::None ? std::string("-") : std::string(r.kind == TargetRef::Sim ? "sim" : "obj") + std::to_string(r.index) + ":" + std::to_string(r.nameId) + ":" + std::to_string(r.portraitRes); };
+                auto tgt = [](const TargetRef& r) { return r.kind == TargetRef::None ? std::string("-") : std::string(r.kind == TargetRef::Sim ? "sim" : r.kind == TargetRef::Object ? "obj" : "other") + std::to_string(r.index) + ":" + std::to_string(r.nameId) + ":" + std::to_string(r.portraitRes); };
                 if (!(t.interact == b.interact) || frame == 0)
                 {
                     const InteractState& v = t.interact;

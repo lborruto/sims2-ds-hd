@@ -142,11 +142,11 @@ run() {
     [ -f "$file" ] || file=$more_shots/$state.st
     if [ ! -f "$file" ]; then echo "no save state $state.st in $shots or $more_shots" > "$tmp/$name.log"; return; fi
     local save=$tmp/$name.sav
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" || return ;; esac
+    case $state in act-cards|sit-casino|sit-shower|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" || return ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" --layout console \
         --compose --shot-at 119 --shot-dir "$tmp/$name/c" --console-focus -1 "$@" > "$tmp/$name.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name.log" || return
-    case $state in act-cards|sit-casino|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" ;; esac
+    case $state in act-cards|sit-casino|sit-shower|A-pk-cnt3-slot1|A-pk-slot1-key2|B-cas-*|C-cas-*|M-music|M-mu-*|SP-*|G-*|F-cload-*|F-copt-*) cp "$complete_save" "$save" ;; esac
     "$bin" "$rom" --headless --frames 120 --state-load "$file" --save "$save" \
         --shot-at 119 --shot-dir "$tmp/$name/r" "$@" > "$tmp/$name-r.log" 2>&1 &&
         grep -q '^clock: ' "$tmp/$name-r.log" && touch "$tmp/$name.ok"
@@ -317,6 +317,9 @@ run prompt-store L-sit-store-none-250 "${late[@]}" &
 run prompt-concierge D-hotel-down "${hotel[@]}" &
 run prompt-none L-sit-cityhall-none-250 "${late[@]}" &
 run prompt-pockets A-pk-town-cnt1 "${late[@]}" &
+# The penthouse's shower (sit-shower, the complete save's own furniture: "Take a Shower" and the
+# hold hint, its name above), the playtest's report of an object A uses with no plate.
+run prompt-shower sit-shower "${late[@]}" --print-words &
 wait
 # The prompt at the UI's sizes (its own group: bottom centre, above the strip).
 run prompt-store-150 L-sit-store-none-250 "${late[@]}" --ui-scale 150 &
@@ -336,7 +339,7 @@ for name in s7 cityhall cityhall-wide cityhall-menu s7-menu gift s5 s5-hd s5-hd-
     registry registry-2x registry-wide registry-guest roominfo roominfo-vacant roominfo-hint \
     music music-2x music-wide music-scrolled stat-main stat-main-2x stat-main-wide stat-asp stat-hotel stat-skills stat-stats \
     s5-hd-75 s5-hd-150 casino-menu-75 casino-menu-150 pockets-smooth shop-smooth shop-smooth-2x \
-    prompt-store prompt-concierge prompt-none prompt-pockets prompt-store-150 prompt-store-75; do
+    prompt-store prompt-concierge prompt-none prompt-pockets prompt-store-150 prompt-store-75 prompt-shower; do
     if [ ! -f "$tmp/$name.ok" ]; then
         echo "FAIL $name: the run did not end well: $(tail -n 1 "$tmp/$name.log")"
         fails=$((fails + 1))
@@ -1482,7 +1485,12 @@ elif case.startswith("prompt-"):
     # -75 / -150: the UI's size (its own group, zoomed about its bottom centre, x 640 row 640).
     z = 1.5 if case.endswith("-150") else 0.75 if case.endswith("-75") else 1.0
     cols = [x for x in range(0, 1280) if any(C(x, y) == FRAME for y in range(644 - int(88 * z), 640, 6))]
-    if case.startswith(("prompt-store", "prompt-concierge")):
+    if case == "prompt-shower":
+        # The words the plate says, as the game's own strings: the object's name, its first verb.
+        words = [l for l in open(log_path, errors="replace") if " words " in l]
+        if not words or "White Shower | Take a Shower | Hold for more" not in words[-1]:
+            errors.append(f"the shower's plate does not say White Shower / Take a Shower: {words[-1].strip() if words else 'no words'}")
+    if case.startswith(("prompt-store", "prompt-concierge", "prompt-shower")):
         if not cols:
             errors.append("no prompt plate")
         else:
@@ -1491,7 +1499,7 @@ elif case.startswith("prompt-"):
             if lo < 4 or hi > 1275: errors.append(f"the plate outside the canvas: {lo}..{hi}")
             if case.startswith("prompt-store") and not 120 * z < hi - lo < 320 * z:
                 errors.append(f"the store's plate (A Buy, the clerk) at {z}: {lo}..{hi}")
-            if case == "prompt-concierge" and hi - lo < 340: errors.append(f"no hint beside the concierge's verb: {lo}..{hi}")
+            if case in ("prompt-concierge", "prompt-shower") and hi - lo < 340: errors.append(f"no hint beside the {case[7:]}'s verb: {lo}..{hi}")
             if (255, 255, 255) not in [C(x, y) for y in range(640 - int(88 * z), 640) for x in range(lo, hi)]: errors.append("no verb")
             # Nothing of it from row 648 to the strip, its drop shadow (7 rows, zoomed) neither:
             # the world's own pixels there.
