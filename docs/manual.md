@@ -82,7 +82,8 @@ you last typed). The mouse works everywhere too.
 - **What A does here.** Near someone or something you can use, a small plate at the bottom says
   what A does ("A Buy", and who or what). Tap A to do it. Hold A for the other things you can do
   (Up / Down choose, let go to do it); while A is held, Left / Right pick the next person or thing
-  nearby.
+  nearby. Closing the menu on another tab (Pockets, Goals...) brings the game back to Interact, so
+  the plate is there as soon as you walk on.
 - **The status bar** runs along the bottom of the window: the time, your money and your Sanity,
   with the camera and menu hints at the right. What you just won (green) or paid (red) shows
   beside the money for a few seconds. The bar stays under conversations too.

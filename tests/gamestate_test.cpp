@@ -600,6 +600,7 @@ static void interact_list()
     // a Sim target, an unknown one, and the neighbours
     r.W16(kActor + 0xA, 51); r.W16(kActor + 0xC, 2); r.W32(kE + 4, 2);
     CHECK(ReadGameState(r.View()).town.interact.target.nameId == 321);
+    CHECK(ReadGameState(r.View()).town.interact.valid && ReadGameState(r.View()).town.interact.actions.empty());   // state 2: no rows, A does nothing
     r.W32(kE + 4, 1);
     CHECK(ReadGameState(r.View()).town.interact.target.nameId == 323 + 51);
     r.W32(kT + 0x308, kE);

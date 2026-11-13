@@ -150,7 +150,10 @@ after 38 frames; `sit-hotel`: none, then after about 220 frames of walking the c
 none again when he walks off; `L-sit-cityhall-none-250`, `sit-hotel`, `sit-basement`: none at the start; the furnace and
 the rods were not reached from `sit-basement` in a short walk). On another tab there is no Interact object at all
 (`A-pk-town-cnt1`, Pockets up: `S+0x34` fails its vtable check, every frame, while walking too): the target is known
-only while the panel's tab is Interact, the world's default. In the world (no menu, the stylus mode `T+0x314` = 1)
+only while the panel's tab is Interact, the world's default. Closing the HD menu on another tab leaves the game there
+(`sit-shower`, MENU, RB, B: Pockets until a tap; the game's own A in the world only switches back to Interact, 6
+frames, a second A acts), so the navigator taps Interact's icon when its menu closes (the target is back about 12
+frames later). In the world (no menu, the stylus mode `T+0x314` = 1)
 the D-pad's Left / Right switch to the strip's previous / next target (`D-cas-right2`: Left 20 frames → the cards,
 object 29, two frames later; `L-sit-casino-none-250`: Right → the Music Panel with the cards as previous); with no
 neighbour Right does not change the target. A held (`T+0x314` 0, pad mode) keeps it and Left still switches; Up /
@@ -179,6 +182,7 @@ the Interact vtable `0x021321C4`):
   with an interface whose `+0x1C` is set: pad mode 0, the lit row `T+0x318` the first on (`vt+0x10`). Held: Up / Down
   move it over the rows that are on, Left / Right switch to `T+0x30C` / `T+0x308`. Released: mode 1 and the lit row's
   selector runs (`vt+0x1C`, `vt+0x20`). `E`, its interface or its `+0x1C` gone while held: mode 2 until A is up.
+- An entry in state 2 has no rows: the reader gives it no actions (no prompt; its "???" title stays).
 - So A uses whatever `E` the picker took, type 0xD included, named or not: the reader takes 0xD as a target with no
   name (`TargetRef::Unnamed`) and as a neighbour; before, either made the whole Interact state invalid (no plate).
   No 0xD actor was found in 98 save states scanned (town, hotel, casino, penthouse, minigames); what it is stays

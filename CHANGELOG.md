@@ -136,6 +136,11 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ### Fixed
 
+- The A plate no longer disappears after you close the menu on Pockets, Goals, Relationships or
+  Options: the menu now always hands the world back on Interact, so the plate shows again and a
+  single A uses what you stand at (before, the first A only switched tabs, with no plate meanwhile).
+- No plate for someone or something walking out of reach while the game no longer offers its
+  actions (A did nothing there).
 - The A plate in the world also shows for the third kind of target the game lets A use (one it
   gives no name: the plate says the verb alone), and something of that kind nearby no longer hides
   the plate of the object you stand at.

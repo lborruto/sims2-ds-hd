@@ -1603,6 +1603,11 @@ pad_build pad-build-double BD-list build-double 200 &
 pad_build pad-build-poor BD-down3 build-poor 120 &
 pad_late pad-hotseat sit-casino interact-hotseat 300 &
 pad_late pad-target D-cas-right2 interact-target 220 &
+# (the words too: the plate's)
+cp "$complete_save" "$tmp/pad-interact-back.sav"
+"$bin" "$rom" --headless --frames 300 --state-load "$shots/sit-shower.st" --save "$tmp/pad-interact-back.sav" --layout console \
+    --print-screen --print-game --print-town --print-words "${late[@]}" --input "$repo/scripts/console/interact-back.txt" \
+    > "$tmp/pad-interact-back.log" 2>&1 && grep -q '^clock: ' "$tmp/pad-interact-back.log" && touch "$tmp/pad-interact-back.ok" &
 pad pad-buy sit-store interact-buy 200 &
 pad_late pad-drencher A-pk-slot1-key2 pockets-drencher 200 &
 pad_late pad-bin A-pk-slot1-key2 pockets-bin 240 &
@@ -1686,6 +1691,14 @@ target() { in_order pad-target 'interact target=obj15' 'console menu open' 'inte
 buy() { in_order pad-buy 'console menu open, focus 0' 'game Catalogue'; }
 check_pad pad-hotseat hotseat
 check_pad pad-target target
+# The menu closed on Pockets (sit-shower): the port's tap brings Interact back before A, the
+# shower's plate shows again, and the one A press takes the shower (its row becomes Exit, 49).
+interact_back() {
+    in_order pad-interact-back 'game Panel/Pockets' 'console menu closed' 'game Panel/Interact' \
+        'words .*White Shower \| Take a Shower \| Hold for more' 'interact target=obj185.* pad=0 ' 'interact target=obj185.*actions=49:1894' || return 1
+    [ "$(grep -c 'pad=0 ' "$tmp/pad-interact-back.log")" = 1 ] || { echo "  pad-interact-back: A taken more than once"; return 1; }
+}
+check_pad pad-interact-back interact_back
 check_pad pad-buy buy
 # Pockets and Give Gift (src/port/pockets.*, gift.*): from A-pk-slot1-key2 (the Super Drencher
 # selected), MENU, A → the Super Drencher's game (overlay 18, Drencher: CONSOLE's Drencher); MENU, Left (slot 1), X →
