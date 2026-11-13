@@ -7,7 +7,7 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-11-11
+## [0.2.0] - 2026-11-13
 
 ### Added
 
