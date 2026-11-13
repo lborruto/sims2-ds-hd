@@ -240,8 +240,9 @@ limit are in [docs/dev-notes.md](docs/dev-notes.md). In short:
 | [CHANGELOG.md](CHANGELOG.md), [SECURITY.md](SECURITY.md) | what changed; how to report a vulnerability |
 
 The pictures in `docs/screenshots` are 1280 × 720 webp (quality 82), made headless from save
-states: `--headless --layout console --compose --wide --res3d 2 --interp --game-pictures smooth
---ui-scale 100`, the PNG saved with Pillow. Only the pictures README.md and docs/manual.md show
+states with the defaults' look: `--headless --layout console --compose --wide --res3d 2 --interp
+--game-pictures pixel --ui-scale 100`, the PNG saved with Pillow; all sixteen are taken again
+together (the states and clocks: [docs/dev-notes.md](docs/dev-notes.md#build-states-and-checks)). Only the pictures README.md and docs/manual.md show
 are kept.
 
 ## Commits and pull requests

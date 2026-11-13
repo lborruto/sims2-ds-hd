@@ -43,7 +43,7 @@
   </tr>
   <tr>
     <td><img src="docs/screenshots/cards.webp" alt="Keelhaulin' Cards big in its frame, a card in the green focus ring, the score board at the right, X Draw a card and B Quit below" width="440"></td>
-    <td><img src="docs/screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit; the hints say how to resume and select" width="440"></td>
+    <td><img src="docs/screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit (in the window, Open the saves folder sits above Quit); the hints say how to resume and select" width="440"></td>
   </tr>
 </table>
 

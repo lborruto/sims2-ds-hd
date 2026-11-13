@@ -141,16 +141,19 @@ emptied), `F-hair-s3-40` (the Hair page, the third style), `F-face-5-40` (the fi
 cell); `s3` / `s4` are Create-a-Sim's Name page and Keep this Sim?. Pass `--clock "2026-01-01
 12:00"` to runs from the town states whose output is compared.
 
-The README's and the manual's pictures (`docs/screenshots`, 1280 × 720 webp, game screenshots are allowed): from a
-state on a scratch copy of the complete save, `--headless --frames 120 --layout console --compose --wide --res3d 2
---interp --game-pictures pixel --ui-scale 100 --shot-at 119` (Pixel: the default look) with the state's `--clock`: the town (`town.webp`:
-`L-sit-casino-none-250`, the world prompt after its steady frames), the HD menu (`sit-casino --console-menu
---console-focus 1`), `A-pk-cnt3-slot1` for Pockets (`--console-focus 0`), `s7` for the phone, `s5` the conversation,
+The README's and the manual's pictures (`docs/screenshots`, 1280 × 720 webp, game screenshots are allowed), all
+sixteen taken again together from one build: `--headless --frames 120 --layout console --compose --wide --res3d 2
+--interp --game-pictures pixel --ui-scale 100 --shot-at 119` (the defaults' look), the complete save's states on a
+scratch copy of it with its clock (`2026-11-05 12:05`), the town's states on a new save at 12:00, the hotel's at
+14:00: the town (`town.webp`: `L-sit-casino-none-250`, the world prompt after its steady frames), the HD menu
+(`sit-casino --console-menu --console-focus 1`), `A-pk-cnt3-slot1` for Pockets (`--console-menu --console-focus 0`), `s7` for the phone, `s5` the conversation,
 `sit-storebuy` the shop, `s3` Create-a-Sim, `s2` the main menu, `M-ci-occ-reg2` the Registry (14:00), `G-X-pirate`
 the cards, `G-A-para` the autopsy, `act-vacuum` (14:00) with `scripts/console/vacuum-pick.txt`, `--frames 300 --shot-at 270` (the gold ring in the focus ring, A's hint to take it); the pause menu's pages with `--frames 64 --shell PAGE
---shell-at 60 --shot-at 63` (the save states page with a `--data-dir` holding a slot), the launch panel with
+--shell-at 60 --shot-at 63` (the save states page with a `--data-dir` holding a slot; Settings on its Graphics tab:
+`--frames 70 --shot-at 69` and a script with `64 2 pad rb`; headless has no *Open the saves folder*, which the alt
+text says), the launch panel with
 `--launch --frames 4 --shot-at 2` and a `--data-dir` holding `recent.txt` and a suspend state (made by
-`scripts/shell/states.txt` from `s7`, then `quit.txt` from `sit-casino`, the ROM through a link named `The Sims 2.nds`); the pause menu's pages over `sit-casino`; the PNG saved with Pillow as webp (quality 82). Look at every picture before
+`scripts/shell/states.txt` from `s7`, then `quit.txt` from `sit-casino`, the ROM through a link named `The Sims 2.nds`; a copy of that folder, taken before the pause menu's runs add the real ROM to its recent list); the pause menu's pages over `sit-casino`; the PNG saved with Pillow as webp (quality 82). Look at every picture before
 using it: HD everywhere, no framed-screen picture, no glitch. Only the pictures README.md and docs/manual.md
 show are kept. Every unit test (`ninja -C build
 <name>_test`: layout, touchscript, hotspots, screens, navigator, controls, gamestate, romdata, uikit, pads, shell)

@@ -37,7 +37,7 @@ is not The Sims 2 is said right there; another region's cartridge plays, but wit
 small screens (said once, until you press A).
 
 <p align="center">
-  <img src="screenshots/launch.webp" alt="The launch panel: Continue with a picture of where you quit, Choose a file, Language and Quit on the left; the controls on the right" width="700">
+  <img src="screenshots/launch.webp" alt="The launch panel under the title Sims 2 DS HD: Continue with a picture of where you quit, Choose a file, Language and Quit on the left; the controls on the right" width="700">
 </p>
 
 A ROM on the command line (`sims2hd path/to/your-sims2.nds`) skips the panel.
@@ -271,7 +271,7 @@ Closing the window asks the same question. Every question opens on No, and B is 
 closes with A or B.
 
 <p align="center">
-  <img src="screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit; the hints say how to resume and select" width="440">
+  <img src="screenshots/pause.webp" alt="The pause menu over the dimmed casino: Resume, Settings, Controls, Save states, Change game, Quit (in the window, Open the saves folder sits above Quit); the hints say how to resume and select" width="440">
   <img src="screenshots/save-states.webp" alt="The save states page: slot 1 with its picture and date, three empty slots, Undo the last load" width="440">
 </p>
 
@@ -287,7 +287,7 @@ defaults (it asks first, on No); window size and place and your keys and buttons
 Everything is kept between runs.
 
 <p align="center">
-  <img src="screenshots/settings.webp" alt="The pause menu's settings on the Display tab: Fullscreen, Interface size, Screen scaling, Game icons, Hide the idle pointer, and Layout under Advanced" width="700">
+  <img src="screenshots/settings.webp" alt="The pause menu's settings on the Graphics tab: Battery saver, 3D resolution at 384p, 60 fps, and Widescreen world under Advanced; the line under the list says what Battery saver does" width="700">
 </p>
 
 **Display**
