@@ -743,7 +743,7 @@ void BuildCas(Composition& c, const MenuView& v, int focus, const GameState& gam
     // Keep this Sim?: No, the cross); A with the item's word (the chosen aspiration's too: Select).
     if (!cs.switching)
     {
-        int right = kCasHints.x + kCasHints.w - 4;
+        int right = kCasHints.x + kCasHints.w - 12; // (32 from the panel's edge, as every panel's hints)
         if (!v.buttons[(int)MenuButton::Start].empty())
         {
             const FittedText w = FitLine(cs.page == 4 ? MenuWords(rom, kStrCasYes) : NextWord(rom, cs.page), kPmHintSize, 18, 220, Weight::ExtraBold);

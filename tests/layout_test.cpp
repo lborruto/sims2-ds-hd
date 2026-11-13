@@ -48,6 +48,33 @@ using namespace sims2wide;
 static int failures = 0;
 #define CHECK(cond) do { if (!(cond)) { fprintf(stderr, "%s:%d: %s\n", __FILE__, __LINE__, #cond); failures++; } } while (0)
 
+// The whole-canvas screens with a framed picture at the left and a panel at the right (the main
+// menu, Settings, the boot, Create-a-Sim): the canvas's left edge to the picture's frame (6 pixels
+// outside the piece), the frame to the panel and the panel to the canvas's right edge the same;
+// the hints' row (the chips in the panel's foot) ending 32 pixels inside the panel's right edge, as
+// every panel's (the town's menus: kPmPanel's right less 32).
+static void EvenSides(const Composition& comp, Rect panel, const char* what, bool hints = true)
+{
+    Rect top {};
+    for (const Piece& q : comp.pieces)
+        if (q.src == Src::Top) top = q.to;
+    const int left = top.x - 6, gap = panel.x - (top.x + top.w + 6), right = kConsoleW - (panel.x + panel.w);
+    if (!(left == gap && gap == right && left >= 16))
+    {
+        fprintf(stderr, "%s: margins %d | %d | %d (want one, 16 or more)\n", what, left, gap, right);
+        failures++;
+    }
+    if (!hints) return;
+    int end = 0;
+    for (const ui::UiItem& u : comp.ui)
+        if (u.kind == ui::UiItem::Chip && u.to.y > panel.y + panel.h - 80 && u.to.x >= panel.x) end = std::max(end, u.to.x + u.to.w);
+    if (end != panel.x + panel.w - 32)
+    {
+        fprintf(stderr, "%s: the hints end at %d (want %d)\n", what, end, panel.x + panel.w - 32);
+        failures++;
+    }
+}
+
 static void TestLayout(Layout l, bool mainIsTop, float aspect, int ow, int oh)
 {
     const Placement p = Place(l, mainIsTop, aspect);
@@ -2717,6 +2744,7 @@ int main()
                     layers(comp);
                     for (const Piece& q : comp.pieces)
                         if (q.src == Src::Top) CHECK(!q.touch && q.from.w == 256 && q.from.x == (topW - 256) / 2); // (the 2D part)
+                    if (phase > 0 && focus == 0) EvenSides(comp, kFrPanel, "main menu", MenuFocusable(v, 0));
                     if (focus != 0 || topW != 256) continue;
                     for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
                         TestConsoleRoundtrip(fe, false, 256, 192, o.first, o.second, false, &comp);
@@ -2897,6 +2925,7 @@ int main()
                             Composition comp {kConsoleW, kConsoleH, {}, {}};
                             BuildSettings(comp, v, focus, g, rom, bottom.data(), nullptr, topW, 192);
                             layers(comp);
+                            EvenSides(comp, kFrPanel, "Settings");
                             if (focus != 0 || topW != 256 || vol != 1296) continue;
                             for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
                                 TestConsoleRoundtrip(none, false, 256, 192, o.first, o.second, false, &comp);
@@ -3160,6 +3189,7 @@ int main()
                     Composition comp {kConsoleW, kConsoleH, {}, {}};
                     BuildCas(comp, v, focus, g, rom, nullptr, bottom.data(), topW, 192);
                     layers(comp);
+                    if (!g.front.cas.switching) EvenSides(comp, kCasPanel, "Create-a-Sim");
                     int tops = 0;
                     for (const Piece& q : comp.pieces)
                         if (q.src == Src::Top) { tops++; CHECK(q.touch && q.from.w == topW && q.to.x + q.to.w <= kCasPanel.x); }

@@ -57,7 +57,7 @@ std::string Label(const RomData& rom, int i) { return MenuWords(rom, kStrFrMenu[
 int HintAWidth(const RomData& rom)
 {
     const Rect d = ChipRect(0, 0, Button::DPadV, OwnWord(&rom, OwnWordId::HintChoose), kPmHintSize, 0, Weight::ExtraBold);
-    return kFrHints.w - d.w - 28 - 40;
+    return kFrHints.w - 8 - d.w - 28 - 40;
 }
 }
 
@@ -251,7 +251,7 @@ void BuildFront(Composition& c, const MenuView& v, int focus, ScreenState s, con
             const Rect dr = ChipRect(0, 0, Button::DPadV, choose, kPmHintSize, 0, Weight::ExtraBold);
             const FittedText w = FitLine(v.items[focus].word, kPmHintSize, 18, HintAWidth(rom), Weight::ExtraBold);
             const Rect ar = ChipRect(0, 0, Button::A, w.text, kPmHintSize, 0, Weight::ExtraBold);
-            const int right = kFrHints.x + kFrHints.w;
+            const int right = kFrHints.x + kFrHints.w - 8; // (the hints' right edge as every panel's: Settings', the town's)
             UiItem a = ChipItem(right - ar.w, kFrHints.y + (kFrHints.h - ar.h) / 2, Button::A, w.text, kPmHintSize, 0, Weight::ExtraBold);
             a.layer = 1;
             c.ui.push_back(a);

@@ -521,26 +521,26 @@ def front():
 BACKDROP = (16, 18, 24)
 
 def front_cas(page, focus, raw_top=True):
-    """HD Create-a-Sim (src/port/cas.*): the top screen (the model) at its shape in 16,16 664 x 640
-    (4:3: 664 x 498 at 16,87), framed; the panel at the right; the game's five tabs = the touch
+    """HD Create-a-Sim (src/port/cas.*): the top screen (the model) at its shape in 22,16 652 x 640
+    (4:3: 652 x 489 at 22,91), framed; the panel at the right; the game's five tabs = the touch
     screen's pixels 2x in the tab bar; one live crop of the page = the touch screen's pixels (the
     gender button 2x, a hair cell, a face, a clothes cell 3x, an aspiration 2x); the focus's green
     halo just outside `focus` (x, y, w, h); white words in the title's well (the name's letters on
     page 0, the page's title on 1-4); the hints."""
     expect("canvas", comp.size, (1280, 720))
     if raw_top:
-        k = 664 / 256
+        k = 652 / 256
         for x in range(0, 256, 11):
             for y in range(0, 192, 11):
                 # (the game's "L" / "R" pills on its turn arrows: covered by the pad's turn chips)
                 if (26 <= x <= 59 or 197 <= x <= 230) and 141 <= y <= 159:
                     continue
-                expect(f"top DS {x},{y}", C(16 + int((x + 0.5) * k), 87 + int((y + 0.5) * k)), top(x, y))
+                expect(f"top DS {x},{y}", C(22 + int((x + 0.5) * k), 91 + int((y + 0.5) * k)), top(x, y))
                 if len(errors) > 4:
                     return
         # The game's "L" pill (DS 29-56, 144-156) under the pad's chip's dark plate (#5961A2).
-        expect("turn pill covered", C(16 + int(31 * k), 87 + int(150 * k)), hexrgb("5961A2"))
-    expect("top frame", C(12, 300), OUTLINE)
+        expect("turn pill covered", C(22 + int(31 * k), 91 + int(150 * k)), hexrgb("5961A2"))
+    expect("top frame", C(18, 300), OUTLINE)
     expect("backdrop", C(5, 5), BACKDROP)
     expect("panel", C(704, 640), FRAME)
     # The tabs: round kit buttons, the page's green, the others the cells' blue.
@@ -600,7 +600,7 @@ def front_cas(page, focus, raw_top=True):
     if sum(1 for p in hints if p != FRAME) < 40: errors.append("no hints")
 
 def front_menu(focus, raw_top=True):
-    """The HD main menu (src/port/front.*): the top screen 3x at 24,72 framed, the panel at the
+    """The HD main menu (src/port/front.*): the top screen 3x at 26,72 framed, the panel at the
     right with four buttons, each a white label, the focused one ringed in green with the game's
     green arrow, the others' arrows blue; DS Wireless (button 3) greyed: its label dim, no arrow;
     the hints under them."""
@@ -608,34 +608,34 @@ def front_menu(focus, raw_top=True):
     if raw_top:
         for x in range(0, 256, 9):
             for y in range(0, 192, 9):
-                expect(f"top 3x DS {x},{y}", C(24 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
+                expect(f"top 3x DS {x},{y}", C(26 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
                 if len(errors) > 4:
                     return
-    expect("top frame", C(20, 300), OUTLINE)
+    expect("top frame", C(22, 300), OUTLINE)
     expect("panel", C(1240, 600), FRAME)
     expect("backdrop", C(5, 5), BACKDROP)
     for i in range(4):
         y0 = 84 + 128 * i
-        white = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (255, 255, 255))
-        arrow = [C(x, y) for y in range(y0 + 18, y0 + 82) for x in range(1164, 1228)]
+        white = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(872, 1154) if C(x, y) == (255, 255, 255))
+        arrow = [C(x, y) for y in range(y0 + 18, y0 + 82) for x in range(1168, 1232)]
         if i == 3:
             # Greyed: a dim label (no white: the kit's inactive #D4D7F2), no arrow.
-            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(868, 1150) if C(x, y) == (0xD4, 0xD7, 0xF2))
+            dim = sum(1 for y in range(y0 + 25, y0 + 75) for x in range(872, 1154) if C(x, y) == (0xD4, 0xD7, 0xF2))
             if white or dim < 30: errors.append(f"button 3: not greyed ({white} white, {dim} dim pixels)")
             if sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40) > 300: errors.append("button 3: an arrow")  # (an arrow: about 1100; the rim alone: under 100)
-            r, g, b = C(835, y0 + 50)
-            if (i == focus) != (RINGED(835, y0 + 50)): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
+            r, g, b = C(839, y0 + 50)
+            if (i == focus) != (RINGED(839, y0 + 50)): errors.append(f"button 3: the focus ring {'missing' if i == focus else 'drawn'}")
             continue
         if white < 30: errors.append(f"button {i}: no label ({white} white pixels)")
         green = sum(1 for r, g, b in arrow if g > r + 60 and g > b + 40)
         blue = sum(1 for r, g, b in arrow if b > r + 80 and b > g + 40)
         if i == focus:
-            r, g, b = C(835, y0 + 50)
-            if not (RINGED(835, y0 + 50)): errors.append(f"button {i}: no focus ring ({r}, {g}, {b})")
+            r, g, b = C(839, y0 + 50)
+            if not (RINGED(839, y0 + 50)): errors.append(f"button {i}: no focus ring ({r}, {g}, {b})")
             if green < 50: errors.append(f"button {i}: the arrow is not green ({green})")
         else:
-            r, g, b = C(835, y0 + 50)
-            if RINGED(835, y0 + 50): errors.append(f"button {i}: ringed")
+            r, g, b = C(839, y0 + 50)
+            if RINGED(839, y0 + 50): errors.append(f"button {i}: ringed")
             if blue < 50: errors.append(f"button {i}: the arrow is not blue ({blue})")
     hints = [C(x, y) for y in range(616, 656) for x in range(1100, 1232)]
     if sum(1 for p in hints if p != FRAME) < 40: errors.append("no hints")
@@ -657,22 +657,22 @@ def front_title(raw_top=True):
     if sum(1 for r, g, b in plate if max(r, g, b) < 70) < 200: errors.append("no dark plate")
 
 def front_boot(raw=True):
-    """The boot: the video (top) 3x at 24,72 and the splash (the touch screen) 1.5x at 838,216,
+    """The boot: the video (top) 3x at 26,72 and the splash (the touch screen) 1.5x at 848,216,
     both framed; the A and START chips under the splash."""
     expect("canvas", comp.size, (1280, 720))
     if raw:
         for x in range(0, 256, 9):
             for y in range(0, 192, 9):
-                expect(f"video 3x DS {x},{y}", C(24 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
+                expect(f"video 3x DS {x},{y}", C(26 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
         for x in range(0, 256, 6):
             for y in range(0, 192, 6):
-                expect(f"splash 1.5x DS {x},{y}", C(838 + x * 3 // 2, 216 + y * 3 // 2), bottom(x, y))
+                expect(f"splash 1.5x DS {x},{y}", C(848 + x * 3 // 2, 216 + y * 3 // 2), bottom(x, y))
                 if len(errors) > 4:
                     return
-    expect("top frame", C(20, 300), OUTLINE)
-    expect("splash frame", C(834, 300), OUTLINE)
+    expect("top frame", C(22, 300), OUTLINE)
+    expect("splash frame", C(844, 300), OUTLINE)
     expect("backdrop", C(5, 5), BACKDROP)
-    chips = [C(x, y) for y in range(534, 590) for x in range(838, 1222)]
+    chips = [C(x, y) for y in range(534, 590) for x in range(848, 1232)]
     if sum(1 for p in chips if p != BACKDROP) < 300: errors.append("no A / START chips")
 
 def front_settings(page, focus):
@@ -685,13 +685,13 @@ def front_settings(page, focus):
     expect("canvas", comp.size, (1280, 720))
     for x in range(0, 256, 11):
         for y in range(0, 192, 11):
-            expect(f"top 3x DS {x},{y}", C(24 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
+            expect(f"top 3x DS {x},{y}", C(26 + 3 * x + 1, 72 + 3 * y + 1), top(x, y))
             if len(errors) > 4:
                 return
     expect("panel", C(1240, 600), FRAME)
     expect("backdrop", C(5, 5), BACKDROP)
     for i in range(4):
-        tx, ty = 872 + (i % 2) * 164 + 2, 140 + (i // 2) * 62
+        tx, ty = 876 + (i % 2) * 164 + 2, 140 + (i // 2) * 62
         px = [C(x, y) for y in range(ty + 4, ty + 54) for x in range(tx + 4, tx + 156)]
         plate = sum(1 for p in px if p == hexrgb("9AA2E3"))
         ink = sum(1 for p in px if p == hexrgb("2E3063"))
@@ -702,28 +702,28 @@ def front_settings(page, focus):
     if len(errors) > 4:
         return
     if page == 0:
-        well = [C(x, y) for y in range(338, 402) for x in range(950, 1130)]
+        well = [C(x, y) for y in range(338, 402) for x in range(954, 1134)]
         if sum(1 for p in well if p == (255, 255, 255)) < 100: errors.append("no percent text")
-        r, g, b = C(1192, 444)
+        r, g, b = C(1196, 444)
         if not ((r > 120 and b > 180) or (r, g, b) == (74, 82, 150)): errors.append(f"knob not at 100 %: {(r, g, b)}")
-        r, g, b = C(1036, 318)
-        if not (RINGED(1036, 318)): errors.append(f"slider not focused: {(r, g, b)}")
+        r, g, b = C(1040, 318)
+        if not (RINGED(1040, 318)): errors.append(f"slider not focused: {(r, g, b)}")
     elif page == 2:
         for i in range(12):
-            gx, gy = 842 + (i % 4) * 100 + 4, 292 + (i // 4) * 88 + 4
+            gx, gy = 846 + (i % 4) * 100 + 4, 292 + (i // 4) * 88 + 4
             fx, fy = 56 + (i % 4) * 48, 72 + (i // 4) * 40
             orange = sum(1 for y in range(gy, gy + 64, 2) for x in range(gx, gx + 80, 2) if (lambda p: p[0] > 180 and 70 < p[1] < 180 and p[2] < 90)(C(x, y)))
             if orange < 50:   # (an unlocked picture: the art, its frame left out, centred 2x)
                 for dy in range(0, 24, 5):
                     for dx in range(0, 32, 5):
                         expect(f"cell {i} DS {fx + 4 + dx},{fy + 4 + dy}", C(gx + 8 + 2 * dx, gy + 8 + 2 * dy), bottom(fx + 4 + dx, fy + 4 + dy))
-            r, g, b = C(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
-            ringed = RINGED(842 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
+            r, g, b = C(846 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
+            ringed = RINGED(846 + (i % 4) * 100 + 44, 292 + (i // 4) * 88 - 3)
             if ringed != (i == focus): errors.append(f"cell {i}: ring {ringed}")
             if len(errors) > 4:
                 return
     elif page == 3:
-        well = [C(x, y) for y in range(286, 582) for x in range(850, 1222)]
+        well = [C(x, y) for y in range(286, 582) for x in range(854, 1226)]
         if sum(1 for p in well if p == (255, 255, 255)) < 200: errors.append("no white credits lines")
         if sum(1 for p in well if p == (0x79, 0xFB, 0x00)) < 100: errors.append("no green credits headings")
     hints = [C(x, y) for y in range(612, 644) for x in range(1100, 1232)]

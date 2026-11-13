@@ -195,6 +195,9 @@ Windows, Mac and Linux downloads attached; the release takes its notes from that
   game's Quit; Moogoo's Start (quit) is in the manual; the social answers sit on rows.
 - The pause menu: a Menu key moved to Enter, Space or the DS's A key resumes the game again
   instead of choosing the row.
+- The front end and Create-a-Sim: the picture and the panel sit as far from the screen's left and
+  right edges as from each other (they were 6 pixels off); their hints end where every other
+  panel's do.
 
 ## [0.1.1] - 2026-11-04
 
