@@ -229,7 +229,7 @@ static void settings_page()
         Result res = sh.Update(Press("right"), f.m);
         CHECK(res.act == Act::Setting && res.arg == r);
         for (int k = 0; k < 20; k++) sh.Update(Press("right"), f.m);
-        CHECK(f.s.volume >= 0 && f.s.volume <= 100 && f.s.resolution3D >= 1 && f.s.resolution3D <= 4 && f.s.stickDeadZone >= 5 &&
+        CHECK(f.s.volume >= 0 && f.s.volume <= 100 && f.s.resolution3D >= 1 && f.s.resolution3D <= 8 && f.s.stickDeadZone >= 5 &&
               f.s.stickDeadZone <= 60 && f.s.triggerThreshold >= 10 && f.s.triggerThreshold <= 90 && f.s.language >= 0 && f.s.language <= 5);
         CHECK(f.s.cursorSpeed >= 50 && f.s.cursorSpeed <= 200 && (f.s.fastSpeed == 0 || (f.s.fastSpeed >= 2 && f.s.fastSpeed <= 4)) &&
               (int)f.s.scaling >= 0 && (int)f.s.scaling <= 2);
@@ -267,7 +267,7 @@ static void settings_page()
         g.s.batterySaver = true;
         g.s.resolution3D = 3;
         CHECK(RowHeld(Row::Res3D, g.s) && RowHeld(Row::Fps60, g.s) && !RowHeld(Row::Wide, g.s) && !RowHeld(Row::Battery, g.s));
-        CHECK(RowValue(Row::Res3D, g.s, 1) == "1\xC3\x97" && RowValue(Row::Fps60, g.s, 1) == OwnWordIn(1, OwnWordId::ShellOff));
+        CHECK(RowValue(Row::Res3D, g.s, 1) == "DS (192p)" && RowValue(Row::Fps60, g.s, 1) == OwnWordIn(1, OwnWordId::ShellOff));
         Shell s2;
         s2.Open(Page::Settings);
         s2.tab = (int)Tab::Graphics;
@@ -277,13 +277,50 @@ static void settings_page()
         bool dim = false, note = false;
         for (const ui::UiItem& it : s2.Build(g.m))
         {
-            if (it.text == "1\xC3\x97" && it.colour == ui::kTextInactive) dim = true;
+            if (it.text == "DS (192p)" && it.colour == ui::kTextInactive) dim = true;
             if (it.text == OwnWordIn(1, OwnWordId::SaverHolds)) note = true;
         }
         CHECK(dim && note);
         g.s.batterySaver = false;
-        CHECK(!RowHeld(Row::Res3D, g.s) && RowValue(Row::Res3D, g.s, 1) == "3\xC3\x97");
+        CHECK(!RowHeld(Row::Res3D, g.s) && RowValue(Row::Res3D, g.s, 1) == "576p");
         CHECK(s2.Update(Press("right"), g.m).act == Act::Setting && g.s.resolution3D == 4);
+        // Held at 8 (1440p): still DS, still no change.
+        g.s.resolution3D = 8;
+        g.s.batterySaver = true;
+        CHECK(RowValue(Row::Res3D, g.s, 1) == "DS (192p)" && s2.Update(Press("right"), g.m).act == Act::None && g.s.resolution3D == 8);
+        g.s.batterySaver = false;
+    }
+    // 3D resolution by its familiar names, over the steps' gaps (4, 6, 8) both ways, stopping
+    // at their ends.
+    {
+        const char* names[] = {"DS (192p)", "384p", "576p", "720p", "1080p", "1440p"};
+        const int steps[] = {1, 2, 3, 4, 6, 8};
+        Settings r;
+        r.resolution3D = 1;
+        for (int i = 0; i < 6; i++)
+        {
+            CHECK(r.resolution3D == steps[i]);
+            for (int lang = 1; lang <= 5; lang++) CHECK(RowValue(Row::Res3D, r, lang) == names[i]);
+            ChangeRow(Row::Res3D, 1, r);
+        }
+        CHECK(r.resolution3D == 8); // (Right at 1440p stays)
+        for (int i = 5; i >= 0; i--)
+        {
+            CHECK(r.resolution3D == steps[i]);
+            ChangeRow(Row::Res3D, -1, r);
+        }
+        CHECK(r.resolution3D == 1); // (Left at DS stays)
+        // A factor between the steps (--res3d, an edited file) moves to the steps around it.
+        r.resolution3D = 5;
+        ChangeRow(Row::Res3D, 1, r);
+        CHECK(r.resolution3D == 6);
+        r.resolution3D = 5;
+        ChangeRow(Row::Res3D, -1, r);
+        CHECK(r.resolution3D == 4);
+        CHECK(Res3DName(5, 1) == "960p" && Res3DName(12, 1) == "2304p");
+        r.resolution3D = 12; // (--res3d 12: Left to the top step)
+        ChangeRow(Row::Res3D, -1, r);
+        CHECK(r.resolution3D == 8);
     }
     // Y resets the tab after asking, focus on No: A on No, or B, keeps everything; Yes puts the
     // tab's rows back to their defaults and only those.
@@ -293,19 +330,19 @@ static void settings_page()
         s2.Open(Page::Settings);
         s2.tab = (int)Tab::Graphics;
         s2.focus = 1;
-        g.s.resolution3D = 4; g.s.widescreen = false; g.s.batterySaver = true; g.s.volume = 30; g.s.layout = Layout::Side;
+        g.s.resolution3D = 8; g.s.widescreen = false; g.s.batterySaver = true; g.s.volume = 30; g.s.layout = Layout::Side;
         g.s.windowW = 1600; g.s.windowH = 900; g.s.windowX = 33; g.s.windowY = 44;
         g.s.controls.SetPad(Controls::X, Controls::IN_LB);
         const Controls::Bindings bindings = g.s.controls;
         CHECK(s2.Update(Press("y"), g.m).act == Act::None && s2.ask == Ask::ResetTab && s2.askFocus == 0);
         for (int lang = 1; lang <= 5; lang++) { g.m.language = lang; CheckBuild(s2, g.m, "reset question"); }
         g.m.language = 1;
-        CHECK(s2.Update(Press("a"), g.m).act == Act::None && s2.ask == Ask::None && g.s.resolution3D == 4);
+        CHECK(s2.Update(Press("a"), g.m).act == Act::None && s2.ask == Ask::None && g.s.resolution3D == 8);
         s2.Update(Press("y"), g.m);
-        CHECK(s2.Update(Press("b"), g.m).act == Act::None && s2.ask == Ask::None && g.s.resolution3D == 4);
+        CHECK(s2.Update(Press("b"), g.m).act == Act::None && s2.ask == Ask::None && g.s.resolution3D == 8);
         s2.Update(Press("y"), g.m);
         s2.Update(Press("a"), g.m); // (two quick A: No, never Yes)
-        CHECK(s2.ask == Ask::None && g.s.resolution3D == 4);
+        CHECK(s2.ask == Ask::None && g.s.resolution3D == 8);
         s2.Update(Press("y"), g.m);
         s2.Update(Press("right"), g.m);
         const Result res = s2.Update(Press("a"), g.m);
@@ -874,14 +911,24 @@ static void platform()
         CHECK(u.Save(path));
         Settings v;
         CHECK(v.Load(path) && v.uiScale == 135 && v.smoothPictures);
-        // 3D resolution held to the row's 1-4 (a 6 read as 6 went down on Right); the cursor's
-        // speed to its steps of 25.
-        { std::ofstream(path) << "resolution_3d=6\ncursor_speed=110\n"; }
+        // 3D resolution on the row's steps (a value between them snaps to the step below, past
+        // them to the last); the cursor's speed to its steps of 25.
+        { std::ofstream(path) << "resolution_3d=7\ncursor_speed=110\n"; }
         Settings r3;
         r3.Load(path);
-        CHECK(r3.resolution3D == 4 && r3.cursorSpeed == 100);
+        CHECK(r3.resolution3D == 6 && r3.cursorSpeed == 100);
         ChangeRow(Row::Res3D, 1, r3);
-        CHECK(r3.resolution3D == 4);
+        CHECK(r3.resolution3D == 8);
+        for (const auto& [in, out] : std::vector<std::pair<const char*, int>>{{"5", 4}, {"7", 6}, {"8", 8}, {"12", 8}, {"40", 8}, {"2", 2}, {"-3", 1}, {"x", 1}})
+        {
+            { std::ofstream(path) << "resolution_3d=" << in << "\n"; }
+            Settings q;
+            q.Load(path);
+            CHECK(q.resolution3D == out);
+        }
+        r3.resolution3D = 6;
+        CHECK(r3.Save(path));
+        { Settings q; q.Load(path); CHECK(q.resolution3D == 6); } // (a factor in the file, as before)
         { std::ofstream(path) << "resolution_3d=0\ncursor_speed=190\n"; }
         r3.Load(path);
         CHECK(r3.resolution3D == 1 && r3.cursorSpeed == 200);
@@ -1089,6 +1136,10 @@ static void fit_all()
             sh.tab = (int)Tab::Graphics;
             for (int i = 0; i < (int)TabRows(sh.tab).rows.size(); i++) { sh.focus = i; FitScan(sh, m, "settings, battery saver"); }
             f.s.batterySaver = false;
+            // Every 3D resolution's name on its row (focused: the pill and its arrows).
+            sh.focus = Where(Row::Res3D).second;
+            for (int n : kRes3DSteps) { f.s.resolution3D = n; FitScan(sh, m, "settings, 3D resolution"); }
+            f.s.resolution3D = Settings().resolution3D;
             sh.Open(Page::Controls);
             FitScan(sh, m, "controls");
             sh.Open(Page::Keys);

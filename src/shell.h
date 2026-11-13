@@ -164,6 +164,9 @@ private:
 void ChangeRow(Row r, int dir, Settings& s);
 std::string RowLabel(Row r, int language);
 std::string RowValue(Row r, const Settings& s, int language);
+// The 3D resolution's factor n by its familiar name: "DS (192p)", "384p", "576p", "720p", "1080p",
+// "1440p" (another n, from --res3d: its lines, 192 x n, and "p").
+std::string Res3DName(int n, int language);
 // The row's note under the list while it has the focus (an OwnWordId; every row has one).
 int RowNote(Row r);
 // The language the shell's words use: the setting's, else the given automatic one.

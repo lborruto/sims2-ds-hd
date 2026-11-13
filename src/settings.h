@@ -16,6 +16,16 @@ enum class MicMode { Off, BlowKey, Real }; // Real: the computer's microphone (a
 // the size: crisp pixels without uneven ones), Smooth (bilinear) or Nearest (raw pixels).
 enum class Scaling { Sharp, Smooth, Nearest };
 
+// The 3D resolution's steps (factors of the DS's 192 lines): 192, 384, 576, 768 (~720p), 1152
+// (~1080p), 1536 (~1440p) lines. Not 12 (2304, ~4K): it works (--res3d 12) but drew at under
+// half the game's speed on an M3 Pro (widescreen, 60 fps); 8 at about 90 %.
+inline constexpr int kRes3DSteps[] = {1, 2, 3, 4, 6, 8};
+inline constexpr int kRes3DStepCount = (int)(sizeof(kRes3DSteps) / sizeof(kRes3DSteps[0]));
+// The step at or below factor n (below the first step: the first; past the last: the last).
+int Res3DStep(int n);
+// Its index in kRes3DSteps.
+int Res3DStepIndex(int n);
+
 struct Settings
 {
     // Playable
@@ -24,7 +34,9 @@ struct Settings
     // Looks: on by default, for CONSOLE; headless runs never load settings and start with them
     // off (main.cpp), so the checks' output stays the same.
     Layout layout = Layout::Console; // the window's layout (--layout overrides it for one run)
-    int resolution3D = 2;      // 1 = DS (192 lines), 2, 3, 4 times sharper (the row's range; a file is held to it)
+    // The 3D's lines as a factor of the DS's 192: one of kRes3DSteps (the row shows them by their
+    // lines: 192p, 384p, 576p, 720p, 1080p, 1440p); a file's other value snaps to the step below.
+    int resolution3D = 2;
     bool widescreen = true;    // 16:9 world when the game's 3D allows it
     bool interpolate60 = true; // 60 fps in-between frames
 

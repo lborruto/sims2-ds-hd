@@ -124,6 +124,8 @@ enum class OwnWordId : int
     // The shop's D-pad over its grid (the focus, the list past its edge): Choose, not Scroll; in
     // the languages where Choose is A's Select word, Browse.
     ShopBrowse,
+    // The 3D resolution's first step (the DS's own 192 lines; the others are numbers: shell.cpp).
+    Res3DDs,
     Count
 };
 

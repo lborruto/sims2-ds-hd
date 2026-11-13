@@ -277,7 +277,15 @@ void ChangeRow(Row r, int dir, Settings& s)
         else s.uiScale = std::clamp(s.uiScale + 5 * d, 60, 150);
         break;
     case Row::Pictures: s.smoothPictures = !s.smoothPictures; break;
-    case Row::Res3D: s.resolution3D = std::clamp(s.resolution3D + d, 1, 4); break;
+    case Row::Res3D:
+    {
+        // The steps (kRes3DSteps), stopping at their ends; from a factor between two (--res3d),
+        // Left goes to the one below it, Right to the one above.
+        const int i = Res3DStepIndex(s.resolution3D);
+        const int to = kRes3DSteps[i] != s.resolution3D && d < 0 ? i : i + d;
+        s.resolution3D = kRes3DSteps[std::clamp(to, 0, kRes3DStepCount - 1)];
+        break;
+    }
     case Row::Wide: s.widescreen = !s.widescreen; break;
     case Row::Fps60: s.interpolate60 = !s.interpolate60; break;
     case Row::Battery: s.batterySaver = !s.batterySaver; break;
@@ -384,6 +392,20 @@ int RowNote(Row r)
     return (int)r >= 0 && (int)r < kRows ? (int)notes[(int)r] : (int)W::Count;
 }
 
+std::string Res3DName(int n, int lang)
+{
+    // By the lines they draw: 192 x n, by the nearest familiar name past 4 (768 is 720p's
+    // class, 1152 1080p's, 1536 1440p's).
+    switch (n)
+    {
+    case 1: return Wd(lang, W::Res3DDs);
+    case 4: return "720p";
+    case 6: return "1080p";
+    case 8: return "1440p";
+    default: return std::to_string(192 * n) + "p";
+    }
+}
+
 std::string RowValue(Row r, const Settings& s, int lang)
 {
     auto onOff = [&](bool b) { return std::string(Wd(lang, b ? W::ShellOn : W::ShellOff)); };
@@ -400,7 +422,7 @@ std::string RowValue(Row r, const Settings& s, int lang)
     case Row::Scaling: return Wd(lang, s.scaling == Scaling::Smooth ? W::ScaleSmooth : s.scaling == Scaling::Nearest ? W::ScaleNearest : W::ScaleSharp);
     case Row::UiSize: return s.uiScale == 0 ? std::string(Wd(lang, W::UiAuto)) : std::to_string(s.uiScale) + " %";
     case Row::Pictures: return Wd(lang, s.smoothPictures ? W::ScaleSmooth : W::ScaleNearest);
-    case Row::Res3D: return std::to_string(s.Res3D()) + "\xC3\x97"; // "2×" (Battery saver's 1× while it holds the row)
+    case Row::Res3D: return Res3DName(s.Res3D(), lang); // (Battery saver's DS while it holds the row)
     case Row::Wide: return onOff(s.widescreen);
     case Row::Fps60: return onOff(s.Interpolate60());
     case Row::Battery: return onOff(s.batterySaver);
