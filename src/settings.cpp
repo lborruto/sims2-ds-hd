@@ -206,6 +206,17 @@ float AutoViewMm(float d)
     return kTable[5][1];
 }
 
+bool HandheldPanel(const std::string& product, int w, int h, float& diagonalMm)
+{
+    std::string p = product;
+    while (!p.empty() && (p.back() == '\n' || p.back() == '\r' || p.back() == ' ')) p.pop_back();
+    const bool panel = (w == 1280 && h == 800) || (w == 800 && h == 1280);
+    if (!panel) return false;
+    if (p == "Jupiter") { diagonalMm = 7.0f * 25.4f; return true; }
+    if (p == "Galileo") { diagonalMm = 7.4f * 25.4f; return true; }
+    return false;
+}
+
 float AutoUiScale(float mmPerPixel, float diagonalMm)
 {
     // Unknown, or not a display's (a projector's or a TV's made-up sizes: under 4" or over 120").

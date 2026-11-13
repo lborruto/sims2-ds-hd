@@ -84,6 +84,12 @@ void FitPlace(int bx, int by, int bw, int bh, int w, int h, int& x, int& y);
 // 0.705 em) as large as 0.53 degrees of sight at the distance a display that size is seen from
 // (AutoViewMm); 1 when either is unknown (0) or not believable.
 float AutoUiScale(float mmPerPixel, float diagonalMm);
+// A handheld PC's own screen, known by its maker's product name (Linux's DMI product_name) and the
+// display's size in pixels (either way round: the Deck's panel is a portrait one turned): its
+// diagonal (mm), so Auto does not depend on what the compositor says of its size (gamescope may
+// report none, or the portrait panel's): the Steam Deck LCD ("Jupiter", 7") and OLED ("Galileo",
+// 7.4") at 1280 x 800. false for anything else (the Deck docked to a TV: the TV's own size).
+bool HandheldPanel(const std::string& product, int displayW, int displayH, float& diagonalMm);
 // The distance (mm) a display diagonalMm across is seen from: 35 cm at 7", 50 at 13", 70 at 24",
 // 80 at 32", 2 m at 43", 2.5 m from 55"; straight lines between.
 float AutoViewMm(float diagonalMm);
