@@ -7,7 +7,7 @@
 namespace sims2hd
 {
 // Every point and area below was read off headless shots of the save states (European ROM) and
-// checked by tapping it (scripts/hotspots/, tests/hotspots_check.sh); CLAUDE.md lists what each
+// checked by tapping it (scripts/hotspots/, tests/hotspots_check.sh); docs/dev-notes.md lists what each
 // tap does and which ones could only be placed from shots.
 
 const Hotspot kTabIcon[5] = {
@@ -185,7 +185,7 @@ const List kBuild = {
     {"close", 236, 171, {221, 157, 30, 30}},
 };
 
-// The music mixer's save page (CMusicSaveMenu, the standard text entry, research/m6 code-D 1.6): the
+// The music mixer's save page (CMusicSaveMenu, the standard text entry, from its code): the
 // keyboard's 26 keys (19 x 30 cells from 6,74, nine a row; the page's letters, digits or signs),
 // its backspace, the three pages (ABC, abc, 123), the three slots' save buttons (round, 32 x 32,
 // their middles 235, 57 / 109 / 160 as drawn) and the X (235,18: back to the mixer).

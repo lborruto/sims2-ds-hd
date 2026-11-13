@@ -1,5 +1,7 @@
 // sims2hd: a sharper and wider picture of the DS's 3D scene. See GPU3D_Wide.h.
 //
+// Adapted from Pokémon FullDex (GPLv3), melonDS/src/GPU3D_Wide.cpp; modified for this project, 2026.
+// https://github.com/mamesj/pokemon-fulldex
 // Ported from Pokemon FullDex (https://github.com/mamesj/pokemon-fulldex, GPLv3), whose
 // melonDS/src/GPU3D_Wide.cpp this is, trimmed to what runs on the processor: the graphics chip
 // paths, the list helper thread and the profiling are left out. Same licence (GPLv3).

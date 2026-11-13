@@ -5,14 +5,14 @@
 # backdrop and the focus ring in the game's colours:
 #   sit-cityhall (the panel, in town): the world (no rail: the HD menu replaced it), the menu hint chip;
 #   the same with --console-menu: the HD menu (src/port/panelmenu.*: no target, no
-#   row) and with --no-romdata (menu-m1) milestone 1's menu, the touch screen 3x over the dimmed
+#   row) and with --no-romdata (menu-m1) the framed-screen menu, the touch screen 3x over the dimmed
 #   world; casino-menu (sit-casino, --console-menu, the focus on row 2), at 2x and --wide: the HD
 #   Interact tab (the portrait the touch screen's pixels 3x, three labelled rows, the focus ring on
 #   the second only, the world dimmed); s7 (the phone): the touch screen 3x over the dimmed world; the same with
 #   --console-focus 0: the ring on the phone's first button; sit-gift (Give Item, empty pockets)
 #   and gift-items (A-gift2-base; 1x, 2x, --wide): the HD Give Gift (src/port/gift.*: the portrait
 #   3x as the touch screen's pixels, the bow the game's sprite, the focus around the selected slot);
-#   pockets-menu (A-pk-cnt3-slot1, the complete save): the HD Pockets tab (src/port/pockets.*); s5 with --no-romdata (no game text: milestone 1's conversation): the dialogue
+#   pockets-menu (A-pk-cnt3-slot1, the complete save): the HD Pockets tab (src/port/pockets.*); s5 with --no-romdata (no game text: the framed-screen conversation): the dialogue
 #   rebuilt wide from the game's pieces; s5-hd (the HD conversation, src/port/dialogue.*): the
 #   world whole, the panel, the name plate's and the text's white pixels, the portrait as the
 #   touch screen's own pixels 2x; s5-hd-wide (--wide): the world not cut at its sides;
@@ -20,8 +20,8 @@
 #   screen 3x at the left, the world small at the top right, the title plate (none for the social
 #   game), the side panel, the prompt bar's words (cards-ask: B's quit question, A and B alone;
 #   vacuum-clog: the blow's hint lit red, the ring on the find A takes; cards-wide, social-wide, vacuum-2x); cards-m1
-#   (--no-romdata): milestone 1's hints' box; s2 (the main menu), title, boot: the HD front end (src/port/front.*);
-#   s3-m1 (Create-a-Sim with --no-romdata: no HUD): milestone 1's front end view, the top screen framed at the left at its shape and the touch screen
+#   (--no-romdata): the framed-screen hints' box; s2 (the main menu), title, boot: the HD front end (src/port/front.*);
+#   s3-m1 (Create-a-Sim with --no-romdata: no HUD): the framed-screen front end view, the top screen framed at the left at its shape and the touch screen
 #   2.5x framed at the right, the buttons' hint below, never SIDE; s3, s4, cas-hair, cas-face, cas-clothes (and s3 at 2x and
 #   --wide, s4 in Italian): the HD Create-a-Sim (src/port/cas.*: the model framed at the left, the game's tabs and the
 #   page's cells the touch screen's pixels, the focus's halo); slots (sit-store, Options >
@@ -40,7 +40,7 @@
 # and A start Hotseat (Cards); from D-cas-right2, Left and Right switch the target (--print-town);
 # from sit-store, A on Buy opens the catalogue; the HD catalogue (src/port/catalogue.*, on copies of
 # the complete save): a couch bought twice, a bed sold, the list scrolled by the game's arrows and
-# closed, a purchase the game refuses not made; HD Build Rooms (src/port/build.*, the research's
+# closed, a purchase the game refuses not made; HD Build Rooms (src/port/build.*, the
 # states with game flag 19 patched in, on copies of a save): the list scrolled by the game's arrows,
 # a room chosen and the question cancelled both ways, a room bought (the money less its permit, its
 # building timer set, the list rebuilt without it, the game's popup 2628 in HD once the menu closes),
@@ -54,7 +54,7 @@
 # Panel/Interact; the game: Cards, Unknown in the black load, which CONSOLE shows as Loading, then
 # Panel/Interact), B then B answers no and X still draws; from act-vacuum-clog, Y held 10
 # frames clears the clog (the bowl's row 1 back to #30A2D3) within 30 frames (RAM: clogged=1, then 0).
-# The pointing minigames (src/activities.*, src/port/minigame.*; the research's G-* states on copies
+# The pointing minigames (src/activities.*, src/port/minigame.*; the `G-*` save states on copies
 # of the complete save): pictures autopsy (and -2x), detector (and -wide), art, art-ask (the frame,
 # the pointer in the playfield's middle, the hints lit as the game asks); and the mg-* runs: an organ
 # carried to the tray and banked, the payout, the autopsy quit (B twice) and not quit (B once), a dig
@@ -104,7 +104,7 @@ bin=sims2hd_slot
 # newlines and placeholders (@N, the money sign), trimmed; with WORDS, only its first WORDS words.
 # gx: the same, escaped for grep -E (in_order).
 for lang in 1 3; do
-    "$real_bin" "$rom" --dump-strings --language "$lang" > "$tmp/strings-$lang.tsv" 2>/dev/null
+    "$real_bin" "$rom" --headless --frames 0 --save "$tmp/strings.sav" --dump-strings --language "$lang" > "$tmp/strings-$lang.tsv" 2>/dev/null
     # (an empty pattern would match anything: no table, no check)
     [ "$(wc -l < "$tmp/strings-$lang.tsv")" -gt 3000 ] || { echo "no string table in language $lang (--dump-strings)"; exit 2; }
 done
@@ -177,7 +177,7 @@ run vacuum-clog act-vacuum-clog "${hotel[@]}" &
 run vacuum-2x act-vacuum "${hotel[@]}" --compose-scale 2 &
 run social-wide act-social "${town[@]}" --wide &
 wait
-# The pointing minigames (the research's held-out states, on copies of the complete save): the
+# The pointing minigames (the held-out save states, on copies of the complete save): the
 # pointer in the playfield's middle (a new screen's), the game's values and prompts.
 run autopsy G-A-para "${late[@]}" &
 run autopsy-2x G-A-para "${late[@]}" --compose-scale 2 &
@@ -300,7 +300,7 @@ run cas-hair F-hair-s3-40 "${town[@]}" --console-focus 10 &
 run cas-face F-face-5-40 "${town[@]}" --console-focus 4 &
 run cas-clothes F-thr-6-40 "${town[@]}" --console-focus 11 &
 wait
-# The UI's size (task 10, --ui-scale) and the game's pictures (--game-pictures smooth): the
+# The UI's size (--ui-scale) and the game's pictures (--game-pictures smooth): the
 # conversation and the panel's menu at 75 % and 150 %, the Pockets' and the catalogue's icons Smooth.
 run s5-hd-75 s5 "${town[@]}" --ui-scale 75 &
 run s5-hd-150 s5 "${town[@]}" --ui-scale 150 &
@@ -420,7 +420,7 @@ def world_full(rows=192):
     return lambda cx, cy: top(fx + (cx - x0) * fw // rw, cy * rows // 720)
 
 def rail():
-    """No rail (the owner: the HD menu, Back / E, replaced it): where it was is the backdrop at 4:3
+    """No rail (the HD menu, Back / E, replaced it): where it was is the backdrop at 4:3
     (the world ends at 1163); the menu's hint is in the strip (strip(hints=True))."""
     BACK = (16, 18, 24)
     expect("no rail: backdrop where its frame was", C(1170, 360), BACK)
@@ -575,7 +575,7 @@ def front_cas(page, focus, raw_top=True):
             1: (94, 126, 46, 53, 3, (822, 441, 150, 171)), 2: (125, 90, 43, 39, 3, (909, 331, 141, 129))}[page]
         ox, oy = bx + (bw - fw * s) // 2, by + (bh - fh * s) // 2
     same = total = 0
-    # (The DS cell's frame and the panel around a figure are keyed out (ux task 6: the picture on the
+    # (The DS cell's frame and the panel around a figure are keyed out (the picture on the
     # HD cell): the game's panel colours, its outline and the choice's green are not compared.)
     keyed = {hexrgb(h) for h in ("383869", "414979", "51518A", "5961A2", "6171B2", "7171B2", "828ACB")}
     compared = 0
@@ -807,7 +807,7 @@ def activity(rows=192, hd=True, skip=0):
     if hd:
         minigame_frame(h + (72 if rows < 192 else 18))
     else:
-        # Milestone 1's hints' box (kHintBox, 850,400; --no-romdata): its outline, its fill, the
+        # The framed-screen hints' box (kHintBox, 850,400; --no-romdata): its outline, its fill, the
         # first button's chip and, in the first row's text (x 972 on), white letters with the
         # outline's shadow.
         expect("hints outline", C(851, 500), OUTLINE)
@@ -880,7 +880,7 @@ def hd_menu(rows, focus, wide=False):
     """The panel's HD menu (src/port/panelmenu.*, interact.*): the panel's outline and frame band,
     the target's portrait as the touch screen's own pixels 3x (DS x 63-127, rows 47-127), the
     title's well, a white label on each action row, the focus ring around row `focus` only, the
-    world dimmed outside the panel; never the touch screen 3x (the milestone 1 menu)."""
+    world dimmed outside the panel; never the touch screen 3x (the framed-screen menu)."""
     expect("panel outline", C(176, 300), OUTLINE)
     expect("panel band", C(180, 300), hexrgb("6171B2"))
     expect("panel fill", C(190, 300), FRAME)
@@ -968,7 +968,7 @@ if case == "cityhall":
 elif case == "cityhall-wide":
     # Widescreen: the world without the game's bar keeps its sides (never cut to make room for
     # the crop): 341 x 176 fitted to the canvas's width, 1280 x 661, top-aligned; the strip right
-    # under it, the canvas's whole width: no black between (the owner's playtest).
+    # under it, the canvas's whole width: no black between (found in a playtest).
     big = Image.open(raw_path.replace(".png", "-top.png")).convert("RGB")
     expect("wide picture", big.size, (341, 192))
     for cx, cy in ((0, 300), (1279, 100), (640, 400), (300, 655), (780, 660), (1000, 660)):
@@ -982,7 +982,7 @@ elif case == "cityhall-menu":
     hd_menu(0, -1)
     strip()
 elif case == "menu-m1":
-    # Without the game's text (--no-romdata): milestone 1's menu, the touch screen 3x (and the
+    # Without the game's text (--no-romdata): the framed-screen menu, the touch screen 3x (and the
     # game's own status bar in the world: no HD bar without its words).
     big_over_dim(192)
 elif case in ("casino-menu", "casino-menu-2x"):
@@ -1547,7 +1547,7 @@ pad_late() {
         grep -q '^clock: ' "$tmp/$name.log" && touch "$tmp/$name.ok"
 }
 # pad_shop NAME STATE SCRIPT FRAMES: the catalogue's runs, on a copy of the complete save (the
-# research's states are the town's: its clock), with the shops' records (--print-hotel).
+# save states are the town's: its clock), with the shops' records (--print-hotel).
 pad_shop() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 file=$shots/$2.st
     [ -f "$file" ] || file=$more_shots/$2.st
@@ -1561,7 +1561,7 @@ pad_shop pad-shop-sell BY-own4 catalogue-sell 120 &
 pad_shop pad-shop-scroll sit-storebuy catalogue-scroll 240 &
 pad_shop pad-shop-poor BY-dn2 catalogue-poor 140 &
 wait
-# pad_build NAME STATE SCRIPT FRAMES: Build Rooms' runs (the research's BD-* states: the town's
+# pad_build NAME STATE SCRIPT FRAMES: Build Rooms' runs (the BD-* save states: the town's
 # save with game flag 19 patched in), on a copy of the complete save, with the hotel's records
 # (--print-hotel) and the popups (--print-town).
 pad_build() {
@@ -1765,7 +1765,7 @@ check_pad pad-build-poor build_poor
 # MENU, Down, A on the concierge's "Registry" → the game's Registry; A → the Small Guest Room's
 # room info; B → the Registry, the focus back on the room; B → the panel. From M-ci-early: A, Down,
 # A → the base value's hint (2597, from the stylus's point); A → closed, the focus back on the
-# line; B, B → the panel. From M-ci-g-base (the research's patch: the concierge waiting as Sim 45),
+# line; B, B → the panel. From M-ci-g-base (a state patched for the check: the concierge waiting as Sim 45),
 # Down, A on the Deluxe Guest Room (not built) → nothing; Up, A → checked into the Small Guest
 # Room (slot 0, the guests stayed 1), then the guest's speech; once.
 registry() {
@@ -1787,9 +1787,9 @@ check_pad pad-registry registry
 check_pad pad-roominfo roominfo_hints
 check_pad pad-checkin checkin_guest
 # The music panel and the stat panel (src/port/music.*, statpanel.*; the complete save, the
-# research's states): from M-music, Up, A → Create-a-Sim plays and the casino keeps it (G+0x449C
+# save states): from M-music, Up, A → Create-a-Sim plays and the casino keeps it (G+0x449C
 # + 4 = 3), Down x4 → the game's scroll 1, A → Edge of Town (code 7), A on it again nothing, B →
-# the panel; from SP-stat-base (the research's patched Music Panel: medium), A, RB, Right, LB,
+# the panel; from SP-stat-base (a state patched for the check: the Music Panel: medium), A, RB, Right, LB,
 # B, LB, B, B → the pages 1, 2 (by Main), 3, 2, Main (the focus back on Hotel Info), 4, Main (on
 # Game Stats), the panel; A then RB during the fade (waited out) → 1, 2, RB → 3.
 music_play() {
@@ -2184,14 +2184,14 @@ cas_cross() {
     local f; f=$(first_frame pad-cas-cross 'answer=2')
     [ -n "$f" ] && [ "$f" -ge 60 ] || { echo "  pad-cas-cross: one B discarded the Sim (frame $f)"; return 1; }
 }
-# B (ux task 6): the previous page from Hair; from the Name page Keep this Sim? with the focus on
+# B: the previous page from Hair; from the Name page Keep this Sim? with the focus on
 # the cross (the view's last item, 5), answered only by the next B: the title.
 cas_back() {
     in_order pad-cas-back 'cas page=1 ' 'cas page=0 ' 'cas page=4 ' 'focus 5' 'answer=2' 'front Title' || return 1
     local f; f=$(first_frame pad-cas-back 'answer=2')
     [ -n "$f" ] && [ "$f" -ge 170 ] || { echo "  pad-cas-back: the Sim discarded before the third B (frame $f)"; return 1; }
 }
-# Start on Keep this Sim?: the tick, as A on it (ux task 6).
+# Start on Keep this Sim?: the tick, as A on it.
 cas_start() { in_order pad-cas-start 'aspiration=0 answer=1' 'game Panel/Interact'; }
 cas_turn() {
     "$python" -I -c '
@@ -2210,10 +2210,10 @@ check_pad pad-cas-back cas_back
 check_pad pad-cas-start cas_start
 check_pad pad-cas-turn cas_turn
 # The HD screens hold through the game's swaps (src/consolehold.*, --print-console: each frame's
-# composition, milestone 1's marked -m1, and the counts at the end): Create-a-Sim's pages from s3 by
+# composition, the framed screens' ending in -m1, and the counts at the end): Create-a-Sim's pages from s3 by
 # RB, LB and Start (every page change the game makes), the front end (title → menu → Create-a-Sim,
 # Load-a-Sim and Settings and back), the panel's tabs, the phone, Give Gift closing after a gift, the
-# Registry ↔ room info, a save loaded into the town: no frame shows milestone 1's picture (a frame of
+# Registry ↔ room info, a save loaded into the town: no frame shows the framed screens (a frame of
 # the game's own between two objects shows the last HD picture, 12 frames at most, taking no input);
 # the tabs, the phone and the Registry's swaps are held (the hold is exercised).
 hold_walk() {
@@ -2235,11 +2235,11 @@ hold_walk hold-gift A-gift2-base gift-give 200 complete "${late[@]}" &
 hold_walk hold-registry D-hotel-down registry-concierge 380 fresh "${hotel[@]}" &
 hold_walk hold-load-slot F-cload-150 load-slot 360 complete "${late[@]}" &
 wait
-# (no frame shows milestone 1's picture; held: at least that many frames held)
+# (no frame shows the framed screens; held: at least that many frames held)
 hold_none() {
     local name=$1 held=${2:-0} line
     line=$(grep '^console: ' "$tmp/$name.log") || { echo "  $name: no console summary"; return 1; }
-    echo "$line" | grep -q ', 0 milestone-1 shown$' || { echo "  $name: $line"; grep -E 'console [a-z-]+-m1( |$)' "$tmp/$name.log" | grep -v ' held ' | head -n 3; return 1; }
+    echo "$line" | grep -q ', 0 framed-screen shown$' || { echo "  $name: $line"; grep -E 'console [a-z-]+-m1( |$)' "$tmp/$name.log" | grep -v ' held ' | head -n 3; return 1; }
     [ "$(echo "$line" | sed -n 's/.* \([0-9]*\) held,.*/\1/p')" -ge "$held" ] || { echo "  $name: fewer than $held held ($line)"; return 1; }
 }
 hold_cas() {
@@ -2376,10 +2376,10 @@ check_pad pad-world-lb world_differs pad-world-lb 0
 # in its row and in the A hint, every Sim's and object's name in the title and the strip, held in
 # their boxes (shrunk at most; a neighbour's name beside the plate may end in an ellipsis).
 for lang in 1 2 3 4 5; do
-    if out=$("$bin" "$rom" --language $lang --measure-menu 2> "$tmp/menu-$lang.log"); then echo "ok   menu-words-$lang: $out"
+    if out=$("$bin" "$rom" --headless --frames 0 --save "$tmp/menu-$lang.sav" --language $lang --measure-menu 2> "$tmp/menu-$lang.log"); then echo "ok   menu-words-$lang: $out"
     else echo "FAIL menu-words-$lang: $out $(tail -n 1 "$tmp/menu-$lang.log")"; fails=$((fails + 1)); fi
 done
-# The pointing minigames on the controller (src/activities.*, the research's held-out states on
+# The pointing minigames on the controller (src/activities.*, the held-out save states on
 # copies of the complete save, --print-minigame: the game's own fields, and the pointer's presses):
 # pad_mg NAME STATE SCRIPT FRAMES.
 pad_mg() {
@@ -2402,7 +2402,7 @@ pad_mg mg-detector-quit G-X-metal detector-quit 120 &
 pad_mg mg-art-play G-X-artgal art-play 200 &
 pad_mg mg-art-done G-X-artgal art-done 200 &
 wait
-# The autopsy: the research's laser cut frees organ 1; then Y (the hand), the D-pad's pointer onto it,
+# The autopsy: the state's laser cut frees organ 1; then Y (the hand), the D-pad's pointer onto it,
 # A held and LB carry it to the tray: the hand drags it (sub 3), it goes in (4), §84 banked, the slot
 # removed. B asks, B quits (the panel); B then A goes on (still the autopsy 140 frames later). The
 # second specimen done (G-A-payout-base, §123 banked): the money paid, +123, and the panel.
@@ -2454,7 +2454,7 @@ check_pad mg-detector-quit detector_quit
 # The painting: A held with Right drags a stroke (cells painted), Y undoes it (none), LB four times
 # goes from the small pencil back round to the bucket (tool buttons 9, 8, 7, 6), A on the canvas fills
 # all 1536 cells, X the next swatch; B asks "Are you done painting?" (the game's popup, kind 2), B its
-# cross (closed, still painting), B and A its tick (closed: the research's patched easel has no
+# cross (closed, still painting), B and A its tick (closed: a state patched for the check: the easel has no
 # controller to finish the painting, so the screen stays).
 art_play() {
     in_order mg-art-play 'pointer down at 128,96' 'minigame art stroke=1 .*painted=[1-9]' 'pointer up' 'minigame art .*painted=0 ' \
@@ -2467,7 +2467,7 @@ art_done() {
         "popup state=2 kind=2 .*$(gx 2440)" 'popup state=2 kind=2 pressed=1,1' 'popup none'
 }
 check_pad mg-art-done art_done
-# The timing minigames on the controller (the research's held-out states on copies of the complete
+# The timing minigames on the controller (the held-out save states on copies of the complete
 # save). MooGoo: from its intro, A every 30 frames (scripts/console/moogoo-round.txt) plays a whole
 # round at the game's pace: the arrow, the players' prompt (one player), the hint and the banners,
 # the player's opening bet (sub 2 on the player's turn: the focus's first monkey that takes one),
@@ -2533,8 +2533,8 @@ crime_throw() {
 }
 check_pad mg-crime crime_throw
 # The Scratch lottery, the music mixer, its save page and the wireless lobby on the controller (the
-# research's held-out states on copies of the complete save; G-T-trade the lobby, reached as the
-# research reached the others: its request written into the casino state).
+# held-out save states on copies of the complete save; G-T-trade the lobby, reached as the
+# others were reached: its request written into the casino state).
 pad_mg mg-scratch-win G-B-sc-two-p10 scratch-win 560 &
 pad_mg mg-scratch-quit G-X-scratch scratch-quit 150 &
 pad_mg mg-scratch-stay G-X-scratch scratch-quit-once 300 &
@@ -2642,7 +2642,7 @@ vacuum_none() {
     ! grep -q -E 'pointer down|clogged=1' "$tmp/mg-vacuum-none.log" || { echo "  mg-vacuum-none: pressed"; return 1; }
 }
 check_pad mg-vacuum-none vacuum_none
-# The words the HD frames say (--print-words: the composition's texts and chips' labels; ux task 6):
+# The words the HD frames say (--print-words: the composition's texts and chips' labels):
 # MooGoo's players before their names are set (strings 1758-1760, never the table's string 0, its
 # copyright line); the lottery's result popup (string 317) with no title (RAM's is a stale 2425); the
 # vacuum's money this session (§75 once the gold ring is kept, while the lifetime total waits for
@@ -2740,7 +2740,7 @@ check_pad pad-placement-leave placement_leave
 boot_late() { in_order "$1" 'boot mode=0' 'front Title' 'title phase=0'; }
 check_pad pad-boot-late-start boot_late pad-boot-late-start
 check_pad pad-boot-late-a boot_late pad-boot-late-a
-# Console manners (the remake's polish, task 2; copies of the complete save, pad only): a question
+# Console manners (copies of the complete save, pad only): a question
 # opens on No (two quick A on "Overwrite this save?" and on Quit answer No), one B on Keep this Sim?
 # lands on its cross (the second discards), LB on the Name page goes nowhere, 123!'s Down never lands
 # on the backspace, fast slider presses all count (Settings: twelve Lefts at five a second → 0 %,
@@ -2846,7 +2846,7 @@ stat_held() { grep -q -E 'stat page=0 .* held=[1-4]' "$tmp/pad-stat.log" || { ec
 check_pad pad-stat stat_held
 load_done() { in_order pad-load-slot "popup state=[1-3] kind=3 .*title=\"$(gx 2425)\"" 'load .* loading' 'front None'; }
 check_pad pad-load-slot load_done
-# The minigames' messages in HD (the remake's polish, task 3; copies of the complete save, pad only): a
+# The minigames' messages in HD (copies of the complete save, pad only): a
 # question of a minigame (the cards' and MooGoo's quit, the painting's "done?", the mixer's save
 # question) opens on No, so A A never answers Yes (the question closed, the game goes on); the HD box
 # hides the game's (its words, its buttons, the focus's halo on No); the cards' end of a turn in an HD
@@ -2854,7 +2854,7 @@ check_pad pad-load-slot load_done
 # ("Touch a Monkey!" in the port's words); the help texts read back from the stylus's point (the
 # Drencher's fire 1666, the crime game's scare 1667, the mixer's variations 1798); the phone's B goes
 # back one level (the ringtones → the menu), then hangs up; the detector powered off never shows
-# milestone 1's rail.
+# the framed-screen rail.
 pad_t3() {
     local name=$1 state=$2 input=$repo/scripts/console/$3.txt frames=$4 clock=$5; shift 5
     cp "$complete_save" "$tmp/$name.sav" || return
@@ -2945,10 +2945,10 @@ for f in sorted(glob.glob(sys.argv[1] + "/f*.png")):
     if int(f.rsplit("/f", 1)[1][:-4]) < int(sys.argv[2]):
         continue
     im = Image.open(f).convert("RGB")
-    # milestone 1's rail: a tall black box at the right where the town's world shows
+    # the framed-screen rail: a tall black box at the right where the town's world shows
     if sum(1 for y in range(100, 600, 10) for x in range(1190, 1270, 10) if sum(im.getpixel((x, y))) < 30) > 5:
         bad.append(f.rsplit("/", 1)[1])
-if bad: print(f"  t3-detector-off: milestone 1's rail in {bad[:3]}")
+if bad: print(f"  t3-detector-off: the framed-screen rail in {bad[:3]}")
 sys.exit(1 if bad else 0)
 PYEOF
 }
@@ -2963,7 +2963,7 @@ check_pad mg-drencher-help t3_help
 check_pad t3-phone-back t3_phone_back
 check_pad t3-detector-off t3_detector_off
 check_pad t3-scratch-win t3_scratch_win
-# The review fixes of the polish's tasks 1-3: the phone's MENU hangs up from a sub-page (never its
+# Review fixes: the phone's MENU hangs up from a sub-page (never its
 # menu first); B from the phone opened from the menu: the dimmed world while the menu comes back,
 # never the town's flash (the frames between the phone and the menu open on its tab darker than
 # the town).
@@ -3166,7 +3166,7 @@ sys.exit(1 if bad else 0)
 PYEOF
 }
 check_pad shell-tabs shell_tabs
-# Platform (task 5). The game's language: --game-language 2 sets the DS firmware's, so the boot's
+# The game's language: --game-language 2 sets the DS firmware's, so the boot's
 # last splash (frame 900, a fresh boot) says the game's French words: its touch screen differs from
 # English's and the strings load in French; fast boot (--fast-boot, the window's rule, logged) ends
 # at that splash and never before it, pressed nothing (the title still waits: an A then opens it);

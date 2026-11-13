@@ -287,7 +287,7 @@ static bool AllReachable(const MenuView& v)
 }
 
 // The HD minigame frame (port/minigame.*) on made-up states: the playfield and the top screen where
-// milestone 1 put them (the mouse round trips onto the playfield), every UI item on the canvas and
+// the framed screens put them (the mouse round trips onto the playfield), every UI item on the canvas and
 // off both pictures, the side panel inside the column, the prompt bar under the playfield, layers
 // ascending, the hints following what the game says (the cards' question and message, the clog).
 static void minigame_frame()
@@ -481,7 +481,7 @@ static void minigame_frame()
                 // (the kit ring's look: two outlines, the green and the white line)
                 CHECK(c.overlays.size() == overlays0 + ((sc == Screen::MooGoo && variant == 1) || (sc == Screen::Mixer && variant == 2) ? 2 : 0));
                 // The lottery's popup: A alone (the game's Close); the mixer's save question (an HD
-                // box since task 3 of the polish, its focus on No): the D-pad, A, B, X; the wireless
+                // box, its focus on No): the D-pad, A, B, X; the wireless
                 // lobby: B alone.
                 if (sc == Screen::Scratch && variant == 2) CHECK(chips == 1);
                 if (sc == Screen::Mixer && variant == 3) CHECK(box && chips == 4);
@@ -502,14 +502,14 @@ static void minigame_frame()
                 for (const auto& o : {std::pair<int, int> {1280, 720}, {2560, 1440}, {1000, 600}})
                     TestConsoleRoundtrip({sc, Tab::None}, false, top.first, top.second, o.first, o.second, true, &c);
             }
-    // Without the game's strings or RAM: milestone 1's activity layout (the 5 x 7 hints' box).
+    // Without the game's strings or RAM: the framed-screen activity layout (the 5 x 7 hints' box).
     CHECK(!MinigameFramed({Screen::Cards, Tab::None}, nullptr, nullptr));
     GameState g;
     g.valid = true;
     CHECK(!MinigameFramed({Screen::Cards, Tab::None}, &g, &rom));
 }
 
-// Task 5: Create-a-Sim's name typed on the keyboard (CasTypeAction; the key matching needs the
+// Create-a-Sim's name typed on the keyboard (CasTypeAction; the key matching needs the
 // game's strings: console_check's pad-cas-type) and fast boot's rule (BootPassesBy).
 static void platform()
 {
@@ -887,7 +887,7 @@ int main()
                 CHECK(bar == (sc != Screen::Cards));
             }
             // The conversation as before (its own box hides the bar), and without the words or
-            // without RAM's values, milestone 1's world, the game's HUD in it.
+            // without RAM's values, the framed-screen world, the game's HUD in it.
             CHECK(BuildConsole({Screen::Dialogue, Tab::None}, false, -1, top.first, top.second, &hud, &strings).ui.empty());
             HudStrings none;
             const Composition m1 = BuildConsole({Screen::Panel, Tab::Goals}, false, -1, top.first, top.second, &hud, &none);
@@ -1010,7 +1010,7 @@ int main()
         CHECK(!CanvasFromTouch(c, 128, 96, cx, cy, sc2));
     }
     // SaveSlots, Unknown (HUD up): the menu composition, framed, with the stick cursor (the Drencher,
-    // once one of them, is an activity of its own: milestone 6).
+    // once one of them, is an activity of its own).
     for (Screen sc : {Screen::SaveSlots, Screen::Unknown})
     {
         const Composition m = BuildConsole({sc, Tab::None}, false, -1, SW, SH);
@@ -1302,7 +1302,7 @@ int main()
 
         // BuildDialogue (a RomData without strings: no text, the player's name on the plate):
         // the world whole, every UI item inside the canvas, a click on the panel taps the game's
-        // arrow; BuildConsole keeps milestone 1's box without the game's strings.
+        // arrow; BuildConsole keeps the framed-screen box without the game's strings.
         RomData rom;
         GameState g;
         g.valid = true;
@@ -1383,7 +1383,7 @@ int main()
                         CHECK(MenuMove(w, phone, 1) == top);
                     }
                 }
-        CHECK(!PanelMenuView(it, &g, &rom).valid);                  // no strings: milestone 1's
+        CHECK(!PanelMenuView(it, &g, &rom).valid);                  // no strings: the framed screens
         CHECK(!PanelMenuViewOf({Screen::Panel, Tab::Goals}, g).valid);
         GameState bad = g;
         bad.town.interact.valid = false;
@@ -1543,7 +1543,7 @@ int main()
             bad = inventory(2);
             bad.town.gift.valid = false;
             CHECK(!GiftMenuViewOf(gs, bad).valid && PanelMenuViewOf(pk, bad).valid);
-            CHECK(!GiftMenuView(gs, &bad, &rom).valid); // no strings: milestone 1's
+            CHECK(!GiftMenuView(gs, &bad, &rom).valid); // no strings: the framed screens
         }
         // The shop's catalogue (port/catalogue.h) on made-up lists: the store's twelve items at
         // every scroll, 0-6 owned, Buy or Sell or nothing selected, money enough or not; a
@@ -1682,7 +1682,7 @@ int main()
             h.catalogue.valid = false;
             CHECK(!CatalogueViewOf(cs, h).valid);
             h.catalogue.valid = true;
-            CHECK(!CatalogueView(cs, &h, &rom).valid); // no strings: milestone 1's
+            CHECK(!CatalogueView(cs, &h, &rom).valid); // no strings: the framed screens
             // Every id distinct, where the first ids met: owned place 0 holding item 1 against Pay,
             // a cell's row against an owned item id at the same index.
             {
@@ -1828,7 +1828,7 @@ int main()
             // No view off its screen, without RAM's part or the strings; a row's id follows its room.
             GameState h = build(4, 0, 0, -1, 2000);
             CHECK(!BuildRoomsViewOf({Screen::Panel, Tab::Interact}, h).valid);
-            CHECK(!BuildRoomsView(bs, &h, &rom).valid); // no strings: milestone 1's
+            CHECK(!BuildRoomsView(bs, &h, &rom).valid); // no strings: the framed screens
             const u32 first = BuildRoomsViewOf(bs, h).items[0].id;
             h.build.scroll = 1;
             CHECK(BuildRoomsViewOf(bs, h).items[0].id != first);
@@ -1938,7 +1938,7 @@ int main()
             // No view off its screen, without RAM's part, with a mode the game has not, or the strings.
             GameState h = hotel(1, 1, 0, false);
             CHECK(!CheckInViewOf({Screen::Panel, Tab::Interact}, h).valid);
-            CHECK(!CheckInView(us, &h, &rom).valid); // no strings: milestone 1's
+            CHECK(!CheckInView(us, &h, &rom).valid); // no strings: the framed screens
             h.checkIn.mode = 2;
             CHECK(!CheckInViewOf(us, h).valid);
             h.checkIn.valid = false;
@@ -2037,11 +2037,11 @@ int main()
                 int tx, ty;
                 CHECK(TouchFromComposition(comp, fit, kPopClose.x + kPopClose.w / 2.0f, kPopClose.y + kPopClose.h / 2.0f, tx, ty));
                 CHECK(RoomInfoHintAt(tx, ty, occupied) < 0 && std::abs(tx - kRiAwayX) <= 12 && std::abs(ty - kRiAwayY) <= 12);
-                CHECK(!RoomInfoViewOf(us, info(occupied, true, -1)).valid); // (which hint unknown: milestone 1's)
+                CHECK(!RoomInfoViewOf(us, info(occupied, true, -1)).valid); // (which hint unknown: the framed-screen one)
             }
             GameState g = info(true, false, -1);
             CHECK(!RoomInfoViewOf({Screen::Panel, Tab::Interact}, g).valid);
-            CHECK(!RoomInfoView(us, &g, &rom).valid); // no strings: milestone 1's
+            CHECK(!RoomInfoView(us, &g, &rom).valid); // no strings: the framed screens
             g.roomInfo.place = 40;
             CHECK(!RoomInfoViewOf(us, g).valid);
         }
@@ -2135,7 +2135,7 @@ int main()
                 g.music.valid = true;
                 g.music.list = {{3, 1, 101, -1}};
                 CHECK(MusicViewOf(us, g).valid && !MusicViewOf({Screen::Panel, Tab::Interact}, g).valid);
-                CHECK(!MusicView(us, &g, &rom).valid); // no strings: milestone 1's
+                CHECK(!MusicView(us, &g, &rom).valid); // no strings: the framed screens
                 g.music.scroll = 1;
                 CHECK(!MusicViewOf(us, g).valid);
                 g.music.valid = false;
@@ -2221,7 +2221,7 @@ int main()
                 g.valid = true;
                 g.stat.valid = true;
                 CHECK(StatPanelViewOf(us, g).valid && !StatPanelViewOf({Screen::Panel, Tab::Interact}, g).valid);
-                CHECK(!StatPanelView(us, &g, &rom).valid); // no strings: milestone 1's
+                CHECK(!StatPanelView(us, &g, &rom).valid); // no strings: the framed screens
                 g.stat.page = 5;
                 CHECK(!StatPanelViewOf(us, g).valid);
                 g.stat.page = 0;
@@ -2502,7 +2502,7 @@ int main()
                     off.town.popup.state = 0;
                     CHECK(!PopupViewOf(on, off).valid);
                     off = h;
-                    off.screen = GScreen::Vacuum; // (a screen the port does not redraw: milestone 1's popup)
+                    off.screen = GScreen::Vacuum; // (a screen the port does not redraw: the framed-screen popup)
                     CHECK(!PopupViewOf({Screen::Vacuum, Tab::None}, off).valid);
                     off.screen = GScreen::Build; // (over the HD Build Rooms: the HD popup)
                     CHECK(PopupViewOf({Screen::Build, Tab::None}, off).valid == PopupViewOf(on, h).valid);
@@ -2511,7 +2511,7 @@ int main()
                     off = h;
                     off.town.popup.boxW = 0;   // (its box not placed yet, sliding in: the HD popup, nothing to press)
                     CHECK(PopupViewOf(on, off).valid && PopupViewOf(on, off).items.empty() && PopupViewOf(on, off).back.empty());
-                    CHECK(!PopupView(on, &h, &rom).valid); // (no strings: milestone 1's)
+                    CHECK(!PopupView(on, &h, &rom).valid); // (no strings: the framed-screen one)
                 }
             {
                 // A popup over the HD catalogue (port/catalogue.h): the popup's view, the catalogue
@@ -2553,7 +2553,7 @@ int main()
                 CHECK(!TouchFromComposition(comp, fit, cell.x + cell.w / 2.0f, cell.y + cell.h / 2.0f, tx, ty)); // the catalogue beneath
             }
             // A popup the game shows over Save slots, Give Gift or the phone whose HD view does not
-            // read (a box without its place): no view at all, not the screen's (milestone 1's picture
+            // read (a box without its place): no view at all, not the screen's (the framed screens
             // holds the game's own popup). (This rom has no strings: the guard itself is PopupOver's.)
             for (ScreenState on : {ScreenState {Screen::SaveSlots, Tab::None}, ScreenState {Screen::Gift, Tab::None}, ScreenState {Screen::Phone, Tab::None}})
             {
@@ -2653,7 +2653,7 @@ int main()
             n.town.note.valid = false;
             CHECK(!NoteViewOf({Screen::Unknown, Tab::None}, n).valid);
         }
-        // BuildConsole: without the game's strings, milestone 1's menu (the touch screen 3x).
+        // BuildConsole: without the game's strings, the framed-screen menu (the touch screen 3x).
         const HudState hud = TestHud();
         const HudStrings strings = TestStrings();
         const Composition m1 = BuildConsole(it, true, 0, 256, 192, &hud, &strings, &g, &rom, face.data());
@@ -2759,7 +2759,7 @@ int main()
             const MenuView v = FrontViewOf(fe, g);
             CHECK(v.valid && v.own && !v.replay && AllReachable(v));
             CHECK(!FrontViewOf(none, g).valid && !FrontViewOf({Screen::Panel, Tab::Interact}, g).valid);
-            CHECK(!FrontView(fe, &g, &rom).valid); // no strings: milestone 1's
+            CHECK(!FrontView(fe, &g, &rom).valid); // no strings: the framed screens
             std::set<u32> ids;
             for (const ViewItem& it : v.items) { ids.insert(it.id); CHECK((it.id >> 24) == (kModFront >> 24)); }
             CHECK(ids.size() == v.items.size());
@@ -2914,7 +2914,7 @@ int main()
                     const MenuView v = SettingsViewOf(none, g);
                     CHECK(v.valid && v.own && !v.replay && v.backCloses && AllReachable(v));
                     CHECK(SettingsViewOf(fe, g).valid && !SettingsViewOf({Screen::Panel, Tab::Interact}, g).valid);
-                    CHECK(!SettingsView(none, &g, &rom).valid); // no strings: milestone 1's
+                    CHECK(!SettingsView(none, &g, &rom).valid); // no strings: the framed screens
                     CHECK(v.back.size() == 1 && v.back[0].x == kSeCloseX && v.back[0].y == kSeCloseY);
                     const MenuAction& lb = v.buttons[(int)MenuButton::LB];
                     const MenuAction& rb = v.buttons[(int)MenuButton::RB];
@@ -3039,7 +3039,7 @@ int main()
                     {
                         const GameState g = load((u8)used, green, popup, wireless);
                         const MenuView v = LoadViewOf(none, g);
-                        // DS Wireless keeps milestone 1's view (its tick opens the wireless lobby).
+                        // DS Wireless keeps the framed-screen view (its tick opens the wireless lobby).
                         if (wireless) { CHECK(!v.valid && !LoadView(none, &g, &rom).valid); continue; }
                         CHECK(v.valid && v.own && !v.replay && AllReachable(v) && (int)v.items.size() == kLoadRows);
                         CHECK(!LoadViewOf({Screen::Panel, Tab::Interact}, g).valid && !LoadView(none, &g, &rom).valid);
@@ -3168,7 +3168,7 @@ int main()
         auto check = [&](const GameState& g, const char* what) {
             const MenuView v = CasViewOf(cas, g);
             if (!v.valid || !v.own || v.replay || !v.stickTurns || !AllReachable(v)) { fprintf(stderr, "cas %s: view\n", what); failures++; return v; }
-            CHECK(!CasView(cas, &g, &rom).valid);   // no strings: milestone 1's
+            CHECK(!CasView(cas, &g, &rom).valid);   // no strings: the framed screens
             CHECK(!CasViewOf({Screen::FrontEnd, Tab::None}, g).valid && !CasViewOf({Screen::Panel, Tab::Interact}, g).valid);
             const int page = g.front.cas.page;
             std::set<u32> here;
@@ -3534,7 +3534,7 @@ int main()
     }
 
     {
-        // The panel's D-pad hints (ux task 6): "Choose" whenever Up / Down move the focus (the
+        // The panel's D-pad hints: "Choose" whenever Up / Down move the focus (the
         // vertical arms for a column, the cross for a grid), a slider's "Adjust", Interact's targets.
         RomData rom;
         auto item = [](Rect r, u32 id) { ViewItem it; it.rect = r; it.id = id; return it; };

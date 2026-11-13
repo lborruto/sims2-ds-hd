@@ -8,7 +8,7 @@
 // The window draws the live crops with the GPU (ui::WholeFactorCrop); --images-cpu rasters them
 // as --compose does (the digest of two builds compares then).
 // --threads N: the raster's threads (1: one; default: the machine's). --ui-scale N (percent) and
-// --game-pictures smooth|pixel: the UI's size and the pictures' look (task 10; default 100, pixel).
+// --game-pictures smooth|pixel: the UI's size and the pictures' look (default 100, pixel).
 //   ninja -C build ui_bench && ./build/ui_bench [scale] [--images-cpu] [--threads N] [--ui-scale N] [--game-pictures smooth]
 #include <algorithm>
 #include <chrono>

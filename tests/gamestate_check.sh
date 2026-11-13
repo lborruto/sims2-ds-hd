@@ -193,7 +193,7 @@ else echo "FAIL rom gate: no $shots/s6.st or no copy"; fail=1; fi
 # the held-out states A-gift2-base (two items, key items not owned), A-pk-cnt3-slot1 (the complete
 # save's pockets), B-st-opt-music, B-ch-opt-quit / B-pause / s6 (popups; their texts must equal
 # the ROM's strings 65, 22 / 23 and 2448) and B-cas-opt-save (three save slots). Copies of these
-# states from research/ram/gen go in shots/ (git-ignored, listed in CLAUDE.md).
+# states go in shots/ (git-ignored, listed in docs/dev-notes.md).
 town_run() { # NAME STATE: the last town lines in NAME.town
     local name=$1 file=$shots/$2.st
     if [ ! -f "$file" ]; then echo "no save state $2.st" > "$tmp/$name.town"; return; fi
@@ -207,7 +207,7 @@ town_want() { # NAME KIND PATTERN LABEL: the last line of that kind matches (gre
 }
 town_text() { # NAME TEXT_ID TITLE_ID LABEL: the popup's text (and title, -1 none) is the ROM's string
     local want got
-    want="title=\"$([ "$3" = -1 ] || "$bin" "$rom" --dump-string "$3" 2>/dev/null)\" text=\"$("$bin" "$rom" --dump-string "$2" 2>/dev/null)\""
+    want="title=\"$([ "$3" = -1 ] || "$bin" "$rom" --headless --frames 0 --save "$tmp/strings.sav" --dump-string "$3" 2>/dev/null)\" text=\"$("$bin" "$rom" --headless --frames 0 --save "$tmp/strings.sav" --dump-string "$2" 2>/dev/null)\""
     got=$(grep '^popup ' "$tmp/$1.town" | tail -n 1 | sed -E 's/^popup state=[0-9]+ kind=[0-9]+ pressed=-?[0-9]+,[01] //')
     if [ -n "$got" ] && [ "$got" = "$want" ]; then echo "ok   $4"; else echo "FAIL $4: want '$want', got '$got'"; fail=1; fi
 }
@@ -258,7 +258,7 @@ town_want m-C-s7-msgs phone 'page=2 .* inbox=- date=' "menus: no messages"
 town_want m-A-gift2-slot2 gift '^gift recipient=22 name=345 slot=1 refused=000000$' "menus: Give Gift to Jebediah, slot 2"
 # The hotel and the shops (--print-hotel): the hotel block on any screen, the registry, room info,
 # the music panel, Build Rooms, the placement editor, the catalogue and the stat panel, from held-out
-# states (copies of the research's M-*, BD-*, BY-*, SP-* and h-catalogue-* in shots/): the early
+# states (copies of the save states M-*, BD-*, BY-*, SP-* and h-catalogue-* in shots/): the early
 # hotel (clock 14:00), the complete save (late clock, a copy of the save), the town (town clock).
 hotel_run() { # NAME STATE CLASS(hotel|late|town)
     local name=$1 file=$shots/$2.st opts
@@ -305,8 +305,8 @@ hotel_want h-stat stat '^stat page=0 transition=0 aspiration=0 level=2 points=29
 hotel_want h-statp stat '^stat page=3 ' "hotel: the Skills page"
 hotel_want h-town hotel '^hotel built=' "hotel: the block reads in the town too"
 hotel_want h-town checkin '^checkin none$' "hotel: no registry on the town's screen"
-# The minigames (--print-minigame): each minigame's screen from the research's held-out G-* states
-# (copies in shots/, listed in CLAUDE.md), the first line each prints (the state's own frame 0). The
+# The minigames (--print-minigame): each minigame's screen from the `G-*` save states
+# (copies in shots/, listed in docs/dev-notes.md), the first line each prints (the state's own frame 0). The
 # part is read on its screen only and is `none` on another (a Panel, the cards).
 mg_run() { # NAME STATE
     local name=$1 file=$shots/$2.st
@@ -354,8 +354,8 @@ mg_want mg-G-D-art-stroke '^art stroke=0 button=0 tool=0 swatch=3 page=0 brush=0
 mg_want mg-G-D-art-line '^art .* button=7 tool=2 swatch=3 .* painted=16 ' "minigame: the line tool, 16 cells"
 mg_want mg-G-D-art-page '^art .* swatch=3 page=1 .* painted=0 ' "minigame: the second palette page, blank canvas"
 mg_want mg-G-X-pirate '^cards deck=40/60 hand=8 opponent=8 score=0,0 treasure=0 box=0 message=0 quit=0 phase=7 turn=0 name="Jun"$' "minigame: the cards dealt (eight each, forty in the deck), no box, the deal's step (7), the player's turn"
-# The front end (--print-front; milestone 5): the title and menu, Settings, Load-a-Sim, Create-a-Sim's pages, Keep this Sim?
-# and the boot screens, from copies of the research's F-* states in shots/. The first line of each kind (the state's own frame 0).
+# The front end (--print-front): the title and menu, Settings, Load-a-Sim, Create-a-Sim's pages, Keep this Sim?
+# and the boot screens, from copies of the save states F-* states in shots/. The first line of each kind (the state's own frame 0).
 front_run() { # NAME STATE: the front lines in NAME.front
     local name=$1 file=$shots/$2.st
     [ -f "$file" ] || file=$more_shots/$2.st

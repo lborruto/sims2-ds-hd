@@ -16,7 +16,7 @@
 // game's own (its scroll), the game's highlight held as the focus (MenuView::selected).
 //
 // What performs: the game's own buttons, its DS keys (the phone reads Up, Down and A itself:
-// research m3 §4): Up / Down press the DS's Up / Down as many times as the game's highlight must
+// docs/research/ram-map.md): Up / Down press the DS's Up / Down as many times as the game's highlight must
 // move to reach the next HD row (a message's text lines are rows to the game: one press of Down
 // from the sender goes past them all to "Next Message"); A moves the highlight to the focused
 // row the same way if it is not there, then presses the DS's A (the game's OK). B goes back one

@@ -6,7 +6,7 @@
 # Needs the ROM and the save states (not in git, so not in CI):
 #   bash tests/screens_check.sh
 # Override with SIMS2HD (the program), ROM, SHOTS (the save states' folder), MORE_SHOTS (a
-# second folder, looked in when SHOTS lacks a state: a worktree's own shots/ besides the main
+# second folder, looked in when SHOTS lacks a state: a second checkout's own shots/ besides the main
 # checkout's) and COMPLETE_SAVE (the downloaded complete save the casino and late hotel states
 # were made on; CARDS_SAVE is its old name); they default to this checkout's build/, roms/,
 # shots/, shots/ and saves/complete-play.sav.

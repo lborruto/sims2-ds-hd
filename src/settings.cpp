@@ -151,10 +151,10 @@ bool Settings::Load(const std::string& path)
     }
     // layout= is written since CONSOLE became the default (after v0.1.1, which never wrote it);
     // a file without a settings_version that says auto comes from a build before version 2:
-    // by the owner's choice it starts in CONSOLE, once (the next save writes version 2 and the
+    // by the maintainer's choice it starts in CONSOLE, once (the next save writes version 2 and the
     // file then says what the player chose).
     if (version < 2 && layout == Layout::Auto) layout = Layout::Console;
-    // Version 3 (the ux round): the game's pictures default to Pixel. Every file before it wrote
+    // Version 3: the game's pictures default to Pixel. Every file before it wrote
     // game_pictures=smooth, the old default, whether chosen or not: it loads as Pixel, once (the
     // next save writes version 3, so a Smooth chosen after that stays).
     if (version < 3) smoothPictures = false;
@@ -166,7 +166,7 @@ bool Settings::Save(const std::string& path) const
     if (path.empty()) return false;
     std::ofstream out(path);
     if (!out) return false;
-    out << "# The Sims 2 DS, one screen: settings. Changed from the pause menu (Start + Back, or Esc).\n"
+    out << "# Sims 2 DS HD: settings. Changed from the pause menu (Start + Back, or Esc).\n"
         << "settings_version=3\n"
         << "mic=" << MicKey(mic) << "\n"
         << "layout=" << LayoutName(layout) << "\n"

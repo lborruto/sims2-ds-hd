@@ -4,8 +4,8 @@ about: Something sims2-ds-hd should do
 labels: enhancement
 ---
 
-**The moment** (where you are in the game and what gets in the way, as in "the shop screen is
-too small in the side panel")
+**The moment** (where you are in the game and what gets in the way, as in "this minigame still
+needs the mouse" or "this screen is still the DS's small picture, not an HD menu")
 
 **What it should do** (a layout, a control, a setting)
 

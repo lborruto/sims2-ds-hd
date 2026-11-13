@@ -152,7 +152,7 @@ MenuView RoomInfoViewOf(ScreenState s, const GameState& game, const RomData* rom
     if (!ri.hint) return LinesView(game, rom);
     // The hint box: the game closes it on the next stylus-down anywhere; a tap away from the lines.
     MenuView v;
-    if (ri.hintId < 0) return v; // (which hint is not known: milestone 1's picture)
+    if (ri.hintId < 0) return v; // (which hint is not known: the framed screens)
     ViewItem close;
     close.rect = kPopClose;
     close.id = kRiHintCloseId;

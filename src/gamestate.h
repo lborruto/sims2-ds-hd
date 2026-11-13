@@ -10,7 +10,7 @@
 namespace sims2hd
 {
 enum class GScreen { Unknown, FrontEnd /*title or main menu*/, CreateASim, Panel, Popup, Phone, Dialogue, Gift, Catalogue, Build, Vacuum, Social, Cards, SaveSlots, Drencher,
-               // The minigames (milestone 6; MinigameState): CONSOLE knows none of them yet (the stick cursor's screens).
+               // The minigames (MinigameState): CONSOLE knows none of them yet (the stick cursor's screens).
                Autopsy, Detector, MooGoo /*intro and game*/, Scratch, Crime, Mixer, MixerSave, ArtGallery,
                // The wireless lobby (module 0x1E, CWirelessLobby, "DS Wireless" 2026: the title's way to the
                // trading session, Keelhaulin' and MooGoo over wireless) and its trading screen (CTradingGame):
@@ -288,7 +288,7 @@ struct TownState
     bool operator==(const TownState&) const = default;
 };
 
-// ---- The hotel and the shops (milestone 4). The hotel block is readable on any screen; each menu's
+// ---- The hotel and the shops. The hotel block is readable on any screen; each menu's
 // part is read only on its own screen (vtable and overlay checked), apart from the others.
 constexpr int kPlaces = 33;           // place ids 0..32 name the rooms (string 0x43 + place)
 constexpr int kNoPlace = 0x21;        // a guest slot's room when it holds none
@@ -465,7 +465,7 @@ struct StatState
     bool operator==(const StatState&) const = default;
 };
 
-// ---- The minigames (milestone 6). Each minigame's part is read only on its own screen (vtable and
+// ---- The minigames. Each minigame's part is read only on its own screen (vtable and
 // overlay checked), apart from the others, valid on its own; the lists are capped. All of them are
 // the game's own fields (docs/research/ram-map.md, "The minigames"); the port reads RAM only.
 
@@ -752,8 +752,8 @@ struct MinigameState
     bool operator==(const MinigameState&) const = default;
 };
 
-// Milestone 5: the front end (title, Settings, Load-a-Sim, Create-a-Sim, the boot screens, the video),
-// read from RAM (research m5-front-end). Each part reads only on its own screen and is valid on its
+// The front end (title, Settings, Load-a-Sim, Create-a-Sim, the boot screens, the video),
+// read from RAM. Each part reads only on its own screen and is valid on its
 // own; none of it is in GameState ==.
 enum class FrontKind { None, Title, MainMenu, Settings, Load, Wireless, CreateASim, KeepSim, Boot, Video };
 struct TitleState
@@ -909,8 +909,8 @@ struct GameState
     PlacementState placement;
     CatalogueState catalogue;
     StatState stat;
-    MinigameState minigame;        // the minigames (milestone 6): the screen's part only; logged apart (--print-minigame)
-    FrontState front;              // milestone 5: the front end's screens (logged apart: --print-front)
+    MinigameState minigame;        // the minigames: the screen's part only; logged apart (--print-minigame)
+    FrontState front;              // the front end's screens (logged apart: --print-front)
     // Screen identity only: hud and dialogue change every minute / page and are logged apart
     // (--print-hud), so --print-game stays one line per screen change.
     bool operator==(const GameState& o) const

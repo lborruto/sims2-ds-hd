@@ -22,8 +22,7 @@ struct Theme
 };
 const Theme& GameTheme();
 
-// The HD screens' shared palette, measured with WCAG's contrast formula (research checklist B1-B4;
-// XAG 102: 4.5:1 for text, 3:1 for inactive text): a row, button or well kFillRow (white text on it
+// The HD screens' shared palette, measured with WCAG's contrast formula (// XAG 102: 4.5:1 for text, 3:1 for inactive text): a row, button or well kFillRow (white text on it
 // 4.58:1; GameTheme().fillDark is the same), the focused row kFillFocus (white 7.15:1), notes and
 // subtitles kTextNote (white: 4.58:1 on a well), inactive text kTextInactive (3.23:1 on kFillRow).
 // The panel's own fill (#828ACB, the game's) takes white at 3.26:1: large text only (titles).

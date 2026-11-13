@@ -466,7 +466,7 @@ void MeasurePhone(const RomData& rom, BlockMeasure& m)
     block(kStrPhCall, Shown(Fill(Fill(rom.String(kStrPhCall), 1, longestMood), 2, longestPlace)), reply);
     block(kStrPhAway, Shown(Fill(rom.String(kStrPhAway), 1, "WWWWWWWW")), reply);
     block(kStrPhNoContacts, MenuWords(rom, kStrPhNoContacts), reply);
-    // The messages the research saw (0x907, 0x49E with an object's name).
+    // The messages seen in the game (0x907, 0x49E with an object's name).
     block(0x907, Shown(Fill(rom.String(0x907), 1, "WWWWWWWW")), message);
     block(0x49E, Shown(Fill(rom.String(0x49E), 2, MenuWords(rom, 0x2B8))), message);
 }

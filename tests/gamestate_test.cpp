@@ -799,7 +799,7 @@ static void menus_random()
 }
 
 
-// ---- The hotel and the shops: made-up RAM with the research's layouts.
+// ---- The hotel and the shops: made-up RAM with the layouts in docs/research/ram-map.md.
 static Ram hotel_ram(u32 vt, int ov)
 {
     Ram r = menus_ram(vt, ov, 0);
@@ -991,7 +991,7 @@ static void hotel_random()
     }
 }
 
-// ---- The minigames (milestone 6): made-up RAM with the research's layouts.
+// ---- The minigames: made-up RAM with the layouts in docs/research/ram-map.md.
 constexpr u32 kMg = 0x021670A4;   // G
 static Ram mg_ram(u32 vt, int ov)
 {
@@ -1297,7 +1297,7 @@ static void mixer_and_art()
 
 // Random bytes in every minigame object: the readers stay in bounds, the lists capped, and a part
 // that reads is valid in itself (no part invalid with its fields half filled).
-// Keelhaulin' Cards and the vacuum (milestone 1's activities, framed in HD by port/minigame.*).
+// Keelhaulin' Cards and the vacuum (the framed-screen activities, framed in HD by port/minigame.*).
 static void cards_and_vacuum()
 {
     Ram r = mg_ram(0x0212F98C, -1);
@@ -1439,7 +1439,7 @@ static void minigame_random()
     }
 }
 
-// ---- The front end (milestone 5): made-up RAM with the research's layouts.
+// ---- The front end: made-up RAM with the layouts in docs/research/ram-map.md.
 constexpr u32 kFT = 0x021A1000, kFN = 0x021A2000, kFH = 0x021A3000, kFB = 0x021A4000;
 static Ram front_ram(u32 vt, int ov)
 {

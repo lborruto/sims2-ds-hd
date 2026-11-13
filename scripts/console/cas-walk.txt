@@ -1,6 +1,6 @@
 # From s3 (the Name page), CONSOLE: every page of Create-a-Sim by RB (Hair, Face, Clothes, Keep this
 # Sim?), back by LB to the Name page, then forward by Start (the name committed) to Keep this Sim?:
-# every page change the game makes, none of its frames milestone 1's picture (--print-console).
+# every page change the game makes, none of its frames the framed screens (--print-console).
 20 2 pad rb
 70 2 pad rb
 120 2 pad rb

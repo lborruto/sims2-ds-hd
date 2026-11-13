@@ -52,7 +52,7 @@ enum class OwnWordId : int
     TradingNote,
     // A help text, a card: closed.
     Close,
-    // (ux task 4c) A word on every hint chip: the D-pad moving a list's or a question's focus, the
+    // A word on every hint chip: the D-pad moving a list's or a question's focus, the
     // stat panel's pages, a slider's value, the concept art opened, Create-a-Sim's model turned; a
     // list the D-pad scrolls where A selects (Choose would say A's word twice: Wählen, Choisir).
     HintChoose, HintPages, HintAdjust, HintView, HintTurn, HintScroll,
@@ -88,16 +88,16 @@ enum class OwnWordId : int
     // The review's round: change game, open the saves' folder, a stale place, a state from another
     // file, a place that did not load.
     ShellChangeGame, ShellOpenFolder, LaunchSaveNewer, StOtherRom, LaunchContinueFailed, QuickOtherRom,
-    // Platform (task 5): the settings' new rows and values, their notes, the save moved to the
+    // the settings' new rows and values, their notes, the save moved to the
     // settings folder (the pause menu's banner), a window screenshot's toast.
     SetBattery, SetMute, SetBackground, SetFastSpeed, FastMax, SetFastKey, FastHold, FastPress, SetFastBoot, SetHidePointer,
     SetCursorSpeed, SetLeftHanded, ScaleSharp, ScaleSmooth, ScaleNearest,
     BatteryNote, BackgroundNote, FastBootNote, ScalingNote, SaveElsewhere, ToastShotAt,
     // The save back beside the ROM (its folder writable again) from the settings folder's copy.
     SaveMovedBack,
-    // The interface's size and the game's pictures (task 10): the rows, Auto, their notes.
+    // The interface's size and the game's pictures: the rows, Auto, their notes.
     SetUiSize, UiAuto, UiSizeNote, SetPictures, PicturesNote,
-    // Settings in five tabs (ux task 5): the tabs' names (Controls: ShellControls), the Advanced
+    // Settings in five tabs: the tabs' names (Controls: ShellControls), the Advanced
     // heading, a note for every row that had none, the real microphone, Language's next-start tag,
     // Battery saver's hold on its rows, the reset question (@1 the tab) and its hint.
     TabDisplay, TabGraphics, TabSound, TabGame, SetAdvanced,
@@ -113,10 +113,10 @@ enum class OwnWordId : int
     // shoulders; the keyboard's Q / W, the mouse), the names keycaps print.
     KeysResetAsk, StUndoAsk, KeysMenuNeeded, CtlCameraCursor, CtlTabs, CtlCameraTabs, CtlStylus,
     KeyMouse, KeyEnter, KeyRightShift, KeyLeftShift, KeySpace, KeyBackspace,
-    // (ux task 6, the town's audit) Build Rooms with nothing left; the world's right stick (it turns
+    // (the town's audit) Build Rooms with nothing left; the world's right stick (it turns
     // the camera and zooms: the status strip's hint).
     BuildNothingLeft, HintCamera,
-    // (ux task 6, the front end and the minigames) The mixer's X: play the song (the game's word is
+    // (the front end and the minigames) The mixer's X: play the song (the game's word is
     // its button's, START in German).
     MixerPlay,
     // The shop's Pay greyed: why (the money short, the places full, an item the store will not take).

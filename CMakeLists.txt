@@ -175,6 +175,12 @@ if(APPLE AND SIMS2HD_MAC_APP)
         MACOSX_BUNDLE_BUNDLE_VERSION "${PROJECT_VERSION}")
 endif()
 
+# Linux: GCC's C++ runtime linked in, so the program needs only the system's C library (glibc 2.39
+# for the release, built on Ubuntu 24.04) and the libraries SDL opens at run time.
+if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(sims2hd PRIVATE -static-libstdc++ -static-libgcc)
+endif()
+
 # Windows: a program that opens no console window when double-clicked (main.cpp attaches to the
 # terminal it was started from, if any), with its icon, linked statically so that the .exe needs
 # no DLL beside it. The file picker uses comdlg32 and ole32.

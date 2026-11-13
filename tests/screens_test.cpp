@@ -1,7 +1,7 @@
 // Checks the HUD rule (screens.*) on synthetic top screens: the status bar must be found
 // whatever tint the Sanity bar gives the strip's right part (red, yellow seen in the game; green
 // and silver not seen yet), and not on a screen without the strip.
-// The rows' colours were measured headless (CLAUDE.md, traps); no game picture is used.
+// The rows' colours were measured headless (docs/dev-notes.md, traps); no game picture is used.
 //   ninja -C build screens_test && ./build/screens_test
 #include <cstdio>
 #include <vector>

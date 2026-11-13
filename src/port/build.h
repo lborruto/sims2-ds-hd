@@ -10,7 +10,7 @@
 //     money left after it, the game's cross ("No" 49) and tick ("Yes" 48).
 //
 // The game's Build Rooms is the stylus only (no DS button is read). What performs, always the
-// game's own taps (the research's touch points, m4 §5):
+// game's own taps (the touch points measured in the game):
 //   A on a row ("Buy", the catalogue's word): its knob (48, 68 / 103 / 138): the game opens page 1 for it. A row the money does
 //     not cover stays focusable (its price is read) but A does nothing: the game refuses it.
 //   Up / Down past the first / last row: the game's arrows (111,172 / 145,172) while it can scroll.

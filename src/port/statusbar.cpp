@@ -14,7 +14,7 @@ namespace sims2hd
 namespace
 {
 // The game's string ids (the same in every language's table): the clock's format, am, pm, the
-// money's format, the HUD's "Sanity:" (research: the HUD draw routine asks for them each frame).
+// money's format, the HUD's "Sanity:" (the game's code: the HUD draw routine asks for them each frame).
 constexpr int kClockId = 30, kAmId = 178, kPmId = 179, kMoneyId = 28, kSanityId = 2421;
 
 // Sizes, canvas pixels.

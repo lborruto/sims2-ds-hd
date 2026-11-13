@@ -3,7 +3,7 @@
 # taps targets from a save state headless, and the run must show the tap's effect: either the
 # recognised screens (--print-screen, the whole sequence) or a last picture that differs from
 # the same run without that tap (a base script). Targets whose tap shows nothing (an empty slot,
-# a list with one entry) are placed from shots only: CLAUDE.md, traps.
+# a list with one entry) are placed from shots only: docs/dev-notes.md, traps.
 # Needs the ROM and the save states (not in git, so not in CI):
 #   bash tests/hotspots_check.sh
 # Override with SIMS2HD, ROM, SHOTS and COMPLETE_SAVE (or CARDS_SAVE) as for
@@ -127,7 +127,7 @@ run() {
     mkdir -p "$out"
     if [ ! -f "$shots/$state.st" ]; then echo "no save state $shots/$state.st" > "$out.log"; : > "$out.out"; return; fi
     # The town's states on the clock their output is compared with; act-cards after the time it
-    # was saved at (never earlier: CLAUDE.md, the clock), or the pictures would differ by the
+    # was saved at (never earlier: docs/dev-notes.md, the clock), or the pictures would differ by the
     # second the run started.
     local opts=(--clock "2026-01-01 12:00")
     [ "$state" = act-cards ] && { cp "$complete_save" "$out.sav"; opts=(--clock "2026-11-05 12:00"); }

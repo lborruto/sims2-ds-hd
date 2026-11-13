@@ -709,7 +709,7 @@ static void cards_ram()
     r.Press(kCards, &PadState::x);
     CHECK(r.Touched(x, y) && x == HotspotsFor(kCards)[Index(kCards, "deck")].x);
     r.Drain();
-    // Nothing known (another ROM): milestone 1's way, A on the focused card.
+    // Nothing known (another ROM): the framed screens' way, A on the focused card.
     r.nav.SetActivityRam({});
     r.Frame(kInteract);
     r.Frame(kCards);
@@ -2109,7 +2109,7 @@ static void view_focus_skips_greyed_and_a_runs()
     CHECK(!q.nav.MenuOpen() && !q.touch.Owns());
 }
 
-// An item whose A starts an animation on the world (the slot machine's Insert Coin, research/m6 12):
+// An item whose A starts an animation on the world (the slot machine's Insert Coin, from its code):
 // its tap runs and the panel's menu closes with it, so the world shows big; the others keep it open.
 static void view_animation_closes_the_menu()
 {

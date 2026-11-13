@@ -68,6 +68,6 @@ bool PortraitShown(const u32* bottom);
 // an invisible touchable piece over the panel mapped onto the game's arrow (a click turns the
 // page). game.dialogue not valid (no page drawn yet: a speech starting, the frames between two):
 // the panel alone. CONSOLE (console.cpp) calls it only with RAM read and rom's strings, and keeps
-// milestone 1's composition otherwise. topW x topH: the top picture's size; bottom: the DS's touch screen.
+// the framed-screen composition otherwise. topW x topH: the top picture's size; bottom: the DS's touch screen.
 void BuildDialogue(Composition& c, const GameState& game, const RomData& rom, const u32* bottom, int topW, int topH);
 }

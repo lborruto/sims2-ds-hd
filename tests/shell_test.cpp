@@ -558,7 +558,7 @@ static void launch_panel()
     }
     f.m.hasSuspend = false;
     CheckBuild(sh, f.m, "launch without a suspend state");
-    // Inside the TV's safe area (research C1: nothing in the outer 5 %, x 64-1216, y 36-684), with
+    // Inside the TV's safe area (nothing in the outer 5 %, x 64-1216, y 36-684), with
     // and without recents (the backdrop and the title's line box, the canvas's width, apart).
     for (bool recents : {false, true})
     {
@@ -812,7 +812,7 @@ static void files()
     fs::remove_all(dir);
 }
 
-// Task 5's pure parts: the window's first size, a screenshot's name, the save's writability and
+// Pure parts of the window and files: the window's first size, a screenshot's name, the save's writability and
 // its fallback, the settings file's new keys, the main page's banner.
 static void SaveRules(const std::filesystem::path& dir);
 static void platform()
@@ -902,9 +902,9 @@ static void platform()
         Settings e;
         e.Load(path);
         CHECK(e.scaling == Scaling::Sharp && e.fastSpeed == 4 && e.cursorSpeed == 50);
-        // Task 10: the interface's size (auto or 60-150 by 5) and the game's pictures.
+        // the interface's size (auto or 60-150 by 5) and the game's pictures.
         Settings u;
-        // (The game's pictures: Pixel by default since the ux round; a file's smooth stays smooth.)
+        // (The game's pictures: Pixel by default since settings version 3; a file's smooth stays smooth.)
         CHECK(u.uiScale == 0 && !u.smoothPictures);
         u.uiScale = 135;
         u.smoothPictures = true;

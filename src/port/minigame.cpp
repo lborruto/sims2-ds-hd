@@ -1042,7 +1042,7 @@ int MinigameHelpAt(Screen s, int x, int y)
     }
     if (s == Screen::Mixer)
     {
-        // The game's regions (first match, research m6 §8) → its help page h: the title 1778 + 2h.
+        // The game's regions (first match) → its help page h: the title 1778 + 2h.
         struct R { int x, y, w, h, page; };
         static constexpr R kRegions[] = {
             {63, 31, 38, 18, 0}, {63, 59, 38, 18, 1}, {3, 4, 28, 18, 2}, {29, 3, 28, 18, 3}, {108, 4, 38, 18, 4}, {6, 138, 28, 18, 5}, {62, 88, 28, 18, 6},
@@ -1353,7 +1353,7 @@ bool MinigameFramed(ScreenState s, const GameState* game, const RomData* rom)
 void BuildMinigame(Composition& c, ScreenState s, int topW, int topH, const HudState* hud, const HudStrings* strings, const GameState& game,
                    const RomData& rom, const u32* bottom, IconCache*, const PointerView* pointer, int focus)
 {
-    // The playfield and the secondary panel as milestone 1 placed them (the stylus's piece, the
+    // The playfield and the secondary panel as the framed screens placed them (the stylus's piece, the
     // checks' pixels): the touch screen 3x at the left, the top screen 384 wide at the right.
     const bool bar = hud && strings && strings->ok && s.screen != Screen::Cards;
     // (The social game's own bar at the top screen's top, the Sim's name and the relationship's

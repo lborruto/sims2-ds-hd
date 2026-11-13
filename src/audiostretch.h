@@ -8,7 +8,8 @@
 // delay. Stretching starts when the frames take clearly longer than a DS frame and ends,
 // seamlessly, once they no longer do.
 //
-// From Pokémon FullDex's frontend/audiostretch.h (GPLv3, https://github.com/mamesj/pokemon-fulldex).
+// Adapted from Pokémon FullDex (GPLv3), frontend/audiostretch.h; modified for this project, 2026.
+// https://github.com/mamesj/pokemon-fulldex
 #pragma once
 #include <algorithm>
 #include <cmath>

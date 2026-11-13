@@ -18,7 +18,7 @@
 //     bowl unread (another ROM): A held is the stylus down at the hand. Y blows into the
 //     microphone (7 frames or more clear a clog); B taps the bowl's X (kVacuumX: the game's only
 //     way out, the vacuum put away).
-//   The pointing minigames (milestone 6) have a pointer of their own, a stick cursor that works
+//   The pointing minigames have a pointer of their own, a stick cursor that works
 //   headless too (ActivityState::px / py; MovePointer): either stick moves it, faster with a
 //   fuller deflection (a square curve: a light touch is slow), LT held makes it slow (a quarter);
 //   the D-pad nudges it one pixel a press, then after kNudgeWait frames held one pixel a frame,
@@ -43,7 +43,7 @@
 //     game's X ("Are you done painting?": its Yes is the game's way back to the panel, on a gallery
 //     entered by an easel); while that question is up A taps its tick, B its cross (the other
 //     buttons wait).
-//   The timing minigames (milestone 6; tuned in game: console_check.sh's mg-moogoo-*, mg-drencher-*,
+//   The timing minigames (tuned in game: console_check.sh's mg-moogoo-*, mg-drencher-*,
 //   mg-crime-*):
 //   MooGoo Monkey: its intro's play arrow on A. The game reads A (the players prompt, its banners),
 //     Left / Right (the players' count) and B (a bet undone, a special card put back) itself: they
@@ -65,7 +65,7 @@
 //     B the game's X (the way out). Start taps its "?" (help); in help mode X / A / Y tap scare /
 //     the rat / subdue (the game explains each), B or Start the "?" again; a help text up: any
 //     press taps the "?" (it closes).
-//   The Scratch lottery (milestone 6): the pointer (the pointing games'), A held scratches (the
+//   The Scratch lottery: the pointer (the pointing games'), A held scratches (the
 //     stylus down at the pointer, capped at kPtrDrag a frame); X rubs the box under the pointer
 //     (or the nearest one still covered) for you: the pointer goes there, presses inside it and
 //     sweeps it in passes kRubStep apart (ScratchRub) until the game reveals it, A or B stopping
@@ -123,7 +123,7 @@ struct VacuumThing
 };
 
 // What the game's RAM says about the activity this frame (GameState::minigame), when it reads
-// (cards: false, nothing known: milestone 1's way).
+// (cards: false, nothing known: the framed screens' way).
 struct ActivityRam
 {
     bool cards = false;               // the cards' part read
@@ -345,7 +345,7 @@ constexpr Point kVacuumX {237, 18};
 constexpr Point kPlacementX {235, 18};
 constexpr int kArtTools = 10, kArtSwatches = 15;
 
-// MooGoo Monkey (the game's rectangles, research/m6 code-B 1.3): the intro's play arrow; monkey m
+// MooGoo Monkey (the game's rectangles, from its code): the intro's play arrow; monkey m
 // (56 + 32 m, 32, 24 x 32), its pile (y 88), hand card i (72 + 32 i, 137); the X (241,177, radius 10)
 // and its question's Yes (80,80, 32 x 32) and No (144,80).
 constexpr Point kMooGooArrow {238, 174}, kMooGooX {241, 177}, kMooGooYes {96, 96}, kMooGooNo {160, 96};
@@ -366,7 +366,7 @@ constexpr Point kCrimeX {224, 32}, kCrimeScare {128, 35}, kCrimeSubdue {128, 156
 constexpr Point kCrimeHelp {32, 32};   // its "?" (17-47, 17-47)
 constexpr int kCrimeAimMin = 47, kCrimeAimMax = 207;
 constexpr float kCrimeAimSpeed = 3.0f;
-// The Scratch lottery (research/m6 code-B 2.2): box i's centre on a ticket of tier t (its cover the
+// The Scratch lottery (from the game's code): box i's centre on a ticket of tier t (its cover the
 // 32 x 32 square around it, a press within 16 of it), the ticket's X; a rub's passes (the game
 // erases 3 x 3 around the stylus: passes 3 apart clear the box; it reveals it at 684 of 1024).
 Point ScratchCentre(int tier, int i);
@@ -374,7 +374,7 @@ Point ScratchX(int tier);
 constexpr int kRubHalf = 15, kRubStep = 3;
 // The rub's path over box i of tier t: from its top left corner, passes along x, kRubStep apart.
 std::vector<Point> ScratchRub(int tier, int i);
-// The music mixer's buttons (research/m6 code-D 1.3, 1.7): PLAY, RECORD, QUIT, GENRE, ?, VOX; the
+// The music mixer's buttons (from the game's code): PLAY, RECORD, QUIT, GENRE, ?, VOX; the
 // song list's row i (its tap, its rectangle); the save question's Yes, No, Preview.
 constexpr Point kMixPlay {82, 40}, kMixRecord {82, 68}, kMixQuit {17, 13}, kMixGenre {43, 12}, kMixHelp {82, 13}, kMixVox {20, 147};
 constexpr Point MixerRow(int i) { return {62, 44 + 16 * i}; }

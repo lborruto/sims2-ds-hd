@@ -91,7 +91,7 @@ static void Usage()
         "  --ui-demo                     (checks) the HD interface kit's demonstration over the picture\n"
         "  --ui-scale N                  the HD interface's size, 60 to 150 percent by 5 (default: the settings', Auto; 100 headless)\n"
         "  --game-pictures smooth|pixel  the game's icons and portraits in the HD interface: the pixel-art scaler or\n"
-        "                                nearest pixels (default: the settings', smooth; pixel headless)\n"
+        "                                nearest pixels (default: the settings', pixel; pixel headless)\n"
         "  --res3d N                     3D drawn N times sharper, 1 to 12 (1 = the DS's 192 lines, 4 ~ 720p, 6 ~ 1080p,\n"
         "                                8 ~ 1440p, 12: 2304 lines, slow; default 2 in the window, 1 headless)\n"
         "  --wide                        widescreen 16:9 world\n"
@@ -111,7 +111,7 @@ static void Usage()
         "  --print-minigame              print the minigame the bottom screen shows (Alien Autopsy, Metal Detector, MooGoo Monkey, scratch lottery, Super Drencher, Crime, Music Mixer and its save menu, Art Gallery), read from RAM, when it changes\n"
         "  --print-vacuum                print the vacuum's bowl (its things, the one held, the funnel's keep animation), read from RAM, when it changes\n"
         "  --print-front                 print the front end (title, Settings, Load-a-Sim, Create-a-Sim, boot screens, video), read from RAM, when it changes\n"
-        "  --print-console               print CONSOLE's composition (which branch; milestone 1's marked m1, a held picture) when it changes, and the counts at the end\n"
+        "  --print-console               print CONSOLE's composition (which branch, the framed screens' ending in -m1; a held picture) when it changes, and the counts at the end\n"
         "  --print-words                 print the words CONSOLE's picture shows (its texts, chips' labels) when they change\n"
         "  --print-town                  print the town's inventory, options, popup, save slots and the menus' lists (interact, pockets, goals, relations, phone, gift, note), read from RAM, when they change\n"
         "  --print-hud                   print the status bar's values and the conversation, read from RAM, when they change\n"
@@ -139,7 +139,7 @@ static void Usage()
         "                                words follow it); default: the settings' (automatic: the computer's) in the\n"
         "                                window, the built-in firmware's (English) headless\n"
         "  --fast-boot                   (checks) the boot's splashes at full speed, as the window does (logged)\n"
-        "  --no-romdata                  (checks) do not read the game's text: milestone 1's CONSOLE\n"
+        "  --no-romdata                  (checks) do not read the game's text: CONSOLE shows the framed screens\n"
         "  --launch                      the launch panel first (shown anyway in the window without a ROM)\n"
         "  --data-dir DIR                where the save states, the suspend state and the recent ROMs go (default: the\n"
         "                                settings folder in the window; none headless unless given)\n"
@@ -765,7 +765,7 @@ relaunch:
     }
     // The game's words for the HD status bar and conversations, once, in the game's language
     // (--language: another, a layout check only): a ROM whose data does not read keeps
-    // milestone 1's CONSOLE (the game's own HUD in the world, its own dialogue box). The
+    // CONSOLE's framed screens (the game's own HUD in the world, its own dialogue box). The
     // archive stays open: the HD menus' icons are decoded from it as they are needed.
     if (!noRomData)
     {
@@ -1774,7 +1774,7 @@ relaunch:
     if (app.settings.interpolate60) fprintf(stderr, "looks: %u in-between frames\n", melonDS::Looks3D.InterpolatedFrames);
     if (!stateSave.empty()) fprintf(stderr, "state save %s: %s\n", stateSave.c_str(), SaveState(nds, stateSave) ? "ok" : "failed");
     if (printConsole)
-        fprintf(stderr, "console: %ld frames, %ld milestone-1 compositions, %ld held, %ld milestone-1 shown\n", app.consoleHold.frames,
+        fprintf(stderr, "console: %ld frames, %ld framed-screen compositions, %ld held, %ld framed-screen shown\n", app.consoleHold.frames,
                 app.consoleHold.fresh1, app.consoleHold.held, app.consoleHold.shown1);
     if (headless)
     {

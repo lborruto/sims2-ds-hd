@@ -18,7 +18,7 @@ namespace sims2hd::ui
 {
 const Theme& GameTheme()
 {
-    // The game's own colours (CLAUDE.md, the console's frames): frame #6171B2 / #5961A2, fills
+    // The game's own colours (docs/dev-notes.md, the console's frames): frame #6171B2 / #5961A2, fills
     // #828ACB, the dark outline and text shadow #383869, the backdrop #101218.
     // (The wells: kFillRow, #6870B6, one shade darker than the game's #6A72B8 so white text on
     // them reaches 4.5:1.)

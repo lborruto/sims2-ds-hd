@@ -17,7 +17,7 @@
 //   Game Stats (4): aliens, goons, vacuum and metal detector earnings (2012..2015; a value below 0
 //     or above 2,000,000,000: "LOTS!").
 //
-// What performs, always the game's own taps (the research's touch points, m4 §7; the game reads no
+// What performs, always the game's own taps (the touch points measured in the game; the game reads no
 // DS key here): on Main, A on a button taps it (the game fades to its page, S+0x38); LB / RB (and
 // Left / Right on a page) go to the previous / next page in the ring Main, Aspirations, Hotel
 // Info, Skills, Game Stats through the game's own way: from Main the page's button, from a page

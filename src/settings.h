@@ -1,4 +1,4 @@
-// The player's settings: one place for every option, whoever uses it. The comfort work loads and
+// The player's settings: one place for every option, whoever uses it. The pause menu loads and
 // saves them (settings.ini in SDL's per-user folder, settings.cpp) and shows them in the settings
 // page; the other parts only read them. Add a field here with its default, then its line in
 // settings.cpp's Load and Save and its row in shell.cpp (in one tab: TabRows, with its note);

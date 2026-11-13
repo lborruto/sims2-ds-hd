@@ -1,4 +1,4 @@
-# The Sims 2 DS, one screen: the manual
+# Sims 2 DS HD: the manual
 
 Everything the [README](../README.md) leaves out: how to start, every control, the pause menu
 and its settings, the controllers, where your files go, the other layouts and what is still
@@ -27,8 +27,8 @@ game is included here. The European version is the one the HD screens are made f
 | Where you play | Download | Start it |
 |---|---|---|
 | **Windows** (64-bit) | `sims2-ds-hd-…-windows-x86_64.zip` | unzip, double-click `sims2hd.exe`; the first time, *More info > Run anyway* |
-| **Mac** (Apple silicon or Intel, macOS 11+) | `sims2-ds-hd-…-macos-universal.zip` | unzip, move *Sims 2 DS HD* to Applications; the first time, right click > *Open* |
-| **Linux** (x86_64) | `sims2-ds-hd-…-linux-x86_64.tar.gz` | unpack, run `./sims2hd` (the file picker needs zenity or kdialog) |
+| **Mac** (Apple silicon or Intel, macOS 11+) | `sims2-ds-hd-…-macos-universal.zip` | unzip, move *Sims 2 DS HD* to Applications; the first time, open it once, then *System Settings > Privacy & Security > Open Anyway* (macOS 14 and earlier: right click > *Open*) |
+| **Linux** (x86_64; a 2024 or newer distribution, glibc 2.39: Ubuntu 24.04, Fedora 40, SteamOS 3.6…) | `sims2-ds-hd-…-linux-x86_64.tar.gz` | unpack, run `./sims2hd` (the file picker needs zenity or kdialog) |
 
 **The launch panel** opens first. *Choose a file* (or drop your `.nds` on the window) starts the
 game. Next time, *Continue* picks up exactly where you quit, with a picture of that moment; your

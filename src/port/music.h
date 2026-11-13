@@ -10,7 +10,7 @@
 //   beside it, the song playing: the green button 3x, its name, and the room it plays in
 //     (0x43 + place).
 //
-// What performs, always the game's own taps (the research's touch points, m4 §4; the game reads
+// What performs, always the game's own taps (the touch points measured in the game; the game reads
 // no DS key here):
 //   A on a row: its play button (62, 41 + 30 i): the game plays the song and keeps it for the room
 //     (u8 G+0x449C + place). The song already playing: no action (the game does nothing there).

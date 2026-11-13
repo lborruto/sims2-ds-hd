@@ -13,8 +13,8 @@ basis, with no guaranteed response time.
 
 The latest release only: the most recent `vX.Y.Z` tag and its downloads on the
 [releases page](https://github.com/lborruto/sims2-ds-hd/releases). Fixes land on `main` and in
-the next release; older tags are not patched. Each download comes with a build provenance
-attestation once the repository is public: `gh attestation verify <file> --repo lborruto/sims2-ds-hd`.
+the next release; older tags are not patched. From v0.2.0 on, each download comes with a build
+provenance attestation (v0.1.1's have none): `gh attestation verify <file> --repo lborruto/sims2-ds-hd`.
 
 ## Security model
 

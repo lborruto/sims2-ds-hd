@@ -103,7 +103,7 @@ public:
     // it every frame; default: nothing known).
     void SetActivityRam(const ActivityRam& r) { activityRam_ = r; }
 
-    // The panel's menu is up (its HD view, else milestone 1's touch screen 3x, over the dimmed world).
+    // The panel's menu is up (its HD view, else the framed-screen touch screen 3x, over the dimmed world).
     // (Not drawn open while it is coming back to the tab it was left on: the game shows Interact
     // first for a few frames.)
     bool MenuOpen() const { return menuOpen_ && !(returnFocus_ > 0 && screen_.tab != returnTab_); }

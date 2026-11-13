@@ -1,4 +1,4 @@
-<h1 align="center">The Sims 2 DS, one screen</h1>
+<h1 align="center">Sims 2 DS HD</h1>
 
 <p align="center">
   <strong>The Sims 2 for the Nintendo DS, played on your computer like a console game.</strong><br>
@@ -52,12 +52,14 @@
 1. **Have your own copy of the game.** Dump it from your own cartridge of the European version
    (an `.nds` file). Nothing of the game is included here.
 2. **Download** the program for Windows, Mac or Linux from the [releases page](../../releases)
-   and unzip it.
+   and unpack it (a `.zip` on Windows and a Mac, a `.tar.gz` on Linux).
 3. **Open it** (`sims2hd`, or *Sims 2 DS HD* on a Mac), choose your game file or drop it on
    the window. Next time, *Continue* starts where you quit.
 
-The program isn't signed, so the first time Windows wants *More info > Run anyway*, and a Mac a
-right click > *Open*.
+The program isn't signed, so the first time Windows wants *More info > Run anyway*; on a Mac, open
+it once, then *System Settings > Privacy & Security > Open Anyway* (macOS 14 and earlier: right
+click > *Open*). Linux: a 2024 or newer distribution (glibc 2.39: Ubuntu 24.04, Fedora 40,
+SteamOS 3.6…).
 
 **On Steam or a Steam Deck:** in Steam, *Add a Game > Add a Non-Steam Game*, pick the program and
 keep Steam Input on with the default Gamepad layout.
@@ -130,10 +132,12 @@ is [Nunito](https://github.com/googlefonts/nunito) ([OFL](assets/fonts/OFL.txt))
 mappings are [SDL_GameControllerDB](https://github.com/mdqinc/SDL_GameControllerDB)
 ([zlib](assets/controllers/LICENSE.txt)). The idea, the controls, the sound stretching and the
 sharper, widescreen 3D come from [Pokémon FullDex](https://github.com/mamesj/pokemon-fulldex),
-GPLv3 too.
+GPLv3 too. Every component, its licence and its notices: [THIRD-PARTY.md](THIRD-PARTY.md).
 
 ## Not affiliated, no warranty
 
 An independent, unofficial project, not made, endorsed or supported by Electronic Arts, Maxis,
 Nintendo or the melonDS team; the names are theirs, used only to say what it works with. Bring
-your own copy, dumped from a cartridge you own. No warranty: keep a copy of your save.
+your own copy, dumped from a cartridge you own. The screenshots show the game's own art,
+© Electronic Arts, here only to illustrate what the program does; none of it is in the program or
+in this repository. No warranty: keep a copy of your save.

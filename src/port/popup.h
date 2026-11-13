@@ -56,7 +56,7 @@ MenuView PopupViewOf(ScreenState s, const GameState& game, const RomData* rom = 
 
 // The HD view CONSOLE draws and the navigator drives on screen s: the popup's when one is up,
 // else the screen's own (the panel's tab, Give Gift, the Save slots, the phone, a note); valid
-// false: milestone 1's composition.
+// false: the framed-screen composition.
 MenuView ConsoleView(ScreenState s, const GameState* game, const RomData* rom);
 // The screen's own view, a popup or not (what a popup is drawn over).
 MenuView ScreenView(ScreenState s, const GameState* game, const RomData* rom);

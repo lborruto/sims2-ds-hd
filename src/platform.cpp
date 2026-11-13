@@ -1,4 +1,6 @@
-// melonDS Platform interface for sims2hd. Adapted from mamesj/pokemon-fulldex (GPLv3), frontend/platform.cpp.
+// melonDS Platform interface for sims2hd.
+// Adapted from Pokémon FullDex (GPLv3), frontend/platform.cpp; modified for this project, 2026.
+// https://github.com/mamesj/pokemon-fulldex
 #include <cstdarg>
 #include <cstdio>
 #include <cstring>

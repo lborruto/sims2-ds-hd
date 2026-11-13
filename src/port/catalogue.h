@@ -8,7 +8,7 @@
 // the game's strings and item icons (the record table's sprites, upscaled).
 //
 // The game's catalogue is the stylus only (no DS button is read). What performs, always the
-// game's own taps (the research's hit rectangles, m4 §6):
+// game's own taps (the hit rectangles measured in the game):
 //   A on a shop item or an owned one: tap it. The game selects it, and that sets its mode: a shop
 //     item is "Buy" (2391), an owned one "Sell" (2392); the HD headers light the game's mode.
 //   A on Pay: tap the simoleon button (146,129; a vendor's 114,129): the game buys the selected
@@ -47,7 +47,7 @@ constexpr int kCaStore = 0x33;    // Johnny Smith's General Store (the only shop
 
 // The game's sprites (descriptor ids; tiles − 1, palette + 1), as the ROM draws them: the
 // simoleon (pay) button 7671 (32 x 32; pressed 7668), the arrows up 7698 / down 7677 (24 x 24),
-// the X 7683. (The research's §6 named 7671 the down arrow and 7677 the pay button: the decoded
+// the X 7683. (An earlier reading named 7671 the down arrow and 7677 the pay button: the decoded
 // pictures say the reverse.)
 constexpr int kSprCaPay = 7671, kSprCaUp = 7698, kSprCaDown = 7677, kSprCaX = 7683;
 

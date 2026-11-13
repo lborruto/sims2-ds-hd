@@ -60,12 +60,12 @@ struct App
     bool portSupported = false;
     // The game's own words for the HD status bar (clock, money, Sanity), read once at start from
     // the ROM's string table in the game's language (port/statusbar.h); not ok when the ROM's
-    // data does not read: CONSOLE then keeps milestone 1's compositions (the game's own HUD).
+    // data does not read: CONSOLE then keeps the framed-screen compositions (the game's own HUD).
     HudStrings hudStrings;
     // The game's strings and archive, opened once at start in the game's language (or
     // --language's): the HD conversation's words, and the archive the icons are read from
     // (kept open for the run). Null when the ROM's data does not read (or --no-romdata):
-    // CONSOLE's conversation is then milestone 1's, and there are no icons.
+    // CONSOLE's conversation is then the framed-screen one, and there are no icons.
     std::unique_ptr<RomData> rom;
     // The game's icons from that archive, decoded and scaled as the HD menus ask (port/icons.h);
     // null with no `rom`.
