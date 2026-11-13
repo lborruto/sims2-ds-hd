@@ -600,10 +600,23 @@ static void interact_list()
     // a Sim target, an unknown one, and the neighbours
     r.W16(kActor + 0xA, 51); r.W16(kActor + 0xC, 2); r.W32(kE + 4, 2);
     CHECK(ReadGameState(r.View()).town.interact.target.nameId == 321);
+    CHECK(ReadGameState(r.View()).town.interact.valid && ReadGameState(r.View()).town.interact.actions.empty());   // state 2: no rows, A does nothing
     r.W32(kE + 4, 1);
     CHECK(ReadGameState(r.View()).town.interact.target.nameId == 323 + 51);
     r.W32(kT + 0x308, kE);
     CHECK(ReadGameState(r.View()).town.interact.next.index == 51);
+    // the picker's third type (0xD): a target the game names with nothing, its rows read; as a
+    // neighbour it no longer hides the target (it made the whole Interact state invalid)
+    r.W16(kActor + 0xC, 0xD);
+    InteractState u = ReadGameState(r.View()).town.interact;
+    CHECK(u.valid && u.target.kind == TargetRef::Unnamed && u.target.index == 51 && u.target.nameId == -1 && u.target.portraitRes == -1 && u.actions.size() == 3);
+    r.W32(kT + 0x308, 0x021A0300); r.W32(0x021A0300, 0x021A0400); r.W32(0x021A0304, 1);
+    r.W16(0x021A0400 + 0xA, 7); r.W16(0x021A0400 + 0xC, 0xD);
+    r.W16(kActor + 0xC, 2);
+    u = ReadGameState(r.View()).town.interact;
+    CHECK(u.valid && u.target.kind == TargetRef::Sim && u.next.kind == TargetRef::Unnamed && u.next.index == 7);
+    r.W16(0x021A0400 + 0xC, 0x7);   // a type the picker never takes: garbage, invalid
+    CHECK(!ReadGameState(r.View()).town.interact.valid);
     // garbage: each part invalid on its own
     r.W32(kT + 0x308, 0);
     r.W16(kActor + 0xA, 57); CHECK(!ReadGameState(r.View()).town.interact.valid);       // Sim index out of the table

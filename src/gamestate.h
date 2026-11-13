@@ -132,10 +132,11 @@ struct SaveSlots
 // The menus' lists, each read apart from the game's tab / screen objects (heap: re-read every frame,
 // vtable checked) and from the block G. Ids are strings_EN numbering or rom.bin resource ids; the
 // words and pictures come from RomData. -1 = none.
-// An Interact target: a Sim or an object of the shared record table.
+// An Interact target: a Sim or an object of the shared record table, or an actor of the third type
+// the game's picker takes (0xD), which the game names with nothing (Unnamed: no name, no portrait).
 struct TargetRef
 {
-    enum Kind { None, Sim, Object };
+    enum Kind { None, Sim, Object, Unnamed };
     int kind = None;
     int index = -1;                   // record index k (Sim k, object id)
     int nameId = -1;                  // string id of the name (321 "???" for an unknown Sim)

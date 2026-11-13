@@ -135,7 +135,7 @@ Read on the screen that shows them (a tab object is read only while its tab is u
 
 | Part | Path | Meaning |
 | --- | --- | --- |
-| Interact | `T = *(S+0x34)` (vtable `0x021321C4`); `E = *(T+0x300)` target (0 none); `E+0` actor (`+0xA` record index, `+0xC` type 2 Sim / 0xB object, `+0x130` its interface), `E+4` kind (2: name 321 "???") | name from the record table (Sim k < 57: 323 + k; object: 463 + id); interface: `+8` action count (0..4), `+0x10 + i` codes (label 1845 + code, at most 106); greyed from the row's selector `*(T+0x6C+4i)+0x94` (codes 2, 0x3A..0x3C by the code); `T+0x308` next / `T+0x30C` previous target (stale when no target: not read); `T+0x314` mode (1 stylus, 0 pad mode, 2 after an action), `T+0x318` highlighted row; `u16 S+0xD0` big portrait (0x1A5A the plumbob) |
+| Interact | `T = *(S+0x34)` (vtable `0x021321C4`); `E = *(T+0x300)` target (0 none); `E+0` actor (`+0xA` record index, `+0xC` type 2 Sim / 0xB object / 0xD unnamed, `+0x130` its interface), `E+4` state (2: no rows, name 321 "???") | name from the record table (Sim k < 57: 323 + k; object: 463 + id); interface: `+8` action count (0..4), `+0x10 + i` codes (label 1845 + code, at most 106); greyed from the row's selector `*(T+0x6C+4i)+0x94` (codes 2, 0x3A..0x3C by the code); `T+0x308` next / `T+0x30C` previous target (stale when no target: not read); `T+0x314` mode (1 stylus, 0 pad mode, 2 after an action), `T+0x318` highlighted row; `u16 S+0xD0` big portrait (0x1A5A the plumbob) |
 | Pockets selection | `Pk = *(S+0x38)` (vtable `0x0213232C`) | `+0x74` slot (-1..count-1), `+0xE0` key item (-1..2), counted item = the ring `*(Pk+0x34)` (`+4` bit 0 shown, x `+0x50` 20.12: (x - 109) / 29) while both are -1 |
 | Goals | `TG = *(S+0x3C)` (vtable `0x02132480`) | `+0x50C` entries (at most 44), `+0x510` lines (132), entry n at `+0x18 + 16n` {id, first line, lines, u8 mission}; `+0x514` selected, `+0x518` first line; mission text 1627 + id; hotel request i: record `G+0x2BE8+0x4C*i` (`+0x48` text, `+0x30` Sim, `+0x32` place; code only); giver portrait from `0x0211FB6C + 0x114*stage + 8*done`; footer when game flag 17 (`G+0x4814`): score = the weights (`0x0211F9EC[4k+2]`) of the 33 set bits of `G+0x4410` (bit 32 is the next word's bit 0; 100 on the complete save), ids 1841 / 1843 and 1842 |
 | Relationships | `TR = *(S+0x40)` (vtable `0x02132580`) | `+0x1C` count (24), `+0x20` first, **`+0x24` selected** (the old `u16 S+0xD0` is the big portrait, not a Sim id: `GameState::selection` reads `TR+0x24`), `+0x28` the selected Sim's id (cross-checked), `+0x2C + 4i` pointers into the Sim records (met only); name 323 + id, description 389 + id, mood 184 + mood, level 192 + 7 * mood + level, portrait the Sim row's `+0xA` |
@@ -150,7 +150,10 @@ after 38 frames; `sit-hotel`: none, then after about 220 frames of walking the c
 none again when he walks off; `L-sit-cityhall-none-250`, `sit-hotel`, `sit-basement`: none at the start; the furnace and
 the rods were not reached from `sit-basement` in a short walk). On another tab there is no Interact object at all
 (`A-pk-town-cnt1`, Pockets up: `S+0x34` fails its vtable check, every frame, while walking too): the target is known
-only while the panel's tab is Interact, the world's default. In the world (no menu, the stylus mode `T+0x314` = 1)
+only while the panel's tab is Interact, the world's default. Closing the HD menu on another tab leaves the game there
+(`sit-shower`, MENU, RB, B: Pockets until a tap; the game's own A in the world only switches back to Interact, 6
+frames, a second A acts), so the navigator taps Interact's icon when its menu closes (the target is back about 12
+frames later). In the world (no menu, the stylus mode `T+0x314` = 1)
 the D-pad's Left / Right switch to the strip's previous / next target (`D-cas-right2`: Left 20 frames → the cards,
 object 29, two frames later; `L-sit-casino-none-250`: Right → the Music Panel with the cards as previous); with no
 neighbour Right does not change the target. A held (`T+0x314` 0, pad mode) keeps it and Left still switches; Up /
@@ -158,6 +161,40 @@ Down light another row (`T+0x318`); the release runs the lit row (`D-cas-right2`
 cards, released → Hotseat, Cards 21 frames later). For one or two frames after a switch `E` is the new target while
 the actions are the old ones greyed and `prev` is `E` itself (frame 22 of the Left run): a reader wanting a steady
 target waits a few frames (the prompt waits 6).
+
+How the game picks and runs the target (read in its code, the Interact object's methods at `0x02069168` ... `0x0206BE9C`;
+the Interact vtable `0x021321C4`):
+
+- The picker (`0x02069D28`, every frame on the Interact tab): a query around the hero (the hero actor
+  `*(*0x0213E580 + 0xF8)`, type 1, its position the 20.12 `+0x78 / +0x7C / +0x80` every actor has; radius 18, 73728 in
+  20.12; `0x02086240` while the D-pad is held, `0x0208695C` at rest) adds actors of types **2 (Sims), 0xD and 0xB
+  (objects; record ids 250, 251 and 255 never)** whose interface `+0x130` is set and whose interface byte `+0x1C` is
+  not 0. Its entries are 12 bytes, `{actor, state, timer}`, a list from `T+0x298`: state 1 in range; one farther than
+  distance² 200 (about 14 units) gets state 2 and a 6-frame timer, then goes; when it was `E`, `E` moves to the next
+  one (`0x0206ADDC`). `T+0x304` is the last `E` the rows were built for.
+- The rows (`0x0206A288`, when `E` changes): none (`T+0x7C` 0) when there is no `E`, no interface or the entry's state
+  is 2; else `T+0x7C` = the interface's `+8` count, each row's selector `*(T+0x6C+4i)` gets `+0x94` = 1 when the
+  interface's `vt+0x10(i)` says the row is off (the default, `0x0208B288`, turns off codes 2 and 0x3A-0x3C), the rows
+  past the count `+0x94` = 1, `T+0x84` = 1 when any row is on, `T+0x80` = 6 (the rows' words are drawn 6 frames later).
+  A row's words: `vt+0xC(i)`, 1845 + code (`0x0208B338`; `0x0208B708` adds Buy's amount); the title: 1840 with
+  `vt+0x1C`'s name (`0x0208B230`: types 2 and 0xB only, 0 for any other), or 321 "???" with no interface or state 2.
+- A in the world (`0x0206A564`, stylus mode `T+0x314` 1): pressed with rows (`T+0x7C` > 0), one on (`T+0x84`), an `E`
+  with an interface whose `+0x1C` is set: pad mode 0, the lit row `T+0x318` the first on (`vt+0x10`). Held: Up / Down
+  move it over the rows that are on, Left / Right switch to `T+0x30C` / `T+0x308`. Released: mode 1 and the lit row's
+  selector runs (`vt+0x1C`, `vt+0x20`). `E`, its interface or its `+0x1C` gone while held: mode 2 until A is up.
+- An entry in state 2 has no rows: the reader gives it no actions (no prompt; its "???" title stays).
+- So A uses whatever `E` the picker took, type 0xD included, named or not: the reader takes 0xD as a target with no
+  name (`TargetRef::Unnamed`) and as a neighbour; before, either made the whole Interact state invalid (no plate).
+  No 0xD actor was found in 98 save states scanned (town, hotel, casino, penthouse, minigames); what it is stays
+  unknown.
+
+Measured in the world with walks (`console_check`'s `prompt-shower`; pad scripts from the penthouse `M-late-none` and
+`sit-shower`, the casino, store, City Hall, hotel lobby and basement states, 800-frame walks each way): every target
+the game took got its plate within 6 frames, none read invalid: the penthouse's White Shower (48 "Take a Shower", Pick
+Up, Move; while showering 49 "Exit"), Off-White Toilet (0 "Use"), Porcelain Sink (47 "Wash Hands"), Black Couch (Sit,
+Sleep, Pick Up, Move), the cards, the Music Panel, the bench, the lobby's chairs and Nuclear Rods, the Nuclear Furnace,
+the clerks and the concierge. The penthouse's fridge (behind a counter), bed and elevator were not reached within the
+radius (the closest walked: 32 and 39 units); the slot machines neither.
 
 ## The hotel and the shops (`GameState::hotel` ... `::stat`)
 

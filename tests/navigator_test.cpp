@@ -189,6 +189,54 @@ static void lb_rb_tap_tabs()
     CHECK(x == kTabIcon[3].x && y == kTabIcon[3].y); // Relationships
 }
 
+// The menu closed on another tab than Interact: in the world the navigator taps Interact's icon
+// (settled, once, again after a wait), so the game keeps its target and the world its prompt.
+static void world_back_on_interact()
+{
+    Rig r;
+    const ScreenState pockets {Screen::Panel, Tab::Pockets};
+    r.Frame(pockets);
+    r.Press(pockets, &PadState::menu);
+    CHECK(r.nav.MenuOpen());
+    CHECK(!r.touch.Owns());                    // the menu open on Pockets: nothing tapped
+    r.Press(pockets, &PadState::b);
+    CHECK(!r.nav.MenuOpen());
+    int x = -1, y = -1;
+    CHECK(r.Touched(x, y) && x == kTabIcon[0].x && y == kTabIcon[0].y);
+    r.Drain();
+    for (int i = 0; i < 10; i++) r.Frame(pockets);
+    CHECK(!r.touch.Owns());                    // waiting for the game to take it
+    for (int i = 0; i < 30; i++) r.Frame(pockets);
+    CHECK(r.Touched(x, y) && x == kTabIcon[0].x);   // not taken: tapped again
+    r.Drain();
+    r.Frame(kInteract);                        // taken: nothing more
+    for (int k = 0; k < 40; k++) r.Frame(pockets);
+    CHECK(!r.touch.Owns());
+    Rig u;                                     // not settled: no tap until it is
+    u.Frame(pockets, {}, false);
+    u.Press(pockets, &PadState::menu);
+    CHECK(u.nav.MenuOpen());
+    PadState b; b.b = true;
+    u.Frame(pockets, b, false);
+    u.Frame(pockets, {}, false);
+    CHECK(!u.nav.MenuOpen() && !u.touch.Owns());
+    u.Frame(pockets);
+    CHECK(u.Touched(x, y) && x == kTabIcon[0].x);
+    Rig l;                                     // a state loaded on Pockets, the menu never open: the game's own
+    for (int k = 0; k < 40; k++) l.Frame(pockets);
+    CHECK(!l.touch.Owns());
+    Rig i;
+    for (int k = 0; k < 40; k++) i.Frame(kInteract);
+    CHECK(!i.touch.Owns());
+    Rig g;                                     // the menu open on Goals: the tab is the player's
+    g.Frame(kGoals);
+    g.Drain();
+    g.Press(kGoals, &PadState::menu);
+    g.Drain();
+    for (int k = 0; k < 40; k++) g.Frame(kGoals);
+    CHECK(g.nav.MenuOpen() && !g.touch.Owns());
+}
+
 static void popup_closed_by_a()
 {
     Rig r;
@@ -3624,6 +3672,7 @@ int main()
     dpad_moves_focus();
     a_taps_focused();
     lb_rb_tap_tabs();
+    world_back_on_interact();
     popup_closed_by_a();
     phone_closed_by_b();
     town_and_dialogue_keep_the_buttons();

@@ -3446,6 +3446,10 @@ int main()
         CHECK(!WorldPromptOf(after, nullptr).shown);
         InteractState invalid = in; invalid.valid = false;
         CHECK(!WorldPromptOf(invalid, nullptr).shown);
+        // A target the game names with nothing (the picker's third type): the plate, no name.
+        InteractState unnamed = in; unnamed.target = {}; unnamed.target.kind = TargetRef::Unnamed; unnamed.target.index = 3;
+        p = WorldPromptOf(unnamed, nullptr);
+        CHECK(p.shown && p.name.empty());
         InteractState many = in; many.actions = {act(2, true), act(6, false), act(71, false)}; many.prev.kind = TargetRef::Object; many.prev.nameId = 492;
         p = WorldPromptOf(many, nullptr);
         CHECK(p.shown && p.more && p.others && !p.held);
